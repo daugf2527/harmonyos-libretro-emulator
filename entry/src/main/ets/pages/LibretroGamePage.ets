@@ -516,10 +516,10 @@ struct LibretroGamePage {
     devices.forEach((d) => {
       let label = d.name;
       switch (d.sourceType) {
-        case InputSourceType.Keyboard: label = `⌨️ ${d.name}`; break;
-        case InputSourceType.Mouse: label = `🖱️ ${d.name}`; break;
-        case InputSourceType.Gamepad: label = `🎮 ${d.name}`; break;
-        case InputSourceType.BluetoothGamepad: label = `🎮(BT) ${d.name}`; break;
+        case InputSourceType.Keyboard: label = `键盘 ${d.name}`; break;
+        case InputSourceType.Mouse: label = `鼠标 ${d.name}`; break;
+        case InputSourceType.Gamepad: label = `手柄 ${d.name}`; break;
+        case InputSourceType.BluetoothGamepad: label = `蓝牙手柄 ${d.name}`; break;
       }
       items.push({ label: label, type: d.sourceType, deviceId: d.deviceId });
     });
@@ -1431,7 +1431,7 @@ struct LibretroGamePage {
         ListItem() {
           Column({ space: 12 }) {
             if (!this.gameRunning) {
-              Button('▶️ 开始游戏')
+              Button('开始游戏')
                 .fontSize(18)
                 .height(50)
                 .width('100%')
@@ -1445,7 +1445,7 @@ struct LibretroGamePage {
             } else {
               Row({ space: 10 }) {
                 if (this.gamePaused) {
-                  Button('▶️')
+                  Button('继续')
                     .fontSize(20)
                     .height(50)
                     .layoutWeight(1)
@@ -1456,7 +1456,7 @@ struct LibretroGamePage {
                       this.resumeGame();
                     })
                 } else {
-                  Button('⏸️')
+                  Button('暂停')
                     .fontSize(20)
                     .height(50)
                     .layoutWeight(1)
@@ -1468,7 +1468,7 @@ struct LibretroGamePage {
                     })
                 }
 
-                Button('🔄')
+                Button('重启')
                   .fontSize(20)
                   .height(50)
                   .layoutWeight(1)
@@ -1480,7 +1480,7 @@ struct LibretroGamePage {
                     await this.startOrSwitchGame();
                   })
 
-                Button('⏹️')
+                Button('停止')
                   .fontSize(20)
                   .height(50)
                   .layoutWeight(1)
@@ -1501,7 +1501,7 @@ struct LibretroGamePage {
         // 10. Soak Test
         ListItem() {
           Column({ space: 8 }) {
-            Button(this.soakRunning ? `⏳ Soak ${this.soakSecondsLeft}s` : '🧪 压力测试 (10min)')
+            Button(this.soakRunning ? `压力测试中 ${this.soakSecondsLeft}s` : '压力测试 (10min)')
               .fontSize(14)
               .height(40)
               .width('100%')

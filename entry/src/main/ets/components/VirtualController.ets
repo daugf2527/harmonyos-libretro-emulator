@@ -62,7 +62,7 @@ export struct DPadControl {
       Row() {
         // 左键
         Column() {
-          this.DirectionButton('◀', RETRO_DEVICE_ID_JOYPAD_LEFT)
+          this.DirectionButton('←', RETRO_DEVICE_ID_JOYPAD_LEFT)
         }
         .margin({ right: 8 })
         
@@ -73,7 +73,7 @@ export struct DPadControl {
         .margin({ right: 8 })
         
         // 右键
-        this.DirectionButton('▶', RETRO_DEVICE_ID_JOYPAD_RIGHT)
+        this.DirectionButton('→', RETRO_DEVICE_ID_JOYPAD_RIGHT)
       }
     }
     .justifyContent(FlexAlign.Center)
@@ -337,7 +337,7 @@ export struct SystemControl {
   build() {
     Row({ space: 10 }) {
       if (this.showStop) {
-        Button('⏹ 停止')
+        Button('停止')
           .width(this.buttonWidth)
           .height(this.buttonHeight)
           .fontSize(16)
@@ -349,7 +349,7 @@ export struct SystemControl {
           })
       }
       
-      Button('🔄 重置')
+      Button('重置')
         .width(this.buttonWidth)
         .height(this.buttonHeight)
         .fontSize(16)

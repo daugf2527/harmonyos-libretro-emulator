@@ -376,7 +376,7 @@ struct TestGambatte {
   build() {
     Column() {
       // 标题
-      Text('🎮 Libretro 核心测试工具')
+      Text('Libretro 核心测试工具')
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .margin({ top: 20, bottom: 10 })
@@ -418,7 +418,7 @@ struct TestGambatte {
       .width('100%')
       .margin({ bottom: 20 })
 
-      Button(this.coreCheckRunning ? '🔍 核心验证中...' : '🔍 验证核心符号')
+      Button(this.coreCheckRunning ? '核心验证中...' : '验证核心符号')
         .fontSize(16)
         .width('80%')
         .height(45)
@@ -461,7 +461,7 @@ struct TestGambatte {
       .margin({ bottom: 20 })
 
       // 测试按钮
-      Button(this.testRunning ? '⏸️ 测试中...' : '▶️ 开始测试')
+      Button(this.testRunning ? '测试中...' : '开始测试')
         .fontSize(18)
         .width('80%')
         .height(50)
@@ -473,7 +473,7 @@ struct TestGambatte {
         })
 
       // 自动化测试按钮
-      Button(this.autoTesting ? `🔄 自动测试中... ${this.autoTestCurrentInfo}` : '🤖 全自动生命周期测试')
+      Button(this.autoTesting ? `自动测试中... ${this.autoTestCurrentInfo}` : '全自动生命周期测试')
         .fontSize(16)
         .width('80%')
         .height(50)
@@ -487,8 +487,11 @@ struct TestGambatte {
       // 测试状态
       Text(this.testStatus)
         .fontSize(16)
-        .fontColor(this.testStatus.includes('✅') ? '#4CAF50' : 
-                   this.testStatus.includes('❌') ? '#F44336' : '#2196F3')
+        .fontColor(this.testStatus.includes('通过') ? '#4CAF50' :
+                   (this.testStatus.includes('失败') ||
+                    this.testStatus.includes('错误') ||
+                    this.testStatus.includes('异常') ||
+                    this.testStatus.includes('无效')) ? '#F44336' : '#2196F3')
         .margin({ top: 20, bottom: 10 })
         .fontWeight(FontWeight.Medium)
 
@@ -512,7 +515,7 @@ struct TestGambatte {
       Blank()
 
       // 底部提示
-      Text('💡 提示：查看完整日志请使用 hdc shell hilog')
+      Text('提示：查看完整日志请使用 hdc shell hilog')
         .fontSize(12)
         .fontColor(Color.Gray)
         .margin({ bottom: 20 })
@@ -588,7 +591,7 @@ struct TestGambatte {
     Column() {
       if (this.lastTestResult?.success) {
         // 成功结果
-        Text('✅ 测试通过')
+        Text('测试通过')
           .fontSize(16)
           .fontColor('#4CAF50')
           .fontWeight(FontWeight.Bold)
@@ -614,7 +617,7 @@ struct TestGambatte {
         }
       } else {
         // 失败结果
-        Text('❌ 测试失败')
+        Text('测试失败')
           .fontSize(16)
           .fontColor('#F44336')
           .fontWeight(FontWeight.Bold)
@@ -657,7 +660,7 @@ struct TestGambatte {
     const rom = availableRoms[this.selectedRomIndex];
 
     if (!core || !rom) {
-      this.testStatus = '❌ 配置错误';
+      this.testStatus = '配置错误';
       this.testResult = '核心或 ROM 配置无效';
       return;
     }
@@ -665,14 +668,14 @@ struct TestGambatte {
     LogHelper.info('TestGambatte', 'Test', `开始测试: ${core.name} - ${rom.name}`);
 
     this.testRunning = true;
-    this.testStatus = '🔄 测试中...';
+    this.testStatus = '测试中...';
     this.testResult = '正在加载核心和 ROM...';
     this.lastTestResult = null;
 
     try {
       const context = this.getUIContext().getHostContext();
       if (!context) {
-        this.testStatus = '❌ 获取上下文失败';
+        this.testStatus = '获取上下文失败';
         this.testRunning = false;
         return;
       }
@@ -739,7 +742,7 @@ struct TestGambatte {
       }
       LogHelper.info('TestGambatte', 'ROM', 'ROM 加载成功');
 
-      this.testStatus = '✅ 已提交到新引擎 (Phase 1)';
+      this.testStatus = '已提交到新引擎 (Phase 1)';
       this.lastTestResult = {
         success: true
       };
@@ -747,7 +750,7 @@ struct TestGambatte {
 
     } catch (error) {
       const err = error as Error;
-      this.testStatus = '❌ 测试异常';
+      this.testStatus = '测试异常';
       this.lastTestResult = {
         success: false,
         error: `异常: ${err.message}`
@@ -766,7 +769,7 @@ struct TestGambatte {
     
     this.autoTesting = true;
     this.autoTestResults = [];
-    this.testStatus = '🤖 自动化测试准备中...';
+    this.testStatus = '自动化测试准备中...';
     
     // 1. 生成测试队列
     // 策略：每个核心取第一个可用的 ROM，如果没有 ROM 且不是 nogame 核心，则标记为无 ROM
@@ -813,7 +816,7 @@ struct TestGambatte {
     }, Promise.resolve());
 
     this.autoTesting = false;
-    this.testStatus = '✅ 自动化测试完成';
+    this.testStatus = '自动化测试完成';
     this.autoTestCurrentInfo = '测试完成';
   }
 
@@ -1014,20 +1017,20 @@ struct TestGambatte {
     }
     const core = this.cores[this.selectedCoreIndex];
     if (!core) {
-      this.testStatus = '❌ 核心无效';
+      this.testStatus = '核心无效';
       this.testResult = '未选择可用核心';
       return;
     }
 
     this.coreCheckRunning = true;
-    this.testStatus = '🔍 核心验证中...';
+    this.testStatus = '核心验证中...';
     this.testResult = '正在验证核心符号...';
     this.lastTestResult = null;
 
     try {
       const context = this.getUIContext().getHostContext();
       if (!context) {
-        this.testStatus = '❌ 获取上下文失败';
+        this.testStatus = '获取上下文失败';
         this.testResult = '无法获取 bundleCodeDir';
         return;
       }
@@ -1040,14 +1043,14 @@ struct TestGambatte {
       const result = nativeApi.testCoreLoader(corePath);
       this.testResult = result;
       if (result.startsWith('Success')) {
-        this.testStatus = '✅ 核心验证通过';
+        this.testStatus = '核心验证通过';
       } else {
-        this.testStatus = '❌ 核心验证失败';
+        this.testStatus = '核心验证失败';
       }
     } catch (error) {
       const msg = (error as Error)?.message || String(error);
       this.testResult = `Failed: ${msg}`;
-      this.testStatus = '❌ 核心验证异常';
+      this.testStatus = '核心验证异常';
       LogHelper.error('TestGambatte', 'Core', `核心验证异常: ${msg}`);
     } finally {
       this.coreCheckRunning = false;

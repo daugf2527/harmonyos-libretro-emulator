@@ -224,7 +224,7 @@ struct CoreLoaderTest {
     let bundleCodeDir = this.getUIContext().getHostContext()!.bundleCodeDir;
     
     // 根据设备架构选择正确的 .so 文件路径
-    // ⚠️ 重要: 虽然文件夹名是 arm64-v8a,但设备上的实际路径是 arm64!
+    // 重要: 虽然文件夹名是 arm64-v8a, 但设备上的实际路径是 arm64!
     let abiPath = deviceInfo.abiList === 'x86_64' ? 'x86_64' : 'arm64';
 
     this.bundleCodeDir = bundleCodeDir;
@@ -365,9 +365,9 @@ struct CoreLoaderTest {
       
       // 根据结果显示提示
       if (result.startsWith('Success')) {
-        console.info('[CoreLoaderTest] ✅ Test PASSED');
+        console.info('[CoreLoaderTest] Test PASSED');
       } else {
-        console.error('[CoreLoaderTest] ❌ Test FAILED');
+        console.error('[CoreLoaderTest] Test FAILED');
       }
     } catch (error) {
       let errorMsg = `Exception: ${error}`;

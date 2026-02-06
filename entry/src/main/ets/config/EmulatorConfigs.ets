@@ -180,7 +180,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     aspectRatio: 4 / 3,        // 单屏 256×192，双屏垂直排列
     nativeWidth: 256,
     nativeHeight: 192,
-    dualScreen: true,          // ⚠️ 双屏
+    dualScreen: true,          // 双屏
     touchScreen: true,         // 下屏触摸
     coreLibrary: 'desmume_libretro.so'
   },
@@ -194,7 +194,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     aspectRatio: 5 / 3,        // 上屏 400×240
     nativeWidth: 400,
     nativeHeight: 240,
-    dualScreen: true,          // ⚠️ 双屏
+    dualScreen: true,          // 双屏
     touchScreen: true,
     coreLibrary: 'citra_libretro.so'
   },

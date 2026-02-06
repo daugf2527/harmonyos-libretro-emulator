@@ -19,7 +19,7 @@ struct Index {
     Column() {
       // Gambatte 测试按钮
       Row() {
-        Button('🔬 测试 Gambatte 核心')
+        Button('测试 Gambatte 核心')
           .fontSize(18)
           .width('80%')
           .height(60)
@@ -39,7 +39,7 @@ struct Index {
       
       // 通用 Libretro 游戏页面按钮
       Row() {
-        Button('🎮 通用 Libretro 游戏')
+        Button('通用 Libretro 游戏')
           .fontSize(18)
           .width('80%')
           .height(60)
@@ -59,7 +59,7 @@ struct Index {
 
       // 新架构测试页面按钮
       Row() {
-        Button('🚀 新架构测试')
+        Button('新架构测试')
           .fontSize(18)
           .width('80%')
           .height(60)
