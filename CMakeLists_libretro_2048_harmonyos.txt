@@ -1,0 +1,184 @@
+# CMakeLists.txt for libretro-2048 (HarmonyOS)
+# 完全适配鸿蒙 NDK 编译
+# 更新时间: 2025-12-08
+
+cmake_minimum_required(VERSION 3.16)
+project(libretro_2048 C)
+
+# ========================================
+# 鸿蒙平台检测
+# ========================================
+if(OHOS_PLATFORM)
+    message(STATUS "✅ 检测到鸿蒙平台: ${OHOS_PLATFORM}")
+    message(STATUS "✅ 目标架构: ${OHOS_ARCH}")
+else()
+    message(WARNING "⚠️  未检测到鸿蒙平台,可能使用通用工具链")
+endif()
+
+# ========================================
+# C 标准设置
+# ========================================
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)  # 禁用 GNU 扩展,使用标准 C99
+
+# ========================================
+# 源文件列表
+# ========================================
+set(SOURCES
+    libretro.c
+    game_shared.c
+    game_noncairo.c
+    # libretro-common 辅助文件
+    libretro-common/file/file_path.c
+    libretro-common/file/file_path_io.c
+    libretro-common/streams/file_stream.c
+    libretro-common/streams/file_stream_transforms.c
+    libretro-common/vfs/vfs_implementation.c
+    libretro-common/compat/compat_strl.c
+    libretro-common/compat/compat_posix_string.c
+    libretro-common/compat/fopen_utf8.c
+    libretro-common/encodings/encoding_utf.c
+    libretro-common/string/stdstring.c
+    libretro-common/time/rtime.c
+)
+
+# ========================================
+# 头文件搜索路径
+# ========================================
+include_directories(
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/libretro-common/include
+)
+
+# ========================================
+# 创建共享库
+# ========================================
+add_library(2048_libretro SHARED ${SOURCES})
+
+# ========================================
+# 输出属性设置
+# ========================================
+set_target_properties(2048_libretro PROPERTIES
+    OUTPUT_NAME "2048_libretro"
+    PREFIX "lib"
+    SUFFIX ".so"
+    C_VISIBILITY_PRESET hidden          # 默认隐藏符号
+    VISIBILITY_INLINES_HIDDEN ON        # 隐藏内联函数
+)
+
+# ========================================
+# 编译选项
+# ========================================
+target_compile_options(2048_libretro PRIVATE
+    # 优化选项
+    -O2                                 # 优化级别 2
+    -fPIC                               # 位置无关代码 (必须)
+    
+    # 警告选项
+    -Wall                               # 所有警告
+    -Wextra                             # 额外警告
+    -Wno-unused-variable                # 忽略未使用变量
+    -Wno-unused-function                # 忽略未使用函数
+    -Wno-unused-parameter               # 忽略未使用参数
+    
+    # 鸿蒙特定选项
+    -ffunction-sections                 # 每个函数单独段
+    -fdata-sections                     # 每个数据单独段
+    -fno-strict-aliasing                # 禁用严格别名
+    -fvisibility=hidden                 # 默认隐藏符号
+)
+
+# ========================================
+# 链接选项
+# ========================================
+target_link_options(2048_libretro PRIVATE
+    -Wl,--gc-sections                   # 移除未使用的段
+    -Wl,--as-needed                     # 只链接需要的库
+    -Wl,--no-undefined                  # 不允许未定义符号
+    -Wl,-z,relro                        # 只读重定位
+    -Wl,-z,now                          # 立即绑定
+)
+
+# ========================================
+# 预处理器定义
+# ========================================
+target_compile_definitions(2048_libretro PRIVATE
+    # 使用 noncairo 版本 (不依赖 Cairo 图形库)
+    NONCAIRO=1
+    
+    # 鸿蒙平台标识
+    __OHOS__=1
+    
+    # POSIX 标准
+    _POSIX_C_SOURCE=200809L
+    
+    # 禁用不需要的功能
+    HAVE_NO_LANGEXTRA=1
+)
+
+# ========================================
+# 导出符号 (Libretro API)
+# ========================================
+# 确保 Libretro API 函数被导出
+set_target_properties(2048_libretro PROPERTIES
+    LINK_FLAGS "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/link.T"
+)
+
+# 如果没有 link.T 文件,创建一个简单的导出列表
+if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/link.T")
+    file(WRITE "${CMAKE_CURRENT_SOURCE_DIR}/link.T"
+"{ global: retro_*; local: *; };"
+    )
+endif()
+
+# ========================================
+# 链接系统库
+# ========================================
+target_link_libraries(2048_libretro PRIVATE
+    m                                   # 数学库 (libm)
+    c                                   # C 标准库 (musl libc)
+)
+
+# ========================================
+# 安装规则
+# ========================================
+install(TARGETS 2048_libretro
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+)
+
+# ========================================
+# 编译信息输出
+# ========================================
+message(STATUS "========================================")
+message(STATUS "编译 libretro-2048 核心 (鸿蒙)")
+message(STATUS "========================================")
+message(STATUS "平台: ${CMAKE_SYSTEM_NAME}")
+message(STATUS "架构: ${CMAKE_SYSTEM_PROCESSOR}")
+if(OHOS_PLATFORM)
+    message(STATUS "鸿蒙平台: ${OHOS_PLATFORM}")
+    message(STATUS "鸿蒙架构: ${OHOS_ARCH}")
+    message(STATUS "鸿蒙 STL: ${OHOS_STL}")
+endif()
+message(STATUS "C 编译器: ${CMAKE_C_COMPILER}")
+message(STATUS "C 标准: C${CMAKE_C_STANDARD}")
+message(STATUS "源文件数量: ${CMAKE_CURRENT_LIST_DIR}")
+list(LENGTH SOURCES SOURCE_COUNT)
+message(STATUS "源文件数量: ${SOURCE_COUNT}")
+message(STATUS "输出文件: lib2048_libretro.so")
+message(STATUS "========================================")
+
+# ========================================
+# 编译后验证
+# ========================================
+add_custom_command(TARGET 2048_libretro POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E echo "✅ 编译完成: $<TARGET_FILE:2048_libretro>"
+    COMMAND ${CMAKE_COMMAND} -E echo "📊 文件大小:"
+    COMMAND ls -lh "$<TARGET_FILE:2048_libretro>"
+    COMMAND ${CMAKE_COMMAND} -E echo "🔍 文件类型:"
+    COMMAND file "$<TARGET_FILE:2048_libretro>"
+    COMMAND ${CMAKE_COMMAND} -E echo "📋 导出符号 (retro_*):"
+    COMMAND nm -D "$<TARGET_FILE:2048_libretro>" | grep " T retro_" || true
+    COMMENT "验证编译产物"
+)

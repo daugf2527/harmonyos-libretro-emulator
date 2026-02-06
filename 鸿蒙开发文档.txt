@@ -1,0 +1,607 @@
+相关官方链接（图形/游戏/NDK）
+https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkgraphics2d-introduction
+https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/native-image-guidelines
+https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/native-window-guidelines
+https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/native-fence-guidelines
+https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/xengine-kit-introduction
+https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/graphics-accelerate-introduction
+https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkgraphics3d-overview
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-uiability-lifecycle-0000002333176745
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-interthead-communication-0000002299257040
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-using-napi-interaction-0000002411166425
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-napi-xcomponent-0000002299097400
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-native-multi-adapt-0000002360976674
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-gesture-events-binding-0000002333256573
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-file-system-0000002333176749
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-log-system-0000002377468518
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-adapt-third-library-0000002290574309
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-universal-improve-0000002348333394
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-adapt-pc-platform-0000002330261222
+https://developer.huawei.com/consumer/cn/doc/games-guides/games-adapt-tv-platform-0000002411169702
+
+==============================
+【重要说明：旧路径已归档】
+==============================
+仓库已收敛到 new_arch（LibretroEngine + VideoPipeline）单主线。
+旧路径（libretro_game/Chip8/2048）已迁移至 `deprecated/legacy/`，本文如出现相关引用仅作历史对照，引用时以新架构为准。
+
+==============================
+【本仓库对照清单（new_arch）】
+==============================
+- XComponent 回调：entry/src/main/cpp/app/framework/plugin_manager.cpp
+- 引擎主线：entry/src/main/cpp/core/engine/libretro_engine.cpp / libretro_engine.h
+- 视频管线：entry/src/main/cpp/core/engine/video_pipeline.cpp / video_pipeline.h
+- GLES 渲染：entry/src/main/cpp/platform/graphics/gles_renderer.cpp / gles_renderer.h
+- EGL 上下文：entry/src/main/cpp/platform/graphics/graphics_context.cpp / graphics_context.h
+- 音频桥接：entry/src/main/cpp/platform/audio/audio_bridge.cpp / audio_bridge.h
+- 音频播放：entry/src/main/cpp/platform/audio/audio_player.cpp / audio_player.h
+- 重采样与缓冲：entry/src/main/cpp/platform/audio/audio_resampler.h / ring_buffer.cpp
+- 输入：entry/src/main/cpp/core/engine/input_manager.cpp / input_snapshot.h
+- 核心加载：entry/src/main/cpp/core/libretro/core_loader.cpp / core_loader.h
+- 环境命令：entry/src/main/cpp/core/libretro/env_dispatcher.cpp / env_dispatcher.h
+- 事件桥接：entry/src/main/cpp/core/engine/event_bridge.cpp / event_bridge.h
+- ArkTS 事件中心：entry/src/main/ets/common/LibretroEventHub.ets
+- ArkTS 切换协调器：entry/src/main/ets/common/LibretroSwitchCoordinator.ets
+- 入口页：entry/src/main/ets/pages/Index.ets
+- 游戏/测试页：entry/src/main/ets/pages/LibretroGamePage.ets / LibretroNewArchTestPage.ets
+
+==============================
+【缺口清单（以源码为准）】
+==============================
+- RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE 目前返回 false（env_dispatcher.cpp）。
+- get_current_framebuffer 目前固定返回 0（env_dispatcher.cpp 回调设置）。
+- Graphics Accelerate Kit 未接入（仓库未引用相关 API）。
+- Vulkan 后端未接入（仓库未引用 libvulkan 相关调用）。
+- 多核心/ROM 管理仍为基础版（UI 与配置待扩展）。
+
+==============================
+【环境与策略提示（以官方文档为准）】
+==============================
+- 涉及 JIT/特权能力的限制与申请流程需以华为官方安全与系统策略为准。
+- 本仓库默认以 HarmonyOS 5.0+（API 12/13+）为目标环境，向下兼容非规划范围。
+
+==============================
+【图形 API 支持现状（HarmonyOS 5/6 官方文档要点）】
+==============================
+- Vulkan：HarmonyOS SDK 支持 Vulkan v1.4.309，具体可用版本取决于 GPU 驱动实现；提供 VK_OHOS_surface / VK_OHOS_external_memory 扩展及 vkCreateSurfaceOHOS 等接口，用于与 OHNativeWindow / OH_NativeBuffer 互操作与零拷贝。
+- OpenGL（桌面）：API version 20 开始支持 OpenGL 3.0，API version 22 支持 OpenGL 4.2；支持设备仅明确到 PC（API 20+）与部分 Tablet（API 22+），需用 OH_Graphics_QueryGL 判断。
+- OpenGL ES：HarmonyOS 支持 OpenGL ES 3.2；扩展能力需在上下文初始化后通过 glGetString 查询。
+- 设备行为差异：OH_Graphics_QueryGL 在 PC/Tablet 可正常调用，其他设备返回为空；手机端应默认走 OpenGL ES 或 Vulkan，不应假设存在 OpenGL 3.x。
+
+==============================
+【XComponent 官方流程全颗粒度抽取（含差异对照）】
+==============================
+
+来源（官方指南）：
+https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/napi-xcomponent-guidelines
+更新时间（页面标注）：2026-01-05
+
+--------------------------------
+1) 概述（官方原意提炼）
+--------------------------------
+XComponent 是一种渲染组件，可用于 EGL/OpenGLES 或媒体数据写入。
+渲染关键点：应用通过 XComponent 持有的 NativeWindow 申请/提交 Buffer 到图形队列；XComponent 负责把该 Surface 整合进 UI。
+
+XComponentType：
+- SURFACE：自绘内容单独展示到屏幕上。
+- TEXTURE：自绘内容与 XComponent 组件内容合成后展示。
+
+--------------------------------
+2) 三种管理模式：阶段顺序 + 句柄(surfaceId/window/nodeHandle)变化
+--------------------------------
+说明：本节只抽取页面/页面引用示例中明确描述的点；页面未明确说明的地方会标注“文档未明确说明”。
+
+2.1 模式A：使用 XComponentController 管理 Surface 生命周期（ArkTS 侧触发回调）
+
+句柄/状态：
+- surfaceId：
+  - 获取：ArkTS 的 onSurfaceCreated(surfaceId) 回调参数，或 getXComponentSurfaceId()。
+  - 传递：ArkTS -> Native（示例描述为通过 Node-API 传入 BigInt(surfaceId) 等方式）。
+  - 生效时机：onSurfaceCreated 触发后才是有效 surfaceId。
+  - 失效：XComponent 销毁后失效。
+- window(OHNativeWindow*)：
+  - 获取：Native 侧通过 OH_NativeWindow_CreateNativeWindowFromSurfaceId(surfaceId, &window)。
+  - 生命周期：需要 Native 自己缓存/管理；官方强调缓存 key 需唯一，XComponent 销毁后应及时从字典/map 删除。
+  - 释放：调用 OH_NativeWindow_DestroyNativeWindow（引用计数减1；为0时析构）。
+- nodeHandle：本模式页面未要求使用。
+
+阶段（按文档描述顺序）：
+1) ArkTS 创建组件：在 build() 中声明 XComponent，并绑定 controller。
+2) ArkTS Surface 创建：onSurfaceCreated(surfaceId) -> 得到 surfaceId（此时才有效）。
+3) Native 创建 window：收到 surfaceId 后，调用 OH_NativeWindow_CreateNativeWindowFromSurfaceId。
+4) ArkTS 尺寸变化：onSurfaceChanged(surfaceId, rect{surfaceWidth/surfaceHeight}) -> 传递到 Native 更新绘制区域/尺寸。
+   - 特殊说明（页面提到）：若是使用 typeNode 创建 SURFACE/TEXTURE 的 XComponent，创建后的缓冲区尺寸为未设置状态，开始绘制前应调用 OH_NativeWindow_NativeWindowHandleOpt 设置缓冲区尺寸。
+5) ArkTS Surface 销毁：onSurfaceDestroyed(surfaceId) -> Native 执行 EGL/Window 等资源释放 + 清理缓存。
+
+2.2 模式B：使用 OH_ArkUI_SurfaceHolder 管理 Surface 生命周期（Native 侧触发回调）
+
+句柄/状态：
+- nodeHandle(ArkUI_NodeHandle)：
+  - 获取：页面描述为“根据 XComponent 组件对应的 ArkUI_NodeHandle 创建 OH_ArkUI_SurfaceHolder”。
+  - 传递：主要在 Native 侧使用（注册事件/回调、创建 SurfaceHolder 等）。
+  - 失效：nodeHandle dispose 后失效（页面/引用描述为 nodeAPI->disposeNode）。
+- window(OHNativeWindow*)：
+  - 获取：页面/引用描述为可通过 OH_ArkUI_XComponent_GetNativeWindow 获取。
+  - 生命周期：页面描述该场景下 NativeWindow 生命周期由系统管理（不需要手动销毁）。
+- surfaceId：本模式页面未走 show surfaceId 流程（文档未明确说明对外暴露）。
+
+阶段：
+1) Native 侧基于 nodeHandle 创建 OH_ArkUI_SurfaceHolder。
+2) Native 侧注册生命周期/事件/可变帧率/无障碍等回调（页面明确“均在 Native 侧触发”）。
+3) 获取 window 并建立 EGL/渲染（具体初始化时机由注册回调驱动；页面未把每一步都写成统一模板）。
+4) 销毁时释放：释放 SurfaceHolder / 回调对象 / Node（页面强调各对象 Dispose 后失效）。
+
+2.3 模式C：使用 NativeXComponent 管理 Surface 生命周期（Native 侧触发回调）
+
+句柄/状态：
+- OH_NativeXComponent*：
+  - 获取：NAPI 导出的对象 unwrap 得到。
+  - 传递：注册回调结构体 OH_NativeXComponent_Callback。
+- window(void* -> OHNativeWindow*)：
+  - 获取：OnSurfaceCreated/OnSurfaceChanged/DispatchTouchEvent 等回调的参数 window。
+  - 失效：Surface 销毁后失效（页面未要求手动销毁该 window 指针）。
+- surfaceId/nodeHandle：本模式不以 surfaceId/nodeHandle 为主线。
+
+阶段：
+1) Native 注册回调：OH_NativeXComponent_RegisterCallback(nativeXComponent, &callback)
+2) Surface Created/Changed：回调触发后获取 window，并通过 OH_NativeXComponent_GetXComponentSize 获取宽高。
+3) 渲染：基于 window 建立 EGL/渲染。
+4) Surface Destroyed：回调触发，执行资源释放。
+
+--------------------------------
+3) 官方文档中出现的回调钩子清单（按类别）
+--------------------------------
+说明：此清单来自页面抽取与页面引用示例中出现/提到的接口名；某些条目页面只“提到支持”但未给出完整注册细节时会标注“文档未明确说明”。
+
+3.1 生命周期
+- OnSurfaceCreated / OnSurfaceChanged / OnSurfaceDestroyed
+  - 触发侧：
+    - XComponentController：ArkTS 侧触发。
+    - OH_ArkUI_SurfaceHolder：Native 侧触发。
+    - NativeXComponent：Native 侧触发。
+
+3.2 触摸
+- NativeXComponent：DispatchTouchEvent + OH_NativeXComponent_GetTouchEvent
+- SurfaceHolder(Node)：NODE_TOUCH_EVENT（nodeAPI 注册 Node 事件）
+
+3.3 鼠标
+- NativeXComponent：OH_NativeXComponent_GetMouseEvent（页面抽取到该能力；具体注册接口名页面有提及，但部分实现细节需以示例为准）
+
+3.4 键盘
+- NativeXComponent：OH_NativeXComponent_GetKeyEvent（页面抽取到该能力；具体注册接口名页面有提及，但部分实现细节需以示例为准）
+
+3.5 焦点
+- NativeXComponent：RegisterFocusEventCallback（页面抽取到的接口名）
+- NativeXComponent：Blur/失焦回调（页面/引用提到支持；文档未明确说明完整注册细节时以示例为准）
+
+3.6 无障碍
+- SurfaceHolder：AccessibilityProvider_Create（页面抽取到）
+  - 说明：页面提供了参考文档链接（需结合该文档确认完整回调面）。
+
+3.7 可变帧率/帧回调
+- SurfaceHolder：OnFrameCallback（页面/引用抽取到；通常用于每帧驱动/注意帧率范围设置）
+- SurfaceHolder：SetExpectedFrameRateRange（页面抽取到）
+
+3.8 其他
+- NativeXComponent：GetNativeXComponent（页面抽取到：基于 ArkUI_NodeHandle 获取 OH_NativeXComponent*）
+- Hover / NodeContent 等（页面/引用提到但细节不全：文档未明确说明，需结合示例/相关文档确认）
+
+--------------------------------
+4) 官方示例：释放顺序与异常/失败处理要点
+--------------------------------
+4.1 EGL 资源释放顺序（官方示例代码表达）
+- 释放 surface：eglDestroySurface
+- 释放 context：eglDestroyContext（失败则打印错误日志）
+- 释放 display：eglTerminate（失败则打印错误日志）
+
+4.2 失败处理（页面明确出现的处理风格）
+- 对 eglDestroyContext / eglTerminate 等返回失败的情况打印日志。
+- 其他失败点（如 eglCreate*、window 获取失败等）页面有提及需检查有效性，但并未为每一个失败点给出统一模板；需要以示例代码块为准。
+
+--------------------------------
+5) 对照我们工程：PluginManager / LibretroEngine / VideoPipeline / GLESRenderer
+--------------------------------
+5.1 当前工程走的是哪种模式？
+- 我们当前主链路：NativeXComponent 模式（OH_NativeXComponent_RegisterCallback）。
+- 工程内未检索到 OH_ArkUI_SurfaceHolder / 无障碍 / 可变帧率(OnFrameCallback/帧率范围) 等相关 API 的实际调用。
+
+5.2 PluginManager（entry/src/main/cpp/app/framework/plugin_manager.cpp）
+- new_arch (id 包含 phase1/new_arch)：
+  - 已注册：OnSurfaceCreated/OnSurfaceChanged/OnSurfaceDestroyed/DispatchTouchEvent。
+  - OnSurfaceCreated/Changed：把 window 转成 OHNativeWindow* -> LibretroEngine::SetNativeWindow；并用 OH_NativeXComponent_GetXComponentSize 触发 OnNativeWindowResized。
+  - DispatchTouchEvent：通过 OH_NativeXComponent_GetTouchEvent 获取触摸，转换成 libretro 的 pointer 输入（SendPointer）。
+  - OnSurfaceDestroyed：只清空引擎里的 window 指针，并对 storedWindow 做 OH_NativeWindow_NativeObjectUnreference。
+
+- libretro_game（entry/src/main/cpp/app/framework/game_app.cpp）：
+  - 已注册：OnSurfaceCreated/Changed/Destroyed。
+  - DispatchTouchEvent：目前为 nullptr（未实现）。
+
+5.3 LibretroEngine（entry/src/main/cpp/core/engine/libretro_engine.cpp）
+- window 生命周期：SetNativeWindow 内部做 NativeObjectReference/Unreference，并通过消息队列投递 WindowCreated/WindowDestroyed。
+- WindowDestroyed 在游戏线程内处理：DestroyHardwareRenderer + videoPipeline_.Reset()（避免 UI 线程直接 Reset 导致 EGL 线程冲突）。
+
+5.4 VideoPipeline（entry/src/main/cpp/core/engine/video_pipeline.cpp/.h）
+- 以 window(OHNativeWindow*) 为唯一渲染入口；对 surfaceId/nodeHandle 没有状态机表达。
+- 对 window 做 NativeWindowHandleOpt：SET_BUFFER_GEOMETRY、SET_USAGE、SET_SWAP_INTERVAL、SET_SOURCE_TYPE、SetScalingModeV2 等。
+- GLES 路径：惰性 Init(window) + RecreateSurface(window)；失败时会降级 SOFTWARE_SCALING。
+
+5.5 GLESRenderer（entry/src/main/cpp/platform/graphics/gles_renderer.cpp）
+- EGL 初始化：CreateEGLContext(window) + eglCreateWindowSurface + eglMakeCurrent。
+- 释放/销毁：Deinit()、DestroySurfaceOnly()、RecreateSurface()。
+
+--------------------------------
+6) 差异点清单（官方 vs 我们工程）
+--------------------------------
+6.1 模式覆盖
+- 官方：XComponentController / OH_ArkUI_SurfaceHolder / NativeXComponent 三种模式并列。
+- 我们：主链路仅落在 NativeXComponent（新架构 + 部分 legacy）。SurfaceHolder 模式能力（无障碍/可变帧率/显示隐藏等）未落地。
+
+6.2 回调钩子覆盖
+- 官方：触摸/鼠标/键盘/焦点/无障碍/可变帧率等（不同模式各自支持面不同）。
+- 我们：
+  - new_arch：已实现生命周期 + 触摸（映射 pointer）。
+  - new_arch：鼠标/键盘/焦点/失焦/悬浮/NodeContent/无障碍/可变帧率 等均未接。
+  - libretro_game：连触摸都未接（DispatchTouchEvent = nullptr）。
+
+6.3 EGL 释放顺序与失败处理
+- 官方示例表达：DestroySurface -> DestroyContext -> Terminate，并对 DestroyContext/Terminate 失败打印日志。
+- 我们 GLESRenderer::Deinit：DestroySurface -> DestroyContext -> Terminate（与示例顺序一致），并对 eglDestroySurface/eglDestroyContext/eglTerminate 失败打印日志。
+
+6.4 surfaceId/nodeHandle 的状态机缺失
+- 官方：
+  - Controller 模式明确围绕 surfaceId 跨语言传递（创建后才有效、销毁后失效）。
+  - SurfaceHolder 模式围绕 nodeHandle 管理事件/生命周期/VFR/无障碍等。
+- 我们：引擎层抽象只围绕 OHNativeWindow*，缺少 surfaceId/nodeHandle 级别的“阶段-句柄”状态表达。
+
+【结论】
+目前我们的实现与官方流程对齐的核心点：NativeXComponent 生命周期回调 + window 获取 + size 获取 + 触摸事件（new_arch）。
+主要缺口：SurfaceHolder/VFR/无障碍/显示隐藏、以及 NativeXComponent 的鼠标/键盘/焦点等输入回调面。
+
+==============================
+【技术备忘（Roadmap 迁移）】
+==============================
+以下内容为历史备忘，涉及系统策略与版本限制时需以华为官方文档为准。
+【渲染后端演进（从现在到“万能”）】
+【里程碑 M0：GLES/NativeWindow 生命周期稳定（必做）】
+- 目标：无论游戏切换/窗口重建/尺寸变化，都不会进入“有声音没画面”。
+- 落地项：
+  - 统一窗口生命周期：`OnSurfaceCreated/Changed/Destroyed` 只负责传递 `OHNativeWindow` 和尺寸，渲染资源释放/重建全部在引擎线程。
+  - `GLES` 上传链路：保持“可解释”的同步（fence/环形 staging），避免 `glFinish()` 兜底。
+
+【ScalingMode（真实实现摘要）】
+`entry/src/main/cpp/core/engine/video_pipeline.cpp::VideoPipeline::Render` 内同时承载三种缩放策略（由 `VideoPipeline::SetScalingMode` 决定）：
+- `ScalingMode::GLES_SCALING`：
+  - `requestWidth/requestHeight` 取窗口尺寸（由 `LibretroEngine::OnNativeWindowResized` 更新 `window_width_/window_height_`），若未知则 fallback 到 `1280x720`
+  - 关闭 CPU 写入：`SET_USAGE` 设置为 `NATIVEBUFFER_USAGE_HW_RENDER | NATIVEBUFFER_USAGE_HW_TEXTURE`
+  - 若几何变化且已初始化 GLES，在 `GlesState::READY` 且请求尺寸变化时会调用 `gles_renderer_.Resize(requestWidth, requestHeight)` 更新目标尺寸
+  - 渲染路径：`gles_renderer_.Init/Render`；若多次不健康会 fallback 到 `SOFTWARE_SCALING`
+- `ScalingMode::SOFTWARE_SCALING`：
+  - `requestWidth/requestHeight` 按 `software_max_width_/software_max_height_` 计算缩放后目标尺寸（偶数对齐）
+  - CPU 写入：`SET_USAGE` 设置为 `NATIVEBUFFER_USAGE_CPU_WRITE | NATIVEBUFFER_USAGE_HW_TEXTURE`
+  - 渲染路径：`NativeWindowRequestBuffer` → `NativeBuffer_Map` → `PixelConverter::ConvertAndScale(...)` → `FlushBuffer`
+- `ScalingMode::HARDWARE_SCALING`：
+  - `requestWidth/requestHeight` 保持源尺寸（`width/height`），并且同样会设置 `OH_NativeWindow_NativeWindowSetScalingModeV2(OH_SCALING_MODE_SCALE_TO_WINDOW_V2)`
+  - 渲染路径同 CPU 写入（RequestBuffer/Map/Flush），依然会走 `PixelConverter::ConvertAndScale(...)`：
+    - 若 `NativeWindow` 实际返回的 Buffer 尺寸与 `SET_BUFFER_GEOMETRY` 请求一致，则通常 `scale≈1`（更接近“只做像素格式转换”）
+    - 若 `NativeWindow` 返回更大尺寸 Buffer（例如接近窗口分辨率），则 `ConvertAndScale` 仍会做软件缩放，可能导致 CPU 压力与掉帧
+
+【VideoPipeline CPU 路径（dupe/fence/map/flush，函数级落点）】
+同样位于 `entry/src/main/cpp/core/engine/video_pipeline.cpp::VideoPipeline::Render`：
+- dupe frame (NULL data)：当 `retro_video_refresh_t` 传入 `data==nullptr` 时
+  - 若 `canDupe_==false` 或没有 `lastFrame_` 缓存，则直接丢帧
+  - 否则回放 `lastFrame_`（复用 `data/width/height/pitch`）作为本帧输入
+- 同步（Fence）：`OH_NativeWindow_NativeWindowRequestBuffer` 返回 `fenceFd` 后，调用 `common::WaitAndCloseFence(fenceFd)`
+- 映射（CPU access）：`OH_NativeBuffer_FromNativeWindowBuffer` → `OH_NativeBuffer_Map`
+- 像素转换 / 按目标 Buffer 尺寸缩放：统一使用 `PixelConverter::ConvertAndScale(..., PixelFormat::RGBA8888, ...)`
+  - 目标区域按 `dstWidth/dstHeight` 计算居中偏移，必要时清空背景（black bars）
+- 解绑与提交：`OH_NativeBuffer_Unmap` → `OH_NativeWindow_NativeWindowFlushBuffer`
+  - 错误路径使用 `OH_NativeWindow_NativeWindowAbortBuffer`
+
+【里程碑 M1：软件核心统一视频路径（必做）】
+- 目标：对 `XRGB8888 / RGB565 / 0RGB1555` 三种像素格式有一致的、可维护的上传/转换策略。
+- 落地项：
+  - 确保 `RETRO_ENVIRONMENT_SET_PIXEL_FORMAT` 变化时管线能切换（纹理重建/转换路径更新）：
+    - new_arch：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::OnEnvironment` 在该命令处理成功后，将像素格式同步到 `VideoPipeline::SetPixelFormat`。
+      - 同时会发出事件：`eventBridge_.Emit("pixel_format_update", ...)`（用于 ArkTS 侧观测/调试）。
+    - GLES 路径：`entry/src/main/cpp/platform/graphics/gles_renderer.cpp::GLESRenderer::Render`
+      - 当 `tex_width_/tex_height_/current_format_` 变化时会触发纹理重建（`glTexImage2D`）。
+      - `XRGB8888`：按字节序以 `GL_BGRA_EXT` 读取；fragment shader 内强制 `alpha=1.0` 以忽略 X 通道。
+      - `RGB565/0RGB1555`：在 GLES 路径中会先转为 `RGBA8888`（scratch buffer），再以 `GL_RGBA/GL_UNSIGNED_BYTE` 上传。
+  - 确保 `RETRO_ENVIRONMENT_SET_GEOMETRY` 能同步到 `VideoPipeline`（用于 base size 变化）：
+    - new_arch：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::OnEnvironment` → `VideoPipeline::SetGeometry`
+  - 确保 `RETRO_ENVIRONMENT_GET_CAN_DUPE` 能同步到 `VideoPipeline`（用于 dupe 帧策略）：
+    - new_arch：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::OnEnvironment` → `VideoPipeline::SetCanDupe`
+  - `RGB565/0RGB1555` 在 GPU 上不可靠时，允许 CPU 转为 RGBA8888 后上传（已验证路径保留）。
+
+【里程碑 M2：硬件核心（HW_RENDER）支持（“万能”的关键增量）】
+- 目标：支持 libretro core 通过 `RETRO_ENVIRONMENT_SET_HW_RENDER` 输出 OpenGL/Vulkan 纹理/FBO。
+- 落地项：
+  - 现状（部分已实现，但尚不可用）：
+    - 环境命令处理：`entry/src/main/cpp/core/libretro/env_dispatcher.cpp::HandleEnvironmentCommand`
+      - `RETRO_ENVIRONMENT_GET_PREFERRED_HW_RENDER`：固定返回 `RETRO_HW_CONTEXT_OPENGLES3`
+      - `RETRO_ENVIRONMENT_SET_HW_RENDER`：拷贝 core 传入的 `retro_hw_render_callback`，并覆写：
+        - `get_proc_address = eglGetProcAddress`（`GetProcAddress`）
+        - `get_current_framebuffer = GetCurrentFramebuffer`（`env_dispatcher.cpp` 内为 stub，当前实现固定返回 `0`）
+        - 最终 `state.SetHwRenderCallback(cb)`（见 `entry/src/main/cpp/core/libretro/env_dispatcher.h::EnvState::SetHwRenderCallback`：会把 `hw_context_type_ = cb.context_type`，并以 `context_type != RETRO_HW_CONTEXT_NONE` 作为 `hw_render_enabled_` 开关）
+      - 关键缺口：`RETRO_ENVIRONMENT_GET_HW_RENDER_INTERFACE` 当前直接 `return false`
+    - 引擎侧 EGL 生命周期：`entry/src/main/cpp/core/engine/libretro_engine.cpp`
+      - 启用入口：`LibretroEngine::OnEnvironment` 在 `SET_HW_RENDER` handled 后，如果已有 `window_` 会尝试 `InitializeHardwareRenderer()`
+      - 窗口消息：`GameLoop` 收到 `MessageType::WindowCreated/WindowDestroyed` 时分别 `InitializeHardwareRenderer/DestroyHardwareRenderer`，并在销毁时 `videoPipeline_.Reset()`
+      - EGL 初始化细节：`InitializeHardwareRenderer` 内优先创建 ES3 上下文，失败则 fallback 到 ES2（`eglChooseConfig + EGL_OPENGL_ES3_BIT` → fallback `EGL_OPENGL_ES2_BIT`；`eglCreateContext` 同样 ES3 → ES2）。创建 `EGLSurface` 并 `eglMakeCurrent` 后：
+        - 强制 `eglSwapInterval(0)`（当前实现会在 HW_RENDER 下解锁 VSync）
+        - 调用 core 提供的 `cb.context_reset()`；销毁时调用 `cb.context_destroy()`
+      - 上屏路径：`LibretroEngine::OnVideoRefresh` 在 `envState_.IsHwRenderEnabled()` 时：
+        - `data == RETRO_HW_FRAME_BUFFER_VALID`：调用 `SwapHardwareBuffers()`（内部为 `eglSwapBuffers`，仅在 `egl_ready_==true` 时有效；如果 `egl_ready_` 尚未就绪，当前实现会静默不 swap，可能表现为黑屏）
+        - `data == nullptr`：直接丢帧返回
+        - `data != nullptr` 且非 `RETRO_HW_FRAME_BUFFER_VALID`：仍会落入 `VideoPipeline::Render(window, data, ...)`（意味着即使 HW_RENDER 已启用，core 仍可能走软件帧输出；此路径不等价于“硬件核心上屏已完成”）
+    - 因为 `GET_HW_RENDER_INTERFACE` 未实现，不能宣称“已支持硬件核心”，目前只能视为具备 EGL 基础设施，但 HW core 链路仍不完整。
+    - 风险/边界（当前实现需要明确）：
+      - `get_current_framebuffer` 目前固定返回 `0`：对于依赖该回调获取 FBO/默认 framebuffer 句柄的 core，可能仍无法正确渲染。
+      - `InitializeHardwareRenderer` 内强制 `eglSwapInterval(0)`：可能改变同步策略（把节奏更多交给音频/核心侧），并带来撕裂/功耗等副作用，需要按机型与 core 行为评估。
+  - 定义 `HwRenderBackend` 最小接口：创建/销毁上下文、`context_reset/context_destroy`、帧提交。
+  - 先支持 OpenGL ES HW_RENDER（与现有 EGL 复用度最高），再评估 Vulkan。
+
+【里程碑 M3：Vulkan 后端（可选，但为“全能”铺路）】
+- 上屏（VK_OHOS_surface）：用 `vkCreateSurfaceOHOS` 将 `VkSurfaceKHR` 对接 `OHNativeWindow`，走 swapchain 上屏。
+- 零拷贝（VK_OHOS_external_memory）：未来当引入解码/相机/跨 API 共享 `OHNativeBuffer` 时，再用 `vkGetNativeBufferPropertiesOHOS` / `VkImportNativeBufferInfoOHOS` 做导入。
+- 官方注意点：若运行时 `dlopen("libvulkan.so")` 动态加载，则 CMake 不额外依赖 `libvulkan.so`，避免符号冲突。
+
+【图像质量增强（可选能力）】
+【XEngine（优先级：中，收益明确）】
+- GLES/Vulkan 侧可用的超分/VRS 扩展。
+- 使用前按官方要求做扩展可用性查询（GLES 侧 `HMS_XEG_GetString`；Vulkan 侧 `HMS_XEG_EnumerateDeviceExtensionProperties`）。
+
+【Graphics Accelerate Kit（优先级：低，偏 3D 游戏渲染增强）】
+- 主要是 `ABR/Frame Generation/OpenGTX` 等能力，更偏 3D 渲染管线增强。
+- 适合等 HW_RENDER / Vulkan 路线明确后再评估接入点。
+
+【缓存与内存压力（purgeable memory）】
+- purgeable memory 适合做“可重建缓存”（例如 shader cache、LUT、预计算表）。
+- 不建议用于实时视频帧（被清理会导致当帧缺数据）。
+
+---
+
+【鸿蒙 Native C++ 模拟器开发白皮书 (Verified Edition)】
+
+这份文档是基于对本仓库当前实现与官方开发指南的对照整理。涉及到“已实现/未实现”的结论，均以仓库源码为准，并尽量标注到文件与函数位置，避免口径不一致。
+
+【⚠️ 关键政策与环境 (Policy & Environment)】
+【1. JIT 编译限制 (Critical Policy Notice)】
+HarmonyOS 5.1.0(18) 及更高版本已默认禁用 JIT 编译。
+- 影响范围：依赖 JIT 提升性能的高性能模拟器（如 PS2, GameCube）将受到直接限制。
+- 解决方案：开发者必须申请特权证书并通过官方审核，方可开启 JIT 权限。
+- 本项目注：Chip8 模拟器属于 legacy 验证链路（已归档），在此限制下仍可正常运行，但进阶开发需注意此红线。
+
+【2. 版本与 API 策略 (Version Strategy)】
+- 目标环境：严需 HarmonyOS 5.0+ (API 12/13+) 或更高版本。
+- 兼容性：不考虑 API 9/10 的向下兼容性。
+- API 标准：强制使用现代 API（如 `OH_NativeXComponent_GetXComponentId`）进行实例管理。
+
+【官方最佳实践参考 (Official Samples)】
+基于官方示例库 (Codelabs/Samples) 的深度对标，确保代码架构符合 HarmonyOS 原生标准。
+
+【1. 渲染核心 (Phase 1)】
+- 参考项目: `基于XComponent组件实现双缓冲功能` (Native Double Buffering)
+- 核心价值: legacy 示例链路 `Chip8App` 对应此场景：`NativeWindow` 请求 Buffer -> 写入像素 -> Flush（已归档）。
+   - 代码位置：`deprecated/legacy/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`
+   - 主链路（Libretro）的视频输出当前走 `VideoPipeline`，不应混为一谈。
+- 关键 API: `OH_NativeWindow_NativeWindowRequestBuffer`, `OH_NativeWindow_NativeWindowFlushBuffer`
+
+【2. 音频系统 (Phase 2)】
+- 参考harmony项目: `实现音频低时延录制与播放` (Low Latency Audio)
+- 核心价值: 游戏音效需要极低延迟（按键即响）。此示例展示了如何配置 `OH_AudioStreamBuilder` 的 `LATENCY_MODE_FAST`，这正是我们需要的。
+- 关键 API: `OH_AudioStreamBuilder`, `OH_AudioRenderer_OnWriteData`
+
+【3. 交互与线程 (Phase 3)】
+- 参考项目: `实现Native侧子线程与UI主线程通信` (Native-UI Communication)
+- 核心价值: 模拟器核心跑在子线程，但寄存器/PC值需要显示在 ArkTS UI 上。此示例展示了如何安全地将 Native 数据“抛”给 UI 线程，防止多线程崩溃。
+- 参考项目: `基于XComponent技术实现自定义动画功能` (Custom Animation)
+- 核心价值: 学习如何利用 Vsync 信号驱动渲染循环，而不是简单的 `sleep(16ms)`，从而获得更平滑的 60FPS 体验。
+
+【4. 文件加载 (Phase 4)】
+- 参考项目: `实现Native侧文件访问` (Native File Access)
+- 核心价值: 必读项目。展示了如何在 C++ 层通过 `Rawfile` 接口读取 hap 包内的 ROM 文件，以及如何通过 `FileUri` 读取用户选择的沙箱文件。
+- 关键 API: `OH_ResourceManager_OpenRawFile`, `OH_FileUri_GetPathFromUri`
+
+【5. 进阶画质 (Phase 5)】
+- 参考项目: `基于GPU加速引擎服务实现时域AI超分` (AI Super Resolution)
+- 核心价值: 这是一个完美的“旗舰级”功能。注意本仓库当前仅落地了 XEngine 的“可用性探测 + 开关”链路（见 `entry/src/main/cpp/platform/graphics/gles_renderer.cpp::GLESRenderer::CheckXEngineSupport/SetXEngineEnabled`），未接入 Graphics Accelerate Kit。
+
+---
+
+【阶段一：高性能渲染 (NativeWindow & XComponent)】
+目标：建立从 C++ 直接写入屏幕缓冲区的通道，实现“低拷贝/可解释”的渲染路径。
+
+【1.1 建立渲染窗口 (XComponent)】
+官方出处：[自定义渲染 (XComponent)](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/napi-xcomponent-guidelines)
+- 关键动作：
+     1.  ArkTS: 配置 `<XComponent type={XComponentType.SURFACE} libraryname="entry" />`。
+     2.  C++: NAPI 初始化入口在 `entry/src/main/cpp/app/napi/module_init.cpp`（`Init`），其中会调用 `PluginManager::Export(env, exports)` 注册 XComponent 回调。
+     3.  C++: XComponent 回调注册在 `entry/src/main/cpp/app/framework/plugin_manager.cpp`（`PluginManager::Export`），内部调用 `OH_NativeXComponent_RegisterCallback`。
+     4.  C++ (Modern): 调用 `OH_NativeXComponent_GetXComponentId` 获取实例 ID，用于多实例管理或上下文绑定（API 12+ 强制推荐）。
+     5.  C++: 在 `OnSurfaceCreatedCB` 回调中，将 `void* window` 强转为 `OHNativeWindow*`。这是你的画布句柄。
+
+【1.2 像素搬运 (NativeWindow)】
+官方出处：[NativeWindow开发指导](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/native-window-guidelines)
+- 依赖库: `libnative_window.so`
+- 头文件: `<native_window/external_window.h>`
+- 核心循环：
+    1.  配置: `OH_NativeWindow_NativeWindowHandleOpt(window, SET_BUFFER_GEOMETRY, requestWidth, requestHeight)`。
+        - 示例（legacy，已归档）：Chip8 使用 `64x32`（`deprecated/legacy/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`）
+        - 主链路（Libretro）：由 `entry/src/main/cpp/core/engine/video_pipeline.cpp::VideoPipeline::Render` 根据 `ScalingMode` 与窗口大小选择 `requestWidth/requestHeight`
+    2.  请求: `OH_NativeWindow_NativeWindowRequestBuffer` 获取 `OHNativeWindowBuffer`。
+    3.  映射: 使用官方 `NativeBuffer` 流程获取 CPU 可写的虚拟地址：
+        1. `OH_NativeBuffer_FromNativeWindowBuffer` 转换得到 `OH_NativeBuffer*`。
+        2. `OH_NativeBuffer_Map` 获取 `void* virAddr`。
+        3. `OH_NativeBuffer_GetConfig` 获取 `stride/width/height/format`。
+    4.  写入: 将你的 framebuffer 像素数据写入 `virAddr`。
+        - 示例（legacy，已归档）：Chip8 的 `gfx[]` → ARGB 写入（`deprecated/legacy/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`）
+        - 主链路（Libretro）：像素转换/缩放与写入在 `entry/src/main/cpp/core/engine/video_pipeline.cpp::VideoPipeline::Render`
+    5.  解绑: `OH_NativeBuffer_Unmap`。
+    6.  提交: `OH_NativeWindow_NativeWindowFlushBuffer` 将画面送显。
+
+---
+
+【阶段二：历史验证链路（已归档）】
+Chip8/legacy 验证链路已迁移至 `deprecated/legacy/`，本路线不再作为主线目标或实现依赖。
+
+---
+
+【阶段三：构建 Libretro 桥接层 (The Bridge)】
+目标：不再手写模拟器核心，而是构建一个符合 Libretro API 标准的鸿蒙原生前端 (Frontend)，使其能对接所有 RetroArch 生态的核心。
+
+【3.1 核心加载器 (Core Loader)】
+- 机制: 使用 `dlopen/dlsym` 动态加载 Libretro Core (`.so` 文件)。
+- 关键接口:
+    - `retro_init`: 初始化核心。
+    - `retro_load_game`: 加载 ROM 数据 (需结合 `FileUri` 和 `RawFile` 读取能力)。
+    - `retro_run`: 驱动核心运行一帧。
+
+【3.2 视音频驱动实现 (Drivers Implementation)】
+这是移植 RetroArch 最艰难的部分，需将 Libretro 的标准回调映射到鸿蒙 API：
+- Video Driver: 实现 `retro_video_refresh_t` -> `NativeWindow` (直接复用阶段一的成果)。
+- Audio Driver: 实现 `retro_audio_sample_t` -> `OHAudio` (直接复用阶段二的成果)。
+- Input Driver: 实现 `retro_input_poll_t` -> `XComponent TouchEvent` (直接复用阶段一的成果)。
+
+【3.2.1 回调注册（Register）】
+- `new_arch`：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::SetupCallbacks`
+  - `coreLoader_.GetSetVideoRefresh()(OnVideoRefresh)`
+  - `coreLoader_.GetSetAudioSample()(OnAudioSample)`
+  - `coreLoader_.GetSetAudioSampleBatch()(OnAudioSampleBatch)`
+  - `coreLoader_.GetSetInputPoll()(OnInputPoll)`
+  - `coreLoader_.GetSetInputState()(OnInputState)`
+
+【3.2.2 数据写入路径（Write paths：UI/回调 → 引擎状态）】
+- Video：
+  - `new_arch`：`LibretroEngine::OnVideoRefresh` → `VideoPipeline::Render`（写入 NativeWindow）；HW core 场景会在 `data == RETRO_HW_FRAME_BUFFER_VALID` 时 `SwapHardwareBuffers()`
+- Audio：
+  - `new_arch`：`LibretroEngine::OnAudioSampleBatch` → `AudioBridge::ProcessAudio`
+- Input（写入前端输入状态）：
+  - `new_arch`：
+    - NAPI：`libretro_engine_napi.cpp::SendInput` → `LibretroEngine::SendInput`（更新 `inputSnapshot_`）
+    - 触摸：`plugin_manager.cpp::DispatchTouchEvent` → `LibretroEngine::SendPointer`（更新 `inputSnapshot_`）
+
+【3.2.3 数据读取路径与线程归属（Read paths & threading）】
+- Input（core 读取）：
+  - `new_arch`：`LibretroEngine::OnInputState` 从 `inputSnapshot_` 读取（JOYPAD + POINTER）；`OnInputPoll` 为 Snapshot 模式空实现
+- 帧驱动线程：
+   - `new_arch`：`LibretroEngine::Start` 创建线程 → `LibretroEngine::GameLoop` → `ProcessFrame` → `retro_run()`
+- 窗口 resize：
+   - `new_arch`：`entry/src/main/cpp/app/framework/plugin_manager.cpp` 的 XComponent 回调 `OnSurfaceCreated/OnSurfaceChanged` → `LibretroEngine::OnNativeWindowResized`（触发 `VideoPipeline::SetWindowSize/ForceReconfiguration`）；`OnSurfaceCreated/OnSurfaceDestroyed` 分别 `LibretroEngine::SetNativeWindow(window/nullptr)`
+
+---
+
+【阶段四：接入 RetroArch 生态 (Ecosystem)】
+目标：利用阶段三构建的通用桥接层，批量接入成熟的游戏核心。
+
+- 前端侧现状（已具备基础设施）：
+    - core 动态加载：
+      - `new_arch`：`entry/src/main/cpp/core/libretro/core_loader.cpp` / `core_loader.h`
+    - new_arch 调用入口：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::LoadCore/LoadRom/SetupCallbacks`
+    - 加载 API 返回值语义（重要）：
+      - ArkTS/NAPI 调用入口：`entry/src/main/cpp/app/napi/libretro_engine_napi.cpp::LoadCore/LoadRom`
+      - `refactoredLoadCore/refactoredLoadRom` 当前仅表示“请求已提交到引擎线程/消息队列”（NAPI 与引擎层都直接 `return true`），不代表 core/ROM 已成功加载
+      - 真实加载成功以引擎线程状态为准：
+        - core 成功：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::HandleMessage(MessageType::LoadCore)` → `LibretroEngine::TransitionTo(EngineState::CORE_LOADED)`
+        - ROM 成功：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::HandleMessage(MessageType::LoadRom)` → `LibretroEngine::TransitionTo(EngineState::GAME_LOADED)` → `LibretroEngine::TransitionTo(EngineState::RUNNING)`
+      - 失败以事件为准：`LibretroEngine::HandleMessage` 内 `eventBridge_.Emit("core_crash", ...)`；状态变化以 `eventBridge_.Emit("engine_state", ...)` 为准
+      - ArkTS 侧建议使用：
+        - 查询：`refactoredGetState` / `refactoredHasCoreLoaded` / `refactoredHasGameLoaded`（`entry/src/main/cpp/app/napi/libretro_engine_napi.cpp`）
+        - 或订阅 `engine_state` 事件驱动 UI 状态机（避免仅凭 `refactoredLoad*` 的返回值判断）
+    - ROM 加载：`entry/src/main/cpp/platform/resource/rom_loader.cpp::ROMLoader::*`
+    - 环境命令分发：`entry/src/main/cpp/core/libretro/env_dispatcher.cpp::HandleEnvironmentCommand`
+    - 针对特定 core 的兼容处理（现存实现）：
+      - `Gambatte`：`entry/src/main/cpp/core/engine/libretro_engine.cpp` 在 `LoadCore` 后检测 `systemInfo_.library_name == "Gambatte"` 并启用 `quirks_`（`audio_stereo_frame_bug/audio_sample_rate_bug`）
+      - `Gambatte`：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::OnAudioSampleBatch` 在 `quirks_.audio_stereo_frame_bug` 时对 `frames` 做 `/2` 修正
+
+【4.1 NES/FC (FCEUmm)】
+- 动作: 编译 `libretro-fceumm` 为鸿蒙 `.so`。
+- 验证: 使用阶段三的加载器运行 NES 游戏，验证 PPU/APU 同步。
+
+【4.2 GBA (VBA-M / mGBA)】
+- 动作: 编译 `libretro-vbam`。
+- 挑战: 性能优化。GBA 需要更强的 CPU 算力，可能需要调整编译优化参数 (-O3)。
+
+【4.3 PS1 (PCSX-ReARMed / Beetle)】
+- 动作: 编译 `libretro-pcsx-rearmed`。
+- 进阶（与当前代码对齐）：仓库已具备 HW_RENDER 的 EGL 基础设施（`LibretroEngine::InitializeHardwareRenderer/SwapHardwareBuffers`），但仍存在关键缺口（`GET_HW_RENDER_INTERFACE` 返回 false、`get_current_framebuffer` 返回 0），因此暂不能宣称 3D HW core 可用。
+
+---
+
+【阶段五：专业特性 (Pro Features)】
+目标：利用鸿蒙独有的图形能力，将模拟器升级为“旗舰级”体验。
+
+【5.1 AI 画质超分（XEngine，可选）】
+官方出处：建议以 XEngine Kit 官方文档为准。
+- 痛点：CHIP-8 的原生分辨率仅 64x32，在大屏上显示颗粒感极重。
+- 现状（已实现开关与探测）：
+     - `entry/src/main/cpp/platform/graphics/gles_renderer.cpp::GLESRenderer::CheckXEngineSupport`（`dlopen("libxengine.so")` + 扩展查询）
+     - `entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::SetAIUpscale` → `entry/src/main/cpp/core/engine/video_pipeline.cpp::VideoPipeline::SetXEngineEnabled`
+- 未实现：Graphics Accelerate Kit 当前没有实际调用点，暂不应在“已实现能力”中描述为可用。
+
+【5.2 高性能 HUD 信息层 (ArkGraphics 2D)】
+官方出处：[ArkGraphics 2D简介](https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/arkgraphics2d-introduction)
+- 功能：显示 FPS、CPU 频率、寄存器实时状态。
+- 现状（未实现/预研项）：仓库当前未引入 ArkGraphics 2D / Native Drawing 的相关代码，后续可作为 overlay 方案评估。
+
+---
+
+【开发顺序建议】
+1.  先画出黑屏：完成阶段 1.1 和 1.2，能在屏幕上显示随机噪点。
+2.  让它动起来：移植 CPU 核心，对接阶段 1 的渲染循环。
+3.  听到声音：完成阶段 2，确保声音不卡顿。
+4.  加载游戏：完成阶段 4，让用户能玩真正的游戏。
+5.  锦上添花：如果前面都做完了，再考虑阶段 5 的 AI 超分。
+
+---
+
+【阶段六：专业化改造 (Technical Debt & Professionalization)】
+目标：解决原型阶段的“野路子”实现，将模拟器内核升级为商业级架构。此阶段任务优先级较低，但决定了最终的性能上限。
+
+【6.1 原生多线程架构 (Native Threading)】
+- 现状（两条链路并存）：
+     - new_arch：`entry/src/main/cpp/core/engine/libretro_engine.cpp::LibretroEngine::Start` 创建线程，`LibretroEngine::GameLoop` 内驱动 `ProcessFrame()`
+- 改造：维持 `LibretroEngine`（new_arch）单主线，避免在 ArkTS/JS 侧逐帧驱动。
+
+【6.2 动态码率控制 (Audio DRC)】
+- 现状（已实现）：
+     - 重采样：`entry/src/main/cpp/platform/audio/audio_resampler.h::AudioResampler`
+     - DRC：`entry/src/main/cpp/platform/audio/audio_bridge.cpp::AudioBridge::ProcessAudio`（按 RingBuffer 水位微调重采样比率）
+- 约束（重要）：`AudioBridge` 当前为全局单例（`AudioBridge::GetInstance()`），需保证同一时刻只有一个音频生产者在写入；做 core/页面切换前应先 Stop/Reset 并确认旧链路已停止。
+- 改造：后续以“可配置化/可观测”为主（阈值、目标水位、日志与统计），而不是从 0 重新实现。
+
+【6.3 硬件加速渲染 (GPU Backend)】
+- 现状（已存在 GPU backend）：
+     - `entry/src/main/cpp/core/engine/video_pipeline.cpp::VideoPipeline::Render` 支持 `ScalingMode::GLES_SCALING`，内部调用 `entry/src/main/cpp/platform/graphics/gles_renderer.cpp::GLESRenderer::Init/Render/Deinit`。
+     - CPU 转换/缩放仍会在 `SOFTWARE_SCALING` 路径发生（NEON），但这属于 fallback/策略选择，不代表“完全没有 GPU backend”。
+- 改造：补齐 HW_RENDER（见 M2）与 Vulkan 之前，优先把现有 GLES 管线的像素格式覆盖与生命周期做稳。
+
+==============================
+【企业级稳定性/资源治理推进建议（libretro + HarmonyOS + Android 依据）】
+==============================
+更新时间：2026-01-20
+下一步执行清单（优先级自高到低）：切换链路单飞与可取消闭环；ROM 按需解包/下载沙盒化/校验；可观测性（错误分类+耗时）；质量门禁（矩阵与跑测）。
+目的：把“切换链路、资源 I/O、可观测性、质量保障”从点修补升级为可持续闭环。
+
+1) 稳定性（切换链路/状态机/可取消）
+- 依据：libretro 官方核心开发文档要求遵循 API 调用约束与执行顺序。
+- 建议：所有 Stop/Reset/Load/Run 必须串行化，统一由引擎线程驱动；UI 仅发起“切换请求”，由单飞机制（latest wins）接管，支持可取消与失败恢复。
+
+2) I/O 与资源治理（rawfile/下载 ROM/多文件依赖）
+- 依据：HarmonyOS ResourceManager 提供 rawfile 异步读取能力；文件写入可用 fileio 流式接口。
+- 建议：内置 ROM 采用“按需解包到沙盒路径”，统一使用 filesDir/system/ 与 filesDir/roms/；下载 ROM 统一拷贝进沙盒后加载；CUE/多文件依赖必须确保同目录与同生命周期，避免关联文件缺失。
+
+3) 可观测性（错误分类/耗时/日志与上报）
+- 依据：Android ANR 官方指南强调主线程阻塞/I/O/锁等待是主要风险；应移出主线程并记录耗时。
+- 建议：统一错误分类与步骤标识；记录每个关键阶段耗时（Stop/LoadCore/LoadRom/首帧）；保留崩溃堆栈与引擎状态快照；UI 侧只做轻量日志与提示。
+
+4) 质量保障（回归矩阵/长期稳定性）
+- 依据：libretro API 契约对核心行为（need_fullpath/no-game 等）具有差异化要求。
+- 建议：建立“核心兼容矩阵 + ROM 类型矩阵 + 切换压力测试 + 长时稳定性跑测”作为发布门槛；所有核心至少覆盖 need_fullpath/no-game/大文件/多文件依赖场景。
+
+参考来源（官方/权威）：
+libretro 核心开发文档（API 约束/顺序）：https://docs.libretro.com/development/cores/developing-cores/
+HarmonyOS 资源管理 ResourceManager（getRawFileContent 等）：https://developer.huawei.com/consumer/cn/doc/harmonyos-references-V13/js-apis-resource-manager-V13
+HarmonyOS fileio 文件管理接口（createStream/write/flush 等）：https://developer.huawei.com/consumer/cn/doc/harmonyos-references-V3/js-apis-fileio-0000001333640945-V3
+HarmonyOS rawfile 示例（ResourceManager 打开 rawfile）：https://developer.huawei.com/consumer/cn/codelab/HarmonyOS-hap1/index.html
+Android ANR 指南（主线程阻塞风险）：https://developer.android.com/training/articles/perf-anr

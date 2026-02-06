@@ -1,0 +1,132 @@
+/*
+ * Copyright (c) 2025 Huawei Device Co., Ltd.
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#ifndef AUDIO_BRIDGE_H
+#define AUDIO_BRIDGE_H
+
+#include "audio_player.h"
+#include "audio_resampler.h"
+#include "interfaces/audio/i_audio_sink.h" // 1. 引入接口
+#include "ring_buffer.h"
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+namespace libretro {
+
+/**
+ * @brief 音频桥接层 implementation
+ */
+class AudioBridge : public interfaces::IAudioSink { // 2. 继承接口
+public:
+  static AudioBridge *GetInstance();
+  static void DestroyInstance();
+
+  // IAudioSink 接口实现
+  bool Initialize(double sample_rate) override;
+  bool Start() override;
+  bool Stop() override;
+  size_t ProcessAudio(const int16_t *data, size_t frames) override;
+  bool IsRunning() const override;
+  bool SetMinimumAudioLatency(int latency_ms) override;
+  bool SetAudioSyncMode(int mode) override;
+
+  // 保留旧的 Initialize (为了兼容现有代码)
+  bool Initialize(int32_t sample_rate = 48000);
+
+  // 重置音频桥接器 (支持更改采样率)
+  bool Reset(int32_t sample_rate);
+
+  // Libretro 回调 (静态)
+  static void AudioSampleCallback(int16_t left, int16_t right);
+  static size_t AudioSampleBatchCallback(const int16_t *data, size_t frames);
+
+  bool Pause();
+  bool IsPlaying() const;
+
+  float GetBufferUsage() const;
+  void GetBufferStats(size_t &underruns, size_t &overruns) const;
+  void ResetBufferStats();
+
+  void SetMinimumLatencyMs(unsigned latency_ms);
+
+  enum class SyncMode {
+    NON_BLOCKING,  // Fast Forward behavior: drop data on overflow
+    AUDIO_BLOCKING // Normal behavior: block until space available
+  };
+
+  void SetSyncMode(SyncMode mode) { sync_mode_.store(mode); }
+  SyncMode GetSyncMode() const { return sync_mode_.load(); }
+
+private:
+  // --- DRC Constants ---
+  static constexpr float kDrcLowThreshold = 0.40f;
+  static constexpr float kDrcHighThreshold = 0.60f;
+  static constexpr double kDrcStep = 0.0005;
+  static constexpr double kDrcMaxSkew = 1.005;
+  static constexpr double kDrcMinSkew = 0.995;
+  static constexpr int kDrcUpdateIntervalMs = 50;
+
+  AudioBridge();
+  ~AudioBridge() override;
+
+  std::shared_ptr<RingBuffer> ring_buffer_;
+  std::unique_ptr<AudioPlayer> audio_player_;
+  // 输出采样率（固定 48k），与 OHAudio 配置一致
+  int32_t sample_rate_ = 48000; // 保持命名以兼容现有日志/计算
+  int32_t output_sample_rate_ = 48000;
+  // 核心（Libretro）实际采样率，用于重采样输入
+  int32_t core_sample_rate_ = 48000;
+  // 轻量重采样器与 DRC 状态
+  AudioResampler resampler_;
+  std::atomic<double> drc_skew_{1.0};
+  // 全局运行状态：用于阻塞读写的退出条件
+  std::atomic<bool> running_{false};
+
+  // Buffering logic
+  bool buffering_ = false;
+
+  std::atomic<SyncMode> sync_mode_{SyncMode::AUDIO_BLOCKING};
+  bool is_started_ = false; // Intended state
+  std::atomic<size_t> min_buffer_frames_{0};
+  std::atomic<size_t> default_min_buffer_frames_{0};
+  std::atomic<unsigned> minimum_latency_ms_{0};
+
+  // DRC 更新节流（从 static 移为成员变量，避免多线程数据竞争）
+  std::chrono::steady_clock::time_point drc_last_update_{};
+  std::chrono::steady_clock::time_point process_audio_last_time_{};
+
+  // 日志节流计数器（从 static 移为成员变量）
+  int process_audio_log_count_{0};
+  int process_audio_drop_log_count_{0};
+  int process_audio_diag_log_count_{0};
+  int process_audio_gap_log_count_{0};
+  int process_audio_slow_log_count_{0};
+
+  std::vector<int16_t> resample_out_buf_;
+
+  std::mutex mutex_;
+  std::atomic<bool> initialized_{false};
+
+  AudioBridge(const AudioBridge &) = delete;
+  AudioBridge &operator=(const AudioBridge &) = delete;
+};
+
+} // namespace libretro
+
+#endif // AUDIO_BRIDGE_H

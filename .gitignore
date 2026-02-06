@@ -1,0 +1,13 @@
+.worktrees/
+.DS_Store
+.codex/
+.codex_tmp/
+.sanshu-memory/
+.windsurf/
+.hvigor/
+.idea/
+entry/.preview/
+entry/.cxx/
+entry/build/
+*.hap
+oh_modules/

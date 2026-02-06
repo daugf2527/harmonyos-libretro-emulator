@@ -1,0 +1,78 @@
+# Cursor Rules Notepad
+
+## Lessons
+- OHAudio 回调差异：API 11 使用 `OH_AudioStreamBuilder_SetRendererCallback` + `OH_AudioRenderer_Callbacks_Struct.OH_AudioRenderer_OnWriteData`（所有数据视为有效）。API 12 推荐 `OH_AudioRenderer_OnWriteDataCallback`，可返回 `AUDIO_DATA_CALLBACK_RESULT_VALID/INVALID`；配套 `OH_AudioStreamBuilder_SetFrameSizeInCallback` 设定单次请求的帧数。
+- 回调填充策略：未能填满时不要返回有效数据。若 API 12 则返回 INVALID 或阻塞回调直至数据充足，避免杂音/卡顿；我们的 `RingBuffer::ReadWait` 与此一致。
+- 低时延路径：OHAudio 低时延建议回调颗粒度≈480 帧（48kHz≈10ms），Builder 采样率=48000、声道=2、PCM I16、RAW 编码。
+- 音频工作组：OpenHarmony 6.0 Beta1 引入 `OH_AudioWorkgroup`，可将音频渲染线程加入工作组以提升实时性与效率；若系统/NDK版本支持，应在创建 Player 后加入并在销毁时退出。
+- Libretro 环境：必须实现 `RETRO_ENVIRONMENT_GET_VARIABLE`（核心选项）、`RETRO_ENVIRONMENT_GET_LOG_INTERFACE`（日志桥接）、`RETRO_ENVIRONMENT_SET_GEOMETRY`（动态几何）。DRC 属于前端内部策略，参考 RetroArch 实现缓慢微调采样比率以稳定水位。
+- 音频驱动循环：移除固定 `sleep_for(16ms)`，以音频背压自然限速 `retro_run()`；静音核心可加入轻微兜底 `sleep(1ms)`。
+ - 采样率统一：输出固定 48k（HarmonyOS/OHAudio 推荐），核心采样率不同时以 4 点 Hermite（Catmull-Rom）插值重采样。DRC 以环形缓冲水位 50%±10% 为目标，`skew` 每次微调 0.0005、限幅 0.995–1.005、节流≥50ms。
+ - 边界处理：重采样需保存上一批尾部 4 个样本以支持负索引插值，尾部不足时重复最后样本，确保流式连续。
+- 初始化与重置：`AudioBridge` 的输入采样率记为核心采样率，输出始终为 48k；重置仅更新重采样器与缓冲，不必重建 Player 除非采样配置变化。
+ - 阻塞读写协作：`RingBuffer::WriteWait/ReadWait` 接收 `running` 参数；当 `running=false` 时应立即返回以避免阻塞。`Clear()` 需同时 `notify_all` 两个条件变量，保证停止/重置时能唤醒读写双方。
+ - API 版本行为：API 12 在不足或停止时应返回 `INVALID`；API 11 在停止或不足时以静音补齐并返回请求大小，遵守旧接口语义。
+ - 实机观测：API 12 回调单次请求常为 960 帧（≈20ms），即使 Builder 设为 480 帧；推测低时延路径会合并回调颗粒度。日志中的 dt 统计包含上一次回调内的阻塞时长，因此出现 >20ms 的 dt 基本对应 `ReadWait` 的等待时间。
+ - M1 行为验证：可见 `[ReadWait] blocking/resumed`（16–78ms 区间）后仍返回 `VALID`，说明阻塞拉取与无噪声策略有效；偶发较长等待为背压的正常表现。
+ - 水位与背压：`[Producer] in/out/buffer` 显示阶段性 `out>in` 但缓冲仍为正，属临时背压；若长期 `out>in` 将增加阻塞频率，需由 M2 音频驱动循环或 DRC 微调将水位稳定在 40%–60%。
+ - 停止验证：stop/pause 期间应出现 `aborted by stop` 相关日志并在数十毫秒内退出；若无则检查 `running=false` 设置与 `RingBuffer::Clear()` 的双条件唤醒。
+ - 后台自动暂停：当 UIAbility 进入后台（onBackground）时，调用 `libretroPauseGame('libretro_game_xcomponent')`，使 `LibretroNativeRenderer::Pause()` 生效并暂停 `retro_run` 与 `AudioBridge`，避免“挂后台自己玩”；前台（onForeground）默认不自动恢复，保留 UI 手动 Resume，必要时可引入“自动恢复”开关。
+ - ArkTS catch 子句：不要为 `catch` 变量做类型注解；若强制注解仅允许 `any/unknown`（但会与“arkts-no-any-unknown”冲突）。采用 `catch (e)`，在内部用类型守卫与断言处理（`typeof e === 'string'` 或 `(e as Error).message`）。避免 `(testNapi as any)`，为 NAPI 接口定义明确类型（例如 `LibentryNapi`）并断言为该接口。
+- 需求优先级：用户只要“结论/审查意见”时，不要主动修改代码；若已修改，先回滚再输出结论。
+- 命令可用性：执行构建/检查命令前先确认脚本/命令存在（例如仓库可能没有 `hvigorw`）。
+- 无锁环形缓冲前提：若生产/消费端用条件变量阻塞等待，head/tail 的修改必须受同一把锁保护或改用原子等待/谓词等待；否则存在“先通知后等待”的丢失唤醒风险。
+- 数据单位统一：LockFreeRingBuffer<T> 的 count 单位是元素数；音频场景若 T=int16_t，应传入 samples 而不是 frames，否则会半写半读。
+- 条件变量通知：通知要在持锁下发生，但避免在已持锁路径再次上锁；应由调用方在持锁下通知，避免 WriteWait/ReadWait 自锁死。
+- 帧节奏器：用递增 deadline 纠正漂移，精调阶段避免 yield；sleep 预留按帧周期比例计算，SetTargetFps 后重置 deadline 初始化。
+
+## Notes
+- 采样率不匹配时使用轻量 4 点 Hermite 插值重采样，`skew` 限幅 ±0.5%，更新周期 ≥50ms。
+- 停止时确保 `running=false` 并 `notify_all()`，避免 `ReadWait/WriteWait` 死锁。
+- 回调路径已切换为阻塞拉取优先（小颗粒度≈10ms），正常态下避免 INVALID；异常/停止时快速退出。
+ - 日志策略：阻塞/恢复日志限流（前 3 次与每 250 次），API12 回调标记 INVALID 原因（running=false/不足），API11 路径在静音补齐时记录一次提示以便分析。
+ - dt 统计口径：在 API 12 回调进入处取时间，dt 包含上一次回调内部 `ReadWait` 的阻塞时长；正常期望 ≈20ms，显著偏大表示“等待供给”。
+ - 帧/样本口径：`frames` 为帧数；`[ReadWait] need/avail` 为样本数（含多声道）。以 48k/2ch/I16 为例，960 帧=1920 样本。
+ - 前后台策略实现：在 `EntryAbility.ets` 引入 `libentry.so` 并于 `onBackground()` 处理后台暂停；记录日志以便诊断异常；后续可考虑提供“广播暂停所有实例”接口以兼容多页面场景。
+- ArkTS 编译器规则：`arkts-no-types-in-catch` 与“catch 变量类型仅可 any/unknown”的组合，实践方案是保持 `catch (e)` 无类型注解，并在函数体内安全地解析 `e`；同时避免在其他位置使用 `any/unknown`，改用明确的接口类型（例如 `LibentryNapi`）并断言为该接口。
+- ArkUI 组件用法：`Switch` 使用 `checked` 属性而非 `state`，需要时用 `$` 做双向绑定，例如 `Switch({ checked: $autoAdjust })`；`onChange((v:boolean)=>{})` 回调参数为布尔值。
+- NAPI 类型声明：为新增接口及时补齐 `entry/src/main/cpp/types/libentry/index.d.ts` 声明（如 `refactoredSetMinimumAudioLatency(latencyMs:number):boolean`），避免 ArkTS 类型缺失导致编译报错。
+ - 音频复位策略：当切换 ROM/核心且采样率不变时，`AudioBridge::Reset()` 不能直接早退；需要重新 `running_=true` 并清空/重置 RingBuffer 和重采样器（`resampler_.Init(core_rate, 48k)`，`drc_skew=1.0`）。否则 `WriteWait(..., running_)` 会因 `running_=false` 早退，导致缓冲永远为 0、播放器不启动，表现为“切换后无声”。
+- 引擎消息队列复位：`LibretroEngine::Stop()` 在推送 `Stop` 后调用 `messageQueue_.Close()` 会让队列永久关闭；后续 `Start()` 新线程中的 `WaitAndPop` 直接返回 false，导致 GameLoop 立即退出。已新增 `ThreadSafeQueue::Reopen()`，并在 `LibretoEngine::Start()` 中调用，修复“停止后无法重启”这一与音频 running_ 类似的生命周期复位问题。
+- 锁的释放方式：不要手动调用 `std::lock_guard` 的析构（例如 `lock.~lock_guard()`），这是未定义行为且可能双重解锁/崩溃。需要提前解锁时改用 `std::unique_lock` 并显式 `unlock()`，或重构为“锁外调用”。
+- OHAudio 拉取策略现状：`AudioPlayer` 的 API11/API12 回调当前用 `RingBuffer::Read`（不足时静音补齐）并返回有效数据；若要实现“不足则 INVALID 或阻塞”的策略，需切换为 `ReadWait` 或按版本返回语义分流。
+- 帧节奏检查：`VideoPipeline::Render` 仅调用 `FramePacer::BeginFrame`，丢帧路径未调用 `EndFrame`，导致丢帧补偿未实际生效。
+
+- 事件总线：已事件化 `fps_update/audio_status/options_update/pixel_format_update/geometry_update/core_message/core_crash/disk_control`；`EventBridge` 对 `fps_update` 做 500ms 限流，关键事件（如 `core_crash`）使用 `force` 直通。
+- Core Options：新增 NAPI `refactoredGetCoreOptions/refactoredSetCoreOption`，前端以 JSON 数组解析显示；持久化通过 `core_options_config_path_`（`core_options_registry.cpp`）读写，`EnvState.ConsumeVariableUpdated()` 触发 UI 刷新。
+- 渲染优化：`VideoPipeline.Render` 在源帧完全覆盖目标（无黑边）时跳过背景清零，减少不必要的 `memset`；仍保证非全覆盖情况下清零黑边。
+- 统计可视化：ArkTS 测试页已接入统计查询与重置 UI，便于观察 `dupe/null` 帧与音频缓冲占用、欠载/过载次数。
+
+## Tasks
+[X] Phase 2 方案对照鸿蒙 OHAudio/Workgroup 与 Libretro 规范
+[X] 总结 API 版本差异（Renderer 回调、帧大小）与实现细则
+[X] 记录音频驱动循环与 DRC 的工程边界与建议
+[X] 统一输出 48k、实现 Hermite 重采样与 DRC 的集成
+[X] M1 日志现象记录与结论整理
+[X] 后台自动暂停策略上线（EntryAbility.onBackground）
+[X] 修复 ArkTS catch 类型编译错误（EntryAbility.onBackground）
+[X] 修复同采样率 Reset 后无声问题（AudioBridge running_ 复位）
+[X] 修复 Stop 后队列未重开导致引擎线程立即退出（添加 Reopen 并在 Start 调用）
+[X] 事件总线扩展与 FPS 显示（LibretroNewArchTestPage）
+[X] Core Options UI 集成与切换（LibretroNewArchTestPage）
+[X] 统计查询与重置按钮（LibretroNewArchTestPage）
+[X] 音频稳态与监控：ArkTS 告警与自动调节最小延迟
+[X] 新增 NAPI：refactoredSetMinimumAudioLatency 并接入页面
+[X] 分析 LockFreeRingBuffer 实现与音频调用场景并记录结论
+[X] 复核本次环形缓冲修复并给出评价
+[ ] 继续代码审查：动态库加载一致性、线程生命周期、音视频资源释放
+[X] 核对两页面布局与组件差异并给结论
+[ ] 细查 ETS 页面与核心接口对齐情况并输出差异
+[X] 深度核查高优修复落地与回归风险
+[X] 复核指定文件与问题清单一致性
+[X] 复核指定文件风险点并输出清单
+[X] 从问题清单移除已修复条目
+[X] 修复丢帧补偿逻辑并补齐帧节奏收尾
+[X] 改进配置冷却逻辑避免误伤合法重配
+[X] 同步更新问题与解决方案文档条目
+[X] 改进帧节奏器时序与等待策略
+[X] 评审音频模块关键文件并输出结论

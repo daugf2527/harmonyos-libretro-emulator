@@ -1,0 +1,14 @@
+{
+  "devices": {
+    "general": [
+      "phone"
+    ]
+  },
+  "development": {
+    "addedSysCaps": [
+      "SystemCapability.Graphic.Graphic2D.NativeDrawing",
+      "SystemCapability.Graphic.Graphic2D.NativeWindow",
+      "SystemCapability.Graphic.Graphic2D.NativeXComponent"
+    ]
+  }
+}

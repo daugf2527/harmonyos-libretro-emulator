@@ -1,0 +1,9 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/CoreLoaderTest",
+    "pages/TestGambatte",
+    "pages/LibretroGamePage",
+    "pages/LibretroNewArchTestPage"
+  ]
+}

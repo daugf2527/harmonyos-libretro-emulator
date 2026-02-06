@@ -1,0 +1,1198 @@
+asd@asddeMac-mini drawing-to-xcomponent %   hdc shell "hilog -v time" | grep -E '\[GLES_DIAG\]|DGLES|EGL|GLESRenderer|VideoPipeline'
+02-05 13:55:11.445 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD68580 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=172lot=2 ns=28500 ptr=0000007F7DD68580 err=0x0
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=17280 patxSubImage ns=4667
+02-05 13:55:12.111 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:12.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=17280
+02-05 13:55:12.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=17ok=1 ns=16900417
+02-05 13:55:12.161 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:12.778 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:13.444 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD68700 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=174lot=2 ns=26542 ptr=0000007F7DD68700 err=0x0
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=17400 patxSubImage ns=4333
+02-05 13:55:14.110 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:14.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=17400
+02-05 13:55:14.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=17ok=1 ns=17053250
+02-05 13:55:14.161 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:14.781 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:15.448 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD685C0 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=175lot=2 ns=39292 ptr=0000007F7DD685C0 err=0x0
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=17520 patxSubImage ns=5333
+02-05 13:55:16.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:16.131 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=17520
+02-05 13:55:16.131 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=17ok=1 ns=16879458
+02-05 13:55:16.164 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:16.781 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:17.447 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD68C80 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=176lot=2 ns=30292 ptr=0000007F7DD68C80 err=0x0
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=17640 patxSubImage ns=4708
+02-05 13:55:18.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:18.131 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=17640
+02-05 13:55:18.131 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=17ok=1 ns=15596791
+02-05 13:55:18.165 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:18.781 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:19.448 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:20.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:20.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD68AC0 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=177lot=2 ns=27750 ptr=0000007F7DD68AC0 err=0x0
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=17760 patxSubImage ns=4875
+02-05 13:55:20.115 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:20.131 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=17760
+02-05 13:55:20.131 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=17ok=1 ns=15836625
+02-05 13:55:20.164 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:20.781 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:21.447 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD68D00 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=178lot=2 ns=27334 ptr=0000007F7DD68D00 err=0x0
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=17880 patxSubImage ns=4916
+02-05 13:55:22.114 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:22.130 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=17880
+02-05 13:55:22.130 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=17ok=1 ns=16544583
+02-05 13:55:22.163 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:22.781 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:23.448 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD68F00 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=180lot=2 ns=42084 ptr=0000007F7DD68F00 err=0x0
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18000 patxSubImage ns=5375
+02-05 13:55:24.113 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:24.130 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18000
+02-05 13:55:24.130 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=16563750
+02-05 13:55:24.164 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:24.781 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:25.460 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DCCBD80 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=181lot=2 ns=28625 ptr=0000007F7DCCBD80 err=0x0
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18120 patxSubImage ns=4958
+02-05 13:55:26.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:26.143 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18120
+02-05 13:55:26.143 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=16058333
+02-05 13:55:26.177 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:26.794 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:27.460 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DCCBC40 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=182lot=2 ns=42583 ptr=0000007F7DCCBC40 err=0x0
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18240 patxSubImage ns=6375
+02-05 13:55:28.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:28.144 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18240
+02-05 13:55:28.144 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=16524625
+02-05 13:55:28.177 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:28.795 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:29.461 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:30.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DCCBD80 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=183lot=2 ns=67917 ptr=0000007F7DCCBD80 err=0x0
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18360 patxSubImage ns=26666
+02-05 13:55:30.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:30.144 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18360
+02-05 13:55:30.144 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=15681458
+02-05 13:55:30.177 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:30.796 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:31.461 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:32.126 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:32.126 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:32.126 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:32.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:32.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DCCB9C0 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:32.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:32.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=184lot=2 ns=27708 ptr=0000007F7DCCB9C0 err=0x0
+02-05 13:55:32.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:32.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:32.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18480 patxSubImage ns=5000
+02-05 13:55:32.127 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:32.143 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18480
+02-05 13:55:32.143 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=16772917
+02-05 13:55:32.177 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:32.795 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:33.460 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DCCBF80 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=186lot=2 ns=67125 ptr=0000007F7DCCBF80 err=0x0
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18600 patxSubImage ns=8917
+02-05 13:55:34.128 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:34.144 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18600
+02-05 13:55:34.144 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=16233667
+02-05 13:55:34.177 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:34.794 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:35.461 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:36.139 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:36.139 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:36.139 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:36.139 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:36.140 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DCCB800 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:36.140 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:36.140 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=187lot=2 ns=96084 ptr=0000007F7DCCB800 err=0x0
+02-05 13:55:36.140 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:36.140 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:36.140 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18720 patxSubImage ns=9041
+02-05 13:55:36.140 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:36.156 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18720
+02-05 13:55:36.156 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=16627833
+02-05 13:55:36.190 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:36.806 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:37.491 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD68E80 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=188lot=2 ns=120084 ptr=0000007F7DD68E80 err=0x0
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18840 patxSubImage ns=5291
+02-05 13:55:38.157 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:38.174 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18840
+02-05 13:55:38.174 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=16719042
+02-05 13:55:38.207 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:55:38.823 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:39.593 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:40.269 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009AD5DA00 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9EDCD480 tid=547724720520
+02-05 13:55:40.269 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F7DD0DDB0 cur_draw=0000007F7DD0DE40 cur_read=0000007F7DD0DE40 egl_display=0000007FAFC221E8 egl_context=0000007F7DD0DDB0 egl_surface=0000007F7DD0DE40
+02-05 13:55:40.269 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:55:40.269 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:55:40.270 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0xA ptr=0000007F7DD6BE00 err=0x0 mapped=1 len=-1 off=-1 access=0xA err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:55:40.270 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:55:40.270 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=189lot=2 ns=251166 ptr=0000007F7DD6BE00 err=0x0
+02-05 13:55:40.270 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:55:40.270 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:55:40.270 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=18960 patxSubImage ns=10125
+02-05 13:55:40.270 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:55:40.285 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=18960
+02-05 13:55:40.286 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=18ok=1 ns=15552833
+02-05 13:55:40.322 24074 30655 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:57:10.197   817   928 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 957996 speed 352k/s API_num 8525
+02-05 13:57:17.029  6600  8600 I A0d003/CoreLoader: 【CoreLoader】【Core】 Preloaded graphics lib: libEGL.so
+02-05 13:57:17.052   817   928 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 328872 speed 46k/s API_num 3193
+02-05 13:57:17.277  6600  8600 I A0d003/VideoPipeline: 【VideoPipeline】【Video】 Config Update: Mode=2, Src=160x144 -> R008x2040, Win=1008x2040
+02-05 13:57:17.302  6600  8600 I C02515/DGLES: [initialize@egl_display.cpp:118] Initialize display
+02-05 13:57:17.308  6600  8600 W C02515/DGLES: [recycle_resource_id@context_common.cpp:589] null gpu context, give up recycle ids
+02-05 13:57:17.309  6600  8600 W C02515/DGLES: [recycle_resource_id@context_common.cpp:589] null gpu context, give up recycle ids
+02-05 13:57:17.309  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 EGL init: display=0000007FAFC221E8 versio5
+02-05 13:57:17.309  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 EGL config: num=1 RGBA=8/8/8/8 DS=0/0
+02-05 13:57:17.358  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:98] StaticValues size 56945
+02-05 13:57:17.360  6600  8600 W C02515/DGLES: [recycle_resource_id@context_common.cpp:589] null gpu context, give up recycle ids
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:114] static_values_local->major_version: 3:
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:115] static_values_local: ARM
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:116] static_values_local->vendor: ARM
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:117] static_values_local->version: OpenGL ES 3.0 (4.1 Metal - 89.4)
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:118] static_values_local->renderer: Mali-G77
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:119] static_values_local->num_extensions: 73
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:120] shading_language_version: OpenGL ES GLSL ES 3.0
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 0, value: GL_OES_EGL_image
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 1, value: GL_OES_EGL_image_external
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 2, value: GL_OES_EGL_sync
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 3, value: GL_OES_depth24
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 4, value: GL_OES_depth32
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 5, value: GL_OES_texture_float
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 6, value: GL_OES_texture_float_linear
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 7, value: GL_OES_texture_half_float
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 8, value: GL_OES_texture_half_float_linear
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 9, value: GL_OES_depth_texture
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 10, value: GL_OES_EGL_image_external_essl3
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 11, value: GL_KHR_texture_compression_astc_ldr
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 12, value: GL_KHR_texture_compression_astc_hdr
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 13, value: GL_OES_vertex_array_object
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 14, value: GL_EXT_color_buffer_float
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 15, value: GL_EXT_color_buffer_half_float
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 16, value: GL_OES_element_index_uint
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 17, value: GL_OES_texture_float_linear
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 18, value: GL_OES_compressed_paletted_texture
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 19, value: GL_OES_packed_depth_stencil
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 20, value: GL_OES_texture_npot
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 21, value: GL_OES_rgb8_rgba8
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 22, value: GL_OES_framebuffer_object
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 23, value: GL_ARB_texture_non_power_of_two
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 24, value: GL_OES_blend_func_separate
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 25, value: GL_OES_blend_equation_separate
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 26, value: GL_OES_blend_subtract
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 27, value: GL_OES_byte_coordinates
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 28, value: GL_OES_point_size_array
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 29, value: GL_OES_point_sprite
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 30, value: GL_OES_single_precision
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 31, value: GL_OES_stencil_wrap
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 32, value: GL_OES_texture_env_crossbar
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 33, value: GL_OES_texture_mirrored_repeat
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 34, value: GL_OES_texture_cube_map
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 35, value: GL_OES_draw_texture
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 36, value: GL_OES_fbo_render_mipmap
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 37, value: GL_OES_stencil8
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 38, value: GL_EXT_blend_minmax
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 39, value: GL_OES_standard_derivatives
+02-05 13:57:17.360  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 40, value: GL_EXT_robustness
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 41, value: GL_EXT_copy_image
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 42, value: GL_EXT_texture_buffer
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 43, value: GL_OES_vertex_half_float
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 44, value: GL_KHR_blend_equation_advanced
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 45, value: GL_EXT_shader_io_blocks
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 46, value: GL_EXT_texture_sRGB_decode
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 47, value: GL_KHR_debug
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 48, value: GL_OES_sample_shading
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 49, value: GL_OES_sample_variables
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 50, value: GL_OES_texture_stencil8
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 51, value: GL_EXT_geometry_shader
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 52, value: GL_EXT_gpu_shader5
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 53, value: GL_OES_shader_multisample_interpolation
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 54, value: GL_EXT_tessellation_shader
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 55, value: GL_EXT_texture_border_clamp
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 56, value: GL_EXT_texture_cube_map_array
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 57, value: GL_OES_shader_image_atomic
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 58, value: GL_EXT_draw_buffers_indexed
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 59, value: GL_OES_texture_storage_multisample_2d_array
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 60, value: GL_EXT_primitive_bounding_box
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 61, value: GL_OES_primitive_bounding_box
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 62, value: GL_KHR_robustness
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 63, value: GL_KHR_robust_buffer_access_behavior
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 64, value: GL_OES_copy_image
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 65, value: GL_EXT_draw_elements_base_vertex
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 66, value: GL_OES_geometry_shader
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 67, value: GL_OES_shader_io_blocks
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 68, value: GL_OES_texture_border_clamp
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 69, value: GL_OES_texture_buffer
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 70, value: GL_OES_texture_cube_map_array
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 71, value: GL_OES_surfaceless_context
+02-05 13:57:17.361  6600  8600 I C02515/DGLES: [init_process_static_context_values@context_common.cpp:126] static_values_local->num_extensions index: 72, value: GL_OES_texture_compression_astc
+02-05 13:57:17.361  6600  8600 W C02515/DGLES: [recycle_resource_id@context_common.cpp:589] null gpu context, give up recycle ids
+02-05 13:57:17.365  6600  8600 W C02515/DGLES: [recycle_resource_id@context_common.cpp:589] null gpu context, give up recycle ids
+02-05 13:57:17.365  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 EGL surface created: window=0000007F9E4D3surface=0000007F9E02D2D0 context=0000007F9E02D150
+02-05 13:57:17.387  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 EGL surface size: 1008x2040
+02-05 13:57:17.388  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 Viewport set: 1008x2040
+02-05 13:57:17.399  6600  8600 W A0d003/GLESRenderer: 【GLESRenderer】【Video】 dlopen libxengine.so failed
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 GLES info: OpenGL ES 3.0 (4.1 Metal - 89. Mali-G77
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES vendor: ARM
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES GLSL: OpenGL ES GLSL ES 3.0
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 GLESRenderer initialized successfully
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 XEngine AI Upscale: OFF
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame begin: id=1 dupe=0e=160x144
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009D7796C0 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9E4D3580 tid=547587160456
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F9E02D150 cur_draw=0000007F9E02D2D0 cur_read=0000007F9E02D2D0 egl_display=0000007FAFC221E8 egl_context=0000007F9E02D150 egl_surface=0000007F9E02D2D0
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO slot free: slot=0 ring_si index=0
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=1 slotence=0000000000000000
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=1 slotence=0000000000000000
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=1 slotence=0000000000000000
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=0 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=0 bind=2 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:57:17.399  6600  8600 E C02515/DGLES: [d_glGetBufferParameteriv@glv3_guest_handle.cpp:867] invalid enum! pname: 9120
+02-05 13:57:17.399  6600  8600 E C02515/DGLES: [set_gl_error_origin@glv3_status.cpp:3011] glError set GL_INVALID_ENUM d_glGetBufferParameteriv
+02-05 13:57:17.399  6600  8600 E C02515/DGLES: [get_gl_error@glv3_status.cpp:3037] get_gl_error return GL_INVALID_ENUM
+02-05 13:57:17.399  6600  8600 E C02515/DGLES: [d_glGetError@glv3_guest_handle.cpp:107] GL Error is 0x500
+02-05 13:57:17.399  6600  8600 E C02515/DGLES: [d_glGetBufferParameteriv@glv3_guest_handle.cpp:867] invalid enum! pname: 9121
+02-05 13:57:17.399  6600  8600 E C02515/DGLES: [set_gl_error_origin@glv3_status.cpp:3011] glError set GL_INVALID_ENUM d_glGetBufferParameteriv
+02-05 13:57:17.399  6600  8600 E C02515/DGLES: [get_gl_error@glv3_status.cpp:3037] get_gl_error return GL_INVALID_ENUM
+02-05 13:57:17.399  6600  8600 E C02515/DGLES: [d_glGetError@glv3_guest_handle.cpp:107] GL Error is 0x500
+02-05 13:57:17.399  6600  8600 W A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map params unsupported (GVALID_ENUM), skip map length/offset queries
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=0 size=73728 mo flags=0x2 ptr=0000007F9DF340C0 err=0x0 mapped=1 len=0 off=0 access=0x2 err_mapped=0x0 err_len=0x500 err_off=0x500 err_access=0x0
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=0 ok=1 err=0x0
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=1 s0 ns=43792 ptr=0000007F9DF340C0 err=0x0
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after pixel_store
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:57:17.399  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 GLES PBO render: slot=0 size=73728 row=25t=2 align=4
+02-05 13:57:17.400  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexImagee=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:57:17.400  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=1 path=Tege ns=571541
+02-05 13:57:17.400  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after tex_upload
+02-05 13:57:17.400  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence created: slot=0
+02-05 13:57:17.400  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:57:17.410  6600  8600 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:563] sync get ret 0 error 1 sync_fd 51
+02-05 13:57:17.410  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=1
+02-05 13:57:17.410  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=1  ns=10581667
+02-05 13:57:17.411  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame end: id=1
+02-05 13:57:17.412   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.416   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.433  6600  8600 I A0d003/VideoPipeline: 【VideoPipeline】【Video】 Config Update: Mode=2, Src=160x144 -> R008x2040, Win=1008x2040
+02-05 13:57:17.433  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame begin: id=2 dupe=0e=160x144
+02-05 13:57:17.433  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009D7796C0 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9E4D3580 tid=547587160456
+02-05 13:57:17.434  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F9E02D150 cur_draw=0000007F9E02D2D0 cur_read=0000007F9E02D2D0 egl_display=0000007FAFC221E8 egl_context=0000007F9E02D150 egl_surface=0000007F9E02D2D0
+02-05 13:57:17.434  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO slot free: slot=1 ring_si index=1
+02-05 13:57:17.434  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=2 slotence=0000000000000001
+02-05 13:57:17.434  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=2 slotence=0000000000000000
+02-05 13:57:17.434  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=2 slotence=0000000000000000
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=1 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=1 bind=3 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=1 size=73728 mo flags=0x2 ptr=0000007F9DF603C0 err=0x0 mapped=1 len=-1 off=-1 access=0x2 err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=1 ok=1 err=0x0
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=2 s1 ns=26625 ptr=0000007F9DF603C0 err=0x0
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after pixel_store
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 GLES PBO render: slot=1 size=73728 row=25t=2 align=4
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=2 path=TeImage ns=9541
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after tex_upload
+02-05 13:57:17.435  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence created: slot=1
+02-05 13:57:17.570  6600  8600 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:563] sync get ret 0 error 1 sync_fd 53
+02-05 13:57:17.570  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=2
+02-05 13:57:17.570  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=2  ns=135764542
+02-05 13:57:17.570  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame end: id=2
+02-05 13:57:17.571   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.572   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.577  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame begin: id=3 dupe=0e=160x144
+02-05 13:57:17.577  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009D7796C0 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9E4D3580 tid=547587160456
+02-05 13:57:17.577  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F9E02D150 cur_draw=0000007F9E02D2D0 cur_read=0000007F9E02D2D0 egl_display=0000007FAFC221E8 egl_context=0000007F9E02D150 egl_surface=0000007F9E02D2D0
+02-05 13:57:17.577  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO slot free: slot=2 ring_si index=2
+02-05 13:57:17.577  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=3 slotence=0000000000000001
+02-05 13:57:17.577  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=3 slotence=0000000000000003
+02-05 13:57:17.577  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=3 slotence=0000000000000000
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0x2 ptr=0000007F9DF8D440 err=0x0 mapped=1 len=-1 off=-1 access=0x2 err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=3 s2 ns=65959 ptr=0000007F9DF8D440 err=0x0
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 GLES PBO render: slot=2 size=73728 row=25t=2 align=4
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=3 path=TeImage ns=11708
+02-05 13:57:17.578  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence created: slot=2
+02-05 13:57:17.586  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=3
+02-05 13:57:17.586  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=3  ns=7144500
+02-05 13:57:17.586  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame end: id=3
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame begin: id=4 dupe=0e=160x144
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009D7796C0 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9E4D3580 tid=547587160456
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F9E02D150 cur_draw=0000007F9E02D2D0 cur_read=0000007F9E02D2D0 egl_display=0000007FAFC221E8 egl_context=0000007F9E02D150 egl_surface=0000007F9E02D2D0
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =0 res=37146
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=4 slotence=0000000000000000
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=4 slotence=0000000000000003
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=4 slotence=0000000000000005
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=0 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=0 bind=2 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:57:17.587  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 2
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=0 size=73728 mo flags=0x2 ptr=0000007F9DF8D1C0 err=0x0 mapped=1 len=-1 off=-1 access=0x2 err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=0 ok=1 err=0x0
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=4 s0 ns=43333 ptr=0000007F9DF8D1C0 err=0x0
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=4 path=TeImage ns=5667
+02-05 13:57:17.587  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence created: slot=0
+02-05 13:57:17.597   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.597   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.607  6600  8600 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:563] sync get ret 0 error 1 sync_fd 55
+02-05 13:57:17.607  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=4
+02-05 13:57:17.607  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=4  ns=19344000
+02-05 13:57:17.607  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame end: id=4
+02-05 13:57:17.608  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame begin: id=5 dupe=0e=160x144
+02-05 13:57:17.608  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009D7796C0 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9E4D3580 tid=547587160456
+02-05 13:57:17.608  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F9E02D150 cur_draw=0000007F9E02D2D0 cur_read=0000007F9E02D2D0 egl_display=0000007FAFC221E8 egl_context=0000007F9E02D150 egl_surface=0000007F9E02D2D0
+02-05 13:57:17.608  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =1 res=37146
+02-05 13:57:17.608  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=5 slotence=0000000000000007
+02-05 13:57:17.608  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=5 slotence=0000000000000000
+02-05 13:57:17.608  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence state: frame=5 slotence=0000000000000005
+02-05 13:57:17.608  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=1 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:57:17.610  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=1 bind=3 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:57:17.610  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 2
+02-05 13:57:17.610  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=1 size=73728 mo flags=0x2 ptr=0000007F9DF8D580 err=0x0 mapped=1 len=-1 off=-1 access=0x2 err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:57:17.610  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=1 ok=1 err=0x0
+02-05 13:57:17.610  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=5 s1 ns=157125 ptr=0000007F9DF8D580 err=0x0
+02-05 13:57:17.610  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:57:17.611  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:57:17.611  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=5 path=TeImage ns=34000
+02-05 13:57:17.613   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.613  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO fence created: slot=1
+02-05 13:57:17.613   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.624  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=5
+02-05 13:57:17.624  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=5  ns=11499958
+02-05 13:57:17.624  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES frame end: id=5
+02-05 13:57:17.626  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:57:17.627  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 2
+02-05 13:57:17.629   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.629   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.641  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =0 res=37146
+02-05 13:57:17.642  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 3
+02-05 13:57:17.646   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.647   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.658  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =1 res=37146
+02-05 13:57:17.658  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 3
+02-05 13:57:17.659   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.660   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.674  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:57:17.674  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 3
+02-05 13:57:17.676   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.676   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.692  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =0 res=37146
+02-05 13:57:17.692  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 4
+02-05 13:57:17.692   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.693   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.707  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =1 res=37146
+02-05 13:57:17.707  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 4
+02-05 13:57:17.710   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.710   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.721  6600  8600 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:563] sync get ret 0 error 1 sync_fd 57
+02-05 13:57:17.725  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:57:17.725  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 4
+02-05 13:57:17.727   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.728   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.742  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =0 res=37146
+02-05 13:57:17.742  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 5
+02-05 13:57:17.745   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.748   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.761   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.762  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 5
+02-05 13:57:17.763   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.775  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 5
+02-05 13:57:17.776   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.777   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.791  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 6
+02-05 13:57:17.793   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.793   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.808  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 6
+02-05 13:57:17.809   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.809   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.825  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 6
+02-05 13:57:17.827   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.828   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.841  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 7
+02-05 13:57:17.843   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.845   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.858  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 7
+02-05 13:57:17.859   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.860   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.927  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 7
+02-05 13:57:17.929   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.933   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.944  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 8
+02-05 13:57:17.946   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.948   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.961   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.961  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 8
+02-05 13:57:17.961   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.965  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 8
+02-05 13:57:17.976   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.976   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.982  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 9
+02-05 13:57:17.992   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:17.993   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:17.998  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 9
+02-05 13:57:18.009   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.010   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.015  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 9
+02-05 13:57:18.025   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.026   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.032  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 10
+02-05 13:57:18.044   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.044   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.049  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 10
+02-05 13:57:18.056   817   928 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 2222441 speed 2163k/s API_num 17900
+02-05 13:57:18.063   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.063   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.065  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 10
+02-05 13:57:18.074   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.074   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.089  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 11
+02-05 13:57:18.263   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.264  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 11
+02-05 13:57:18.274   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.340  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 11
+02-05 13:57:18.361   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.367   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.387  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 12
+02-05 13:57:18.686  6600  8600 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 2609762 speed 1998k/s API_num 952
+02-05 13:57:18.691  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 12
+02-05 13:57:18.694   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.722   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.855   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.856   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.857  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 12
+02-05 13:57:18.884   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.885  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 13
+02-05 13:57:18.886   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.910   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.910   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.913  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 13
+02-05 13:57:18.947   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.949   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:18.953  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 13
+02-05 13:57:18.974   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:18.983  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 14
+02-05 13:57:18.983  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:57:18.983   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.011   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.011   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.014  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 14
+02-05 13:57:19.045   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.047  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 14
+02-05 13:57:19.050   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.062   817   928 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 802392 speed 778k/s API_num 6060
+02-05 13:57:19.064   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.065  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 15
+02-05 13:57:19.067   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.079   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.080  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 15
+02-05 13:57:19.084   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.102   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.105  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 15
+02-05 13:57:19.117   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.128   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.130  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 16
+02-05 13:57:19.132   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.153  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 16
+02-05 13:57:19.154   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.158   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.177   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.178  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 16
+02-05 13:57:19.199   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.208   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.210  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 17
+02-05 13:57:19.223   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.238   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.243  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 17
+02-05 13:57:19.252   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.264   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.265  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 17
+02-05 13:57:19.267   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.283   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.285   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.287  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 18
+02-05 13:57:19.301   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.301  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 18
+02-05 13:57:19.301   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.314   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.314   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.315  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 18
+02-05 13:57:19.323   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.323   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.323  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 19
+02-05 13:57:19.339   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.341   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.343  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 19
+02-05 13:57:19.355   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.356   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.357  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 19
+02-05 13:57:19.371   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.372   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.374  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 20
+02-05 13:57:19.388   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.389   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.391  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 20
+02-05 13:57:19.405   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.406   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.408  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 20
+02-05 13:57:19.421   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.421   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.424  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 21
+02-05 13:57:19.439   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.439   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.442  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 21
+02-05 13:57:19.455   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.456  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 21
+02-05 13:57:19.457   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.472   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.475   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.476  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 22
+02-05 13:57:19.489   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.491  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 22
+02-05 13:57:19.493   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.506   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.507  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 22
+02-05 13:57:19.509   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.521   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.523  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 23
+02-05 13:57:19.524   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.545   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.546   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.548  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 23
+02-05 13:57:19.557   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.560  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 23
+02-05 13:57:19.561   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.572   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.572   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.577  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 24
+02-05 13:57:19.588   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.590  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 24
+02-05 13:57:19.591   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.610  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 24
+02-05 13:57:19.610   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.613   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.624   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.625   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.626  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 25
+02-05 13:57:19.641   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.642   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.646  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 25
+02-05 13:57:19.657   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.658   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.661  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 25
+02-05 13:57:19.674   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.675   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.677  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 26
+02-05 13:57:19.691   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.691   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.692  6600  8600 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 3146766 speed 3052k/s API_num 1134
+02-05 13:57:19.693  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 26
+02-05 13:57:19.706   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.707   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.710  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 26
+02-05 13:57:19.723   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.724   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.727  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 27
+02-05 13:57:19.739   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.742   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.744  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 27
+02-05 13:57:19.744  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:57:19.756   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.756   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.760  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 27
+02-05 13:57:19.775   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.776   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.777  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 28
+02-05 13:57:19.792   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.794   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.795  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 28
+02-05 13:57:19.807   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.809   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.809  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 28
+02-05 13:57:19.824   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.825   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.829  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 29
+02-05 13:57:19.842   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.843   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.844  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 29
+02-05 13:57:19.857   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.857   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.860  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 29
+02-05 13:57:19.872   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.874   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.877  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 30
+02-05 13:57:19.897  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 30
+02-05 13:57:19.900   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.900   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.910   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.911   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.912  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 30
+02-05 13:57:19.921   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.922   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.930  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 31
+02-05 13:57:19.942   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.943   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.947  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 31
+02-05 13:57:19.957   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.959   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.963  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 31
+02-05 13:57:19.972   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.973   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.980  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 32
+02-05 13:57:19.992   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:19.992   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:19.997  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 32
+02-05 13:57:20.007   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.009   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.013  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 32
+02-05 13:57:20.022   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.023   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.032  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 33
+02-05 13:57:20.041   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.042   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.052  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 33
+02-05 13:57:20.062   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.062   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.063  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 33
+02-05 13:57:20.071   817   928 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 3690672 speed 3572k/s API_num 28735
+02-05 13:57:20.072   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.072   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.079  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 34
+02-05 13:57:20.093   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.096  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 34
+02-05 13:57:20.097   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.109   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.113   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.116  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 34
+02-05 13:57:20.123   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.124   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.130  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 35
+02-05 13:57:20.140   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.140   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.146  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 35
+02-05 13:57:20.158   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.159   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.162  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 35
+02-05 13:57:20.174   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.175   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.181  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 36
+02-05 13:57:20.191   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.192   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.197  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 36
+02-05 13:57:20.208   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.211   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.213  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 36
+02-05 13:57:20.224   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.225   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.229  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 37
+02-05 13:57:20.242   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.244   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.246  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 37
+02-05 13:57:20.258   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.259   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.263  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 37
+02-05 13:57:20.274   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.275   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.279  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 38
+02-05 13:57:20.291   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.291   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.296  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 38
+02-05 13:57:20.308   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.309   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.313  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 38
+02-05 13:57:20.324   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.325   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.329  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 39
+02-05 13:57:20.342   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.345   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.346  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 39
+02-05 13:57:20.358   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.359   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.363  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 39
+02-05 13:57:20.374   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.376   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.380  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 40
+02-05 13:57:20.391   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.394   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.397  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 40
+02-05 13:57:20.407   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.410   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.413  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES render params: data=00009D7796C0 size=160x144 pitch=512 row=256 bpp=2 fmt=2 dupe=0 viewport=1008x2040 window=0000007F9E4D3580 tid=547587160456
+02-05 13:57:20.413  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GLES context: cur_display=000FAFC221E8 cur_context=0000007F9E02D150 cur_draw=0000007F9E02D2D0 cur_read=0000007F9E02D2D0 egl_display=0000007FAFC221E8 egl_context=0000007F9E02D150 egl_surface=0000007F9E02D2D0
+02-05 13:57:20.413  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO buffer params: slot=2 siz728 usage=0x88E0 err_size=0x0 err_usage=0x0
+02-05 13:57:20.413  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO state: slot=2 bind=4 size28 is_buf=1 err_is_buf=0x0 err_bind=0x0 err_data=0x0 err_bind_query=0x0 err_size_query=0x0
+02-05 13:57:20.413  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 40
+02-05 13:57:20.413  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map: slot=2 size=73728 mo flags=0x2 ptr=0000007F9DF75740 err=0x0 mapped=1 len=-1 off=-1 access=0x2 err_mapped=0x0 err_len=0x0 err_off=0x0 err_access=0x0
+02-05 13:57:20.413  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unmap: slot=2 ok=1 err=0x0
+02-05 13:57:20.413  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO map+copy+unmap: frame=120t=2 ns=177625 ptr=0000007F9DF75740 err=0x0
+02-05 13:57:20.414  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO unpack: align=4 row_len=2rr_align=0x0 err_row=0x0
+02-05 13:57:20.414  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex upload: path=TexSubImsize=160x144 fmt=2 type=33635 bound_tex=1 err_tex_bind=0x0
+02-05 13:57:20.414  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO tex time: frame=120 path=ubImage ns=10958
+02-05 13:57:20.414  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:57:20.429  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers ok: frame=120
+02-05 13:57:20.429  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] eglSwapBuffers time: frame=12=1 ns=15422792
+02-05 13:57:20.430  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 41
+02-05 13:57:20.435   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.444   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.463   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.463  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 41
+02-05 13:57:20.470   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.503  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] PBO wait (non-block) sample: =2 res=37146
+02-05 13:57:20.503  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 41
+02-05 13:57:20.511   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.512   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.523  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 42
+02-05 13:57:20.526   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.527   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.545  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 42
+02-05 13:57:20.548   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.551   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.561   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.561   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.565  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 42
+02-05 13:57:20.572  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 43
+02-05 13:57:20.579   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.581   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.588   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.597  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 43
+02-05 13:57:20.602   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.605   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.608  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 43
+02-05 13:57:20.612   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.623   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.625  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 44
+02-05 13:57:20.628   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.640   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.641   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.644  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 44
+02-05 13:57:20.654   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.655   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.658  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 44
+02-05 13:57:20.671   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.672   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.674  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 45
+02-05 13:57:20.688   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.689   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.692  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 45
+02-05 13:57:20.708  6600  8600 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 4345534 speed 4176k/s API_num 1566
+02-05 13:57:20.709  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 45
+02-05 13:57:20.711   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.711   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.722   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.722   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.726  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 46
+02-05 13:57:20.747   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.749   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.750  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 46
+02-05 13:57:20.755   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.762   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.766  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 46
+02-05 13:57:20.771   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.773   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.783  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 47
+02-05 13:57:20.788   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.791   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.799  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 47
+02-05 13:57:20.804   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.805   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.816  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 47
+02-05 13:57:20.821   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.821   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.833  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 48
+02-05 13:57:20.838   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.840   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.849  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 48
+02-05 13:57:20.854   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.857   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.865  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 48
+02-05 13:57:20.871   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.874   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.882  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 49
+02-05 13:57:20.887   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.890   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.899  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 49
+02-05 13:57:20.905   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.906   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.916  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 49
+02-05 13:57:20.921   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.922   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.932  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 50
+02-05 13:57:20.938   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.942   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.950  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 50
+02-05 13:57:20.955   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.959   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.966  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 50
+02-05 13:57:20.971   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.971   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.982  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 51
+02-05 13:57:20.987   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:20.987   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:20.999  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 51
+02-05 13:57:21.004   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.005   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.016  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 51
+02-05 13:57:21.021   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.024   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.032  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 52
+02-05 13:57:21.038   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.038   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.050  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 52
+02-05 13:57:21.054   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.056   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.066  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 52
+02-05 13:57:21.072   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.073   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.082  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 53
+02-05 13:57:21.087   817   928 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 3755532 speed 3610k/s API_num 29239
+02-05 13:57:21.087   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.088   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.100  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 53
+02-05 13:57:21.105   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.108   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.116  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 53
+02-05 13:57:21.125   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.129   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.135  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 54
+02-05 13:57:21.135  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:57:21.138   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.156  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 54
+02-05 13:57:21.161   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.168   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.168  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 54
+02-05 13:57:21.183   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.188  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 55
+02-05 13:57:21.192   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.198   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.208  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 55
+02-05 13:57:21.209   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.216   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.230  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 55
+02-05 13:57:21.231   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.231   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.250   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.250  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 56
+02-05 13:57:21.251   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.266   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.266   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.268  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 56
+02-05 13:57:21.283  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 56
+02-05 13:57:21.283   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.283   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.299   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.299  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 57
+02-05 13:57:21.299   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.315   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.317   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.320  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 57
+02-05 13:57:21.332   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.332   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.336  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 57
+02-05 13:57:21.348   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.349   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.353  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 58
+02-05 13:57:21.365   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.366   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.370  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 58
+02-05 13:57:21.381   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.381   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.386  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 58
+02-05 13:57:21.399   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.399   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.403  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 59
+02-05 13:57:21.414   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.415   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.419  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 59
+02-05 13:57:21.431   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.432   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.436  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 59
+02-05 13:57:21.447   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.448   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.454  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 60
+02-05 13:57:21.465   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.465   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.469  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 60
+02-05 13:57:21.481   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.481   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.486  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 60
+02-05 13:57:21.498   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.498   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.502  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 61
+02-05 13:57:21.515   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.515   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.519  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 61
+02-05 13:57:21.531   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.532   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.536  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 61
+02-05 13:57:21.547   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.548   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.552  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 62
+02-05 13:57:21.565   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.565   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.569  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 62
+02-05 13:57:21.582   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.582   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.587  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 62
+02-05 13:57:21.598   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.599   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.603  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 63
+02-05 13:57:21.615   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.615   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.620  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 63
+02-05 13:57:21.632   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.633   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.636  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 63
+02-05 13:57:21.648   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.648   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.653  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 64
+02-05 13:57:21.665   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.665   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.670  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 64
+02-05 13:57:21.681   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.681   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.686  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 64
+02-05 13:57:21.698   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.698   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.703  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 65
+02-05 13:57:21.714   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.715   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.719  6600  8600 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 4420457 speed 4269k/s API_num 1593
+02-05 13:57:21.720  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 65
+02-05 13:57:21.731   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.731   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.736  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 65
+02-05 13:57:21.747   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.748   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.753  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 66
+02-05 13:57:21.765   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.765   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.769  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 66
+02-05 13:57:21.782   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.782   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.788  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 66
+02-05 13:57:21.797   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.798   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.805  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 67
+02-05 13:57:21.814   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.814   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.821  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 67
+02-05 13:57:21.821  6600  8600 I A0d003/GLESRenderer: 【GLESRenderer】【Video】 [GLES_DIAG] GL ok after draw
+02-05 13:57:21.831   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.831   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.838  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 67
+02-05 13:57:21.848   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.848   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.854  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 68
+02-05 13:57:21.864   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.864   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.871  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 68
+02-05 13:57:21.881   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.882   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.888  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 68
+02-05 13:57:21.898   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.898   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.908  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 69
+02-05 13:57:21.914   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.915   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.921  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 69
+02-05 13:57:21.931   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.931   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.937  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 69
+02-05 13:57:21.948   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.948   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.955  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 70
+02-05 13:57:21.965   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.965   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.970  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 70
+02-05 13:57:21.981   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.982   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:21.988  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 70
+02-05 13:57:21.998   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:21.998   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.004  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 71
+02-05 13:57:22.014   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.014   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.021  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 71
+02-05 13:57:22.032   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.032   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.038  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 71
+02-05 13:57:22.048   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.049   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.055  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 72
+02-05 13:57:22.064   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.065   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.071  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 72
+02-05 13:57:22.081   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.082   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.089  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 72
+02-05 13:57:22.097   817   928 E C02515/DGLES: [d_eglSwapBuffers_special@egl_gpu.cpp:725] thread output size 3818688 speed 3690k/s API_num 29743
+02-05 13:57:22.098   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.098   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.104  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 73
+02-05 13:57:22.115   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.115   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.121  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 73
+02-05 13:57:22.131   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.131   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.138  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 73
+02-05 13:57:22.147   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.148   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.155  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 74
+02-05 13:57:22.165   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.165   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.171  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 74
+02-05 13:57:22.181   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.182   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.187  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 74
+02-05 13:57:22.198   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.198   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.204  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 75
+02-05 13:57:22.214   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.215   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.222  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 75
+02-05 13:57:22.231   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.231   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.238  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 75
+02-05 13:57:22.249   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.249   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.255  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 76
+02-05 13:57:22.265   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.265   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.271  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 76
+02-05 13:57:22.282   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.283   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.288  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 76
+02-05 13:57:22.298   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.299   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.305  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 77
+02-05 13:57:22.315   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.315   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.321  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 77
+02-05 13:57:22.332   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.332   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.337  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 77
+02-05 13:57:22.348   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.352   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.354  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 78
+02-05 13:57:22.364   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.364   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.371  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 78
+02-05 13:57:22.381   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.382   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.388  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 4 all_len 73728 offset 0 length 73728 access 2 map_cnt 78
+02-05 13:57:22.398   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.398   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.404  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 2 all_len 73728 offset 0 length 73728 access 2 map_cnt 79
+02-05 13:57:22.415   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.415   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+02-05 13:57:22.421  6600  8600 E C02515/DGLES: [d_glMapBufferRange@glv3_mem.cpp:115] mapbuffer dynamic data is nullptr target 88ec usage 88e0 id 3 all_len 73728 offset 0 length 73728 access 2 map_cnt 79
+02-05 13:57:22.431   817   928 E C02515/DGLES: [d_eglCreateImage_special@egl_gpu.cpp:280] createimage with ctx null opengl_context 7fb0835400
+02-05 13:57:22.431   817   928 E C02515/DGLES: [d_glBindTexture_special@glv3_status.cpp:615] bind external with nullptr gbuffer 0
+^C
+asd@asddeMac-mini drawing-to-xcomponent % 
+
