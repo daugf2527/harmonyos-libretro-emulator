@@ -10,6 +10,12 @@ if ! command -v hvigorw >/dev/null 2>&1; then
   exit 1
 fi
 
+hvigorw_bin="$(command -v hvigorw)"
+if [[ ! -x "${hvigorw_bin}" ]]; then
+  echo "[FAIL] hvigorw is not executable: ${hvigorw_bin}" >&2
+  exit 1
+fi
+
 if ! command -v ohpm >/dev/null 2>&1; then
   echo "[FAIL] ohpm is required in PATH." >&2
   exit 1
@@ -48,9 +54,8 @@ install_deps "${ROOT_DIR}"
 install_deps "${ROOT_DIR}/entry"
 
 echo "[INFO] Running hvigor build..."
-chmod +x "${ROOT_DIR}/hvigorw"
-"${ROOT_DIR}/hvigorw" clean --no-daemon
-"${ROOT_DIR}/hvigorw" assembleHap --mode module \
+"${hvigorw_bin}" clean --no-daemon
+"${hvigorw_bin}" assembleHap --mode module \
   -p module="${module_target}" \
   -p product="${product_name}" \
   -p buildMode="${build_mode}" \
