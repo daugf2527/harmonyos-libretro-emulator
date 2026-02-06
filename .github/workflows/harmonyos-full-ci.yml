@@ -272,8 +272,12 @@ jobs:
             cp "${file}" "${target}"
           done < <(find "${GITHUB_WORKSPACE}/entry/build" -type f -name "*.hap" | sort)
 
-          if [[ -n "${{ steps.sign.outputs.signed_hap }}" && -f "${{ steps.sign.outputs.signed_hap }}" ]]; then
-            cp "${{ steps.sign.outputs.signed_hap }}" "${artifact_dir}/"
+          signed_hap="${{ steps.sign.outputs.signed_hap }}"
+          if [[ -n "${signed_hap}" && -f "${signed_hap}" ]]; then
+            signed_target="${artifact_dir}/$(basename "${signed_hap}")"
+            if [[ "${signed_hap}" != "${signed_target}" ]]; then
+              cp "${signed_hap}" "${signed_target}"
+            fi
           fi
 
           echo "artifact_dir=${artifact_dir}" >> "${GITHUB_OUTPUT}"
