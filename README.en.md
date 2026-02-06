@@ -160,3 +160,75 @@ For implementation details, start with:
 - `entry/src/main/cpp/app/napi/libretro_engine_napi.cpp`
 - `entry/src/main/ets/pages/LibretroGamePage.ets`
 - `entry/src/main/ets/common/LibretroEventHub.ets`
+
+## CI and Automated Regression
+
+The repository now includes a GitHub Actions workflow at `.github/workflows/ci.yml`.
+It runs on `push` and `pull_request` and executes:
+
+- `scripts/ci/check_repo_hygiene.sh`
+  - merge conflict marker scan
+  - tracked build/cache output scan
+  - shell script syntax validation
+- `scripts/ci/check_regression_guards.sh`
+  - NativeBuffer safety guards (forbid `mmap/munmap`, require `FromNativeWindowBuffer + Map/Unmap`)
+  - `LOG_DOMAIN` compliance (`#undef LOG_DOMAIN` present and value in `0xD000-0xFFFF`)
+  - forbid hard-coded `SET_TIMEOUT=5`
+  - TODO/FIXME/HACK/XXX marker scan in first-party source
+
+Run locally:
+
+```bash
+bash scripts/ci/check_repo_hygiene.sh
+bash scripts/ci/check_regression_guards.sh
+```
+
+## Full GitHub Actions Pipeline (HarmonyOS)
+
+This repository now includes `.github/workflows/harmonyos-full-ci.yml`, which supports:
+
+- HarmonyOS Command Line Tools setup (JDK 17 + hvigorw/ohpm/codelinter)
+- codelinter quality gate
+- `hvigorw assembleHap` build
+- optional HAP signing
+- HAP artifact upload
+- automatic release asset upload on `v*` tags
+- optional self-hosted device install/run
+
+### Triggers
+
+- Manual: `workflow_dispatch`
+- Auto release: push a `v*` tag
+
+### Required variable (configure at least one)
+
+- `secrets.HARMONY_COMMANDLINE_TOOLS_URL` or `vars.HARMONY_COMMANDLINE_TOOLS_URL`
+
+Optional checksum:
+
+- `secrets.HARMONY_COMMANDLINE_TOOLS_SHA256` or `vars.HARMONY_COMMANDLINE_TOOLS_SHA256`
+
+### Private Download Authentication (Optional)
+
+If your Command Line Tools are hosted in a private location (for example, private GitHub Release assets or private object storage), configure:
+
+- `HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN` (recommended)
+- `HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME` (default: `Bearer`)
+- `HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER` (use this when you already have a full header, e.g. `Authorization: token xxx`)
+- `HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT` (optional, e.g. `application/octet-stream`)
+
+For private GitHub Release assets, prefer the API asset URL:
+
+`https://api.github.com/repos/{owner}/{repo}/releases/assets/{asset_id}`
+
+The script will automatically add `Accept: application/octet-stream` and use your configured token/header.
+If no `AUTH_*` value is configured and the URL is under `api.github.com`, the workflow falls back to `GITHUB_TOKEN` automatically (recommended for same-repo assets).
+
+### Signing secrets (required when `run_signing=true`)
+
+- `HARMONY_SIGN_KEYSTORE_B64` (base64 of `.p12`)
+- `HARMONY_SIGN_CERT_B64` (base64 of `.cer`)
+- `HARMONY_SIGN_PROFILE_B64` (base64 of `.p7b`)
+- `HARMONY_SIGN_KEY_ALIAS`
+- `HARMONY_SIGN_KEY_PWD`
+- `HARMONY_SIGN_KEYSTORE_PWD`

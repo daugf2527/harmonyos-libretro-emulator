@@ -1,0 +1,350 @@
+name: HarmonyOS Full CI/CD
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: "hvigor build mode"
+        type: choice
+        options:
+          - release
+          - debug
+        default: release
+      product_name:
+        description: "hvigor product name"
+        type: string
+        default: default
+      module_target:
+        description: "hvigor module target (module@target)"
+        type: string
+        default: entry@default
+      codelinter_exit_on:
+        description: "codelinter gate levels (error,warn,suggestion)"
+        type: string
+        default: error
+      run_signing:
+        description: "run hap signing after build"
+        type: boolean
+        default: true
+      run_device_deploy:
+        description: "deploy signed hap to self-hosted HarmonyOS device"
+        type: boolean
+        default: false
+      app_bundle_name:
+        description: "bundle name for aa start"
+        type: string
+        default: com.example.drawingtoxcomponent
+      app_ability_name:
+        description: "ability name for aa start"
+        type: string
+        default: EntryAbility
+      app_module_name:
+        description: "module name for aa start"
+        type: string
+        default: entry
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: harmonyos-full-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-sign:
+    name: Build And Sign
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    outputs:
+      run_device_deploy: ${{ steps.cfg.outputs.run_device_deploy }}
+      app_bundle_name: ${{ steps.cfg.outputs.app_bundle_name }}
+      app_ability_name: ${{ steps.cfg.outputs.app_ability_name }}
+      app_module_name: ${{ steps.cfg.outputs.app_module_name }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Resolve Pipeline Config
+        id: cfg
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          build_mode="${{ inputs.build_mode }}"
+          product_name="${{ inputs.product_name }}"
+          module_target="${{ inputs.module_target }}"
+          codelinter_exit_on="${{ inputs.codelinter_exit_on }}"
+          app_bundle_name="${{ inputs.app_bundle_name }}"
+          app_ability_name="${{ inputs.app_ability_name }}"
+          app_module_name="${{ inputs.app_module_name }}"
+
+          if [[ -z "${build_mode}" ]]; then build_mode="release"; fi
+          if [[ -z "${product_name}" ]]; then product_name="default"; fi
+          if [[ -z "${module_target}" ]]; then module_target="entry@default"; fi
+          if [[ -z "${codelinter_exit_on}" ]]; then codelinter_exit_on="error"; fi
+          if [[ -z "${app_bundle_name}" ]]; then app_bundle_name="com.example.drawingtoxcomponent"; fi
+          if [[ -z "${app_ability_name}" ]]; then app_ability_name="EntryAbility"; fi
+          if [[ -z "${app_module_name}" ]]; then app_module_name="entry"; fi
+
+          run_signing="true"
+          run_device_deploy="false"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.run_signing }}" == "false" ]]; then
+              run_signing="false"
+            fi
+            if [[ "${{ inputs.run_device_deploy }}" == "true" ]]; then
+              run_device_deploy="true"
+            fi
+          fi
+
+          {
+            echo "HARMONY_BUILD_MODE=${build_mode}"
+            echo "HARMONY_PRODUCT_NAME=${product_name}"
+            echo "HARMONY_MODULE_TARGET=${module_target}"
+            echo "CODELINTER_EXIT_ON=${codelinter_exit_on}"
+            echo "RUN_SIGNING=${run_signing}"
+          } >> "${GITHUB_ENV}"
+
+          {
+            echo "run_signing=${run_signing}"
+            echo "run_device_deploy=${run_device_deploy}"
+            echo "app_bundle_name=${app_bundle_name}"
+            echo "app_ability_name=${app_ability_name}"
+            echo "app_module_name=${app_module_name}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Setup Harmony Command Line Tools
+        shell: bash
+        env:
+          HARMONY_CLI_INSTALL_DIR: ${{ runner.temp }}/harmony-cli
+          HARMONY_COMMANDLINE_TOOLS_URL: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_URL != '' && secrets.HARMONY_COMMANDLINE_TOOLS_URL || vars.HARMONY_COMMANDLINE_TOOLS_URL }}
+          HARMONY_COMMANDLINE_TOOLS_SHA256: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 != '' && secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 || vars.HARMONY_COMMANDLINE_TOOLS_SHA256 }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${HARMONY_COMMANDLINE_TOOLS_URL}" ]]; then
+            echo "[FAIL] Missing HARMONY_COMMANDLINE_TOOLS_URL (secret or repo variable)." >&2
+            exit 1
+          fi
+          bash scripts/ci/setup_harmony_env.sh
+
+      - name: Tool Version Check
+        shell: bash
+        run: |
+          set -euo pipefail
+          java -version
+          hvigorw -v
+          ohpm -v
+          codelinter -v
+
+      - name: Run Code Linter Gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          report_dir="${RUNNER_TEMP}/codelinter-report"
+          mkdir -p "${report_dir}"
+          codelinter -e "${CODELINTER_EXIT_ON}" -f json -o "${report_dir}/report.json" .
+
+      - name: Build HAP
+        id: build
+        shell: bash
+        run: bash scripts/ci/build_harmony_hap.sh
+
+      - name: Prepare Signing Material
+        if: ${{ steps.cfg.outputs.run_signing == 'true' }}
+        id: signprep
+        shell: bash
+        env:
+          HARMONY_SIGN_KEYSTORE_B64: ${{ secrets.HARMONY_SIGN_KEYSTORE_B64 }}
+          HARMONY_SIGN_CERT_B64: ${{ secrets.HARMONY_SIGN_CERT_B64 }}
+          HARMONY_SIGN_PROFILE_B64: ${{ secrets.HARMONY_SIGN_PROFILE_B64 }}
+          HARMONY_SIGN_KEY_ALIAS: ${{ secrets.HARMONY_SIGN_KEY_ALIAS }}
+          HARMONY_SIGN_KEY_PWD: ${{ secrets.HARMONY_SIGN_KEY_PWD }}
+          HARMONY_SIGN_KEYSTORE_PWD: ${{ secrets.HARMONY_SIGN_KEYSTORE_PWD }}
+        run: |
+          set -euo pipefail
+
+          required_vars=(
+            HARMONY_SIGN_KEYSTORE_B64
+            HARMONY_SIGN_CERT_B64
+            HARMONY_SIGN_PROFILE_B64
+            HARMONY_SIGN_KEY_ALIAS
+            HARMONY_SIGN_KEY_PWD
+            HARMONY_SIGN_KEYSTORE_PWD
+          )
+          for var_name in "${required_vars[@]}"; do
+            if [[ -z "${!var_name:-}" ]]; then
+              echo "[FAIL] Missing signing secret: ${var_name}" >&2
+              exit 1
+            fi
+          done
+
+          sign_dir="${RUNNER_TEMP}/harmony-sign"
+          mkdir -p "${sign_dir}"
+          echo "${HARMONY_SIGN_KEYSTORE_B64}" | base64 --decode > "${sign_dir}/sign.p12"
+          echo "${HARMONY_SIGN_CERT_B64}" | base64 --decode > "${sign_dir}/sign.cer"
+          echo "${HARMONY_SIGN_PROFILE_B64}" | base64 --decode > "${sign_dir}/sign.p7b"
+
+          unsigned_hap="${{ steps.build.outputs.unsigned_hap }}"
+          if [[ -z "${unsigned_hap}" ]]; then
+            unsigned_hap="${{ steps.build.outputs.primary_hap }}"
+          fi
+          if [[ -z "${unsigned_hap}" ]]; then
+            echo "[FAIL] No unsigned/primary HAP available for signing." >&2
+            exit 1
+          fi
+
+          hap_sign_tool="${HARMONY_COMMANDLINE_TOOLS_HOME}/sdk/default/openharmony/toolchains/lib/hap-sign-tool.jar"
+          if [[ ! -f "${hap_sign_tool}" ]]; then
+            echo "[FAIL] hap-sign-tool.jar not found: ${hap_sign_tool}" >&2
+            exit 1
+          fi
+
+          unsigned_name="$(basename "${unsigned_hap}")"
+          if [[ "${unsigned_name}" == *"-unsigned.hap" ]]; then
+            signed_name="${unsigned_name/-unsigned.hap/-signed.hap}"
+          else
+            signed_name="${unsigned_name%.hap}-signed.hap"
+          fi
+          signed_output="${RUNNER_TEMP}/harmony-hap-artifacts/${signed_name}"
+          mkdir -p "$(dirname "${signed_output}")"
+
+          {
+            echo "HAP_SIGN_TOOL_JAR=${hap_sign_tool}"
+            echo "UNSIGNED_HAP=${unsigned_hap}"
+            echo "SIGNED_HAP_OUTPUT=${signed_output}"
+            echo "SIGN_KEY_ALIAS=${HARMONY_SIGN_KEY_ALIAS}"
+            echo "SIGN_APP_CERT_FILE=${sign_dir}/sign.cer"
+            echo "SIGN_PROFILE_FILE=${sign_dir}/sign.p7b"
+            echo "SIGN_KEYSTORE_FILE=${sign_dir}/sign.p12"
+            echo "SIGN_KEY_PWD=${HARMONY_SIGN_KEY_PWD}"
+            echo "SIGN_KEYSTORE_PWD=${HARMONY_SIGN_KEYSTORE_PWD}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Sign HAP
+        if: ${{ steps.cfg.outputs.run_signing == 'true' }}
+        id: sign
+        shell: bash
+        run: bash scripts/ci/sign_harmony_hap.sh
+
+      - name: Collect HAP Artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_dir="${RUNNER_TEMP}/harmony-hap-artifacts"
+          mkdir -p "${artifact_dir}"
+
+          while IFS= read -r file; do
+            rel_path="${file#${GITHUB_WORKSPACE}/}"
+            target="${artifact_dir}/${rel_path}"
+            mkdir -p "$(dirname "${target}")"
+            cp "${file}" "${target}"
+          done < <(find "${GITHUB_WORKSPACE}/entry/build" -type f -name "*.hap" | sort)
+
+          if [[ -n "${{ steps.sign.outputs.signed_hap }}" && -f "${{ steps.sign.outputs.signed_hap }}" ]]; then
+            cp "${{ steps.sign.outputs.signed_hap }}" "${artifact_dir}/"
+          fi
+
+          echo "artifact_dir=${artifact_dir}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload HAP Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmonyos-hap
+          path: ${{ steps.artifacts.outputs.artifact_dir }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Code Linter Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: codelinter-report
+          path: ${{ runner.temp }}/codelinter-report
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.artifacts.outputs.artifact_dir }}/**/*.hap
+          generate_release_notes: true
+
+  deploy-to-device:
+    name: Deploy To Harmony Device
+    needs: build-and-sign
+    if: ${{ needs.build-and-sign.outputs.run_device_deploy == 'true' }}
+    runs-on:
+      - self-hosted
+      - linux
+    timeout-minutes: 30
+
+    steps:
+      - name: Download HAP Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: harmonyos-hap
+          path: ${{ runner.temp }}/harmony-hap-artifacts
+
+      - name: Ensure hdc Availability
+        shell: bash
+        env:
+          HARMONY_CLI_INSTALL_DIR: ${{ runner.temp }}/harmony-cli
+          HARMONY_COMMANDLINE_TOOLS_URL: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_URL != '' && secrets.HARMONY_COMMANDLINE_TOOLS_URL || vars.HARMONY_COMMANDLINE_TOOLS_URL }}
+          HARMONY_COMMANDLINE_TOOLS_SHA256: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 != '' && secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 || vars.HARMONY_COMMANDLINE_TOOLS_SHA256 }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if command -v hdc >/dev/null 2>&1; then
+            exit 0
+          fi
+          if [[ -z "${HARMONY_COMMANDLINE_TOOLS_URL}" ]]; then
+            echo "[FAIL] hdc not found and HARMONY_COMMANDLINE_TOOLS_URL is not configured." >&2
+            exit 1
+          fi
+          bash scripts/ci/setup_harmony_env.sh
+
+      - name: Select HAP For Device Deploy
+        id: deployhap
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_root="${RUNNER_TEMP}/harmony-hap-artifacts"
+          hap_file="$(find "${artifact_root}" -type f -name "*-signed.hap" | sort | head -n 1 || true)"
+          if [[ -z "${hap_file}" ]]; then
+            hap_file="$(find "${artifact_root}" -type f -name "*.hap" | sort | head -n 1 || true)"
+          fi
+          if [[ -z "${hap_file}" ]]; then
+            echo "[FAIL] No HAP file found for deploy." >&2
+            exit 1
+          fi
+          echo "hap_file=${hap_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install And Run On Device
+        shell: bash
+        env:
+          HAP_FILE: ${{ steps.deployhap.outputs.hap_file }}
+          APP_BUNDLE_NAME: ${{ needs.build-and-sign.outputs.app_bundle_name }}
+          APP_ABILITY_NAME: ${{ needs.build-and-sign.outputs.app_ability_name }}
+          APP_MODULE_NAME: ${{ needs.build-and-sign.outputs.app_module_name }}
+        run: bash scripts/ci/install_run_hap_on_device.sh

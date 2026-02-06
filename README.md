@@ -121,3 +121,74 @@ entry/src/main/ets/
 - `entry/src/main/cpp/app/napi/libretro_engine_napi.cpp`
 - `entry/src/main/ets/pages/LibretroGamePage.ets`
 - `entry/src/main/ets/common/LibretroEventHub.ets`
+
+## 10. CI 与自动回归
+
+仓库已提供 GitHub Actions 工作流：`.github/workflows/ci.yml`，在 `push`/`pull_request` 自动执行：
+
+- `scripts/ci/check_repo_hygiene.sh`
+  - 冲突标记扫描
+  - 构建缓存目录误提交扫描
+  - Shell 脚本语法检查
+- `scripts/ci/check_regression_guards.sh`
+  - NativeBuffer 访问规范守卫（禁止 `mmap/munmap`，要求 `FromNativeWindowBuffer + Map/Unmap`）
+  - `LOG_DOMAIN` 合规检查（需存在 `#undef LOG_DOMAIN` 且值在 `0xD000-0xFFFF`）
+  - 禁止硬编码 `SET_TIMEOUT=5`
+  - 第一方源码 `TODO/FIXME/HACK/XXX` 标记扫描
+
+本地手动执行：
+
+```bash
+bash scripts/ci/check_repo_hygiene.sh
+bash scripts/ci/check_regression_guards.sh
+```
+
+## 11. GitHub Actions 完整流水线（HarmonyOS）
+
+仓库新增完整流程工作流：`.github/workflows/harmonyos-full-ci.yml`，支持：
+
+- Command Line Tools 环境准备（JDK17 + hvigorw/ohpm/codelinter）
+- `codelinter` 门禁
+- `hvigorw assembleHap` 构建
+- HAP 签名（可选）
+- 将 HAP 作为 Artifact 上传
+- 标签 `v*` 自动发布 Release（附带 HAP）
+- self-hosted 设备安装运行（可选）
+
+### 触发方式
+
+- 手动：`workflow_dispatch`
+- 自动发布：推送 `v*` tag
+
+### 必需变量（至少配置其一）
+
+- `secrets.HARMONY_COMMANDLINE_TOOLS_URL` 或 `vars.HARMONY_COMMANDLINE_TOOLS_URL`
+
+可选校验：
+
+- `secrets.HARMONY_COMMANDLINE_TOOLS_SHA256` 或 `vars.HARMONY_COMMANDLINE_TOOLS_SHA256`
+
+### 私有下载鉴权（可选）
+
+当 Command Line Tools 位于私有地址（如私有 GitHub Release/私有对象存储）时，可配置：
+
+- `HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN`（推荐）
+- `HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME`（默认 `Bearer`）
+- `HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER`（若已是完整 Header，可直接传，例如 `Authorization: token xxx`）
+- `HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT`（按需，例如 `application/octet-stream`）
+
+如果 URL 使用 GitHub Release Asset API（推荐私有仓库方式）：
+
+`https://api.github.com/repos/{owner}/{repo}/releases/assets/{asset_id}`
+
+脚本会自动追加 `Accept: application/octet-stream`，并使用上述 token/header 发起下载。
+若未配置 `AUTH_*` 且 URL 为 `api.github.com`，workflow 会自动回退使用 `GITHUB_TOKEN`（同仓库资产推荐）。
+
+### 签名所需 Secrets（开启 `run_signing=true` 时必需）
+
+- `HARMONY_SIGN_KEYSTORE_B64`（`.p12` 的 base64）
+- `HARMONY_SIGN_CERT_B64`（`.cer` 的 base64）
+- `HARMONY_SIGN_PROFILE_B64`（`.p7b` 的 base64）
+- `HARMONY_SIGN_KEY_ALIAS`
+- `HARMONY_SIGN_KEY_PWD`
+- `HARMONY_SIGN_KEYSTORE_PWD`
