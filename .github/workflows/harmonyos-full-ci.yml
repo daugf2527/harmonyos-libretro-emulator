@@ -42,6 +42,14 @@ on:
         description: "module name for aa start"
         type: string
         default: entry
+      commandline_tools_url:
+        description: "optional override URL for Harmony Command Line Tools zip"
+        type: string
+        default: ""
+      commandline_tools_sha256:
+        description: "optional override SHA256 for tools zip"
+        type: string
+        default: ""
   push:
     tags:
       - "v*"
@@ -63,6 +71,8 @@ jobs:
       app_bundle_name: ${{ steps.cfg.outputs.app_bundle_name }}
       app_ability_name: ${{ steps.cfg.outputs.app_ability_name }}
       app_module_name: ${{ steps.cfg.outputs.app_module_name }}
+      commandline_tools_url: ${{ steps.cfg.outputs.commandline_tools_url }}
+      commandline_tools_sha256: ${{ steps.cfg.outputs.commandline_tools_sha256 }}
 
     steps:
       - name: Checkout
@@ -87,6 +97,8 @@ jobs:
           app_bundle_name="${{ inputs.app_bundle_name }}"
           app_ability_name="${{ inputs.app_ability_name }}"
           app_module_name="${{ inputs.app_module_name }}"
+          commandline_tools_url="${{ inputs.commandline_tools_url }}"
+          commandline_tools_sha256="${{ inputs.commandline_tools_sha256 }}"
 
           if [[ -z "${build_mode}" ]]; then build_mode="release"; fi
           if [[ -z "${product_name}" ]]; then product_name="default"; fi
@@ -121,14 +133,16 @@ jobs:
             echo "app_bundle_name=${app_bundle_name}"
             echo "app_ability_name=${app_ability_name}"
             echo "app_module_name=${app_module_name}"
+            echo "commandline_tools_url=${commandline_tools_url}"
+            echo "commandline_tools_sha256=${commandline_tools_sha256}"
           } >> "${GITHUB_OUTPUT}"
 
       - name: Setup Harmony Command Line Tools
         shell: bash
         env:
           HARMONY_CLI_INSTALL_DIR: ${{ runner.temp }}/harmony-cli
-          HARMONY_COMMANDLINE_TOOLS_URL: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_URL != '' && secrets.HARMONY_COMMANDLINE_TOOLS_URL || vars.HARMONY_COMMANDLINE_TOOLS_URL }}
-          HARMONY_COMMANDLINE_TOOLS_SHA256: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 != '' && secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 || vars.HARMONY_COMMANDLINE_TOOLS_SHA256 }}
+          HARMONY_COMMANDLINE_TOOLS_URL: ${{ steps.cfg.outputs.commandline_tools_url != '' && steps.cfg.outputs.commandline_tools_url || secrets.HARMONY_COMMANDLINE_TOOLS_URL != '' && secrets.HARMONY_COMMANDLINE_TOOLS_URL || vars.HARMONY_COMMANDLINE_TOOLS_URL }}
+          HARMONY_COMMANDLINE_TOOLS_SHA256: ${{ steps.cfg.outputs.commandline_tools_sha256 != '' && steps.cfg.outputs.commandline_tools_sha256 || secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 != '' && secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 || vars.HARMONY_COMMANDLINE_TOOLS_SHA256 }}
           HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER }}
           HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN }}
           HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME }}
@@ -137,7 +151,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "${HARMONY_COMMANDLINE_TOOLS_URL}" ]]; then
-            echo "[FAIL] Missing HARMONY_COMMANDLINE_TOOLS_URL (secret or repo variable)." >&2
+            echo "[FAIL] Missing HARMONY_COMMANDLINE_TOOLS_URL. Configure one of:" >&2
+            echo "  1) workflow_dispatch input: commandline_tools_url" >&2
+            echo "  2) repo secret/variable: HARMONY_COMMANDLINE_TOOLS_URL" >&2
             exit 1
           fi
           bash scripts/ci/setup_harmony_env.sh
@@ -306,8 +322,8 @@ jobs:
         shell: bash
         env:
           HARMONY_CLI_INSTALL_DIR: ${{ runner.temp }}/harmony-cli
-          HARMONY_COMMANDLINE_TOOLS_URL: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_URL != '' && secrets.HARMONY_COMMANDLINE_TOOLS_URL || vars.HARMONY_COMMANDLINE_TOOLS_URL }}
-          HARMONY_COMMANDLINE_TOOLS_SHA256: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 != '' && secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 || vars.HARMONY_COMMANDLINE_TOOLS_SHA256 }}
+          HARMONY_COMMANDLINE_TOOLS_URL: ${{ needs.build-and-sign.outputs.commandline_tools_url != '' && needs.build-and-sign.outputs.commandline_tools_url || secrets.HARMONY_COMMANDLINE_TOOLS_URL != '' && secrets.HARMONY_COMMANDLINE_TOOLS_URL || vars.HARMONY_COMMANDLINE_TOOLS_URL }}
+          HARMONY_COMMANDLINE_TOOLS_SHA256: ${{ needs.build-and-sign.outputs.commandline_tools_sha256 != '' && needs.build-and-sign.outputs.commandline_tools_sha256 || secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 != '' && secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 || vars.HARMONY_COMMANDLINE_TOOLS_SHA256 }}
           HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER }}
           HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN }}
           HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME }}
