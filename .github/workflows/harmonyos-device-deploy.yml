@@ -1,0 +1,111 @@
+name: HarmonyOS Device Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Source GitHub Actions run id that contains harmonyos-hap artifact"
+        type: string
+        required: true
+      artifact_name:
+        description: "Artifact name to download"
+        type: string
+        default: harmonyos-hap
+      hap_glob:
+        description: "Preferred HAP match pattern (for example *-signed.hap)"
+        type: string
+        default: "*-signed.hap"
+      app_bundle_name:
+        description: "Bundle name for aa start"
+        type: string
+        default: com.example.drawingtoxcomponent
+      app_ability_name:
+        description: "Ability name for aa start"
+        type: string
+        default: EntryAbility
+      app_module_name:
+        description: "Module name for aa start"
+        type: string
+        default: entry
+      commandline_tools_url:
+        description: "Optional override URL for Harmony Command Line Tools zip"
+        type: string
+        default: ""
+      commandline_tools_sha256:
+        description: "Optional override SHA256 for tools zip"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: harmonyos-device-deploy-${{ github.workflow }}-${{ inputs.source_run_id }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-to-device:
+    name: Deploy To Harmony Device
+    runs-on:
+      - self-hosted
+      - linux
+    timeout-minutes: 30
+
+    steps:
+      - name: Download HAP Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.source_run_id }}
+          name: ${{ inputs.artifact_name }}
+          path: ${{ runner.temp }}/harmony-hap-artifacts
+
+      - name: Ensure hdc Availability
+        shell: bash
+        env:
+          HARMONY_CLI_INSTALL_DIR: ${{ runner.temp }}/harmony-cli
+          HARMONY_COMMANDLINE_TOOLS_URL: ${{ inputs.commandline_tools_url != '' && inputs.commandline_tools_url || secrets.HARMONY_COMMANDLINE_TOOLS_URL != '' && secrets.HARMONY_COMMANDLINE_TOOLS_URL || vars.HARMONY_COMMANDLINE_TOOLS_URL }}
+          HARMONY_COMMANDLINE_TOOLS_SHA256: ${{ inputs.commandline_tools_sha256 != '' && inputs.commandline_tools_sha256 || secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 != '' && secrets.HARMONY_COMMANDLINE_TOOLS_SHA256 || vars.HARMONY_COMMANDLINE_TOOLS_SHA256 }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME }}
+          HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT: ${{ secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT != '' && secrets.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT || vars.HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if command -v hdc >/dev/null 2>&1; then
+            exit 0
+          fi
+          if [[ -z "${HARMONY_COMMANDLINE_TOOLS_URL}" ]]; then
+            echo "[FAIL] hdc not found and HARMONY_COMMANDLINE_TOOLS_URL is not configured." >&2
+            exit 1
+          fi
+          bash scripts/ci/setup_harmony_env.sh
+
+      - name: Select HAP For Device Deploy
+        id: deployhap
+        shell: bash
+        env:
+          HAP_GLOB: ${{ inputs.hap_glob }}
+        run: |
+          set -euo pipefail
+          artifact_root="${RUNNER_TEMP}/harmony-hap-artifacts"
+          hap_file="$(find "${artifact_root}" -type f -name "${HAP_GLOB}" | sort | head -n 1 || true)"
+          if [[ -z "${hap_file}" ]]; then
+            hap_file="$(find "${artifact_root}" -type f -name "*.hap" | sort | head -n 1 || true)"
+          fi
+          if [[ -z "${hap_file}" ]]; then
+            echo "[FAIL] No HAP file found for deploy." >&2
+            exit 1
+          fi
+          echo "hap_file=${hap_file}" >> "${GITHUB_OUTPUT}"
+
+      - name: Install And Run On Device
+        shell: bash
+        env:
+          HAP_FILE: ${{ steps.deployhap.outputs.hap_file }}
+          APP_BUNDLE_NAME: ${{ inputs.app_bundle_name }}
+          APP_ABILITY_NAME: ${{ inputs.app_ability_name }}
+          APP_MODULE_NAME: ${{ inputs.app_module_name }}
+        run: bash scripts/ci/install_run_hap_on_device.sh

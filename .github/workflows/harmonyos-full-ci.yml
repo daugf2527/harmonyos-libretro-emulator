@@ -1,4 +1,4 @@
-name: HarmonyOS Full CI/CD
+name: HarmonyOS Full CI/CD (Manual Legacy)
 
 on:
   workflow_dispatch:
@@ -50,9 +50,6 @@ on:
         description: "optional override SHA256 for tools zip"
         type: string
         default: ""
-  push:
-    tags:
-      - "v*"
 
 permissions:
   contents: write

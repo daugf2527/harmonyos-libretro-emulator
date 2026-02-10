@@ -124,7 +124,12 @@ entry/src/main/ets/
 
 ## 10. CI 与自动回归
 
-仓库已提供 GitHub Actions 工作流：`.github/workflows/ci.yml`，在 `push`/`pull_request` 自动执行：
+仓库目前有两层 CI：
+
+- 轻量静态守卫：`.github/workflows/ci.yml`（`push`/`pull_request`）
+- PR 构建门禁：`.github/workflows/harmonyos-pr-ci.yml`（`pull_request`）
+
+其中 `ci.yml` 负责：
 
 - `scripts/ci/check_repo_hygiene.sh`
   - 冲突标记扫描
@@ -136,6 +141,14 @@ entry/src/main/ets/
   - 禁止硬编码 `SET_TIMEOUT=5`
   - 第一方源码 `TODO/FIXME/HACK/XXX` 标记扫描
 
+`harmonyos-pr-ci.yml` 在 PR 中追加：
+
+- HarmonyOS Command Line Tools 环境准备
+- `codelinter` 门禁
+- `hvigorw assembleHap` 构建
+- HAP 结构 smoke 检查（`module.json` / `ets/modules.abc` / `libentry.so`）
+- 上传 PR 构建产物与 codelinter 报告
+
 本地手动执行：
 
 ```bash
@@ -143,22 +156,23 @@ bash scripts/ci/check_repo_hygiene.sh
 bash scripts/ci/check_regression_guards.sh
 ```
 
-## 11. GitHub Actions 完整流水线（HarmonyOS）
+## 11. GitHub Actions 发布与部署流水线（HarmonyOS）
 
-仓库新增完整流程工作流：`.github/workflows/harmonyos-full-ci.yml`，支持：
+发布与部署拆分为 3 条工作流：
 
-- Command Line Tools 环境准备（JDK17 + hvigorw/ohpm/codelinter）
-- `codelinter` 门禁
-- `hvigorw assembleHap` 构建
-- HAP 签名（可选）
-- 将 HAP 作为 Artifact 上传
-- 标签 `v*` 自动发布 Release（附带 HAP）
-- self-hosted 设备安装运行（可选）
+- `harmonyos-pr-ci.yml`：PR 质量门禁
+- `harmonyos-release.yml`：`v*` tag 自动构建、签名、发布 GitHub Release
+- `harmonyos-device-deploy.yml`：手动从指定 run 下载 HAP 并部署到 self-hosted 设备
+
+兼容保留：
+
+- `harmonyos-full-ci.yml`：仅手动触发的旧版全流程（Manual Legacy）
 
 ### 触发方式
 
-- 手动：`workflow_dispatch`
-- 自动发布：推送 `v*` tag
+- PR 门禁：提交 PR 自动触发 `harmonyos-pr-ci.yml`
+- 自动发布：推送 `v*` tag 触发 `harmonyos-release.yml`
+- 手动部署：`workflow_dispatch` 触发 `harmonyos-device-deploy.yml`
 
 ### 必需变量（至少配置其一）
 
@@ -184,7 +198,7 @@ bash scripts/ci/check_regression_guards.sh
 脚本会自动追加 `Accept: application/octet-stream`，并使用上述 token/header 发起下载。
 若未配置 `AUTH_*` 且 URL 为 `api.github.com`，workflow 会自动回退使用 `GITHUB_TOKEN`（同仓库资产推荐）。
 
-### 签名所需 Secrets（开启 `run_signing=true` 时必需）
+### 签名所需 Secrets（`harmonyos-release.yml` 必需）
 
 - `HARMONY_SIGN_KEYSTORE_B64`（`.p12` 的 base64）
 - `HARMONY_SIGN_CERT_B64`（`.cer` 的 base64）
@@ -192,3 +206,18 @@ bash scripts/ci/check_regression_guards.sh
 - `HARMONY_SIGN_KEY_ALIAS`
 - `HARMONY_SIGN_KEY_PWD`
 - `HARMONY_SIGN_KEYSTORE_PWD`
+
+### 生产发布审批与通知（可选）
+
+- `harmonyos-release.yml` 默认使用 `environment: production`
+  - 若仓库中为 `production` 配置了 Required reviewers，则会在发布前等待人工审批
+- 可配置发布通知 webhook：
+  - `secrets.RELEASE_NOTIFY_WEBHOOK_URL` 或 `vars.RELEASE_NOTIFY_WEBHOOK_URL`
+  - 发布成功后会 POST 包含 `tag/release_url/run_url/commit` 的 JSON 消息
+
+### 手动真机部署输入（`harmonyos-device-deploy.yml`）
+
+- `source_run_id`（必填）：要部署的 CI run id
+- `artifact_name`（默认 `harmonyos-hap`）
+- `hap_glob`（默认 `*-signed.hap`）
+- `app_bundle_name` / `app_ability_name` / `app_module_name`

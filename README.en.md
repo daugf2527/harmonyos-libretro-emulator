@@ -163,8 +163,12 @@ For implementation details, start with:
 
 ## CI and Automated Regression
 
-The repository now includes a GitHub Actions workflow at `.github/workflows/ci.yml`.
-It runs on `push` and `pull_request` and executes:
+The repository now uses two CI layers:
+
+- Lightweight static guards: `.github/workflows/ci.yml` (`push`/`pull_request`)
+- PR build gate: `.github/workflows/harmonyos-pr-ci.yml` (`pull_request`)
+
+`ci.yml` runs:
 
 - `scripts/ci/check_repo_hygiene.sh`
   - merge conflict marker scan
@@ -176,6 +180,14 @@ It runs on `push` and `pull_request` and executes:
   - forbid hard-coded `SET_TIMEOUT=5`
   - TODO/FIXME/HACK/XXX marker scan in first-party source
 
+`harmonyos-pr-ci.yml` adds:
+
+- HarmonyOS Command Line Tools setup
+- codelinter quality gate
+- `hvigorw assembleHap` build
+- HAP smoke checks (`module.json` / `ets/modules.abc` / `libentry.so`)
+- PR artifact upload and codelinter report upload
+
 Run locally:
 
 ```bash
@@ -183,22 +195,23 @@ bash scripts/ci/check_repo_hygiene.sh
 bash scripts/ci/check_regression_guards.sh
 ```
 
-## Full GitHub Actions Pipeline (HarmonyOS)
+## Release and Deploy Pipelines (HarmonyOS)
 
-This repository now includes `.github/workflows/harmonyos-full-ci.yml`, which supports:
+Release and deploy are split into three workflows:
 
-- HarmonyOS Command Line Tools setup (JDK 17 + hvigorw/ohpm/codelinter)
-- codelinter quality gate
-- `hvigorw assembleHap` build
-- optional HAP signing
-- HAP artifact upload
-- automatic release asset upload on `v*` tags
-- optional self-hosted device install/run
+- `harmonyos-pr-ci.yml`: PR quality gates
+- `harmonyos-release.yml`: automatic build/sign/release for `v*` tags
+- `harmonyos-device-deploy.yml`: manual deploy to self-hosted devices from a selected run
+
+Legacy compatibility:
+
+- `harmonyos-full-ci.yml`: manual-only legacy full pipeline
 
 ### Triggers
 
-- Manual: `workflow_dispatch`
+- PR gate: open/update a pull request
 - Auto release: push a `v*` tag
+- Manual device deploy: run `harmonyos-device-deploy.yml` via `workflow_dispatch`
 
 ### Required variable (configure at least one)
 
@@ -224,7 +237,7 @@ For private GitHub Release assets, prefer the API asset URL:
 The script will automatically add `Accept: application/octet-stream` and use your configured token/header.
 If no `AUTH_*` value is configured and the URL is under `api.github.com`, the workflow falls back to `GITHUB_TOKEN` automatically (recommended for same-repo assets).
 
-### Signing secrets (required when `run_signing=true`)
+### Signing secrets (required by `harmonyos-release.yml`)
 
 - `HARMONY_SIGN_KEYSTORE_B64` (base64 of `.p12`)
 - `HARMONY_SIGN_CERT_B64` (base64 of `.cer`)
@@ -232,3 +245,18 @@ If no `AUTH_*` value is configured and the URL is under `api.github.com`, the wo
 - `HARMONY_SIGN_KEY_ALIAS`
 - `HARMONY_SIGN_KEY_PWD`
 - `HARMONY_SIGN_KEYSTORE_PWD`
+
+### Production Approval and Notifications (Optional)
+
+- `harmonyos-release.yml` uses `environment: production`
+  - If `production` has required reviewers configured, release waits for manual approval
+- Optional release webhook:
+  - `secrets.RELEASE_NOTIFY_WEBHOOK_URL` or `vars.RELEASE_NOTIFY_WEBHOOK_URL`
+  - On success, the workflow sends JSON with `tag/release_url/run_url/commit`
+
+### Manual Device Deploy Inputs (`harmonyos-device-deploy.yml`)
+
+- `source_run_id` (required): run id containing HAP artifacts
+- `artifact_name` (default: `harmonyos-hap`)
+- `hap_glob` (default: `*-signed.hap`)
+- `app_bundle_name` / `app_ability_name` / `app_module_name`
