@@ -116,7 +116,7 @@ bool ROMLoader::ValidateROM(const uint8_t* data, size_t size) {
         return false;
     }
     
-    // TODO: 可以添加更多验证逻辑
+    // 可按需扩展校验逻辑：
     // - 检查文件头魔数
     // - 验证 CRC/校验和
     // - 检查文件格式
