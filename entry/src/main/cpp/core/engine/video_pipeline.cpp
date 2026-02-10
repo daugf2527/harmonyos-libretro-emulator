@@ -416,8 +416,7 @@ void VideoPipeline::EnsureWindowConfiguredIfNeeded(OHNativeWindow *window,
       }
       return;
     }
-    // Cooldown over, reset but keep count non-zero to track instability if
-    // needed? Or just reset. Let's reset to give it a fresh chance.
+    // Cooldown 结束后重置重试计数，重新尝试配置。
     retry_count_ = 0;
     LOGF(LOG_INFO, "VideoPipeline: Config retry cooldown ended");
   }

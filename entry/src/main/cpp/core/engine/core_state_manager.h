@@ -31,11 +31,8 @@ public:
   void CheatReset();
   bool CheatSet(unsigned index, bool enabled, const std::string &code);
 
-  // --- Controller/Region Config (Optional refactor, included in original plan
-  // scope? The plan mentioned "CoreState & Cheat", but Controller/Region logic
-  // often goes with core configuration. Let's stick to the plan strictly:
-  // SaveState, SRAM, Cheat. However, Controller/Region were next to them in the
-  // file. Let's keep the scope focused on State/Memory/Cheats as planned.
+  // Controller/Region 配置由 LibretroEngine 管理。
+  // CoreStateManager 仅负责 SaveState/SRAM/Cheat。
 
 private:
   CoreLoader &coreLoader_;

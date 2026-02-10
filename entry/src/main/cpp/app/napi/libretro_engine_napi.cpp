@@ -703,7 +703,7 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
 
 static napi_value PauseEngine(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
-  LOGF(LOG_INFO, "⏸ [NEW] PauseEngine called");
+  LOGF(LOG_INFO, " [NEW] PauseEngine called");
   GetEngine()->Pause();
 
   return MakeBool(env, true);
@@ -712,7 +712,7 @@ static napi_value PauseEngine(napi_env env, napi_callback_info info) {
 
 static napi_value ResumeEngine(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
-  LOGF(LOG_INFO, "▶ [NEW] ResumeEngine called");
+  LOGF(LOG_INFO, " [NEW] ResumeEngine called");
   GetEngine()->Resume();
 
   return MakeBool(env, true);

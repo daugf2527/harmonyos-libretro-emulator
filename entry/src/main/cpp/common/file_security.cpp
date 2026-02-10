@@ -143,7 +143,7 @@ bool ValidateRomPath(const std::string &romPath) {
   // 允许的 ROM 目录
   const char *allowedRomDirs[] = {
       "/data/storage/el2/base/haps/entry/files/roms",   // 用户 ROM 目录
-      "/data/storage/el2/base/haps/entry/files/system", // 系统目录（用于临时 ROM）
+      "/data/storage/el2/base/haps/entry/files/system", // 系统目录（ROM 暂存）
   };
 
   for (const char *allowedDir : allowedRomDirs) {

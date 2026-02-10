@@ -407,11 +407,7 @@ void GLESRenderer::Deinit() {
     hms_xeg_renderSpatialUpscale_ = nullptr;
   }
 
-  // ScopedGLObj will handle GL deletions automatically (program, vao, vbo,
-  // texture). But we need to ensure context is current if we want to delete
-  // them? Actually, destructors will run when members are destroyed or reset.
-  // But here members are still alive. We should reset them explicitly if
-  // context acts up. However, simple Reset(0) is enough.
+  // ScopedGLObj 管理 GL 对象生命周期，这里显式 reset 以确保在 Deinit 时释放。
 
   // Make context current to allow safe deletion
   bool contextCurrent = false;

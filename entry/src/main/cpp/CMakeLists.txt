@@ -152,10 +152,10 @@ endif()
 # )
 
 # if(xengine-lib)
-#     message(STATUS "✅ Found libxengine: ${xengine-lib}")
+#     message(STATUS "Found libxengine: ${xengine-lib}")
 #     target_link_libraries(entry PUBLIC ${xengine-lib})
 # else()
-#     message(WARNING "⚠️ libxengine not found in ${HMS_ROOT_PATH}/lib/${HMS_ARCH_DIR}")
+#     message(WARNING "libxengine not found in ${HMS_ROOT_PATH}/lib/${HMS_ARCH_DIR}")
 # endif()
 
 # Link other libraries
@@ -170,11 +170,11 @@ target_link_libraries(entry PUBLIC libqos.so)
 # 
 # Phase 3.1: 使用 dlopen 动态加载 Libretro 核心
 # 
-# ⚠️ 重要: 不要在编译时链接 libretro_2048.so!
+# 重要: 不要在编译时链接 libretro_2048.so!
 # 原因: 编译时链接会让 libentry.so 依赖 libretro_2048.so,
 #       导致加载 libentry.so 时报错 "No such file or directory"
 # 
-# ✅ 正确做法: 
+# 正确做法:
 # 1. 将 libretro_2048.so 放在 entry/libs/arm64-v8a/ 目录
 # 2. 构建系统会自动将其打包到 HAP 中
 # 3. 运行时通过 dlopen() 动态加载
@@ -190,10 +190,10 @@ target_link_libraries(entry PUBLIC libqos.so)
 if (${OHOS_ARCH} STREQUAL "arm64-v8a")
     # 添加优化选项
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize")
-    message(STATUS "✅ NEON optimization enabled for arm64-v8a")
+    message(STATUS "NEON optimization enabled for arm64-v8a")
     message(STATUS "   Compiler flags: ${CMAKE_CXX_FLAGS}")
 elseif (${OHOS_ARCH} STREQUAL "armeabi-v7a")
     # armeabi-v7a 需要显式启用 NEON
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon -mfloat-abi=softfp -O3")
-    message(STATUS "✅ NEON optimization enabled for armeabi-v7a")
+    message(STATUS "NEON optimization enabled for armeabi-v7a")
 endif()

@@ -206,10 +206,6 @@ bool AudioPlayer::Start() {
   }
 
   is_playing_ = true;
-  // Reset debug counter helper (this is a hack for static var, but okay for
-  // debugging) Ideally we should make it a member, but static is fine for quick
-  // debug. Actually, let's just let it run for the first 50 callbacks of the
-  // *session*.
   LOGF(LOG_INFO, "%{public}s AudioPlayer started", kAudioChainPrefix);
 
   return true;

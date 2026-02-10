@@ -204,21 +204,7 @@ int16_t InputManager::OnInputState(unsigned port, unsigned device,
     return 0;
   }
 
-  // Delegate to InputSnapshot logic
-  // Note: The original logic in LibretroEngine delegated to
-  // inputSnapshot_.GetButton/GetAnalog/GetPointer depending on device type. We
-  // need to reproduce that logic here. However, input_snapshot.h didn't have a
-  // unified "OnInputState" helper, it had GetButton/GetAnalog etc. Let's
-  // implement the switch-case logic here similar to how it's typically done in
-  // Libretro frontends.
-
-  // Check InputSnapshot implementation (based on previous view_file, checks
-  // were lock-free) We need to route the request based on device type.
-
-  // Since we don't have the original LibretroEngine::OnInputState logic visible
-  // right now (it was in the truncated part of libretro_engine.cpp), we must
-  // assume standard Libretro input handling behaviors. Let's look at what
-  // input_snapshot.h offers. Based on typical usage:
+  // Route libretro input queries by device type and read from InputSnapshot.
 
   if (device == RETRO_DEVICE_JOYPAD) {
     // Handle JOYPAD_MASK query (id == RETRO_DEVICE_ID_JOYPAD_MASK)
@@ -255,8 +241,8 @@ int16_t InputManager::OnInputState(unsigned port, unsigned device,
     }
   }
 
-  // RETRO_DEVICE_LIGHTGUN / RETRO_DEVICE_MOUSE / RETRO_DEVICE_KEYBOARD
-  // 当前未实现，保持返回 0。
+  // RETRO_DEVICE_LIGHTGUN / RETRO_DEVICE_MOUSE / RETRO_DEVICE_KEYBOARD:
+  // currently unimplemented, return 0.
 
   return 0;
 }

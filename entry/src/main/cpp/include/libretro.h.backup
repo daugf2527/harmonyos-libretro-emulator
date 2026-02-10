@@ -58,7 +58,7 @@ enum retro_pixel_format {
 #define RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL         8
 #define RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY          9
 #define RETRO_ENVIRONMENT_SET_PIXEL_FORMAT             10
-#define RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS        11  // ✅ 修正为 11（官方标准值）
+#define RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS        11  // 修正为 11（官方标准值）
 #define RETRO_ENVIRONMENT_SET_KEYBOARD_CALLBACK        12
 #define RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE   13
 #define RETRO_ENVIRONMENT_SET_HW_RENDER                14
@@ -68,7 +68,7 @@ enum retro_pixel_format {
 #define RETRO_ENVIRONMENT_SET_SUPPORT_NO_GAME          18
 #define RETRO_ENVIRONMENT_GET_LIBRETRO_PATH            19
 #define RETRO_ENVIRONMENT_GET_CONTENT_DIRECTORY        30
-#define RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY           31  // ✅ 保持 31
+#define RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY           31  // 保持 31
 
 struct retro_game_info {
    const char *path;

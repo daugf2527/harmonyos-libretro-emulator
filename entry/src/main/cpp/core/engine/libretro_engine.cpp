@@ -1006,15 +1006,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       LOGF(LOG_ERROR, " [NEW] LoadCore Failed: %{public}s",
            currentCorePath_.c_str());
 
-      // 构建详细错误信息
-      // json_escape is defined later in the file, we might need to move it up
-      // or implement a simple escape here. Since moving json_escape is a larger
-      // change, I'll use a simple snprintf for now, assuming basic strings.
-      // Ideally we should use the json_escape utility.
-      // Let's rely on simple format for now as error messages are usually safe.
-      // Actually, json_escape is static inline at line ~788. I cannot use it
-      // here easily without moving it. I will just output raw strings, hoping
-      // they don't contain quotes.
+      // 构建转义后的错误信息，避免 payload JSON 被特殊字符破坏。
 
       std::string step = coreLoader_.GetLastErrorStep();
       std::string msg = coreLoader_.GetLastErrorMessage();
