@@ -232,13 +232,17 @@ jobs:
           generate_release_notes: true
 
       - name: Notify Release Webhook
-        if: ${{ success() && (secrets.RELEASE_NOTIFY_WEBHOOK_URL != '' || vars.RELEASE_NOTIFY_WEBHOOK_URL != '') }}
+        if: ${{ success() }}
         shell: bash
         env:
           RELEASE_NOTIFY_WEBHOOK_URL: ${{ secrets.RELEASE_NOTIFY_WEBHOOK_URL != '' && secrets.RELEASE_NOTIFY_WEBHOOK_URL || vars.RELEASE_NOTIFY_WEBHOOK_URL }}
           RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ github.ref_name }}
         run: |
           set -euo pipefail
+          if [[ -z "${RELEASE_NOTIFY_WEBHOOK_URL}" ]]; then
+            echo "[INFO] RELEASE_NOTIFY_WEBHOOK_URL is empty, skip notification."
+            exit 0
+          fi
           payload="$(jq -n \
             --arg tag "${GITHUB_REF_NAME}" \
             --arg repository "${GITHUB_REPOSITORY}" \

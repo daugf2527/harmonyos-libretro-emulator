@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: harmonyos-pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: harmonyos-pr-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -41,7 +41,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: harmonyos-device-deploy-${{ github.workflow }}-${{ inputs.source_run_id }}
+  group: harmonyos-device-deploy-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
