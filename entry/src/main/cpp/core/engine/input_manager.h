@@ -5,6 +5,7 @@
 #include "event_bridge.h"
 #include "input_snapshot.h"
 #include "interfaces/input/i_input_manager.h"
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <mutex>
@@ -66,7 +67,7 @@ private:
   std::function<void(unsigned, unsigned)> controller_port_device_callback_;
 
   // Static instance for Libretro C-style callbacks
-  static InputManager *g_instance;
+  static std::atomic<InputManager *> g_instance;
 };
 
 } // namespace libretro

@@ -74,22 +74,25 @@ bool TryParseSourceType(int sourceType, InputSourceType &out) {
 }
 } // namespace
 
-InputManager *InputManager::g_instance = nullptr;
+std::atomic<InputManager *> InputManager::g_instance{nullptr};
 
 InputManager::InputManager(EventBridge *eventBridge)
     : eventBridge_(eventBridge) {
-  g_instance = this;
+  g_instance.store(this, std::memory_order_release);
   LOGF(LOG_INFO, "InputManager created");
 }
 
 InputManager::~InputManager() {
-  if (g_instance == this) {
-    g_instance = nullptr;
-  }
+  InputManager *expected = this;
+  (void)g_instance.compare_exchange_strong(expected, nullptr,
+                                           std::memory_order_acq_rel,
+                                           std::memory_order_acquire);
   LOGF(LOG_INFO, "InputManager destroyed");
 }
 
-InputManager *InputManager::GetInstance() { return g_instance; }
+InputManager *InputManager::GetInstance() {
+  return g_instance.load(std::memory_order_acquire);
+}
 
 bool InputManager::SendInput(int port, int id, bool pressed) {
   if (!IsValidPort(port) || !IsValidButton(id)) {
@@ -200,7 +203,8 @@ void InputManager::OnInputPoll() {
 
 int16_t InputManager::OnInputState(unsigned port, unsigned device,
                                    unsigned index, unsigned id) {
-  if (!g_instance) {
+  InputManager *instance = g_instance.load(std::memory_order_acquire);
+  if (!instance) {
     return 0;
   }
 
@@ -211,24 +215,24 @@ int16_t InputManager::OnInputState(unsigned port, unsigned device,
     if (index == 0) {
       if (id == RETRO_DEVICE_ID_JOYPAD_MASK) {
         return static_cast<int16_t>(
-            g_instance->inputSnapshot_.GetButtonsMask(port));
+            instance->inputSnapshot_.GetButtonsMask(port));
       }
       // Single button query
-      return g_instance->inputSnapshot_.GetButton(port, id) ? 1 : 0;
+      return instance->inputSnapshot_.GetButton(port, id) ? 1 : 0;
     }
   }
 
   if (device == RETRO_DEVICE_ANALOG) {
     // index: RETRO_DEVICE_INDEX_ANALOG_LEFT (0) or RIGHT (1)
     // id: RETRO_DEVICE_ID_ANALOG_X (0) or Y (1)
-    return g_instance->inputSnapshot_.GetAnalog(port, index, id);
+    return instance->inputSnapshot_.GetAnalog(port, index, id);
   }
 
   if (device == RETRO_DEVICE_POINTER) {
     int16_t x = 0;
     int16_t y = 0;
     bool pressed = false;
-    g_instance->inputSnapshot_.GetPointer(port, x, y, pressed);
+    instance->inputSnapshot_.GetPointer(port, x, y, pressed);
     switch (id) {
     case RETRO_DEVICE_ID_POINTER_X:
       return x;
@@ -249,7 +253,8 @@ int16_t InputManager::OnInputState(unsigned port, unsigned device,
 
 bool InputManager::OnRumble(unsigned port, retro_rumble_effect effect,
                             uint16_t strength) {
-  if (!g_instance || !g_instance->eventBridge_) {
+  InputManager *instance = g_instance.load(std::memory_order_acquire);
+  if (!instance || !instance->eventBridge_) {
     return false;
   }
 
@@ -258,13 +263,14 @@ bool InputManager::OnRumble(unsigned port, retro_rumble_effect effect,
            "{\"port\": %u, \"effect\": %d, \"strength\": %u}", port,
            static_cast<int>(effect), strength);
 
-  g_instance->eventBridge_->Emit("rumble", payload, false);
+  instance->eventBridge_->Emit("rumble", payload, false);
   return true;
 }
 
 bool InputManager::OnSensorSetState(unsigned port, retro_sensor_action action,
                                     unsigned rate) {
-  if (!g_instance || !g_instance->eventBridge_) {
+  InputManager *instance = g_instance.load(std::memory_order_acquire);
+  if (!instance || !instance->eventBridge_) {
     return false;
   }
 
@@ -272,15 +278,16 @@ bool InputManager::OnSensorSetState(unsigned port, retro_sensor_action action,
   snprintf(payload, sizeof(payload),
            "{\"port\": %u, \"action\": %d, \"rate\": %u}", port,
            static_cast<int>(action), rate);
-  g_instance->eventBridge_->Emit("sensor_state", payload, false);
+  instance->eventBridge_->Emit("sensor_state", payload, false);
   return true;
 }
 
 float InputManager::OnSensorGetInput(unsigned port, unsigned id) {
-  if (!g_instance) {
+  InputManager *instance = g_instance.load(std::memory_order_acquire);
+  if (!instance) {
     return 0.0f;
   }
-  return g_instance->inputSnapshot_.GetSensor(port, id);
+  return instance->inputSnapshot_.GetSensor(port, id);
 }
 
 } // namespace libretro
