@@ -715,6 +715,27 @@ bool LibretroEngine::SendVirtualAnalog(int port, int index, int id,
   return false;
 }
 
+bool LibretroEngine::DispatchKeyboardEvent(bool down, unsigned keycode,
+                                           uint32_t character,
+                                           uint16_t key_modifiers) {
+  bool dispatched = false;
+  (void)ExecuteSyncTask(
+      [this, &dispatched, down, keycode, character, key_modifiers]() {
+        if (!coreLoader_.IsLoaded()) {
+          return;
+        }
+        const ::retro_keyboard_callback *callback =
+            envState_.GetKeyboardCallback();
+        if (!callback || !callback->callback) {
+          return;
+        }
+        callback->callback(down, keycode, character, key_modifiers);
+        dispatched = true;
+      },
+      kSyncTaskTimeoutMs);
+  return dispatched;
+}
+
 void LibretroEngine::SendPointer(int port, int16_t x, int16_t y, bool pressed) {
   if (inputManager_) {
     inputManager_->SendPointer(port, x, y, pressed);

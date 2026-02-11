@@ -15,6 +15,7 @@
 
 #include "plugin_manager.h"
 #include "core/engine/libretro_engine.h"
+#include "core/libretro/libretro.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include <ace/xcomponent/native_xcomponent_key_event.h>
 #include <atomic>
@@ -182,6 +183,52 @@ static bool MapKeyCodeToJoypad(OH_NativeXComponent_KeyCode code, int &outId) {
   return false;
 }
 
+static unsigned MapKeyCodeToRetroKey(OH_NativeXComponent_KeyCode code) {
+  switch (code) {
+  case KEY_DPAD_UP:
+    return RETROK_UP;
+  case KEY_DPAD_DOWN:
+    return RETROK_DOWN;
+  case KEY_DPAD_LEFT:
+    return RETROK_LEFT;
+  case KEY_DPAD_RIGHT:
+    return RETROK_RIGHT;
+  case KEY_ENTER:
+    return RETROK_RETURN;
+  case KEY_SPACE:
+    return RETROK_SPACE;
+  case KEY_ESCAPE:
+    return RETROK_ESCAPE;
+  case KEY_Z:
+    return RETROK_z;
+  case KEY_X:
+    return RETROK_x;
+  case KEY_A:
+    return RETROK_a;
+  case KEY_S:
+    return RETROK_s;
+  default:
+    break;
+  }
+
+  // Best-effort fallback for printable ASCII-like keycodes.
+  const unsigned rawCode = static_cast<unsigned>(code);
+  if (rawCode >= RETROK_SPACE && rawCode <= RETROK_DELETE) {
+    return rawCode;
+  }
+  return RETROK_UNKNOWN;
+}
+
+static uint32_t BuildRetroCharacter(unsigned retroKeycode, bool down) {
+  if (!down) {
+    return 0;
+  }
+  if (retroKeycode >= RETROK_SPACE && retroKeycode <= RETROK_DELETE) {
+    return static_cast<uint32_t>(retroKeycode);
+  }
+  return 0;
+}
+
 static bool HandleNewArchKeyEvent(OH_NativeXComponent *component) {
   if (!component) {
     return false;
@@ -207,10 +254,23 @@ static bool HandleNewArchKeyEvent(OH_NativeXComponent *component) {
     return false;
   }
 
-  int joypadId = -1;
-  if (!MapKeyCodeToJoypad(code, joypadId)) {
+  const bool isDown = (action == OH_NATIVEXCOMPONENT_KEY_ACTION_DOWN);
+  const bool isUp = (action == OH_NATIVEXCOMPONENT_KEY_ACTION_UP);
+  if (!isDown && !isUp) {
     return false;
   }
+
+  const unsigned retroKeycode = MapKeyCodeToRetroKey(code);
+  const uint32_t character = BuildRetroCharacter(retroKeycode, isDown);
+  bool keyboardDispatched = false;
+  if (retroKeycode != RETROK_UNKNOWN || character != 0) {
+    keyboardDispatched = libretro::LibretroEngine::GetInstance()
+                             ->DispatchKeyboardEvent(isDown, retroKeycode,
+                                                     character, 0);
+  }
+
+  int joypadId = -1;
+  const bool mapToJoypad = MapKeyCodeToJoypad(code, joypadId);
 
   const std::string xId = GetNewArchXComponentId(component);
   const uint64_t count = ++KeyEventCount();
@@ -228,15 +288,19 @@ static bool HandleNewArchKeyEvent(OH_NativeXComponent *component) {
       deviceId, libretro::InputSourceType::Keyboard,
       std::string("Keyboard ") + deviceId);
 
-  int port = 0;
-  if (!ResolvePortForDevice(deviceId, libretro::InputSourceType::Keyboard,
-                            port)) {
-    return false;
+  bool joypadDispatched = false;
+  if (mapToJoypad) {
+    int port = 0;
+    if (!ResolvePortForDevice(deviceId, libretro::InputSourceType::Keyboard,
+                              port)) {
+      return keyboardDispatched;
+    }
+
+    libretro::LibretroEngine::GetInstance()->SendInput(port, joypadId, isDown);
+    joypadDispatched = true;
   }
 
-  const bool pressed = (action == OH_NATIVEXCOMPONENT_KEY_ACTION_DOWN);
-  libretro::LibretroEngine::GetInstance()->SendInput(port, joypadId, pressed);
-  return true;
+  return keyboardDispatched || joypadDispatched;
 }
 
 std::mutex &NewArchWindowMutex() {

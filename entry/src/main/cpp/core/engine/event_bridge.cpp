@@ -123,6 +123,7 @@ void EventBridge::Emit(EventType event, const std::string &payload,
 
   std::string payload_to_send = payload;
   int eventKey = static_cast<int>(event);
+  bool send_pending_payload = false;
 
   ThrottleRule rule{};
   if (!force) {
@@ -145,7 +146,8 @@ void EventBridge::Emit(EventType event, const std::string &payload,
       // Check pending
       auto pending_it = pending_payload_.find(eventKey);
       if (pending_it != pending_payload_.end()) {
-        pending_payload_.erase(pending_it);
+        payload_to_send = pending_it->second;
+        send_pending_payload = true;
       }
     }
   }
@@ -171,6 +173,9 @@ void EventBridge::Emit(EventType event, const std::string &payload,
   } else {
       if (!force) {
         last_event_time_[eventKey] = now;
+      }
+      if (send_pending_payload) {
+        pending_payload_.erase(eventKey);
       }
       queue_full_count_ = 0;
   }

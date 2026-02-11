@@ -151,6 +151,8 @@ public:
   void SendAnalog(int port, int index, int id, int16_t value);
   bool SendVirtualInput(int port, int id, bool pressed);
   bool SendVirtualAnalog(int port, int index, int id, int16_t value);
+  bool DispatchKeyboardEvent(bool down, unsigned keycode, uint32_t character,
+                             uint16_t key_modifiers);
   void SendPointer(int port, int16_t x, int16_t y, bool pressed);
   void SendSensor(int port, int id, float value);
   bool AssignPortSource(int port, InputSourceType sourceType,
