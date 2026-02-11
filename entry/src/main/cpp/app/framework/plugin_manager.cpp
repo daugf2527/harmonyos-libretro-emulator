@@ -640,8 +640,19 @@ void PluginManager::Export(napi_env env, napi_value exports) {
             (void)window;
             NewArchHasFocus().store(false);
             NewArchMouseDown().store(false);
-            libretro::LibretroEngine::GetInstance()->SendPointer(0, 0, 0,
-                                                                 false);
+            const std::string deviceId = BuildMouseDeviceId();
+            int port = 0;
+            if (ResolvePortForDevice(deviceId, libretro::InputSourceType::Mouse,
+                                     port)) {
+              libretro::LibretroEngine::GetInstance()->SendPointer(port, 0, 0,
+                                                                   false);
+              return;
+            }
+            // 未解析到端口时兜底清理常见端口，避免残留 pressed 状态。
+            for (int fallbackPort = 0; fallbackPort < 4; ++fallbackPort) {
+              libretro::LibretroEngine::GetInstance()->SendPointer(
+                  fallbackPort, 0, 0, false);
+            }
           });
       if (blurRet != OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
         LOGF(LOG_WARN,
