@@ -177,7 +177,8 @@ bool SetCoreOptionsV2(EnvState &state, const ::retro_core_options_v2 *opts) {
   }
   state.SetCoreOptions(CopyCoreOptionCategories(opts->categories),
                        CopyCoreOptionDefinitionsV2(opts->definitions));
-  ApplyCoreOptionValues(state, state.GetCoreOptionDefinitions());
+  const auto defsSnapshot = state.GetCoreOptionDefinitions();
+  ApplyCoreOptionValues(state, defsSnapshot);
   return true;
 }
 
@@ -187,7 +188,8 @@ bool SetCoreOptionsV1(EnvState &state, const ::retro_core_option_definition *def
     return true;
   }
   state.SetCoreOptions({}, CopyCoreOptionDefinitionsV1(defs));
-  ApplyCoreOptionValues(state, state.GetCoreOptionDefinitions());
+  const auto defsSnapshot = state.GetCoreOptionDefinitions();
+  ApplyCoreOptionValues(state, defsSnapshot);
   return true;
 }
 
@@ -196,8 +198,8 @@ bool SetCoreOptionValue(EnvState &state, const char *key, const char *value) {
     return false;
   }
 
-  const CoreOptionDefinition *def =
-      FindDefinitionByKey(state.GetCoreOptionDefinitions(), key);
+  const auto defsSnapshot = state.GetCoreOptionDefinitions();
+  const CoreOptionDefinition *def = FindDefinitionByKey(defsSnapshot, key);
   if (!def) {
     return false;
   }

@@ -728,6 +728,7 @@ void EnvState::ResetCoreState() {
 }
 
 void EnvState::ClearCoreOptions() {
+  std::lock_guard<std::mutex> lock(core_options_mutex_);
   core_option_categories_.clear();
   core_option_definitions_.clear();
 }
@@ -735,6 +736,7 @@ void EnvState::ClearCoreOptions() {
 void EnvState::SetCoreOptions(
     std::vector<core_options::CoreOptionCategory> categories,
     std::vector<core_options::CoreOptionDefinition> definitions) {
+  std::lock_guard<std::mutex> lock(core_options_mutex_);
   core_option_categories_ = std::move(categories);
   core_option_definitions_ = std::move(definitions);
 }

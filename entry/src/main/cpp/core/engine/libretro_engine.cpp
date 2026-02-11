@@ -1725,7 +1725,8 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
           
           static size_t skipLogCount = 0;
           if (++skipLogCount % 60 == 0) {
-             LOGF(LOG_WARN, "[Perf] Auto-skipping frame (audio usage=%.1f%%)", usage * 100.0f);
+             LOGF(LOG_WARN, "[Perf] Auto-skipping frame (audio usage=%{public}.1f%%)",
+                  usage * 100.0f);
           }
 
           {
@@ -2128,7 +2129,7 @@ bool LibretroEngine::SetCoreOption(const std::string &key,
 
 std::string LibretroEngine::GetCoreOptionsJson() const {
   std::string s = "[";
-  const auto &defs = envState_.GetCoreOptionDefinitions();
+  const auto defs = envState_.GetCoreOptionDefinitions();
   for (size_t i = 0; i < defs.size(); ++i) {
     const auto &d = defs[i];
     std::string keyEsc, descEsc, valEsc;

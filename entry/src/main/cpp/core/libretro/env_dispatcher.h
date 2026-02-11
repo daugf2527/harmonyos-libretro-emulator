@@ -128,10 +128,12 @@ public:
   void ClearCoreOptions();
   void SetCoreOptions(std::vector<core_options::CoreOptionCategory> categories,
                       std::vector<core_options::CoreOptionDefinition> definitions);
-  const std::vector<core_options::CoreOptionCategory> &GetCoreOptionCategories() const {
+  std::vector<core_options::CoreOptionCategory> GetCoreOptionCategories() const {
+    std::lock_guard<std::mutex> lock(core_options_mutex_);
     return core_option_categories_;
   }
-  const std::vector<core_options::CoreOptionDefinition> &GetCoreOptionDefinitions() const {
+  std::vector<core_options::CoreOptionDefinition> GetCoreOptionDefinitions() const {
+    std::lock_guard<std::mutex> lock(core_options_mutex_);
     return core_option_definitions_;
   }
 
@@ -243,6 +245,7 @@ private:
   std::string username_ = "Player";
   ::retro_language language_ = ::RETRO_LANGUAGE_CHINESE_SIMPLIFIED;
 
+  mutable std::mutex core_options_mutex_;
   std::vector<core_options::CoreOptionCategory> core_option_categories_;
   std::vector<core_options::CoreOptionDefinition> core_option_definitions_;
 
