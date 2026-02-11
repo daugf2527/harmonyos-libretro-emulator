@@ -664,11 +664,6 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     }
   }
 
-  if (token == 0) {
-    token = switch_token.fetch_add(1) + 1;
-  }
-  switch_token.store(token);
-
   std::string resolvedRomPath(romPath);
   std::shared_ptr<std::vector<uint8_t>> romData = nullptr;
   if (!LoadRomDataFromRawfileIfNeeded(env, resolvedRomPath, resMgrValue,
@@ -683,6 +678,11 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
          static_cast<unsigned long long>(kSwitchDedupeWindowMs));
     return MakeResolvedPromise(env, true);
   }
+
+  if (token == 0) {
+    token = switch_token.fetch_add(1) + 1;
+  }
+  switch_token.store(token);
 
   auto *ctx = new SwitchGameAsyncContext();
   ctx->env = env;
