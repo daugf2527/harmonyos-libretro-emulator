@@ -1,5 +1,6 @@
 #pragma once
 #include "libretro.h"
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -38,12 +39,13 @@ public:
   bool ReplaceImageIndex(unsigned index, const std::string& path);
   bool AddImageIndex();
   bool AddImagePath(const std::string& path);
-  bool IsEjected() const { return ejected_; }
+  bool IsEjected() const;
   
 private:
   retro_disk_control_ext_callback callbacks_{};
   bool is_ext_ = false;
   bool ejected_ = false;
+  mutable std::mutex mutex_;
 };
 
 } // namespace libretro

@@ -10,6 +10,7 @@
 namespace libretro {
 
 void DiskController::SetCallbacks(const retro_disk_control_ext_callback* cbs) {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (cbs) {
     callbacks_ = *cbs;
     is_ext_ = true;
@@ -18,6 +19,7 @@ void DiskController::SetCallbacks(const retro_disk_control_ext_callback* cbs) {
 }
 
 void DiskController::SetCallbacks(const retro_disk_control_callback* cbs) {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (cbs) {
     callbacks_.set_eject_state = cbs->set_eject_state;
     callbacks_.get_eject_state = cbs->get_eject_state;
@@ -32,6 +34,7 @@ void DiskController::SetCallbacks(const retro_disk_control_callback* cbs) {
 }
 
 bool DiskController::Eject() {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.set_eject_state) return false;
   bool success = callbacks_.set_eject_state(true);
   if (success) ejected_ = true;
@@ -39,6 +42,7 @@ bool DiskController::Eject() {
 }
 
 bool DiskController::Insert() {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.set_eject_state) return false;
   bool success = callbacks_.set_eject_state(false);
   if (success) ejected_ = false;
@@ -46,21 +50,25 @@ bool DiskController::Insert() {
 }
 
 bool DiskController::SetImageIndex(unsigned index) {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.set_image_index) return false;
   return callbacks_.set_image_index(index);
 }
 
 unsigned DiskController::GetImageIndex() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.get_image_index) return 0;
   return callbacks_.get_image_index();
 }
 
 unsigned DiskController::GetNumImages() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.get_num_images) return 0;
   return callbacks_.get_num_images();
 }
 
 bool DiskController::ReplaceImageIndex(unsigned index, const std::string& path) {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.replace_image_index) return false;
   struct retro_game_info info = {0};
   info.path = path.empty() ? nullptr : path.c_str();
@@ -68,11 +76,13 @@ bool DiskController::ReplaceImageIndex(unsigned index, const std::string& path) 
 }
 
 bool DiskController::AddImageIndex() {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.add_image_index) return false;
   return callbacks_.add_image_index();
 }
 
 bool DiskController::AddImagePath(const std::string& path) {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.add_image_index) return false;
 
   // 添加一个新槽位
@@ -98,6 +108,11 @@ bool DiskController::AddImagePath(const std::string& path) {
   }
 
   return true;
+}
+
+bool DiskController::IsEjected() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return ejected_;
 }
 
 } // namespace libretro
