@@ -1,6 +1,15 @@
-# HarmonyOS Libretro 前端（new_arch）
+# HarmonyOS Libretro Emulator 前端（new_arch）
 
 > 以仓库代码现状为准（更新日期：2026-02-06）。
+
+## GitHub 检索关键词
+
+- `harmonyos libretro emulator`
+- `openharmony libretro frontend`
+- `harmonyos xcomponent emulator`
+- `arkts libretro`
+- `retroarch harmonyos`
+- `harmonyos vulkan gles`
 
 ## 1. 项目定位
 

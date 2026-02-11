@@ -1,6 +1,15 @@
-# HarmonyOS Libretro Frontend (new_arch)
+# HarmonyOS Libretro Emulator Frontend (new_arch)
 
 > This document reflects the current repository state (updated on 2026-02-06).
+
+## GitHub Search Keywords
+
+- `harmonyos libretro emulator`
+- `openharmony libretro frontend`
+- `harmonyos xcomponent emulator`
+- `arkts libretro`
+- `retroarch harmonyos`
+- `harmonyos vulkan gles`
 
 ## Project Positioning
 
