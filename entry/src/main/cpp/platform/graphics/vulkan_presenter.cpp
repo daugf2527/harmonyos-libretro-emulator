@@ -143,13 +143,10 @@ bool VulkanPresenter::Present() {
     return false;
   }
   const uint32_t index = sync_index_.load();
-  FrameState *state = nullptr;
-  {
-    std::lock_guard<std::mutex> lock(state_mutex_);
-    state = GetFrameStateLocked(index);
-    if (!state) {
-      return false;
-    }
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  FrameState *state = GetFrameStateLocked(index);
+  if (!state) {
+    return false;
   }
   if (!state->presenter_cmd_ready) {
     if (index >= swapchain_images_.size()) {
