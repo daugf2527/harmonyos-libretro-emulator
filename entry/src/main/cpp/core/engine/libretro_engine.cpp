@@ -442,6 +442,10 @@ void LibretroEngine::Reset() {
   stopTimedOut_.store(false);
   startInProgress_.store(false);
   stopInProgress_.store(false);
+  {
+    std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+    pendingFilesDir_.clear();
+  }
 
   // 2. 重置消息队列（清空残留消息并重新打开）
   messageQueue_.Reopen();
@@ -806,12 +810,20 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
   }
 
   if (running_.load()) {
+    {
+      std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+      pendingFilesDir_ = filesDir;
+    }
     if (messageQueue_.IsClosed()) {
+      std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+      pendingFilesDir_.clear();
       LOGF(LOG_WARN, "[NEW] SetFilesDir dropped: message queue closed");
       return false;
     }
     if (!messageQueue_.Push(EngineMessage::MakeLoadMessage(
             MessageType::SetFilesDir, filesDir))) {
+      std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+      pendingFilesDir_.clear();
       LOGF(LOG_WARN, "[NEW] SetFilesDir dropped: message queue closed");
       return false;
     }
@@ -819,13 +831,26 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
   }
 
   // 引擎未运行时可直接设置（无并发读写）
-  envState_.SetBaseDir(filesDir);
+  if (!envState_.SetBaseDir(filesDir)) {
+    LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set from ArkTS failed");
+    return false;
+  }
+  {
+    std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+    pendingFilesDir_.clear();
+  }
   LOGF(LOG_INFO, "[NEW] EnvState BaseDir set from ArkTS: %{public}s",
        filesDir.c_str());
   return true;
 }
 
 std::string LibretroEngine::GetFilesDir() const {
+  {
+    std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+    if (!pendingFilesDir_.empty()) {
+      return pendingFilesDir_;
+    }
+  }
   const char *dir = envState_.GetBaseDir();
   return dir ? std::string(dir) : "";
 }
@@ -1355,11 +1380,20 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     }
   } break;
   case MessageType::SetFilesDir: {
+    const std::string requestPath = msg.payload.loadPath.path;
+    auto clearPendingIfMatched = [this, &requestPath]() {
+      std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+      if (pendingFilesDir_ == requestPath) {
+        pendingFilesDir_.clear();
+      }
+    };
+
     EngineState st = state_.load();
     if (IsCoreLoadedState(st) || st == EngineState::LOADING ||
         st == EngineState::STOPPING) {
       LOGF(LOG_WARN, "[NEW] SetFilesDir ignored after core loaded: %{public}s",
            msg.payload.loadPath.path);
+      clearPendingIfMatched();
       break;
     }
     if (!envState_.SetBaseDir(msg.payload.loadPath.path)) {
@@ -1368,6 +1402,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       LOGF(LOG_INFO, "[NEW] EnvState BaseDir set from Engine thread: %{public}s",
            msg.payload.loadPath.path);
     }
+    clearPendingIfMatched();
     break;
   }
   case MessageType::WindowCreated:

@@ -291,6 +291,8 @@ private:
   std::atomic<bool> stopInProgress_{false};
   std::atomic<bool> stopTimedOut_{false};
   std::recursive_mutex controlMutex_;
+  mutable std::mutex filesDirHintMutex_;
+  std::string pendingFilesDir_;
   std::thread gameThread_;
   std::mutex stateMutex_;
   std::condition_variable stateCond_;
