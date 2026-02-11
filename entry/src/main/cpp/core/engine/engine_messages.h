@@ -41,9 +41,10 @@ struct EngineMessageInput {
 };
 
 struct EngineMessageLoadPath {
-  // 固定 512 字节：鸿蒙沙箱路径通常 <100 字符，512 足够覆盖所有场景
+  // 与 NAPI 路径缓冲保持一致，避免跨线程消息层静默截断。
   // 使用固定数组而非 std::string 是为了保持消息结构的简单性和可拷贝性
-  char path[512];
+  static constexpr size_t kPathCapacity = 1024;
+  char path[kPathCapacity];
   std::shared_ptr<std::vector<uint8_t>> data;
 };
 
@@ -97,7 +98,8 @@ struct EngineMessage {
                   std::shared_ptr<std::vector<uint8_t>> data = nullptr) {
     EngineMessage msg;
     msg.type = type;
-    size_t copyLen = (path.size() < 511) ? path.size() : 511;
+    const size_t maxLen = EngineMessageLoadPath::kPathCapacity - 1;
+    size_t copyLen = (path.size() < maxLen) ? path.size() : maxLen;
     std::memcpy(msg.payload.loadPath.path, path.c_str(), copyLen);
     msg.payload.loadPath.path[copyLen] = '\0';
     msg.payload.loadPath.data = data;

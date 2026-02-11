@@ -63,6 +63,10 @@ constexpr const char *kAudioDiagPrefix = "[AUDIO_DIAG]";
 constexpr uint32_t kSyncTaskTimeoutMs = 5000;
 thread_local LibretroEngine *g_engineThreadInstance = nullptr;
 
+bool IsMessagePathTooLong(const std::string &path) {
+  return path.size() >= EngineMessageLoadPath::kPathCapacity;
+}
+
 class EngineRendererAdapter : public interfaces::IRenderer {
 public:
   explicit EngineRendererAdapter(LibretroEngine *engine) : engine_(engine) {}
@@ -535,6 +539,12 @@ void LibretroEngine::Resume() {
 
 bool LibretroEngine::LoadCore(const std::string &corePath) {
   std::lock_guard<std::recursive_mutex> lock(controlMutex_);
+  if (IsMessagePathTooLong(corePath)) {
+    LOGF(LOG_ERROR,
+         "[NEW] LoadCore rejected: path too long (%{public}zu >= %{public}zu)",
+         corePath.size(), EngineMessageLoadPath::kPathCapacity);
+    return false;
+  }
   // 自动启动引擎（如果未运行）
   if (!running_) {
     LOGF(LOG_INFO, "[NEW] LoadCore: Engine not running, auto-starting...");
@@ -551,6 +561,12 @@ bool LibretroEngine::LoadCore(const std::string &corePath) {
 bool LibretroEngine::LoadGame(const std::string &gamePath,
                               std::shared_ptr<std::vector<uint8_t>> data) {
   std::lock_guard<std::recursive_mutex> lock(controlMutex_);
+  if (IsMessagePathTooLong(gamePath)) {
+    LOGF(LOG_ERROR,
+         "[NEW] LoadRom rejected: path too long (%{public}zu >= %{public}zu)",
+         gamePath.size(), EngineMessageLoadPath::kPathCapacity);
+    return false;
+  }
   if (!messageQueue_.Push(EngineMessage::MakeLoadMessage(MessageType::LoadRom,
                                                          gamePath, data))) {
     LOGF(LOG_WARN, "[NEW] LoadRom dropped: message queue closed");
@@ -801,6 +817,12 @@ bool LibretroEngine::CanSendVirtual(int port) const {
 
 bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
   std::lock_guard<std::recursive_mutex> lock(controlMutex_);
+  if (IsMessagePathTooLong(filesDir)) {
+    LOGF(LOG_ERROR,
+         "[NEW] SetFilesDir rejected: path too long (%{public}zu >= %{public}zu)",
+         filesDir.size(), EngineMessageLoadPath::kPathCapacity);
+    return false;
+  }
   const EngineState st = state_.load();
   if (IsCoreLoadedState(st) || st == EngineState::LOADING ||
       st == EngineState::STOPPING) {
