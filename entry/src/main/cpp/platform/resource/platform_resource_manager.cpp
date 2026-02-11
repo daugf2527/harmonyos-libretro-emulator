@@ -57,9 +57,10 @@ void PlatformResourceManager::Initialize(NativeResourceManager *native_mgr) {
   LOGF(LOG_INFO, "PlatformResourceManager initialized with NativeResourceManager: %{public}p", native_mgr);
 }
 
-bool PlatformResourceManager::LoadRawFile(const std::string &path,
-                                          std::vector<uint8_t> &out_data) {
-  std::lock_guard<std::mutex> lock(mutex_);
+bool PlatformResourceManager::LoadRawFileUnlocked(
+    const std::string &path,
+    NativeResourceManager *native_mgr,
+    std::vector<uint8_t> &out_data) const {
   if (path.empty()) {
     return false;
   }
@@ -91,9 +92,8 @@ bool PlatformResourceManager::LoadRawFile(const std::string &path,
   }
 
   // 2. 尝试从 RawFile 加载 (如果已初始化)
-  if (native_resource_manager_) {
-    RawFile *rawFile =
-        OH_ResourceManager_OpenRawFile(native_resource_manager_, path.c_str());
+  if (native_mgr) {
+    RawFile *rawFile = OH_ResourceManager_OpenRawFile(native_mgr, path.c_str());
     if (!rawFile) {
       LOGF(LOG_WARN, "OpenRawFile failed: %{public}s", path.c_str());
     } else {
@@ -132,19 +132,34 @@ bool PlatformResourceManager::LoadRawFile(const std::string &path,
   return false;
 }
 
+bool PlatformResourceManager::LoadRawFile(const std::string &path,
+                                          std::vector<uint8_t> &out_data) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return LoadRawFileUnlocked(path, native_resource_manager_, out_data);
+}
+
+bool PlatformResourceManager::LoadRawFileWithManager(
+    const std::string &path,
+    NativeResourceManager *native_mgr,
+    std::vector<uint8_t> &out_data) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return LoadRawFileUnlocked(path, native_mgr, out_data);
+}
+
 bool PlatformResourceManager::FileExists(const std::string &path) const {
   struct stat buffer;
   return (stat(path.c_str(), &buffer) == 0);
 }
 
-std::vector<std::string> PlatformResourceManager::GetRawFileList(const std::string &dir) const {
+std::vector<std::string> PlatformResourceManager::GetRawFileListUnlocked(
+    const std::string &dir, NativeResourceManager *native_mgr) const {
   std::vector<std::string> fileList;
-  if (!native_resource_manager_) {
+  if (!native_mgr) {
     return fileList;
   }
 
   // 尝试打开 RawDir
-  RawDir *rawDir = OH_ResourceManager_OpenRawDir(native_resource_manager_, dir.c_str());
+  RawDir *rawDir = OH_ResourceManager_OpenRawDir(native_mgr, dir.c_str());
   if (!rawDir) {
     LOGF(LOG_WARN, "OpenRawDir failed: %{public}s", dir.c_str());
     return fileList;
@@ -160,6 +175,11 @@ std::vector<std::string> PlatformResourceManager::GetRawFileList(const std::stri
 
   OH_ResourceManager_CloseRawDir(rawDir);
   return fileList;
+}
+
+std::vector<std::string> PlatformResourceManager::GetRawFileList(const std::string &dir) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return GetRawFileListUnlocked(dir, native_resource_manager_);
 }
 
 bool PlatformResourceManager::ReadFile(const std::string &path,
@@ -195,11 +215,8 @@ std::vector<std::string> PlatformResourceManager::ListDir(const std::string &dir
     return fileList;
   }
 
-  if (native_resource_manager_) {
-    return GetRawFileList(dir);
-  }
-
-  return fileList;
+  std::lock_guard<std::mutex> lock(mutex_);
+  return GetRawFileListUnlocked(dir, native_resource_manager_);
 }
 
 } // namespace libretro

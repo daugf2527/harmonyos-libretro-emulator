@@ -45,13 +45,23 @@ public:
                 std::vector<uint8_t> &out_data) override;
   std::vector<std::string> ListDir(const std::string &dir) const override;
 
+  // 显式传入 NativeResourceManager，避免依赖单例缓存句柄生命周期。
+  bool LoadRawFileWithManager(const std::string &path,
+                              NativeResourceManager *native_mgr,
+                              std::vector<uint8_t> &out_data);
+
   // 初始化 (传入 HarmonyOS 资源管理器句柄)
   void Initialize(NativeResourceManager *native_mgr);
 
 private:
   PlatformResourceManager();
   ~PlatformResourceManager() override;
-  std::mutex mutex_;
+  bool LoadRawFileUnlocked(const std::string &path,
+                           NativeResourceManager *native_mgr,
+                           std::vector<uint8_t> &out_data) const;
+  std::vector<std::string> GetRawFileListUnlocked(
+      const std::string &dir, NativeResourceManager *native_mgr) const;
+  mutable std::mutex mutex_;
 
   NativeResourceManager *native_resource_manager_ = nullptr;
 

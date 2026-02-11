@@ -44,20 +44,42 @@ ROMLoadResult ROMLoader::LoadFromRawFile(
     const std::string& rawfile_path,
     NativeResourceManager* resource_manager
 ) {
+    ROMLoadResult result;
+    result.success = false;
+    result.path = rawfile_path;
+    result.size = 0;
+
     LOGF(LOG_INFO, "Loading ROM from rawfile: %{public}s", rawfile_path.c_str());
 
     if (!resource_manager) {
-        ROMLoadResult result;
-        result.success = false;
-        result.path = rawfile_path;
         result.error_message = "Resource manager is null";
         LOGF(LOG_ERROR, "%{public}s", result.error_message.c_str());
         return result;
     }
 
+    if (rawfile_path.empty()) {
+        result.error_message = "ROM path is empty";
+        LOGF(LOG_ERROR, "%{public}s", result.error_message.c_str());
+        return result;
+    }
+
     auto *mgr = PlatformResourceManager::GetInstance();
-    mgr->Initialize(resource_manager);
-    return LoadFromVfs(rawfile_path, *mgr);
+    if (!mgr->LoadRawFileWithManager(rawfile_path, resource_manager, result.data)) {
+        result.error_message = "Failed to read ROM file";
+        LOGF(LOG_ERROR, "%{public}s: %{public}s", result.error_message.c_str(), rawfile_path.c_str());
+        return result;
+    }
+
+    result.size = result.data.size();
+    if (!ValidateROM(result.data.data(), result.size)) {
+        result.error_message = "Invalid ROM file";
+        LOGF(LOG_ERROR, "%{public}s", result.error_message.c_str());
+        return result;
+    }
+
+    result.success = true;
+    LOGF(LOG_INFO, " ROM loaded successfully: %{public}zu bytes", result.size);
+    return result;
 }
 
 retro_game_info ROMLoader::CreateGameInfo(
