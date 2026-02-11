@@ -10,7 +10,9 @@
 #include "common/file_security.h"
 #include "napi/native_api.h"
 #include <elf.h>
+#include <cstring>
 #include <fcntl.h>
+#include <limits>
 #include <string>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -114,6 +116,41 @@ static bool MapVaddrToOffset32(const Elf32_Phdr *phdrs, uint16_t phnum,
   return false;
 }
 
+static bool IsRangeWithin(size_t offset, size_t length, size_t total) {
+  return offset <= total && length <= (total - offset);
+}
+
+template <typename HeaderType>
+static bool IsProgramHeaderTableValid(size_t phoff, uint16_t phnum,
+                                      uint16_t phentsize, size_t total) {
+  if (phentsize != sizeof(HeaderType)) {
+    return false;
+  }
+  const size_t entrySize = sizeof(HeaderType);
+  if (phnum > 0 &&
+      phnum > (std::numeric_limits<size_t>::max() / entrySize)) {
+    return false;
+  }
+  const size_t tableSize = static_cast<size_t>(phnum) * entrySize;
+  return IsRangeWithin(phoff, tableSize, total);
+}
+
+static bool ReadBoundedCString(const std::vector<uint8_t> &data, size_t offset,
+                               std::string &out) {
+  if (offset >= data.size()) {
+    return false;
+  }
+  const char *start = reinterpret_cast<const char *>(data.data() + offset);
+  const size_t maxLen = data.size() - offset;
+  const void *nul = std::memchr(start, '\0', maxLen);
+  if (!nul) {
+    return false;
+  }
+  const char *end = reinterpret_cast<const char *>(nul);
+  out.assign(start, static_cast<size_t>(end - start));
+  return !out.empty();
+}
+
 static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
   NeededResult result;
   std::vector<uint8_t> data;
@@ -138,32 +175,55 @@ static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
     }
     const Elf64_Ehdr *ehdr =
         reinterpret_cast<const Elf64_Ehdr *>(data.data());
+    const size_t phoff = static_cast<size_t>(ehdr->e_phoff);
+    if (static_cast<Elf64_Off>(phoff) != ehdr->e_phoff) {
+      result.error = "ELF64 phoff overflow";
+      return result;
+    }
+    if (!IsProgramHeaderTableValid<Elf64_Phdr>(phoff, ehdr->e_phnum,
+                                               ehdr->e_phentsize,
+                                               data.size())) {
+      result.error = "ELF64 phdr table out of range";
+      return result;
+    }
     const Elf64_Phdr *phdrs =
-        reinterpret_cast<const Elf64_Phdr *>(data.data() + ehdr->e_phoff);
+        reinterpret_cast<const Elf64_Phdr *>(data.data() + phoff);
     Elf64_Off dyn_offset = 0;
     Elf64_Xword dyn_size = 0;
+    bool dyn_found = false;
     for (uint16_t i = 0; i < ehdr->e_phnum; ++i) {
       if (phdrs[i].p_type == PT_DYNAMIC) {
         dyn_offset = phdrs[i].p_offset;
         dyn_size = phdrs[i].p_filesz;
+        dyn_found = true;
         break;
       }
     }
-    if (dyn_offset == 0 || dyn_size == 0) {
+    if (!dyn_found || dyn_size == 0) {
       result.error = "PT_DYNAMIC not found";
       return result;
     }
+    const size_t dynOffset = static_cast<size_t>(dyn_offset);
+    const size_t dynSize = static_cast<size_t>(dyn_size);
+    if (static_cast<Elf64_Off>(dynOffset) != dyn_offset ||
+        static_cast<Elf64_Xword>(dynSize) != dyn_size ||
+        !IsRangeWithin(dynOffset, dynSize, data.size())) {
+      result.error = "ELF64 dynamic section out of range";
+      return result;
+    }
     const Elf64_Dyn *dyn =
-        reinterpret_cast<const Elf64_Dyn *>(data.data() + dyn_offset);
-    size_t dyn_count = dyn_size / sizeof(Elf64_Dyn);
+        reinterpret_cast<const Elf64_Dyn *>(data.data() + dynOffset);
+    size_t dyn_count = dynSize / sizeof(Elf64_Dyn);
     Elf64_Addr strtab_vaddr = 0;
+    bool strtab_found = false;
     for (size_t i = 0; i < dyn_count; ++i) {
       if (dyn[i].d_tag == DT_STRTAB) {
         strtab_vaddr = static_cast<Elf64_Addr>(dyn[i].d_un.d_ptr);
+        strtab_found = true;
         break;
       }
     }
-    if (strtab_vaddr == 0) {
+    if (!strtab_found) {
       result.error = "DT_STRTAB not found";
       return result;
     }
@@ -175,15 +235,18 @@ static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
     }
     for (size_t i = 0; i < dyn_count; ++i) {
       if (dyn[i].d_tag == DT_NEEDED) {
-        const size_t name_offset =
-            strtab_offset + static_cast<size_t>(dyn[i].d_un.d_val);
-        if (name_offset < data.size()) {
-          const char *name =
-              reinterpret_cast<const char *>(data.data() + name_offset);
-          if (name && name[0]) {
-            result.libs.emplace_back(name);
-          }
+        const size_t needed_offset = static_cast<size_t>(dyn[i].d_un.d_val);
+        if (needed_offset > data.size() - strtab_offset) {
+          result.error = "ELF64 DT_NEEDED offset out of range";
+          return result;
         }
+        const size_t name_offset = strtab_offset + needed_offset;
+        std::string libName;
+        if (!ReadBoundedCString(data, name_offset, libName)) {
+          result.error = "ELF64 DT_NEEDED string not terminated";
+          return result;
+        }
+        result.libs.emplace_back(std::move(libName));
       }
     }
     return result;
@@ -196,32 +259,55 @@ static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
     }
     const Elf32_Ehdr *ehdr =
         reinterpret_cast<const Elf32_Ehdr *>(data.data());
+    const size_t phoff = static_cast<size_t>(ehdr->e_phoff);
+    if (static_cast<Elf32_Off>(phoff) != ehdr->e_phoff) {
+      result.error = "ELF32 phoff overflow";
+      return result;
+    }
+    if (!IsProgramHeaderTableValid<Elf32_Phdr>(phoff, ehdr->e_phnum,
+                                               ehdr->e_phentsize,
+                                               data.size())) {
+      result.error = "ELF32 phdr table out of range";
+      return result;
+    }
     const Elf32_Phdr *phdrs =
-        reinterpret_cast<const Elf32_Phdr *>(data.data() + ehdr->e_phoff);
+        reinterpret_cast<const Elf32_Phdr *>(data.data() + phoff);
     Elf32_Off dyn_offset = 0;
     Elf32_Word dyn_size = 0;
+    bool dyn_found = false;
     for (uint16_t i = 0; i < ehdr->e_phnum; ++i) {
       if (phdrs[i].p_type == PT_DYNAMIC) {
         dyn_offset = phdrs[i].p_offset;
         dyn_size = phdrs[i].p_filesz;
+        dyn_found = true;
         break;
       }
     }
-    if (dyn_offset == 0 || dyn_size == 0) {
+    if (!dyn_found || dyn_size == 0) {
       result.error = "PT_DYNAMIC not found";
       return result;
     }
+    const size_t dynOffset = static_cast<size_t>(dyn_offset);
+    const size_t dynSize = static_cast<size_t>(dyn_size);
+    if (static_cast<Elf32_Off>(dynOffset) != dyn_offset ||
+        static_cast<Elf32_Word>(dynSize) != dyn_size ||
+        !IsRangeWithin(dynOffset, dynSize, data.size())) {
+      result.error = "ELF32 dynamic section out of range";
+      return result;
+    }
     const Elf32_Dyn *dyn =
-        reinterpret_cast<const Elf32_Dyn *>(data.data() + dyn_offset);
-    size_t dyn_count = dyn_size / sizeof(Elf32_Dyn);
+        reinterpret_cast<const Elf32_Dyn *>(data.data() + dynOffset);
+    size_t dyn_count = dynSize / sizeof(Elf32_Dyn);
     Elf32_Addr strtab_vaddr = 0;
+    bool strtab_found = false;
     for (size_t i = 0; i < dyn_count; ++i) {
       if (dyn[i].d_tag == DT_STRTAB) {
         strtab_vaddr = static_cast<Elf32_Addr>(dyn[i].d_un.d_ptr);
+        strtab_found = true;
         break;
       }
     }
-    if (strtab_vaddr == 0) {
+    if (!strtab_found) {
       result.error = "DT_STRTAB not found";
       return result;
     }
@@ -233,15 +319,18 @@ static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
     }
     for (size_t i = 0; i < dyn_count; ++i) {
       if (dyn[i].d_tag == DT_NEEDED) {
-        const size_t name_offset =
-            strtab_offset + static_cast<size_t>(dyn[i].d_un.d_val);
-        if (name_offset < data.size()) {
-          const char *name =
-              reinterpret_cast<const char *>(data.data() + name_offset);
-          if (name && name[0]) {
-            result.libs.emplace_back(name);
-          }
+        const size_t needed_offset = static_cast<size_t>(dyn[i].d_un.d_val);
+        if (needed_offset > data.size() - strtab_offset) {
+          result.error = "ELF32 DT_NEEDED offset out of range";
+          return result;
         }
+        const size_t name_offset = strtab_offset + needed_offset;
+        std::string libName;
+        if (!ReadBoundedCString(data, name_offset, libName)) {
+          result.error = "ELF32 DT_NEEDED string not terminated";
+          return result;
+        }
+        result.libs.emplace_back(std::move(libName));
       }
     }
     return result;
