@@ -7,6 +7,7 @@
  */
 
 #include "core/libretro/core_loader.h"
+#include "common/file_security.h"
 #include "napi/native_api.h"
 #include <elf.h>
 #include <fcntl.h>
@@ -287,6 +288,17 @@ static napi_value TestCoreLoader(napi_env env, napi_callback_info info) {
   }
 
   LOGF(LOG_INFO, "Received corePath from ArkTS: %{public}s", corePath.c_str());
+
+  // 与 CoreLoader::LoadCore 保持一致：任何文件访问前先做 allowlist 校验。
+  if (!security::ValidateCorePath(corePath)) {
+    LOGF(LOG_ERROR,
+         "Security: Core path validation failed in TestCoreLoader: %{public}s",
+         corePath.c_str());
+    napi_value result;
+    napi_create_string_utf8(env, "Error: Core path not in allowed directories",
+                            NAPI_AUTO_LENGTH, &result);
+    return result;
+  }
 
   NeededResult neededEarly = ReadNeededLibrariesFromElf(corePath);
   if (!neededEarly.libs.empty()) {
