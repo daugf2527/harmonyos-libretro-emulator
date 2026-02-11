@@ -20,9 +20,9 @@
 
 ## 质检结论（摘要）
 
-- 仓库现有静态门禁通过，但存在 **42 个需后续修复的问题**：
+- 仓库现有静态门禁通过，但存在 **45 个需后续修复的问题**：
   - 8 个高优先级（并发数据竞争/线程模型违规/生命周期收敛阻断/输入路由死锁/Stop 超时析构崩溃）
-  - 23 个中优先级（日志格式规范一致性、敏感文件忽略规则、事件合并丢更新、核心选项并发访问、磁盘控制并发访问、PluginManager 输入状态隔离、StopEngineAsync 生命周期收敛、Stop 超时恢复通道、端口映射一致性、AudioBridge 统计并发访问、Blur 端口错配、Touch 固定端口错配、全局引擎回调指针线程边界、全局输入回调指针线程边界、CoreLoader 测试接口路径校验前读取、CoreLoaderNapi ELF 边界校验缺口、PlatformResourceManager 句柄生命周期收敛、PlatformResourceManager 锁边界一致性、EnvState 目录字符串跨线程同步、SetFilesDir/LoadRom 时序一致性、SwitchGameAsync token 取消窗口、keyboard callback 转发链路缺失、EngineMessage 路径静默截断）
+  - 26 个中优先级（日志格式规范一致性、敏感文件忽略规则、事件合并丢更新、核心选项并发访问、磁盘控制并发访问、PluginManager 输入状态隔离、StopEngineAsync 生命周期收敛、Stop 超时恢复通道、端口映射一致性、AudioBridge 统计并发访问、Blur 端口错配、Touch 固定端口错配、全局引擎回调指针线程边界、全局输入回调指针线程边界、CoreLoader 测试接口路径校验前读取、CoreLoaderNapi ELF 边界校验缺口、PlatformResourceManager 句柄生命周期收敛、PlatformResourceManager 锁边界一致性、EnvState 目录字符串跨线程同步、SetFilesDir/LoadRom 时序一致性、SwitchGameAsync token 取消窗口、keyboard callback 转发链路缺失、EngineMessage 路径静默截断、Vulkan wait_sync_index 同步语义缺口、Vulkan present 队列选择错误、VulkanPresenter 帧状态并发悬垂指针风险）
   - 11 个低优先级（AV 查询并发可见性、全局静态回调线程边界加固、主回调注册返回值可观测性、Start 异常路径门禁复位、Reset 状态通知一致性、NAPI async work 失败路径收口、StopEngineAsync 异常复位、NAPI async complete 状态分流、NAPI 导出注册返回值可观测性、CoreLoaderNapi 大文件读取上限/异常保护、core options 配置并发读改写覆盖）
 
 ## 问题清单
@@ -587,6 +587,65 @@
   - 任意被 NAPI 接受的路径在引擎消费侧保持字节级一致。
   - 超限输入返回明确错误，不再出现静默截断。
 
+### P1-24 同步语义缺口：`VulkanPresenter::WaitSyncIndex` 使用 1 秒超时返回，可能在前端未完成时允许 core 复用图像
+
+- 严重级别：`Medium`
+- 影响：`wait_sync_index` 在 `VK_TIMEOUT` 时仅记录日志并返回；core 侧会把“回调返回”视为可继续复用图像/资源，可能在前端 GPU 工作未完成时触发并发访问，导致画面损坏或不稳定。
+- 代码证据：
+  - 1 秒超时等待并在超时后继续返回：`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:342`、`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:353`、`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:355`、`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:360`
+- 官方/权威依据：
+  - libretro Vulkan 接口语义：图像在 `wait_sync_index` 完成前不得被 core 触碰。
+  - 来源：`entry/src/main/cpp/core/libretro/libretro_vulkan.h:353`、`entry/src/main/cpp/core/libretro/libretro_vulkan.h:374`
+  - Vulkan 规范：`vkWaitForFences` 返回 `VK_TIMEOUT` 表示等待条件未满足。
+  - 来源：<https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkWaitForFences.html>
+- 修复建议（后续实施）：
+  - `wait_sync_index` 必须“完成再返回”：使用无穷等待或循环等待到成功；`VK_ERROR_DEVICE_LOST` 进入结构化错误态。
+  - 保留超时日志可作为诊断，但不应提前放行 core 复用。
+- 验收标准：
+  - `WaitSyncIndex()` 仅在 fence 完成后返回（或进入明确错误态）。
+  - 压力场景下不再出现“超时后继续复用”的同步违约行为。
+
+### P1-25 队列语义缺口：`VulkanPresenter` 固定使用 graphics queue 调用 `present`，忽略 negotiation 提供的 `presentation_queue`
+
+- 严重级别：`Medium`
+- 影响：当 core 通过 Vulkan negotiation 提供独立 `presentation_queue` 时，前端仍在 graphics queue 上执行 `vkQueuePresentKHR`，可能导致 present 失败或渲染链路不稳定。
+- 代码证据：
+  - `VulkanContext` 已维护并暴露 `present_queue`：`entry/src/main/cpp/platform/graphics/vulkan_context.h:30`、`entry/src/main/cpp/platform/graphics/vulkan_context.cpp:271`、`entry/src/main/cpp/platform/graphics/vulkan_context.cpp:315`
+  - `VulkanPresenter` 初始化仅取 `GetQueue()`：`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:54`
+  - `vkQueuePresentKHR` 固定使用 `queue_`：`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:490`
+- 官方/权威依据：
+  - Vulkan 规范：`vkQueuePresentKHR` 传入队列必须支持向目标 surface presentation。
+  - 来源：<https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkQueuePresentKHR.html>
+  - libretro Vulkan negotiation 语义：当主队列不支持 presentation 时，core 可提供单独 `presentation_queue`。
+  - 来源：<https://github.com/libretro/libretro-common/blob/master/include/libretro_vulkan.h>
+- 修复建议（后续实施）：
+  - `VulkanPresenter` 增加 `present_queue_` 并从 `VulkanContext::GetPresentQueue()` 初始化。
+  - `queue_submit` 保持 graphics queue，`queue_present_khr` 改用 present queue。
+- 验收标准：
+  - 独立 present queue 场景下 `vkQueuePresentKHR` 稳定成功，不再因队列选择错误失败。
+
+### P1-26 并发边界缺口：`Present()` 解锁后继续使用 `FrameState*`，与 `frames_` 并发改写/resize 存在 UB 风险
+
+- 严重级别：`Medium`
+- 影响：`Present()` 在锁内获取 `FrameState*` 后解锁继续访问；并发路径可在锁内重写或 `resize(frames_)`，可能触发悬垂指针、数据竞争与偶发崩溃。
+- 代码证据：
+  - `Present()` 取指针后解锁并继续访问：`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:147`、`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:154`、`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:162`
+  - `SetSyncIndexMask -> EnsureFrameSlots` 可 `resize(frames_)`：`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:173`、`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:378`、`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:392`
+  - 并发重写帧状态：`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:301`、`entry/src/main/cpp/platform/graphics/vulkan_presenter.cpp:325`
+- 官方/权威依据：
+  - libretro Vulkan 接口强调线程友好，core 可在任意线程构建/提交命令。
+  - 来源：<https://github.com/libretro/libretro-common/blob/master/include/libretro_vulkan.h>
+  - `std::vector` 重分配会使元素引用/指针失效。
+  - 来源：<https://en.cppreference.com/w/cpp/container/vector>
+  - C++ data race 属于未定义行为（UB）。
+  - 来源：<https://en.cppreference.com/w/cpp/language/multithread>
+- 修复建议（后续实施）：
+  - 为 `Present/SetSyncIndexMask/SetImage/SetCommandBuffers` 建立统一并发协议；禁止“解锁后持有 `frames_` 元素裸指针”。
+  - 优先采用锁内快照+锁外只读副本，或稳定地址容器+细粒度锁。
+- 验收标准：
+  - 不再存在解锁后访问 `frames_` 元素裸指针路径。
+  - 并发 Vulkan 压力场景下无随机崩溃/同步状态错乱。
+
 ### P2-1 并发可见性问题：`GetAVInfo` 读取 AV 字段与引擎线程写入未同步
 
 - 严重级别：`Low`
@@ -827,17 +886,20 @@
 29. `P1-21` `SwitchGameAsync` token 取消窗口
 30. `P1-22` keyboard callback 转发链路缺失
 31. `P1-23` `EngineMessage` 路径静默截断
-32. `P2-1` `GetAVInfo` 并发可见性问题
-33. `P2-2` `env_dispatcher` 全局静态回调线程边界加固
-34. `P2-3` 主回调注册返回值可观测性
-35. `P2-4` `Start` 异常路径门禁复位
-36. `P2-5` `Reset` 状态通知一致性
-37. `P2-6` async work 创建/入队失败路径收口
-38. `P2-7` `StopEngineAsync` 异常路径门禁复位
-39. `P2-8` async complete 状态分流
-40. `P2-9` NAPI 导出注册返回值可观测性
-41. `P2-10` `CoreLoaderNapi` 大文件读取上限/异常保护
-42. `P2-11` core options 配置并发读改写覆盖
+32. `P1-24` Vulkan `wait_sync_index` 同步语义缺口
+33. `P1-25` Vulkan `present` 队列选择语义缺口
+34. `P1-26` `Present` 解锁后 `FrameState*` 并发悬垂风险
+35. `P2-1` `GetAVInfo` 并发可见性问题
+36. `P2-2` `env_dispatcher` 全局静态回调线程边界加固
+37. `P2-3` 主回调注册返回值可观测性
+38. `P2-4` `Start` 异常路径门禁复位
+39. `P2-5` `Reset` 状态通知一致性
+40. `P2-6` async work 创建/入队失败路径收口
+41. `P2-7` `StopEngineAsync` 异常路径门禁复位
+42. `P2-8` async complete 状态分流
+43. `P2-9` NAPI 导出注册返回值可观测性
+44. `P2-10` `CoreLoaderNapi` 大文件读取上限/异常保护
+45. `P2-11` core options 配置并发读改写覆盖
 
 ## GitHub Issue 映射
 
@@ -906,6 +968,12 @@
     - <https://github.com/daugf2527/hongmeng/issues/43>
   - `P1-23`：`#45`
     - <https://github.com/daugf2527/hongmeng/issues/45>
+  - `P1-24`：`#46`
+    - <https://github.com/daugf2527/hongmeng/issues/46>
+  - `P1-25`：`#47`
+    - <https://github.com/daugf2527/hongmeng/issues/47>
+  - `P1-26`：`#48`
+    - <https://github.com/daugf2527/hongmeng/issues/48>
   - `P2-1`：`#13`
     - <https://github.com/daugf2527/hongmeng/issues/13>
   - `P2-2`：`#16`

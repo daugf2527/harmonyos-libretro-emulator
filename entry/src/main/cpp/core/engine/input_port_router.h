@@ -52,6 +52,7 @@ public:
 private:
   bool IsValidPort(int port) const;
   void ClearPortStateLocked(int port);
+  bool UnassignPortLocked(int port);
   bool MatchSourceType(InputSourceType portType,
                        InputSourceType incomingType) const;
 

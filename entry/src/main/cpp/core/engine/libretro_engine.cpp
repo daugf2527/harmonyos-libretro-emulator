@@ -29,9 +29,40 @@ namespace libretro {
 // 静态实例指针，用于回调桥接（Phase 1 简化处理，仅支持单实例）
 static LibretroEngine *g_engineInstance = nullptr;
 
+class EngineSyncTask {
+public:
+  explicit EngineSyncTask(std::function<void()> task) : task_(std::move(task)) {}
+
+  void Run() {
+    if (task_) {
+      task_();
+    }
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      done_ = true;
+    }
+    cond_.notify_all();
+  }
+
+  bool Wait(uint32_t timeoutMs) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return cond_.wait_for(lock, std::chrono::milliseconds(timeoutMs),
+                          [this]() { return done_; });
+  }
+
+private:
+  std::function<void()> task_;
+  std::mutex mutex_;
+  std::condition_variable cond_;
+  bool done_ = false;
+};
+
 namespace {
 constexpr const char *kAudioChainPrefix = "[AUD][CHAIN]";
 constexpr const char *kAudioDiagPrefix = "[AUDIO_DIAG]";
+constexpr uint32_t kSyncTaskTimeoutMs = 5000;
+thread_local LibretroEngine *g_engineThreadInstance = nullptr;
+
 class EngineRendererAdapter : public interfaces::IRenderer {
 public:
   explicit EngineRendererAdapter(LibretroEngine *engine) : engine_(engine) {}
@@ -219,7 +250,18 @@ LibretroEngine *LibretroEngine::GetInstance() {
 }
 
 LibretroEngine::~LibretroEngine() {
-  Stop();
+  const bool stopped = Stop();
+  if (!stopped && gameThread_.joinable()) {
+    LOGF(LOG_ERROR,
+         "[NEW] Destructor fallback join: waiting for game thread after stop timeout");
+    gameThread_.join();
+    running_ = false;
+    stopRequested_.store(false);
+    stopTimedOut_.store(false);
+    stopInProgress_.store(false);
+    state_.store(EngineState::STOPPED);
+    stateCond_.notify_all();
+  }
   g_engineInstance = nullptr;
   LOGF(LOG_INFO, "[NEW] LibretroEngine Destroyed");
 }
@@ -322,15 +364,15 @@ bool LibretroEngine::Start() {
   return true;
 }
 
-void LibretroEngine::Stop() {
+bool LibretroEngine::Stop() {
   std::lock_guard<std::recursive_mutex> lock(controlMutex_);
   if (stopInProgress_.exchange(true)) {
     LOGF(LOG_WARN, "[NEW] Stop ignored: stop already in progress");
-    return;
+    return false;
   }
   if (!running_) {
     stopInProgress_.store(false);
-    return;
+    return true;
   }
 
   LOGF(LOG_INFO, " [NEW] Stopping Engine...");
@@ -340,13 +382,12 @@ void LibretroEngine::Stop() {
        "[NEW] Stop requested: phase=%{public}s, phase_ms=%{public}lld",
        PhaseToString(phase), static_cast<long long>(phaseMs));
 
-  stopRequested_.store(true);
-  TransitionTo(EngineState::STOPPING);
-
   // 发送停止消息并关闭队列
   // 由引擎线程处理状态切换与清理，避免提前进入 STOPPING 跳过 Stop 消息。
   if (!messageQueue_.Push({MessageType::Stop, {}})) {
     LOGF(LOG_WARN, "[NEW] Stop dropped: message queue closed");
+    stopInProgress_.store(false);
+    return false;
   }
   messageQueue_.Close();
 
@@ -367,7 +408,7 @@ void LibretroEngine::Stop() {
          "[NEW] Stop timeout phase=%{public}s, phase_ms=%{public}lld",
          PhaseToString(currentPhase), static_cast<long long>(currentPhaseMs));
     stopInProgress_.store(false);
-    return;
+    return false;
   }
 
   if (gameThread_.joinable()) {
@@ -380,6 +421,7 @@ void LibretroEngine::Stop() {
   stopTimedOut_.store(false);
   stopInProgress_.store(false);
   LOGF(LOG_INFO, " [NEW] Engine Stopped");
+  return true;
 }
 
 void LibretroEngine::Reset() {
@@ -389,7 +431,11 @@ void LibretroEngine::Reset() {
   // 1. 确保引擎已停止
   if (running_) {
     LOGF(LOG_WARN, "[NEW] Reset called while running, stopping first...");
-    Stop();
+    if (!Stop()) {
+      LOGF(LOG_ERROR,
+           "[NEW] Reset aborted: stop did not complete, skip destructive cleanup");
+      return;
+    }
   }
 
   stopRequested_.store(false);
@@ -771,6 +817,32 @@ interfaces::IRenderer *LibretroEngine::GetRendererInterface() const {
   return rendererInterface_.get();
 }
 
+bool LibretroEngine::ExecuteSyncTask(const std::function<void()> &task,
+                                     uint32_t timeoutMs) {
+  if (!task) {
+    return false;
+  }
+  if (g_engineThreadInstance == this || !running_.load()) {
+    task();
+    return true;
+  }
+  if (messageQueue_.IsClosed()) {
+    LOGF(LOG_WARN, "[NEW] SyncTask dropped: message queue closed");
+    return false;
+  }
+
+  auto syncTask = std::make_shared<EngineSyncTask>(task);
+  if (!messageQueue_.Push(EngineMessage::MakeSyncTaskMessage(syncTask))) {
+    LOGF(LOG_WARN, "[NEW] SyncTask push failed: message queue closed");
+    return false;
+  }
+  if (!syncTask->Wait(timeoutMs)) {
+    LOGF(LOG_ERROR, "[NEW] SyncTask timeout after %{public}u ms", timeoutMs);
+    return false;
+  }
+  return true;
+}
+
 void LibretroEngine::SetMinimumAudioLatency(unsigned latency_ms) {
   envState_.SetPendingMinimumAudioLatencyMs(latency_ms);
 }
@@ -791,6 +863,7 @@ bool LibretroEngine::InitializeEventBridge(napi_env env, napi_value callback) {
 void LibretroEngine::GameLoop() {
   LOGF(LOG_INFO, " [NEW] GameLoop Thread Entry: ID = %{public}zu",
        std::hash<std::thread::id>{}(std::this_thread::get_id()));
+  g_engineThreadInstance = this;
   SetPhase(EnginePhase::IDLE);
 
   while (running_.load()) {
@@ -914,6 +987,7 @@ void LibretroEngine::GameLoop() {
   videoPipeline_.Reset();
 
   LOGF(LOG_INFO, " [NEW] GameLoop Thread Exit");
+  g_engineThreadInstance = nullptr;
   gameLoopExited_.store(true);
   stopCond_.notify_all();
 }
@@ -1338,6 +1412,11 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     }
     // [FIX] 在游戏线程清理 VideoPipeline (GLES 资源)
     videoPipeline_.Reset();
+    break;
+  case MessageType::SyncTask:
+    if (msg.payload.syncTask.task) {
+      msg.payload.syncTask.task->Run();
+    }
     break;
   default:
     break;
@@ -1847,7 +1926,7 @@ size_t LibretroEngine::OnAudioSampleBatch(const int16_t *data, size_t frames) {
     return bridge->ProcessAudio(data, actualFrames);
   } else {
     // [DEBUG] 如果 Bridge 没运行，打印警告 (节流)
-    if (g_engineInstance->stats_.audioBatchCalls % 60 == 0) {
+    if (batch_count % 60 == 0) {
       LOGF(LOG_WARN,
            "%{public}s Audio dropped: Bridge not running (ptr=%{public}p)",
            kAudioChainPrefix, bridge);
@@ -2195,26 +2274,84 @@ void LibretroEngine::DetectCoreQuirks() {
 
 // --- SaveState 实现 ---
 
-size_t LibretroEngine::GetSaveStateSize() const {
-  return stateManager_ ? stateManager_->GetSaveStateSize() : 0;
+size_t LibretroEngine::GetSaveStateSize() {
+  size_t size = 0;
+  (void)ExecuteSyncTask(
+      [this, &size]() {
+        if (stateManager_) {
+          size = stateManager_->GetSaveStateSize();
+        }
+      },
+      kSyncTaskTimeoutMs);
+  return size;
 }
 
 bool LibretroEngine::SaveState(std::vector<uint8_t> &outData) {
-  return stateManager_ ? stateManager_->SaveState(outData) : false;
+  bool ok = false;
+  std::vector<uint8_t> snapshot;
+  if (!ExecuteSyncTask(
+          [this, &ok, &snapshot]() {
+            if (stateManager_) {
+              ok = stateManager_->SaveState(snapshot);
+            }
+          },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  if (!ok) {
+    return false;
+  }
+  outData = std::move(snapshot);
+  return true;
 }
 
 bool LibretroEngine::LoadState(const std::vector<uint8_t> &data) {
-  return stateManager_ ? stateManager_->LoadState(data) : false;
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, &ok, &data]() {
+            if (stateManager_) {
+              ok = stateManager_->LoadState(data);
+            }
+          },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  return ok;
 }
 
 // --- SRAM 接口 ---
 
 bool LibretroEngine::GetSRAM(std::vector<uint8_t> &outData) {
-  return stateManager_ ? stateManager_->GetSRAM(outData) : false;
+  bool ok = false;
+  std::vector<uint8_t> snapshot;
+  if (!ExecuteSyncTask(
+          [this, &ok, &snapshot]() {
+            if (stateManager_) {
+              ok = stateManager_->GetSRAM(snapshot);
+            }
+          },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  if (!ok) {
+    return false;
+  }
+  outData = std::move(snapshot);
+  return true;
 }
 
 bool LibretroEngine::SetSRAM(const std::vector<uint8_t> &data) {
-  return stateManager_ ? stateManager_->SetSRAM(data) : false;
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, &ok, &data]() {
+            if (stateManager_) {
+              ok = stateManager_->SetSRAM(data);
+            }
+          },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  return ok;
 }
 
 uintptr_t LibretroEngine::GetHwRenderFramebuffer() const {
@@ -2227,49 +2364,94 @@ uintptr_t LibretroEngine::GetHwRenderFramebuffer() const {
 // --- 核心控制实现 ---
 
 void LibretroEngine::ResetCore() {
-  if (!coreLoader_.IsLoaded()) {
-    return;
-  }
-  auto fn = coreLoader_.GetReset();
-  if (fn) {
-    fn();
-    LOGF(LOG_INFO, "Core reset");
+  const bool dispatched = ExecuteSyncTask(
+      [this]() {
+        if (!coreLoader_.IsLoaded()) {
+          return;
+        }
+        auto fn = coreLoader_.GetReset();
+        if (fn) {
+          fn();
+          LOGF(LOG_INFO, "Core reset");
+        }
+      },
+      kSyncTaskTimeoutMs);
+  if (!dispatched) {
+    LOGF(LOG_WARN, "[NEW] ResetCore skipped: sync dispatch failed");
   }
 }
 
 // --- 金手指实现 ---
 
 void LibretroEngine::CheatReset() {
-  if (stateManager_) {
-    stateManager_->CheatReset();
+  const bool dispatched = ExecuteSyncTask(
+      [this]() {
+        if (stateManager_) {
+          stateManager_->CheatReset();
+        }
+      },
+      kSyncTaskTimeoutMs);
+  if (!dispatched) {
+    LOGF(LOG_WARN, "[NEW] CheatReset skipped: sync dispatch failed");
   }
 }
 
 bool LibretroEngine::CheatSet(unsigned index, bool enabled,
                               const std::string &code) {
-  return stateManager_ ? stateManager_->CheatSet(index, enabled, code) : false;
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, &ok, index, enabled, &code]() {
+            if (stateManager_) {
+              ok = stateManager_->CheatSet(index, enabled, code);
+            }
+          },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  return ok;
 }
 
 // --- 控制器/区域实现 ---
 
 void LibretroEngine::SetControllerPortDevice(unsigned port, unsigned device) {
-  if (!coreLoader_.IsLoaded()) {
-    return;
-  }
-  auto fn = coreLoader_.GetSetControllerPortDevice();
-  if (fn) {
-    fn(port, device);
-    LOGF(LOG_INFO, "Set controller port %{public}u to device %{public}u", port,
-         device);
+  const bool dispatched = ExecuteSyncTask(
+      [this, port, device]() {
+        if (!coreLoader_.IsLoaded()) {
+          return;
+        }
+        auto fn = coreLoader_.GetSetControllerPortDevice();
+        if (fn) {
+          fn(port, device);
+          LOGF(LOG_INFO, "Set controller port %{public}u to device %{public}u",
+               port, device);
+        }
+      },
+      kSyncTaskTimeoutMs);
+  if (!dispatched) {
+    LOGF(LOG_WARN,
+         "[NEW] SetControllerPortDevice skipped: sync dispatch failed (port=%{public}u, device=%{public}u)",
+         port, device);
   }
 }
 
-unsigned LibretroEngine::GetRegion() const {
-  if (!coreLoader_.IsLoaded()) {
-    return 0; // RETRO_REGION_NTSC
+unsigned LibretroEngine::GetRegion() {
+  unsigned region = 0;
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, &region, &ok]() {
+            if (!coreLoader_.IsLoaded()) {
+              return;
+            }
+            auto fn = coreLoader_.GetGetRegion();
+            if (fn) {
+              region = fn();
+              ok = true;
+            }
+          },
+          kSyncTaskTimeoutMs)) {
+    return 0;
   }
-  auto fn = coreLoader_.GetGetRegion();
-  return fn ? fn() : 0;
+  return ok ? region : 0;
 }
 
 } // namespace libretro

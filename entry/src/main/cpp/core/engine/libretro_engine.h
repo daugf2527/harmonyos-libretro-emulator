@@ -121,7 +121,7 @@ public:
 
   // --- 控制接口 (由 UI/JS 线程调用) ---
   bool Start();
-  void Stop();
+  bool Stop();
   void Pause();
   void Resume();
 
@@ -168,7 +168,7 @@ public:
   interfaces::IRenderer *GetRendererInterface() const;
 
   // --- SaveState 接口 ---
-  size_t GetSaveStateSize() const;
+  size_t GetSaveStateSize();
   bool SaveState(std::vector<uint8_t> &outData);
   bool LoadState(const std::vector<uint8_t> &data);
 
@@ -185,7 +185,7 @@ public:
 
   // --- 控制器/区域接口 ---
   void SetControllerPortDevice(unsigned port, unsigned device);
-  unsigned GetRegion() const;
+  unsigned GetRegion();
 
   // --- AV 信息查询 ---
   unsigned GetVideoWidth() const { return videoWidth_; }
@@ -279,6 +279,7 @@ private:
   void SetLastErrorInfo(const std::string &reason, const std::string &step,
                         const std::string &message);
   void DetectCoreQuirks();
+  bool ExecuteSyncTask(const std::function<void()> &task, uint32_t timeoutMs);
 
   // --- 成员变量 ---
   std::atomic<EngineState> state_{EngineState::INIT};

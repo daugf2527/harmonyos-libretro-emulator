@@ -32,6 +32,25 @@ namespace libretro {
 namespace {
 constexpr const char *kAudioChainPrefix = "[AUD][CHAIN]";
 constexpr const char *kAudioDiagPrefix = "[AUDIO_DIAG]";
+
+class CallbackGuard {
+public:
+  explicit CallbackGuard(AudioPlayer *player) : player_(player) {
+    active_ = player_ && player_->EnterCallback();
+  }
+
+  ~CallbackGuard() {
+    if (active_) {
+      player_->ExitCallback();
+    }
+  }
+
+  bool IsActive() const { return active_; }
+
+private:
+  AudioPlayer *player_ = nullptr;
+  bool active_ = false;
+};
 }
 
 AudioPlayer::AudioPlayer() {
@@ -41,6 +60,30 @@ AudioPlayer::AudioPlayer() {
 AudioPlayer::~AudioPlayer() {
   Cleanup();
   LOGF(LOG_INFO, "%{public}s AudioPlayer destroyed", kAudioChainPrefix);
+}
+
+bool AudioPlayer::EnterCallback() {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
+  if (shutting_down_) {
+    return false;
+  }
+  ++active_callbacks_;
+  return true;
+}
+
+void AudioPlayer::ExitCallback() {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
+  if (active_callbacks_ > 0) {
+    --active_callbacks_;
+  }
+  if (active_callbacks_ == 0) {
+    callback_cond_.notify_all();
+  }
+}
+
+bool AudioPlayer::IsShuttingDown() const {
+  std::lock_guard<std::mutex> lock(callback_mutex_);
+  return shutting_down_;
 }
 
 bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
@@ -55,6 +98,17 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
   channel_count_ = channel_count;
   ring_buffer_ = ring_buffer;
   running_ = running;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    is_playing_ = false;
+    resume_on_interrupt_ = false;
+    workgroup_token_ = 0;
+  }
+  {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    shutting_down_ = false;
+    active_callbacks_ = 0;
+  }
 
   // 1. 创建音频流构造器
   OH_AudioStream_Result result =
@@ -185,19 +239,29 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
 }
 
 bool AudioPlayer::Start() {
-  if (!renderer_) {
-    LOGF(LOG_ERROR, "%{public}s Audio renderer not initialized",
+  if (IsShuttingDown()) {
+    LOGF(LOG_WARN, "%{public}s Start ignored: cleanup in progress",
          kAudioChainPrefix);
     return false;
   }
 
-  if (is_playing_) {
-    LOGF(LOG_WARN, "%{public}s Audio player already playing",
-         kAudioChainPrefix);
-    return true;
+  OH_AudioRenderer *renderer = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    renderer = renderer_;
+    if (!renderer) {
+      LOGF(LOG_ERROR, "%{public}s Audio renderer not initialized",
+           kAudioChainPrefix);
+      return false;
+    }
+    if (is_playing_) {
+      LOGF(LOG_WARN, "%{public}s Audio player already playing",
+           kAudioChainPrefix);
+      return true;
+    }
   }
 
-  OH_AudioStream_Result result = OH_AudioRenderer_Start(renderer_);
+  OH_AudioStream_Result result = OH_AudioRenderer_Start(renderer);
   if (result != AUDIOSTREAM_SUCCESS) {
     LOGF(LOG_ERROR,
          "%{public}s Failed to start audio renderer: %{public}d",
@@ -205,25 +269,33 @@ bool AudioPlayer::Start() {
     return false;
   }
 
-  is_playing_ = true;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    is_playing_ = true;
+    resume_on_interrupt_ = false;
+  }
   LOGF(LOG_INFO, "%{public}s AudioPlayer started", kAudioChainPrefix);
 
   return true;
 }
 
 bool AudioPlayer::Pause() {
-  if (!renderer_) {
-    LOGF(LOG_ERROR, "%{public}s Audio renderer not initialized",
-         kAudioChainPrefix);
-    return false;
+  OH_AudioRenderer *renderer = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    renderer = renderer_;
+    if (!renderer) {
+      LOGF(LOG_ERROR, "%{public}s Audio renderer not initialized",
+           kAudioChainPrefix);
+      return false;
+    }
+    if (!is_playing_) {
+      LOGF(LOG_WARN, "%{public}s Audio player not playing", kAudioChainPrefix);
+      return true;
+    }
   }
 
-  if (!is_playing_) {
-    LOGF(LOG_WARN, "%{public}s Audio player not playing", kAudioChainPrefix);
-    return true;
-  }
-
-  OH_AudioStream_Result result = OH_AudioRenderer_Pause(renderer_);
+  OH_AudioStream_Result result = OH_AudioRenderer_Pause(renderer);
   if (result != AUDIOSTREAM_SUCCESS) {
     LOGF(LOG_ERROR,
          "%{public}s Failed to pause audio renderer: %{public}d",
@@ -231,25 +303,32 @@ bool AudioPlayer::Pause() {
     return false;
   }
 
-  is_playing_ = false;
-  resume_on_interrupt_ = false;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    is_playing_ = false;
+    resume_on_interrupt_ = false;
+  }
   LOGF(LOG_INFO, "%{public}s AudioPlayer paused", kAudioChainPrefix);
 
   return true;
 }
 
 bool AudioPlayer::Stop() {
-  if (!renderer_) {
-    LOGF(LOG_ERROR, "%{public}s Audio renderer not initialized",
-         kAudioChainPrefix);
-    return false;
+  OH_AudioRenderer *renderer = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    renderer = renderer_;
+    if (!renderer) {
+      LOGF(LOG_ERROR, "%{public}s Audio renderer not initialized",
+           kAudioChainPrefix);
+      return false;
+    }
+    if (!is_playing_) {
+      return true;
+    }
   }
 
-  if (!is_playing_) {
-    return true;
-  }
-
-  OH_AudioStream_Result result = OH_AudioRenderer_Stop(renderer_);
+  OH_AudioStream_Result result = OH_AudioRenderer_Stop(renderer);
   if (result != AUDIOSTREAM_SUCCESS) {
     LOGF(LOG_ERROR,
          "%{public}s Failed to stop audio renderer: %{public}d",
@@ -257,8 +336,11 @@ bool AudioPlayer::Stop() {
     return false;
   }
 
-  is_playing_ = false;
-  resume_on_interrupt_ = false;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    is_playing_ = false;
+    resume_on_interrupt_ = false;
+  }
 
   // 清空缓冲区
   if (ring_buffer_) {
@@ -270,7 +352,10 @@ bool AudioPlayer::Stop() {
   return true;
 }
 
-bool AudioPlayer::IsPlaying() const { return is_playing_; }
+bool AudioPlayer::IsPlaying() const {
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  return is_playing_;
+}
 
 // OHAudio 回调: 写入数据 (API 12+ 推荐)
 OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
@@ -279,6 +364,10 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   auto *player = static_cast<AudioPlayer *>(userData);
   auto cb_start = std::chrono::steady_clock::now();
   if (!player || !player->ring_buffer_ || !audioData || audioDataSize <= 0) {
+    return AUDIO_DATA_CALLBACK_RESULT_INVALID;
+  }
+  CallbackGuard callbackGuard(player);
+  if (!callbackGuard.IsActive()) {
     return AUDIO_DATA_CALLBACK_RESULT_INVALID;
   }
 
@@ -293,18 +382,20 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   }
 
   if (!player->workgroup_disabled_.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> lock(player->state_mutex_);
     if (player->workgroup_ && player->workgroup_token_ == 0) {
       OH_AudioCommon_Result add_result =
           OH_AudioWorkgroup_AddCurrentThread(player->workgroup_,
                                              &player->workgroup_token_);
-      if (add_result == AUDIOCOMMON_RESULT_SUCCESS && player->workgroup_token_ > 0) {
+      if (add_result == AUDIOCOMMON_RESULT_SUCCESS &&
+          player->workgroup_token_ > 0) {
         LOGF(LOG_INFO,
              "%{public}s Audio workgroup thread added (token: %{public}d)",
              kAudioChainPrefix, player->workgroup_token_);
       } else {
         bool expected = false;
-        if (player->workgroup_disabled_.compare_exchange_strong(expected, true,
-                                                                std::memory_order_relaxed)) {
+        if (player->workgroup_disabled_.compare_exchange_strong(
+                expected, true, std::memory_order_relaxed)) {
           LOGF(LOG_WARN,
                "%{public}s Audio workgroup disabled: AddCurrentThread failed (%{public}d)",
                kAudioChainPrefix, add_result);
@@ -332,32 +423,34 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   bool workgroup_started = false;
 
   // Phase 3.3+ - 通知音频工作组开始处理（可选优化，失败则自动禁用）
-  if (!player->workgroup_disabled_.load(std::memory_order_relaxed) &&
-      player->workgroup_ && player->workgroup_token_ > 0) {
-    timespec ts{};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    uint64_t start_ns = static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL +
-                        static_cast<uint64_t>(ts.tv_nsec);
+  if (!player->workgroup_disabled_.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> lock(player->state_mutex_);
+    if (player->workgroup_ && player->workgroup_token_ > 0) {
+      timespec ts{};
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+      uint64_t start_ns = static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL +
+                          static_cast<uint64_t>(ts.tv_nsec);
 
-    uint64_t work_ns =
-        (static_cast<uint64_t>(frames_needed) * 1000000000ULL +
-         static_cast<uint64_t>(player->sample_rate_) - 1ULL) /
-        static_cast<uint64_t>(player->sample_rate_);
-    if (work_ns < 1) {
-      work_ns = 1;
-    }
+      uint64_t work_ns =
+          (static_cast<uint64_t>(frames_needed) * 1000000000ULL +
+           static_cast<uint64_t>(player->sample_rate_) - 1ULL) /
+          static_cast<uint64_t>(player->sample_rate_);
+      if (work_ns < 1) {
+        work_ns = 1;
+      }
 
-    OH_AudioCommon_Result start_result =
-        OH_AudioWorkgroup_Start(player->workgroup_, start_ns,
-                                start_ns + work_ns);
-    workgroup_started = (start_result == AUDIOCOMMON_RESULT_SUCCESS);
-    if (!workgroup_started) {
-      bool expected = false;
-      if (player->workgroup_disabled_.compare_exchange_strong(expected, true,
-                                                              std::memory_order_relaxed)) {
-        LOGF(LOG_WARN,
-             "%{public}s Audio workgroup disabled: Start failed (%{public}d)",
-             kAudioChainPrefix, start_result);
+      OH_AudioCommon_Result start_result =
+          OH_AudioWorkgroup_Start(player->workgroup_, start_ns,
+                                  start_ns + work_ns);
+      workgroup_started = (start_result == AUDIOCOMMON_RESULT_SUCCESS);
+      if (!workgroup_started) {
+        bool expected = false;
+        if (player->workgroup_disabled_.compare_exchange_strong(
+                expected, true, std::memory_order_relaxed)) {
+          LOGF(LOG_WARN,
+               "%{public}s Audio workgroup disabled: Start failed (%{public}d)",
+               kAudioChainPrefix, start_result);
+        }
       }
     }
   }
@@ -441,14 +534,18 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   }
 
   if (workgroup_started && !player->workgroup_disabled_.load(std::memory_order_relaxed)) {
-    OH_AudioCommon_Result stop_result = OH_AudioWorkgroup_Stop(player->workgroup_);
-    if (stop_result != AUDIOCOMMON_RESULT_SUCCESS) {
-      bool expected = false;
-      if (player->workgroup_disabled_.compare_exchange_strong(expected, true,
-                                                              std::memory_order_relaxed)) {
-        LOGF(LOG_WARN,
-             "%{public}s Audio workgroup disabled: Stop failed (%{public}d)",
-          kAudioChainPrefix, stop_result);
+    std::lock_guard<std::mutex> lock(player->state_mutex_);
+    if (player->workgroup_) {
+      OH_AudioCommon_Result stop_result =
+          OH_AudioWorkgroup_Stop(player->workgroup_);
+      if (stop_result != AUDIOCOMMON_RESULT_SUCCESS) {
+        bool expected = false;
+        if (player->workgroup_disabled_.compare_exchange_strong(
+                expected, true, std::memory_order_relaxed)) {
+          LOGF(LOG_WARN,
+               "%{public}s Audio workgroup disabled: Stop failed (%{public}d)",
+               kAudioChainPrefix, stop_result);
+        }
       }
     }
   }
@@ -520,6 +617,11 @@ int32_t AudioPlayer::OnWriteDataLegacy(OH_AudioRenderer *renderer,
   if (!player || !player->ring_buffer_ || !audioData || audioDataSize <= 0) {
     return 0;
   }
+  CallbackGuard callbackGuard(player);
+  if (!callbackGuard.IsActive()) {
+    std::memset(audioData, 0, static_cast<size_t>(audioDataSize));
+    return audioDataSize;
+  }
 
   if (player->running_ && !player->running_->load()) {
     std::memset(audioData, 0, static_cast<size_t>(audioDataSize));
@@ -543,17 +645,19 @@ int32_t AudioPlayer::OnWriteDataLegacy(OH_AudioRenderer *renderer,
 
   bool workgroup_started = false;
   if (!player->workgroup_disabled_.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> lock(player->state_mutex_);
     if (player->workgroup_ && player->workgroup_token_ == 0) {
-      OH_AudioCommon_Result add_result =
-          OH_AudioWorkgroup_AddCurrentThread(player->workgroup_, &player->workgroup_token_);
-      if (add_result == AUDIOCOMMON_RESULT_SUCCESS && player->workgroup_token_ > 0) {
+      OH_AudioCommon_Result add_result = OH_AudioWorkgroup_AddCurrentThread(
+          player->workgroup_, &player->workgroup_token_);
+      if (add_result == AUDIOCOMMON_RESULT_SUCCESS &&
+          player->workgroup_token_ > 0) {
         LOGF(LOG_INFO,
              "%{public}s Audio workgroup thread added (token: %{public}d)",
              kAudioChainPrefix, player->workgroup_token_);
       } else {
         bool expected = false;
-        if (player->workgroup_disabled_.compare_exchange_strong(expected, true,
-                                                                std::memory_order_relaxed)) {
+        if (player->workgroup_disabled_.compare_exchange_strong(
+                expected, true, std::memory_order_relaxed)) {
           LOGF(LOG_WARN,
                "%{public}s Audio workgroup disabled: AddCurrentThread failed (%{public}d)",
                kAudioChainPrefix, add_result);
@@ -563,30 +667,32 @@ int32_t AudioPlayer::OnWriteDataLegacy(OH_AudioRenderer *renderer,
     }
   }
 
-  if (!player->workgroup_disabled_.load(std::memory_order_relaxed) &&
-      player->workgroup_ && player->workgroup_token_ > 0) {
-    timespec ts{};
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    uint64_t start_ns = static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL +
-                        static_cast<uint64_t>(ts.tv_nsec);
-    uint64_t work_ns =
-        (static_cast<uint64_t>(frames_needed) * 1000000000ULL +
-         static_cast<uint64_t>(player->sample_rate_) - 1ULL) /
-        static_cast<uint64_t>(player->sample_rate_);
-    if (work_ns < 1) {
-      work_ns = 1;
-    }
-    OH_AudioCommon_Result start_result =
-        OH_AudioWorkgroup_Start(player->workgroup_, start_ns,
-                                start_ns + work_ns);
-    workgroup_started = (start_result == AUDIOCOMMON_RESULT_SUCCESS);
-    if (!workgroup_started) {
-      bool expected = false;
-      if (player->workgroup_disabled_.compare_exchange_strong(expected, true,
-                                                              std::memory_order_relaxed)) {
-        LOGF(LOG_WARN,
-             "%{public}s Audio workgroup disabled: Start failed (%{public}d)",
-             kAudioChainPrefix, start_result);
+  if (!player->workgroup_disabled_.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> lock(player->state_mutex_);
+    if (player->workgroup_ && player->workgroup_token_ > 0) {
+      timespec ts{};
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+      uint64_t start_ns = static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL +
+                          static_cast<uint64_t>(ts.tv_nsec);
+      uint64_t work_ns =
+          (static_cast<uint64_t>(frames_needed) * 1000000000ULL +
+           static_cast<uint64_t>(player->sample_rate_) - 1ULL) /
+          static_cast<uint64_t>(player->sample_rate_);
+      if (work_ns < 1) {
+        work_ns = 1;
+      }
+      OH_AudioCommon_Result start_result =
+          OH_AudioWorkgroup_Start(player->workgroup_, start_ns,
+                                  start_ns + work_ns);
+      workgroup_started = (start_result == AUDIOCOMMON_RESULT_SUCCESS);
+      if (!workgroup_started) {
+        bool expected = false;
+        if (player->workgroup_disabled_.compare_exchange_strong(
+                expected, true, std::memory_order_relaxed)) {
+          LOGF(LOG_WARN,
+               "%{public}s Audio workgroup disabled: Start failed (%{public}d)",
+               kAudioChainPrefix, start_result);
+        }
       }
     }
   }
@@ -610,15 +716,20 @@ int32_t AudioPlayer::OnWriteDataLegacy(OH_AudioRenderer *renderer,
                 static_cast<size_t>(tail_bytes));
   }
 
-  if (workgroup_started && !player->workgroup_disabled_.load(std::memory_order_relaxed)) {
-    OH_AudioCommon_Result stop_result = OH_AudioWorkgroup_Stop(player->workgroup_);
-    if (stop_result != AUDIOCOMMON_RESULT_SUCCESS) {
-      bool expected = false;
-      if (player->workgroup_disabled_.compare_exchange_strong(expected, true,
-                                                              std::memory_order_relaxed)) {
-        LOGF(LOG_WARN,
-             "%{public}s Audio workgroup disabled: Stop failed (%{public}d)",
-             kAudioChainPrefix, stop_result);
+  if (workgroup_started &&
+      !player->workgroup_disabled_.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> lock(player->state_mutex_);
+    if (player->workgroup_) {
+      OH_AudioCommon_Result stop_result =
+          OH_AudioWorkgroup_Stop(player->workgroup_);
+      if (stop_result != AUDIOCOMMON_RESULT_SUCCESS) {
+        bool expected = false;
+        if (player->workgroup_disabled_.compare_exchange_strong(
+                expected, true, std::memory_order_relaxed)) {
+          LOGF(LOG_WARN,
+               "%{public}s Audio workgroup disabled: Stop failed (%{public}d)",
+               kAudioChainPrefix, stop_result);
+        }
       }
     }
   }
@@ -674,6 +785,10 @@ int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
   if (!player) {
     return 0;
   }
+  CallbackGuard callbackGuard(player);
+  if (!callbackGuard.IsActive()) {
+    return 0;
+  }
 
   // 记录中断事件
   LOGF(LOG_INFO, "%{public}s Audio interrupt: type=%{public}d, hint=%{public}d",
@@ -683,35 +798,52 @@ int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
   switch (hint) {
   case AUDIOSTREAM_INTERRUPT_HINT_PAUSE:
     // 音频焦点丢失,暂停播放
-    if (player->is_playing_) {
-      player->resume_on_interrupt_ = true;
-      player->is_playing_ = false;
-      // 注意: 这里不调用 OH_AudioRenderer_Pause，因为系统可能已经暂停了流
-      // 但为了状态同步，最好还是调一下，或者只更新 flag
-      // 官方文档建议在回调中不要执行耗时操作，Pause 可能是阻塞的？
-      // 通常 Pause 是安全的。
-      OH_AudioRenderer_Pause(renderer);
+    {
+      std::lock_guard<std::mutex> lock(player->state_mutex_);
+      if (player->is_playing_) {
+        player->resume_on_interrupt_ = true;
+        player->is_playing_ = false;
+        // 注意: 这里不调用 OH_AudioRenderer_Pause，因为系统可能已经暂停了流
+        // 但为了状态同步，最好还是调一下，或者只更新 flag
+        // 官方文档建议在回调中不要执行耗时操作，Pause 可能是阻塞的？
+        // 通常 Pause 是安全的。
+        OH_AudioRenderer_Pause(renderer);
+      }
     }
-    LOGF(LOG_INFO,
-         "%{public}s Audio paused due to interrupt (resume_later=%{public}d)",
-         kAudioChainPrefix, player->resume_on_interrupt_);
+    {
+      std::lock_guard<std::mutex> lock(player->state_mutex_);
+      LOGF(LOG_INFO,
+           "%{public}s Audio paused due to interrupt (resume_later=%{public}d)",
+           kAudioChainPrefix, player->resume_on_interrupt_ ? 1 : 0);
+    }
     break;
 
-  case AUDIOSTREAM_INTERRUPT_HINT_RESUME:
+  case AUDIOSTREAM_INTERRUPT_HINT_RESUME: {
     // 音频焦点恢复,可以继续播放
-    LOGF(LOG_INFO,
-         "%{public}s Audio resume hint received (resume_flag=%{public}d)",
-         kAudioChainPrefix, player->resume_on_interrupt_);
-    if (player->resume_on_interrupt_) {
+    bool resume = false;
+    {
+      std::lock_guard<std::mutex> lock(player->state_mutex_);
+      resume = player->resume_on_interrupt_;
+      if (resume) {
         player->resume_on_interrupt_ = false;
-        player->Start(); // Start 更新 is_playing_ 并调用 OH_AudioRenderer_Start
+      }
+      LOGF(LOG_INFO,
+           "%{public}s Audio resume hint received (resume_flag=%{public}d)",
+           kAudioChainPrefix, resume ? 1 : 0);
+    }
+    if (resume) {
+      player->Start(); // Start 更新 is_playing_ 并调用 OH_AudioRenderer_Start
     }
     break;
+  }
 
   case AUDIOSTREAM_INTERRUPT_HINT_STOP:
     // 音频焦点永久丢失,停止播放
-    player->is_playing_ = false;
-    player->resume_on_interrupt_ = false;
+    {
+      std::lock_guard<std::mutex> lock(player->state_mutex_);
+      player->is_playing_ = false;
+      player->resume_on_interrupt_ = false;
+    }
     LOGF(LOG_INFO, "%{public}s Audio stopped due to interrupt",
          kAudioChainPrefix);
     break;
@@ -724,45 +856,71 @@ int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
 }
 
 void AudioPlayer::Cleanup() {
-  // 停止播放
-  if (renderer_) {
-    OH_AudioRenderer_Stop(renderer_);
+  {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    shutting_down_ = true;
+  }
+
+  OH_AudioRenderer *renderer = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    renderer = renderer_;
+  }
+
+  if (renderer) {
+    OH_AudioRenderer_Stop(renderer);
+  }
+
+  {
+    std::unique_lock<std::mutex> lock(callback_mutex_);
+    callback_cond_.wait(lock, [this]() { return active_callbacks_ == 0; });
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
     is_playing_ = false;
-  }
+    resume_on_interrupt_ = false;
 
-  // Phase 3.3+ - 清理音频工作组
-  if (workgroup_) {
-    if (workgroup_token_ > 0) {
-      OH_AudioWorkgroup_RemoveThread(workgroup_, workgroup_token_);
-      workgroup_token_ = 0;
-      LOGF(LOG_INFO, "%{public}s Audio workgroup thread removed",
-           kAudioChainPrefix);
+    // Phase 3.3+ - 清理音频工作组
+    if (workgroup_) {
+      if (workgroup_token_ > 0) {
+        OH_AudioWorkgroup_RemoveThread(workgroup_, workgroup_token_);
+        workgroup_token_ = 0;
+        LOGF(LOG_INFO, "%{public}s Audio workgroup thread removed",
+             kAudioChainPrefix);
+      }
+
+      if (resource_manager_) {
+        OH_AudioResourceManager_ReleaseWorkgroup(resource_manager_, workgroup_);
+        LOGF(LOG_INFO, "%{public}s Audio workgroup released",
+             kAudioChainPrefix);
+      }
+
+      workgroup_ = nullptr;
     }
 
-    if (resource_manager_) {
-      OH_AudioResourceManager_ReleaseWorkgroup(resource_manager_, workgroup_);
-      LOGF(LOG_INFO, "%{public}s Audio workgroup released",
-           kAudioChainPrefix);
+    resource_manager_ = nullptr;
+
+    // 释放渲染器
+    if (renderer_) {
+      OH_AudioRenderer_Release(renderer_);
+      renderer_ = nullptr;
     }
 
-    workgroup_ = nullptr;
-  }
-
-  resource_manager_ = nullptr;
-
-  // 释放渲染器
-  if (renderer_) {
-    OH_AudioRenderer_Release(renderer_);
-    renderer_ = nullptr;
-  }
-
-  // 销毁构造器
-  if (builder_) {
-    OH_AudioStreamBuilder_Destroy(builder_);
-    builder_ = nullptr;
+    // 销毁构造器
+    if (builder_) {
+      OH_AudioStreamBuilder_Destroy(builder_);
+      builder_ = nullptr;
+    }
   }
 
   ring_buffer_ = nullptr;
+  running_ = nullptr;
+
+  {
+    std::lock_guard<std::mutex> lock(callback_mutex_);
+    shutting_down_ = false;
+  }
 }
 
 } // namespace libretro

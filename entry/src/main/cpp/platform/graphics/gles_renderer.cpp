@@ -259,6 +259,12 @@ void GLESRenderer::DestroySurfaceOnly() {
   }
 
   if (egl_surface_ != EGL_NO_SURFACE) {
+    // Best-effort drain to reduce driver warnings like "host is using destroying surface".
+    if (eglGetCurrentDisplay() == egl_display_ &&
+        eglGetCurrentContext() == egl_context_) {
+      glFinish();
+    }
+
     // Make context not current before destroying surface
     eglMakeCurrent(egl_display_, EGL_NO_SURFACE, EGL_NO_SURFACE,
                    EGL_NO_CONTEXT);
@@ -412,6 +418,10 @@ void GLESRenderer::Deinit() {
   // Make context current to allow safe deletion
   bool contextCurrent = false;
   if (egl_display_ != EGL_NO_DISPLAY && egl_context_ != EGL_NO_CONTEXT) {
+    if (eglGetCurrentDisplay() == egl_display_ &&
+        eglGetCurrentContext() == egl_context_) {
+      glFinish();
+    }
     contextCurrent = eglMakeCurrent(egl_display_, EGL_NO_SURFACE,
                                     EGL_NO_SURFACE, egl_context_);
   }
@@ -888,154 +898,15 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
            egl_display_, egl_context_, egl_surface_);
     }
 
-    // === 启用 PBO 异步上传 ===
-    const unsigned slot = BeginUploadScratch();
-    if (pbo_fence_state_log_count_ < 5 ||
-        (pbo_fence_state_log_count_ % 120) == 0) {
-      pbo_fence_state_log_count_++;
-      for (size_t i = 0; i < upload_fence_ring_.size(); ++i) {
-        LOGF(LOG_INFO,
-             "[GLES_DIAG] PBO fence state: frame=%{public}lu slot=%{public}u fence=%{public}p",
-             frameId, static_cast<unsigned>(i),
-             upload_fence_ring_[i]);
-      }
-    }
-
-    if (upload_scratch_ring_[slot].size() < dataSize) {
-      upload_scratch_ring_[slot].resize(dataSize);
-    }
-
-    if (pbo_ring_[slot] == 0) {
-      glGenBuffers(1, &pbo_ring_[slot]);
-    }
-
-    ClearGlErrors();
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo_ring_[slot]);
-    const GLenum errBind = glGetError();
-
-    glBufferData(GL_PIXEL_UNPACK_BUFFER, dataSize, nullptr, GL_STREAM_DRAW);
-    const GLenum errData = glGetError();
-
-    GLint binding = 0;
-    glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &binding);
-    const GLenum errBinding = glGetError();
-
-    GLint bufSize = 0;
-    GLint bufUsage = 0;
-    GLenum errSize = GL_NO_ERROR;
-    if (binding != 0) {
-      glGetBufferParameteriv(GL_PIXEL_UNPACK_BUFFER, GL_BUFFER_SIZE, &bufSize);
-      errSize = glGetError();
-      glGetBufferParameteriv(GL_PIXEL_UNPACK_BUFFER, GL_BUFFER_USAGE, &bufUsage);
-      const GLenum errUsage = glGetError();
-      if (ShouldLog(pbo_buffer_param_log_count_)) {
-        LOGF(LOG_INFO,
-             "[GLES_DIAG] PBO buffer params: slot=%{public}u size=%{public}u usage=0x%{public}X "
-             "err_size=0x%{public}X err_usage=0x%{public}X",
-             slot, static_cast<unsigned>(bufSize),
-             static_cast<unsigned>(bufUsage),
-             static_cast<unsigned>(errSize),
-             static_cast<unsigned>(errUsage));
-      }
-    }
-
-    if (ShouldLog(pbo_debug_log_count_)) {
-      GLboolean isBuf = glIsBuffer(pbo_ring_[slot]);
-      GLenum errIsBuf = glGetError();
-      LOGF(LOG_INFO,
-           "[GLES_DIAG] PBO state: slot=%{public}u bind=%{public}u size=%{public}u "
-           "is_buf=%{public}d err_is_buf=0x%{public}X "
-           "err_bind=0x%{public}X err_data=0x%{public}X "
-           "err_bind_query=0x%{public}X err_size_query=0x%{public}X",
-           slot, static_cast<unsigned>(binding),
-           static_cast<unsigned>(bufSize),
-           isBuf == GL_TRUE ? 1 : 0,
-           static_cast<unsigned>(errIsBuf),
-           static_cast<unsigned>(errBind),
-           static_cast<unsigned>(errData),
-           static_cast<unsigned>(errBinding),
-           static_cast<unsigned>(errSize));
-    }
-
-  const uint64_t mapStart = NowNs();
-    // PBO map flag mode: 0=WRITE|INVALIDATE|UNSYNC, 1=WRITE|INVALIDATE, 2=WRITE only.
-    static constexpr int kPboMapFlagsMode = 2;
-    GLbitfield mapFlags = GL_MAP_WRITE_BIT;
-    if (kPboMapFlagsMode == 0) {
-      mapFlags |= GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_UNSYNCHRONIZED_BIT;
-    } else if (kPboMapFlagsMode == 1) {
-      mapFlags |= GL_MAP_INVALIDATE_BUFFER_BIT;
-    }
-    void *mappedPtr = glMapBufferRange(
-        GL_PIXEL_UNPACK_BUFFER, 0, dataSize, mapFlags);
-    const GLenum errMap = glGetError();
-    if (ShouldLog(pbo_map_detail_log_count_)) {
-      GLint mapped = 0;
-      GLint mapFlagsState = 0;
-      void *mapPtrState = nullptr;
-      glGetBufferParameteriv(GL_PIXEL_UNPACK_BUFFER, GL_BUFFER_MAPPED, &mapped);
-      GLenum errMapped = glGetError();
-      glGetBufferParameteriv(GL_PIXEL_UNPACK_BUFFER, GL_BUFFER_ACCESS_FLAGS,
-                             &mapFlagsState);
-      GLenum errMapFlags = glGetError();
-      glGetBufferPointerv(GL_PIXEL_UNPACK_BUFFER, GL_BUFFER_MAP_POINTER,
-                          &mapPtrState);
-      GLenum errMapPtr = glGetError();
-      LOGF(LOG_INFO,
-           "[GLES_DIAG] PBO map: slot=%{public}u size=%{public}u mode=%{public}d "
-           "flags=0x%{public}X ptr=%{public}p err=0x%{public}X mapped=%{public}d "
-           "map_ptr=%{public}p access=0x%{public}X err_mapped=0x%{public}X "
-           "err_access=0x%{public}X err_ptr=0x%{public}X",
-           slot, static_cast<unsigned>(dataSize), kPboMapFlagsMode,
-           static_cast<unsigned>(mapFlags), mappedPtr,
-           static_cast<unsigned>(errMap),
-           mapped, mapPtrState,
-           static_cast<unsigned>(mapFlagsState),
-           static_cast<unsigned>(errMapped),
-           static_cast<unsigned>(errMapFlags),
-           static_cast<unsigned>(errMapPtr));
-    }
-
-    if (mappedPtr) {
-      memcpy(mappedPtr, data, dataSize);
-      const GLboolean unmapOk = glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-      const GLenum errUnmap = glGetError();
-      if (ShouldLog(pbo_unmap_detail_log_count_)) {
-        LOGF(LOG_INFO,
-             "[GLES_DIAG] PBO unmap: slot=%{public}u ok=%{public}d err=0x%{public}X",
-             slot, unmapOk == GL_TRUE ? 1 : 0,
-             static_cast<unsigned>(errUnmap));
-      }
-      if ((unmapOk == GL_FALSE || errUnmap != GL_NO_ERROR) &&
-          ShouldLog(pbo_error_log_count_)) {
-        LOGF(LOG_WARN,
-             "[GLES_DIAG] PBO unmap failed: ok=%{public}d err=0x%{public}X "
-             "slot=%{public}u size=%{public}u",
-             unmapOk == GL_TRUE ? 1 : 0,
-             static_cast<unsigned>(errUnmap), slot,
-             static_cast<unsigned>(dataSize));
-      }
-    }
-    const uint64_t mapEnd = NowNs();
-    if (ShouldLog(pbo_timing_log_count_)) {
-      LOGF(LOG_INFO,
-           "[GLES_DIAG] PBO map+copy+unmap: frame=%{public}lu slot=%{public}u "
-           "ns=%{public}u ptr=%{public}p err=0x%{public}X",
-           frameId, slot,
-           static_cast<unsigned>(mapEnd - mapStart), mappedPtr,
-           static_cast<unsigned>(errMap));
-    }
-
-    if (!mappedPtr) {
-      if (ShouldLog(pbo_error_log_count_)) {
-        LOGF(LOG_WARN,
-             "[GLES_DIAG] PBO map failed: err=0x%{public}X slot=%{public}u size=%{public}u",
-             static_cast<unsigned>(errMap), slot,
-             static_cast<unsigned>(dataSize));
-      }
-      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-      EndUploadScratch(slot);
-      return;
+    // Driver compatibility path:
+    // For some Harmony devices/simulators, PBO upload path can produce noisy
+    // driver-side diagnostics. Use direct texture upload for stable behavior.
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    const GLenum errUnpackBind = glGetError();
+    if (errUnpackBind != GL_NO_ERROR && ShouldLog(pbo_error_log_count_)) {
+      LOGF(LOG_WARN,
+           "[GLES_DIAG] direct upload: unbind unpack buffer failed err=0x%{public}X",
+           static_cast<unsigned>(errUnpackBind));
     }
 
     ClearGlErrors();
@@ -1062,7 +933,7 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
       glGetIntegerv(GL_UNPACK_ROW_LENGTH, &curRowLen);
       GLenum errRow = glGetError();
       LOGF(LOG_INFO,
-           "[GLES_DIAG] PBO unpack: align=%{public}d row_len=%{public}d "
+           "[GLES_DIAG] upload unpack: align=%{public}d row_len=%{public}d "
            "err_align=0x%{public}X err_row=0x%{public}X",
            curAlign, curRowLen,
            static_cast<unsigned>(errAlign),
@@ -1072,13 +943,13 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     if (render_debug_log_count_ < 3) {
       render_debug_log_count_++;
       LOGF(LOG_INFO,
-           "GLES PBO render: slot=%{public}u size=%{public}u row=%{public}d "
+           "GLES direct render: size=%{public}u row=%{public}d "
            "fmt=%{public}d align=%{public}d",
-           slot, static_cast<unsigned>(dataSize), rowLength,
+           static_cast<unsigned>(dataSize), rowLength,
            static_cast<int>(format), unpackAlignment);
     }
 
-    // Texture Upload from PBO (offset 0)
+    // Direct Texture Upload from client memory
     GLint boundTex = 0;
     glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTex);
     const GLenum errTexBind = glGetError();
@@ -1088,18 +959,18 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     const uint64_t texStart = NowNs();
     if (useTexImage) {
       glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0,
-                   pixelFormat, pixelType, nullptr);
+                   pixelFormat, pixelType, data);
       tex_width_ = width;
       tex_height_ = height;
       current_format_ = format;
     } else {
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, pixelFormat,
-                      pixelType, nullptr);
+                      pixelType, data);
     }
     const uint64_t texEnd = NowNs();
     if (ShouldLog(pbo_tex_log_count_)) {
       LOGF(LOG_INFO,
-           "[GLES_DIAG] PBO tex upload: path=%{public}s size=%{public}ux%{public}u "
+           "[GLES_DIAG] tex upload (direct): path=%{public}s size=%{public}ux%{public}u "
            "fmt=%{public}d type=%{public}u bound_tex=%{public}d "
            "err_tex_bind=0x%{public}X",
            useTexImage ? "TexImage" : "TexSubImage",
@@ -1109,7 +980,7 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     }
     if (ShouldLog(pbo_tex_timing_log_count_)) {
       LOGF(LOG_INFO,
-           "[GLES_DIAG] PBO tex time: frame=%{public}lu path=%{public}s "
+           "[GLES_DIAG] tex time (direct): frame=%{public}lu path=%{public}s "
            "ns=%{public}u",
            frameId, useTexImage ? "TexImage" : "TexSubImage",
            static_cast<unsigned>(texEnd - texStart));
@@ -1118,9 +989,6 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
 
     glPixelStorei(GL_UNPACK_ROW_LENGTH, prevUnpackRowLength);
     glPixelStorei(GL_UNPACK_ALIGNMENT, prevUnpackAlignment);
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-
-    EndUploadScratch(slot);
   }
 
   // XEngine hook
@@ -1133,29 +1001,6 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
   }
   LogGlError("draw");
-
-  //  Security: Add Sync Fence to detect GPU hangs before blocking on
-  // SwapBuffers
-  GLsync sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (sync) {
-    glFlush(); // Ensure commands are submitted to the GPU
-    // Wait up to 33ms (approx 2 frames at 60Hz) to avoid blocking the game loop
-    // indefinitely
-    GLenum waitRes =
-        glClientWaitSync(sync, GL_SYNC_FLUSH_COMMANDS_BIT, 33000000ULL);
-    glDeleteSync(sync);
-
-    if (waitRes == GL_TIMEOUT_EXPIRED) {
-      LOGF(LOG_WARN,
-                   "GLES Render Timeout! GPU might be hung or overloaded.");
-      healthy_ = false;
-      return;
-    } else if (waitRes == GL_WAIT_FAILED) {
-      LOGF(LOG_ERROR,
-                   "glClientWaitSync failed: 0x%{public}x", glGetError());
-      // Not necessarily a fatal hang, but suspicious
-    }
-  }
 
   // Swap Buffers
   const uint64_t swapStart = NowNs();

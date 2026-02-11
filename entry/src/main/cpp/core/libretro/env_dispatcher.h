@@ -54,10 +54,12 @@ public:
   bool IsInRetroRun() const { return in_retro_run_; }
 
   void SetPendingMinimumAudioLatencyMs(unsigned latency_ms) {
+    std::lock_guard<std::mutex> lock(min_audio_latency_mutex_);
     pending_min_audio_latency_ms_ = latency_ms;
     has_pending_min_audio_latency_ = true;
   }
   bool ConsumePendingMinimumAudioLatencyMs(unsigned &out_latency_ms) {
+    std::lock_guard<std::mutex> lock(min_audio_latency_mutex_);
     if (!has_pending_min_audio_latency_) {
       return false;
     }
@@ -216,6 +218,7 @@ private:
 
   unsigned pending_min_audio_latency_ms_ = 0;
   bool has_pending_min_audio_latency_ = false;
+  mutable std::mutex min_audio_latency_mutex_;
   bool in_retro_run_ = false;
 
   std::map<std::string, std::string> variables_;

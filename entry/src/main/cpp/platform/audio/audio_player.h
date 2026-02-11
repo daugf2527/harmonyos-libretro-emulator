@@ -20,9 +20,11 @@
 #include <ohaudio/native_audiorenderer.h>
 #include <ohaudio/native_audiostreambuilder.h>
 #include <ohaudio/native_audio_resource_manager.h>  // Phase 3.3+ - 音频工作组
+#include <condition_variable>
 #include <chrono>
 #include <cstdint>
 #include <atomic>
+#include <mutex>
 
 namespace libretro {
 
@@ -89,6 +91,9 @@ public:
      * @return true 正在播放
      */
     bool IsPlaying() const;
+    bool EnterCallback();
+    void ExitCallback();
+    bool IsShuttingDown() const;
     
     /**
      * @brief 获取采样率
@@ -172,6 +177,11 @@ private:
     int32_t channel_count_ = 2;                 // 声道数
     bool is_playing_ = false;                   // 播放状态
     bool resume_on_interrupt_ = false;          // 中断恢复标志
+    mutable std::mutex state_mutex_;
+    mutable std::mutex callback_mutex_;
+    std::condition_variable callback_cond_;
+    size_t active_callbacks_ = 0;
+    bool shutting_down_ = false;
     
     // 日志节流计数器（从 static 移为成员变量，避免多线程数据竞争）
     mutable std::chrono::steady_clock::time_point callback_last_time_{};

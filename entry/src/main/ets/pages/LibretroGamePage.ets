@@ -213,6 +213,8 @@ struct LibretroGamePage {
   private pendingStart: boolean = false;
   private switchToken: number = 0;
   private pendingSwitch: PendingSwitch | undefined = undefined;
+  private lastStartOrSwitchAtMs: number = 0;
+  private readonly startOrSwitchDebounceMs: number = 600;
   // 动态输入源列表
   @State inputSourceItems: InputSourceItem[] = [];
   
@@ -1778,7 +1780,7 @@ struct LibretroGamePage {
   }
   
   // 开始/切换游戏 (新架构流程)
-  async startOrSwitchGame() {
+  async startOrSwitchGame(forceImmediate: boolean = false) {
     if (this.switching) {
       this.pendingSwitch = {
         coreIndex: this.selectedCoreIndex,
@@ -1796,6 +1798,26 @@ struct LibretroGamePage {
       LogHelper.error('LibretroGame', 'Core', '核心或 ROM 无效');
       this.switching = false;
       return;
+    }
+
+    // 防止重复点击导致同一游戏反复 stop/start 抖动。
+    if (this.gameRunning &&
+      !this.gamePaused &&
+      this.currentCore === core.name &&
+      this.currentRom === rom.name) {
+      LogHelper.warn('LibretroGame', 'Engine', '当前游戏已运行，忽略重复启动请求');
+      this.switching = false;
+      return;
+    }
+
+    if (!forceImmediate) {
+      const nowMs = Date.now();
+      if (nowMs - this.lastStartOrSwitchAtMs < this.startOrSwitchDebounceMs) {
+        LogHelper.warn('LibretroGame', 'Engine', '启动请求过于频繁，已防抖忽略');
+        this.switching = false;
+        return;
+      }
+      this.lastStartOrSwitchAtMs = nowMs;
     }
     
     LogHelper.info(
@@ -1887,7 +1909,7 @@ struct LibretroGamePage {
         const availableRoms = this.getAvailableRoms();
         this.selectedRomIndex =
           pending.romIndex < availableRoms.length ? pending.romIndex : 0;
-        this.startOrSwitchGame();
+        this.startOrSwitchGame(true);
       }
     }
   }

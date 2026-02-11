@@ -1,12 +1,16 @@
 #ifndef LIBRETRO_ENGINE_ENGINE_MESSAGES_H
 #define LIBRETRO_ENGINE_ENGINE_MESSAGES_H
 
+#include <cstring>
 #include <memory>
 #include <native_window/external_window.h>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace libretro {
+
+class EngineSyncTask;
 
 /**
  * @brief 消息类型定义
@@ -23,7 +27,8 @@ enum class MessageType {
   WindowCreated,   // 窗口已创建
   WindowDestroyed, // 窗口已销毁
   WindowResized,   // 窗口尺寸变化
-  SetVideoFormat   // 设置视频格式
+  SetVideoFormat,  // 设置视频格式
+  SyncTask         // 同步任务（在 Engine 线程执行）
 };
 
 /**
@@ -64,6 +69,10 @@ struct EngineMessageVideoFormat {
   int pitch;
 };
 
+struct EngineMessageSyncTask {
+  std::shared_ptr<EngineSyncTask> task;
+};
+
 /**
  * @brief 统一消息包装体 (Tagged Struct)
  * 采用 C++14 安全的 pod 组合，避免 union 在非 POD 类型（如
@@ -79,6 +88,7 @@ struct EngineMessage {
     EngineMessageWindow window;
     EngineMessageWindowSize windowSize;
     EngineMessageVideoFormat videoFormat;
+    EngineMessageSyncTask syncTask;
   } payload;
 
   // 辅助构造函数：LoadCore/LoadRom (处理路径)
@@ -108,6 +118,13 @@ struct EngineMessage {
     msg.type = MessageType::WindowResized;
     msg.payload.windowSize.width = width;
     msg.payload.windowSize.height = height;
+    return msg;
+  }
+
+  static EngineMessage MakeSyncTaskMessage(std::shared_ptr<EngineSyncTask> task) {
+    EngineMessage msg;
+    msg.type = MessageType::SyncTask;
+    msg.payload.syncTask.task = std::move(task);
     return msg;
   }
 

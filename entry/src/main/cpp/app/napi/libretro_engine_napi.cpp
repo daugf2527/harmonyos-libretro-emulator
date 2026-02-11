@@ -7,6 +7,7 @@
 #include <hilog/log.h>
 #include <exception>
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
@@ -37,6 +38,47 @@ static std::atomic<uint64_t> switch_token{0};
 static std::mutex switch_mutex;
 static std::condition_variable switch_cond;
 static uint64_t active_switch_token = 0;
+static std::mutex switch_dedupe_mutex;
+static std::string last_switch_core_path;
+static std::string last_switch_rom_path;
+static uint64_t last_switch_request_ms = 0;
+static constexpr uint64_t kSwitchDedupeWindowMs = 800;
+
+static uint64_t GetSteadyNowMs() {
+  const auto now = std::chrono::steady_clock::now().time_since_epoch();
+  return static_cast<uint64_t>(
+      std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
+}
+
+static bool ShouldDedupSwitchRequest(const std::string &corePath,
+                                     const std::string &romPath) {
+  bool switchingNow = false;
+  {
+    std::lock_guard<std::mutex> lock(switch_mutex);
+    switchingNow = active_switch_token != 0;
+  }
+
+  const EngineState state = GetEngine()->GetState();
+  const bool engineBusy =
+      switchingNow || state == EngineState::STARTING ||
+      state == EngineState::LOADING || state == EngineState::STOPPING ||
+      state == EngineState::RUNNING || state == EngineState::GAME_LOADED ||
+      state == EngineState::CORE_LOADED;
+
+  const uint64_t nowMs = GetSteadyNowMs();
+  std::lock_guard<std::mutex> dedupeLock(switch_dedupe_mutex);
+  const bool sameRequest =
+      corePath == last_switch_core_path && romPath == last_switch_rom_path;
+  const bool withinWindow =
+      nowMs >= last_switch_request_ms &&
+      (nowMs - last_switch_request_ms) < kSwitchDedupeWindowMs;
+
+  last_switch_core_path = corePath;
+  last_switch_rom_path = romPath;
+  last_switch_request_ms = nowMs;
+
+  return sameRequest && withinWindow && engineBusy;
+}
 
 static bool LoadRomDataFromRawfileIfNeeded(
     napi_env env,
@@ -441,7 +483,12 @@ static void RecoverAfterSwitchFailure(uint32_t timeoutMs, uint64_t token) {
   if (!IsLatestSwitchToken(token)) {
     return;
   }
-  GetEngine()->Stop();
+  const bool stopped = GetEngine()->Stop();
+  if (!stopped) {
+    LOGF(LOG_ERROR,
+         "[NEW] RecoverAfterSwitchFailure: stop timeout, skip reset to avoid lifecycle overlap");
+    return;
+  }
   (void)GetEngine()->WaitForState(EngineState::STOPPED, timeoutMs);
   GetEngine()->Reset();
 }
@@ -471,7 +518,10 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
   const EngineState currentState = GetEngine()->GetState();
   if (currentState != EngineState::INIT &&
       currentState != EngineState::STOPPED) {
-    GetEngine()->Stop();
+    if (!GetEngine()->Stop()) {
+      ctx->result = false;
+      return;
+    }
     if (!WaitForStateWithToken(EngineState::STOPPED, ctx->timeoutMs,
                                ctx->token)) {
       RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
@@ -628,6 +678,13 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     return MakeResolvedPromise(env, false);
   }
 
+  if (ShouldDedupSwitchRequest(std::string(corePath), resolvedRomPath)) {
+    LOGF(LOG_WARN,
+         "[NEW] SwitchGameAsync deduped duplicate request within %{public}llu ms",
+         static_cast<unsigned long long>(kSwitchDedupeWindowMs));
+    return MakeResolvedPromise(env, true);
+  }
+
   auto *ctx = new SwitchGameAsyncContext();
   ctx->env = env;
   ctx->corePath = corePath;
@@ -675,9 +732,9 @@ static napi_value InitEventBridge(napi_env env, napi_callback_info info) {
 static napi_value StopEngine(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] StopEngine called");
-  GetEngine()->Stop();
+  const bool stopped = GetEngine()->Stop();
 
-  return MakeBool(env, true);
+  return MakeBool(env, stopped);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -691,7 +748,7 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
 
   std::thread([]() {
     try {
-      GetEngine()->Stop();
+      (void)GetEngine()->Stop();
     } catch (...) {
     }
     stop_in_progress.store(false);

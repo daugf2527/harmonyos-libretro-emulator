@@ -40,7 +40,7 @@ bool InputPortRouter::AssignPort(int port, InputSourceType sourceType,
   std::lock_guard<std::mutex> lock(mutex_);
 
   if (sourceType == InputSourceType::None) {
-    return UnassignPort(port);
+    return UnassignPortLocked(port);
   }
 
   if (sourceType == InputSourceType::Virtual) {
@@ -93,7 +93,10 @@ bool InputPortRouter::UnassignPort(int port) {
   }
 
   std::lock_guard<std::mutex> lock(mutex_);
+  return UnassignPortLocked(port);
+}
 
+bool InputPortRouter::UnassignPortLocked(int port) {
   const std::string deviceId = portSources_[port].deviceId;
   if (!deviceId.empty()) {
     auto it = deviceToPort_.find(deviceId);
