@@ -15,7 +15,6 @@
 #include <rawfile/raw_file_manager.h>
 #include <string>
 #include <vector>
-#include <thread>
 #include <fstream>
 #include <cstdio>
 #include <iostream>
@@ -738,6 +737,45 @@ static napi_value StopEngine(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+struct StopEngineAsyncContext {
+  napi_env env = nullptr;
+  napi_async_work work = nullptr;
+  bool stopped = false;
+};
+
+static void ExecuteStopEngineAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<StopEngineAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->stopped = GetEngine()->Stop();
+}
+
+static void CompleteStopEngineAsync(napi_env env, napi_status status,
+                                    void *data) {
+  auto *ctx = static_cast<StopEngineAsyncContext *>(data);
+  if (!ctx) {
+    stop_in_progress.store(false);
+    return;
+  }
+
+  if (status != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] StopEngineAsync work failed: status=%{public}d",
+         static_cast<int>(status));
+  } else if (!ctx->stopped) {
+    LOGF(LOG_WARN,
+         "[NEW] StopEngineAsync completed with stop timeout/failure");
+  }
+
+  stop_in_progress.store(false);
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
 static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] StopEngineAsync called");
@@ -746,15 +784,45 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
     return MakeBool(env, true);
   }
 
-  std::thread([]() {
-    try {
-      (void)GetEngine()->Stop();
-    } catch (...) {
-    }
+  auto *ctx = new StopEngineAsyncContext();
+  ctx->env = env;
+
+  napi_value resourceName;
+  napi_create_string_utf8(env, "StopEngineAsyncWork", NAPI_AUTO_LENGTH,
+                          &resourceName);
+  napi_status createStatus =
+      napi_create_async_work(env, nullptr, resourceName, ExecuteStopEngineAsync,
+                             CompleteStopEngineAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    LOGF(LOG_ERROR, "[NEW] StopEngineAsync create work failed");
     stop_in_progress.store(false);
-  }).detach();
+    delete ctx;
+    return MakeBool(env, false);
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] StopEngineAsync queue work failed");
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    stop_in_progress.store(false);
+    delete ctx;
+    return MakeBool(env, false);
+  }
 
   return MakeBool(env, true);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+static napi_value ResetEngine(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  LOGF(LOG_INFO, " [NEW] ResetEngine called");
+  GetEngine()->Reset();
+  const bool resetOk = GetEngine()->GetState() == EngineState::INIT;
+  if (!resetOk) {
+    LOGF(LOG_WARN, "[NEW] ResetEngine did not converge to INIT");
+  }
+  return MakeBool(env, resetOk);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -1736,6 +1804,8 @@ void RegisterLibretroRefactoredNapi(napi_env env, napi_value exports) {
       {"refactoredStopEngine", nullptr, StopEngine, nullptr, nullptr, nullptr,
        napi_default, nullptr},
       {"refactoredStopEngineAsync", nullptr, StopEngineAsync, nullptr, nullptr, nullptr,
+       napi_default, nullptr},
+      {"refactoredResetEngine", nullptr, ResetEngine, nullptr, nullptr, nullptr,
        napi_default, nullptr},
       {"refactoredPauseEngine", nullptr, PauseEngine, nullptr, nullptr, nullptr,
        napi_default, nullptr},

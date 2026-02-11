@@ -52,6 +52,13 @@ bool InputPortRouter::AssignPort(int port, InputSourceType sourceType,
         LOGF(LOG_INFO,
              "Auto-unbind virtual port %{public}d for new port %{public}d",
              i, port);
+        const std::string staleDeviceId = portSources_[i].deviceId;
+        if (!staleDeviceId.empty()) {
+          auto staleIt = deviceToPort_.find(staleDeviceId);
+          if (staleIt != deviceToPort_.end() && staleIt->second == i) {
+            deviceToPort_.erase(staleIt);
+          }
+        }
         ClearPortStateLocked(i);
         portSources_[i].sourceType = InputSourceType::None;
         portSources_[i].deviceId.clear();
@@ -66,6 +73,14 @@ bool InputPortRouter::AssignPort(int port, InputSourceType sourceType,
            "AssignPort conflict: device %{public}s already bound to port %{public}d",
            deviceId.c_str(), it->second);
       return false;
+    }
+  }
+
+  const std::string oldDeviceId = portSources_[port].deviceId;
+  if (!oldDeviceId.empty() && oldDeviceId != deviceId) {
+    auto oldIt = deviceToPort_.find(oldDeviceId);
+    if (oldIt != deviceToPort_.end() && oldIt->second == port) {
+      deviceToPort_.erase(oldIt);
     }
   }
 
@@ -152,8 +167,12 @@ bool InputPortRouter::ResolvePortForDevice(const std::string &deviceId,
   if (existing != deviceToPort_.end()) {
     int port = existing->second;
     if (IsValidPort(port)) {
-      outPort = port;
-      return true;
+      const PortSource &source = portSources_[port];
+      if (source.deviceId == deviceId &&
+          MatchSourceType(source.sourceType, sourceType)) {
+        outPort = port;
+        return true;
+      }
     }
     deviceToPort_.erase(existing);
   }

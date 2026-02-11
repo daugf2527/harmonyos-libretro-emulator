@@ -11,3 +11,9 @@ entry/.cxx/
 entry/build/
 *.hap
 oh_modules/
+
+# Certificate / key materials
+*.csr
+*.pem
+*.key
+*.p12
