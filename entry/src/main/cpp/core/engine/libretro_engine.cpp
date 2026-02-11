@@ -27,7 +27,7 @@
 namespace libretro {
 
 // 静态实例指针，用于回调桥接（Phase 1 简化处理，仅支持单实例）
-static LibretroEngine *g_engineInstance = nullptr;
+static std::atomic<LibretroEngine *> g_engineInstance{nullptr};
 
 class EngineSyncTask {
 public:
@@ -65,6 +65,10 @@ thread_local LibretroEngine *g_engineThreadInstance = nullptr;
 
 bool IsMessagePathTooLong(const std::string &path) {
   return path.size() >= EngineMessageLoadPath::kPathCapacity;
+}
+
+LibretroEngine *GetEngineInstanceSnapshot() {
+  return g_engineInstance.load(std::memory_order_acquire);
 }
 
 class EngineRendererAdapter : public interfaces::IRenderer {
@@ -218,7 +222,7 @@ bool IsValidTransition(EngineState from, EngineState to) {
 
 LibretroEngine::LibretroEngine() {
   LOGF(LOG_INFO, "[NEW] LibretroEngine Created");
-  g_engineInstance = this;
+  g_engineInstance.store(this, std::memory_order_release);
 
   // Initialize InputManager
   inputManager_ = std::make_unique<InputManager>(&eventBridge_);
@@ -235,6 +239,7 @@ LibretroEngine::LibretroEngine() {
   diskController_ = std::make_unique<DiskController>();
   // HW Render framebuffer provider
   SetGlobalHwRenderFramebufferCallback([]() -> uintptr_t {
+    LibretroEngine *g_engineInstance = GetEngineInstanceSnapshot();
     if (!g_engineInstance) {
       return 0;
     }
@@ -266,7 +271,7 @@ LibretroEngine::~LibretroEngine() {
     state_.store(EngineState::STOPPED);
     stateCond_.notify_all();
   }
-  g_engineInstance = nullptr;
+  g_engineInstance.store(nullptr, std::memory_order_release);
   LOGF(LOG_INFO, "[NEW] LibretroEngine Destroyed");
 }
 
@@ -1738,6 +1743,7 @@ void LibretroEngine::ProcessFrame() {
 
 void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
                                     unsigned height, size_t pitch) {
+  LibretroEngine *g_engineInstance = GetEngineInstanceSnapshot();
   if (!g_engineInstance)
     return;
 
@@ -1931,6 +1937,7 @@ void LibretroEngine::OnAudioSample(int16_t left, int16_t right) {
 }
 
 size_t LibretroEngine::OnAudioSampleBatch(const int16_t *data, size_t frames) {
+  LibretroEngine *g_engineInstance = GetEngineInstanceSnapshot();
   if (!g_engineInstance)
     return 0;
 
@@ -2015,6 +2022,7 @@ size_t LibretroEngine::OnAudioSampleBatch(const int16_t *data, size_t frames) {
 }
 
 bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
+  LibretroEngine *g_engineInstance = GetEngineInstanceSnapshot();
   if (!g_engineInstance) {
     return false;
   }
