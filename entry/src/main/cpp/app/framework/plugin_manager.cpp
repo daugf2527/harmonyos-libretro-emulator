@@ -527,6 +527,12 @@ void PluginManager::Export(napi_env env, napi_value exports) {
           // 只处理单点触控，模拟 Pointer 设备 (光枪/触摸屏)
           if (touchEvent.numPoints > 0) {
             OH_NativeXComponent_TouchPoint &point = touchEvent.touchPoints[0];
+            const std::string pointerDeviceId = BuildMouseDeviceId();
+            int port = 0;
+            if (!ResolvePortForDevice(pointerDeviceId,
+                                      libretro::InputSourceType::Mouse, port)) {
+              port = 0;
+            }
 
             // 坐标归一化映射到 [-0x8000, 0x7fff]
             // X: 0..width -> -0x8000..0x7fff
@@ -551,7 +557,7 @@ void PluginManager::Export(napi_env env, napi_value exports) {
                             touchEvent.type == OH_NATIVEXCOMPONENT_MOVE);
 
             libretro::LibretroEngine::GetInstance()->SendPointer(
-                0, static_cast<int16_t>(normX), static_cast<int16_t>(normY),
+                port, static_cast<int16_t>(normX), static_cast<int16_t>(normY),
                 pressed);
           }
         }
