@@ -19,21 +19,21 @@ class EnvState {
 public:
   bool SetBaseDir(const std::string &filesDir);
   void ResetCoreState();
-  const char *GetBaseDir() const { return base_directory_.c_str(); }
+  const char *GetBaseDir() const;
   void SetLibretroPath(const std::string &corePath) { libretro_path_ = corePath; }
   const char *GetLibretroPath() const { return libretro_path_.c_str(); }
 
-  const char *GetSystemDirectory() const { return system_directory_.c_str(); }
-  const char *GetSaveDirectory() const { return save_directory_.c_str(); }
-  const char *GetContentDirectory() const { return content_directory_.c_str(); }
-  const char *GetCoreAssetsDirectory() const { return core_assets_directory_.c_str(); }
-  const char *GetCacheDirectory() const { return cache_directory_.c_str(); }
+  const char *GetSystemDirectory() const;
+  const char *GetSaveDirectory() const;
+  const char *GetContentDirectory() const;
+  const char *GetCoreAssetsDirectory() const;
+  const char *GetCacheDirectory() const;
 
-  void SetSystemDirectory(const std::string &dir) { system_directory_ = dir; }
-  void SetSaveDirectory(const std::string &dir) { save_directory_ = dir; }
-  void SetContentDirectory(const std::string &dir) { content_directory_ = dir; }
-  void SetCoreAssetsDirectory(const std::string &dir) { core_assets_directory_ = dir; }
-  void SetCacheDirectory(const std::string &dir) { cache_directory_ = dir; }
+  void SetSystemDirectory(const std::string &dir);
+  void SetSaveDirectory(const std::string &dir);
+  void SetContentDirectory(const std::string &dir);
+  void SetCoreAssetsDirectory(const std::string &dir);
+  void SetCacheDirectory(const std::string &dir);
 
   void SetFrameTimeCallback(::retro_frame_time_callback_t cb, ::retro_usec_t reference) {
     frame_time_callback_ = cb;
@@ -121,9 +121,7 @@ public:
   void SetLanguage(::retro_language lang) { language_ = lang; }
   ::retro_language GetLanguage() const { return language_; }
 
-  const std::string &GetCoreOptionsConfigPath() const {
-    return core_options_config_path_;
-  }
+  std::string GetCoreOptionsConfigPath() const;
 
   void ClearCoreOptions();
   void SetCoreOptions(std::vector<core_options::CoreOptionCategory> categories,
@@ -221,6 +219,7 @@ private:
   unsigned pending_min_audio_latency_ms_ = 0;
   bool has_pending_min_audio_latency_ = false;
   mutable std::mutex min_audio_latency_mutex_;
+  mutable std::mutex directory_mutex_;
   bool in_retro_run_ = false;
 
   std::map<std::string, std::string> variables_;

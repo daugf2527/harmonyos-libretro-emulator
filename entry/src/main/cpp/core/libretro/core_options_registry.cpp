@@ -211,7 +211,7 @@ bool SetCoreOptionValue(EnvState &state, const char *key, const char *value) {
     return false;
   }
 
-  const std::string &path = state.GetCoreOptionsConfigPath();
+  const std::string path = state.GetCoreOptionsConfigPath();
   if (!path.empty()) {
     std::map<std::string, std::string> cfg;
     (void)LoadCoreOptionsConfig(path, cfg);

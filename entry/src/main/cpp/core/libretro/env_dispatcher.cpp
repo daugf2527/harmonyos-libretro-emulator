@@ -617,33 +617,119 @@ static std::string ParseDefaultOptionValue(const char *value) {
   return common::TrimCopy(first);
 }
 
+static const char *CopyStringToTlsBuffer(const std::string &value) {
+  static thread_local std::array<std::string, 8> tls_values;
+  static thread_local size_t tls_index = 0;
+  std::string &slot = tls_values[tls_index];
+  tls_index = (tls_index + 1) % tls_values.size();
+  slot = value;
+  return slot.c_str();
+}
+
+const char *EnvState::GetBaseDir() const {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  return CopyStringToTlsBuffer(base_directory_);
+}
+
+const char *EnvState::GetSystemDirectory() const {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  return CopyStringToTlsBuffer(system_directory_);
+}
+
+const char *EnvState::GetSaveDirectory() const {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  return CopyStringToTlsBuffer(save_directory_);
+}
+
+const char *EnvState::GetContentDirectory() const {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  return CopyStringToTlsBuffer(content_directory_);
+}
+
+const char *EnvState::GetCoreAssetsDirectory() const {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  return CopyStringToTlsBuffer(core_assets_directory_);
+}
+
+const char *EnvState::GetCacheDirectory() const {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  return CopyStringToTlsBuffer(cache_directory_);
+}
+
+void EnvState::SetSystemDirectory(const std::string &dir) {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  system_directory_ = dir;
+}
+
+void EnvState::SetSaveDirectory(const std::string &dir) {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  save_directory_ = dir;
+}
+
+void EnvState::SetContentDirectory(const std::string &dir) {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  content_directory_ = dir;
+}
+
+void EnvState::SetCoreAssetsDirectory(const std::string &dir) {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  core_assets_directory_ = dir;
+}
+
+void EnvState::SetCacheDirectory(const std::string &dir) {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  cache_directory_ = dir;
+}
+
+std::string EnvState::GetCoreOptionsConfigPath() const {
+  std::lock_guard<std::mutex> lock(directory_mutex_);
+  return core_options_config_path_;
+}
+
 bool EnvState::SetBaseDir(const std::string &filesDir) {
   if (filesDir.empty()) {
-    base_directory_.clear();
-    system_directory_.clear();
-    save_directory_.clear();
-    content_directory_.clear();
-    core_assets_directory_.clear();
-    cache_directory_.clear();
-    config_directory_.clear();
+    {
+      std::lock_guard<std::mutex> lock(directory_mutex_);
+      base_directory_.clear();
+      system_directory_.clear();
+      save_directory_.clear();
+      content_directory_.clear();
+      core_assets_directory_.clear();
+      cache_directory_.clear();
+      config_directory_.clear();
+      core_options_config_path_.clear();
+    }
     SetVfsRoot(std::string());
     SetVfsSystemDir(std::string());
     SetVfsContentDir(std::string());
-    core_options_config_path_.clear();
     return true;
   }
 
-  base_directory_ = filesDir;
-  system_directory_ = filesDir + "/system";
-  save_directory_ = filesDir + "/saves";
-  content_directory_ = filesDir + "/roms";
-  core_assets_directory_ = filesDir + "/core_assets";
-  cache_directory_ = filesDir + "/cache";
-  config_directory_ = filesDir + "/config";
-  core_options_config_path_ = config_directory_ + "/retroarch-core-options.cfg";
-  SetVfsRoot(filesDir);
-  SetVfsSystemDir(system_directory_);
-  SetVfsContentDir(content_directory_);
+  const std::string baseDir = filesDir;
+  const std::string systemDir = filesDir + "/system";
+  const std::string saveDir = filesDir + "/saves";
+  const std::string contentDir = filesDir + "/roms";
+  const std::string coreAssetsDir = filesDir + "/core_assets";
+  const std::string cacheDir = filesDir + "/cache";
+  const std::string configDir = filesDir + "/config";
+  const std::string coreOptionsConfigPath =
+      configDir + "/retroarch-core-options.cfg";
+
+  {
+    std::lock_guard<std::mutex> lock(directory_mutex_);
+    base_directory_ = baseDir;
+    system_directory_ = systemDir;
+    save_directory_ = saveDir;
+    content_directory_ = contentDir;
+    core_assets_directory_ = coreAssetsDir;
+    cache_directory_ = cacheDir;
+    config_directory_ = configDir;
+    core_options_config_path_ = coreOptionsConfigPath;
+  }
+
+  SetVfsRoot(baseDir);
+  SetVfsSystemDir(systemDir);
+  SetVfsContentDir(contentDir);
 
   bool success = true;
   auto ensureDir = [&](const std::string &dir) {
@@ -653,17 +739,17 @@ bool EnvState::SetBaseDir(const std::string &filesDir) {
     }
   };
 
-  ensureDir(system_directory_);
-  ensureDir(save_directory_);
-  ensureDir(content_directory_);
-  ensureDir(core_assets_directory_);
-  ensureDir(cache_directory_);
-  ensureDir(config_directory_);
+  ensureDir(systemDir);
+  ensureDir(saveDir);
+  ensureDir(contentDir);
+  ensureDir(coreAssetsDir);
+  ensureDir(cacheDir);
+  ensureDir(configDir);
 
   // 常用子目录（避免 VFS 在父目录不存在时被拒绝）
-  const std::string arcade_dir = system_directory_ + "/arcade";
-  const std::string arc_dir = system_directory_ + "/arc";
-  const std::string fbneo_dir = system_directory_ + "/fbneo";
+  const std::string arcade_dir = systemDir + "/arcade";
+  const std::string arc_dir = systemDir + "/arc";
+  const std::string fbneo_dir = systemDir + "/fbneo";
   const std::string fbneo_patched_dir = fbneo_dir + "/patched";
   const std::string fbneo_path_dir = fbneo_dir + "/path";
   const std::string fbneo_channel_dir = fbneo_dir + "/channelf";
