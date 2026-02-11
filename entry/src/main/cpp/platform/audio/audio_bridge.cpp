@@ -624,6 +624,7 @@ bool AudioBridge::Stop() {
 }
 
 bool AudioBridge::IsPlaying() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!initialized_ || !audio_player_) {
     return false;
   }
@@ -632,6 +633,7 @@ bool AudioBridge::IsPlaying() const {
 }
 
 float AudioBridge::GetBufferUsage() const {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!initialized_ || !ring_buffer_) {
     return 0.0f;
   }
@@ -640,6 +642,7 @@ float AudioBridge::GetBufferUsage() const {
 }
 
 void AudioBridge::GetBufferStats(size_t &underruns, size_t &overruns) const {
+  std::lock_guard<std::mutex> lock(mutex_);
   underruns = 0;
   overruns = 0;
 
@@ -651,6 +654,7 @@ void AudioBridge::GetBufferStats(size_t &underruns, size_t &overruns) const {
 }
 
 void AudioBridge::ResetBufferStats() {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!initialized_ || !ring_buffer_) {
     return;
   }

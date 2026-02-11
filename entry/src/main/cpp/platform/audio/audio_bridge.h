@@ -120,7 +120,7 @@ private:
 
   std::vector<int16_t> resample_out_buf_;
 
-  std::mutex mutex_;
+  mutable std::mutex mutex_;
   std::atomic<bool> initialized_{false};
 
   AudioBridge(const AudioBridge &) = delete;
