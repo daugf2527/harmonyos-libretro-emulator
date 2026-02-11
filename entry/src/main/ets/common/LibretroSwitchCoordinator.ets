@@ -8,6 +8,7 @@ interface LibretroNapi {
   refactoredStartEngine(): boolean;
   refactoredStopEngine(): boolean;
   refactoredStopEngineAsync(): boolean;
+  refactoredResetEngine(): boolean;
   refactoredLoadCore(path: string): boolean;
   refactoredLoadRom(
     path: string,
@@ -100,7 +101,22 @@ export default class LibretroSwitchCoordinator {
       timeoutMs
     );
     if (!ok) {
-      const message = `Stop timeout: id=${id}`;
+      const resetTriggered = nativeApi.refactoredResetEngine();
+      if (resetTriggered) {
+        const recovered = await nativeApi.refactoredWaitForStateAsync(
+          EngineState.INIT,
+          timeoutMs
+        );
+        if (recovered) {
+          LogHelper.warn(
+            'LibretroSwitch',
+            'Engine',
+            `Stop timeout recovered by reset: id=${id}`
+          );
+          return this.ok();
+        }
+      }
+      const message = `Stop timeout: id=${id}, resetTriggered=${resetTriggered}`;
       LogHelper.error('LibretroSwitch', 'Engine', message);
       return this.fail('wait_close_complete', 'stop_timeout', message);
     }

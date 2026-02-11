@@ -327,6 +327,8 @@ bool LibretroEngine::Start() {
   }
   if (stopTimedOut_.load()) {
     LOGF(LOG_ERROR, "[NEW] Start blocked: previous stop timed out");
+    SetLastErrorInfo("start_blocked_stop_timeout", "Start",
+                     "previous stop timed out; call refactoredResetEngine");
     startInProgress_.store(false);
     return false;
   }
@@ -413,9 +415,13 @@ bool LibretroEngine::Stop() {
     LOGF(LOG_ERROR, "[NEW] Stop timeout after %{public}u ms", STOP_TIMEOUT_MS);
     const EnginePhase currentPhase = phase_.load(std::memory_order_acquire);
     const int64_t currentPhaseMs = GetPhaseDurationMs();
+    const std::string phaseName = PhaseToString(currentPhase);
+    const std::string timeoutMsg =
+        "phase=" + phaseName + ", phase_ms=" + std::to_string(currentPhaseMs);
     LOGF(LOG_ERROR,
          "[NEW] Stop timeout phase=%{public}s, phase_ms=%{public}lld",
-         PhaseToString(currentPhase), static_cast<long long>(currentPhaseMs));
+         phaseName.c_str(), static_cast<long long>(currentPhaseMs));
+    SetLastErrorInfo("stop_timeout", phaseName, timeoutMsg);
     stopInProgress_.store(false);
     return false;
   }
@@ -429,6 +435,7 @@ bool LibretroEngine::Stop() {
   stopRequested_.store(false);
   stopTimedOut_.store(false);
   stopInProgress_.store(false);
+  ClearLastErrorInfo();
   LOGF(LOG_INFO, " [NEW] Engine Stopped");
   return true;
 }
