@@ -112,7 +112,9 @@ private:
   VulkanApi api_{};
   VkDevice device_ = VK_NULL_HANDLE;
   VkQueue queue_ = VK_NULL_HANDLE;
+  VkQueue present_queue_ = VK_NULL_HANDLE;
   uint32_t queue_family_index_ = 0;
+  uint32_t present_queue_family_index_ = 0;
   VkSwapchainKHR swapchain_ = VK_NULL_HANDLE;
   std::vector<VkImage> swapchain_images_;
   std::vector<VkImageLayout> swapchain_image_layouts_;

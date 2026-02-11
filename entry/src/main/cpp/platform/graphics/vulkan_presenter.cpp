@@ -52,8 +52,13 @@ bool VulkanPresenter::Initialize(const VulkanContext &context) {
   api_ = context.GetApi();
   device_ = context.GetDevice();
   queue_ = context.GetQueue();
+  present_queue_ = context.GetPresentQueue();
   queue_family_index_ = context.GetQueueFamilyIndex();
+  present_queue_family_index_ = context.GetPresentQueueFamilyIndex();
   swapchain_ = context.GetSwapchain();
+  if (present_queue_ == VK_NULL_HANDLE) {
+    present_queue_ = queue_;
+  }
 
   if (!CreateCommandPool()) {
     return false;
@@ -86,7 +91,9 @@ bool VulkanPresenter::Initialize(const VulkanContext &context) {
   }
 
   ready_ = true;
-  LOGF(LOG_INFO, "Vulkan presenter initialized");
+  LOGF(LOG_INFO,
+       "Vulkan presenter initialized: gfx_family=%{public}u present_family=%{public}u",
+       queue_family_index_, present_queue_family_index_);
   return true;
 }
 
@@ -132,14 +139,17 @@ void VulkanPresenter::Destroy() {
   interface_ = retro_hw_render_interface_vulkan{};
   device_ = VK_NULL_HANDLE;
   queue_ = VK_NULL_HANDLE;
+  present_queue_ = VK_NULL_HANDLE;
   queue_family_index_ = 0;
+  present_queue_family_index_ = 0;
   swapchain_ = VK_NULL_HANDLE;
   ready_ = false;
 }
 
 bool VulkanPresenter::Present() {
   if (!ready_ || device_ == VK_NULL_HANDLE || !api_.queue_submit ||
-      !api_.queue_present_khr || swapchain_ == VK_NULL_HANDLE) {
+      !api_.queue_present_khr || swapchain_ == VK_NULL_HANDLE ||
+      queue_ == VK_NULL_HANDLE || present_queue_ == VK_NULL_HANDLE) {
     return false;
   }
   const uint32_t index = sync_index_.load();
@@ -344,15 +354,17 @@ void VulkanPresenter::WaitSyncIndex() {
     return;
   }
   
-  // Wait for the fence to ensure the GPU has finished with this frame's resources
-  // before the core starts reusing them.
+  // wait_sync_index must only return after this frame is fully retired on GPU.
+  // Returning on timeout breaks the synchronization contract with the core.
   if (api_.wait_for_fences) {
-    VkResult res = api_.wait_for_fences(device_, 1, &state->submit_fence, VK_TRUE,
-                                        1000000000); // 1s timeout
-    if (res == VK_TIMEOUT) {
-        LOGF(LOG_ERROR, "WaitSyncIndex: vkWaitForFences timed out (1s) - GPU hang?");
+    const VkResult res = api_.wait_for_fences(device_, 1, &state->submit_fence,
+                                              VK_TRUE, UINT64_MAX);
+    if (res == VK_ERROR_DEVICE_LOST) {
+      LOGF(LOG_ERROR, "WaitSyncIndex: vkWaitForFences device lost: %{public}d",
+           static_cast<int32_t>(res));
     } else if (res != VK_SUCCESS) {
-        LOGF(LOG_WARN, "WaitSyncIndex: vkWaitForFences failed: %d", res);
+      LOGF(LOG_WARN, "WaitSyncIndex: vkWaitForFences failed: %{public}d",
+           static_cast<int32_t>(res));
     }
   }
 }
@@ -484,7 +496,7 @@ bool VulkanPresenter::SubmitFrame(FrameState &state, uint32_t image_index) {
   present.pSwapchains = &swapchain_;
   present.pImageIndices = &image_index;
 
-  const VkResult present_res = api_.queue_present_khr(queue_, &present);
+  const VkResult present_res = api_.queue_present_khr(present_queue_, &present);
   if (present_res == VK_ERROR_OUT_OF_DATE_KHR ||
       present_res == VK_SUBOPTIMAL_KHR) {
     if (ShouldLog(present_out_of_date_count_, 3, 60)) {
