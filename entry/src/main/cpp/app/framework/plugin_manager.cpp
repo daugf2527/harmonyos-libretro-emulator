@@ -35,14 +35,79 @@
 #include "common/log_prefix.h"
 
 namespace {
-std::atomic<bool> &NewArchMouseDown() {
-  static std::atomic<bool> *v = new std::atomic<bool>(false);
-  return *v;
+struct NewArchPointerState {
+  bool mouseDown = false;
+  bool hasFocus = false;
+};
+
+std::mutex &NewArchPointerStateMutex() {
+  static std::mutex *m = new std::mutex();
+  return *m;
 }
 
-std::atomic<bool> &NewArchHasFocus() {
-  static std::atomic<bool> *v = new std::atomic<bool>(false);
-  return *v;
+std::unordered_map<std::string, NewArchPointerState> &NewArchPointerStateById() {
+  static std::unordered_map<std::string, NewArchPointerState> *m =
+      new std::unordered_map<std::string, NewArchPointerState>();
+  return *m;
+}
+
+void SetNewArchMouseDown(const std::string &xId, bool down) {
+  if (xId.empty()) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(NewArchPointerStateMutex());
+  NewArchPointerStateById()[xId].mouseDown = down;
+}
+
+bool GetNewArchMouseDown(const std::string &xId) {
+  if (xId.empty()) {
+    return false;
+  }
+  std::lock_guard<std::mutex> lock(NewArchPointerStateMutex());
+  auto &states = NewArchPointerStateById();
+  auto it = states.find(xId);
+  return it != states.end() ? it->second.mouseDown : false;
+}
+
+void SetNewArchHasFocus(const std::string &xId, bool focus) {
+  if (xId.empty()) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(NewArchPointerStateMutex());
+  NewArchPointerStateById()[xId].hasFocus = focus;
+}
+
+bool AnyNewArchMouseDown() {
+  std::lock_guard<std::mutex> lock(NewArchPointerStateMutex());
+  for (const auto &kv : NewArchPointerStateById()) {
+    if (kv.second.mouseDown) {
+      return true;
+    }
+  }
+  return false;
+}
+
+bool AnyNewArchHasFocus() {
+  std::lock_guard<std::mutex> lock(NewArchPointerStateMutex());
+  for (const auto &kv : NewArchPointerStateById()) {
+    if (kv.second.hasFocus) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void ClearNewArchPointerState(const std::string &xId) {
+  if (xId.empty()) {
+    return;
+  }
+  std::lock_guard<std::mutex> lock(NewArchPointerStateMutex());
+  NewArchPointerStateById().erase(xId);
+}
+
+void ClearAllNewArchPointerStates() {
+  std::lock_guard<std::mutex> lock(NewArchPointerStateMutex());
+  NewArchPointerStateById().clear();
 }
 
 std::string GetNewArchXComponentId(OH_NativeXComponent *component) {
@@ -375,6 +440,7 @@ PluginManager::~PluginManager() {
     }
     map.clear();
   }
+  ClearAllNewArchPointerStates();
 }
 
 void PluginManager::Export(napi_env env, napi_value exports) {
@@ -497,6 +563,7 @@ void PluginManager::Export(napi_env env, napi_value exports) {
         if (storedWindow) {
           OH_NativeWindow_NativeObjectUnreference(storedWindow);
         }
+        ClearNewArchPointerState(xId);
       };
       callback.DispatchTouchEvent = [](OH_NativeXComponent *component,
                                        void *window) {
@@ -600,23 +667,23 @@ void PluginManager::Export(napi_env env, napi_value exports) {
 
         if (mouseEvent.action == OH_NATIVEXCOMPONENT_MOUSE_PRESS &&
             (mouseEvent.button & OH_NATIVEXCOMPONENT_LEFT_BUTTON)) {
-          NewArchMouseDown().store(true);
+          SetNewArchMouseDown(xId, true);
         } else if (mouseEvent.action == OH_NATIVEXCOMPONENT_MOUSE_RELEASE &&
                    (mouseEvent.button & OH_NATIVEXCOMPONENT_LEFT_BUTTON)) {
-          NewArchMouseDown().store(false);
+          SetNewArchMouseDown(xId, false);
         } else if (mouseEvent.action == OH_NATIVEXCOMPONENT_MOUSE_CANCEL) {
-          NewArchMouseDown().store(false);
+          SetNewArchMouseDown(xId, false);
         }
 
-        const bool pressed = NewArchMouseDown().load();
+        const bool pressed = GetNewArchMouseDown(xId);
         (void)NormalizeAndSendPointer(component, window, port, mouseEvent.x,
                                       mouseEvent.y, pressed);
       };
       mouseCallback.DispatchHoverEvent = [](OH_NativeXComponent *component,
                                             bool isHover) {
-        (void)component;
+        const std::string xId = GetNewArchXComponentId(component);
         if (!isHover) {
-          NewArchMouseDown().store(false);
+          SetNewArchMouseDown(xId, false);
         }
       };
 
@@ -630,9 +697,9 @@ void PluginManager::Export(napi_env env, napi_value exports) {
 
       int32_t focusRet = OH_NativeXComponent_RegisterFocusEventCallback(
           nativeXComponent, [](OH_NativeXComponent *component, void *window) {
-            (void)component;
             (void)window;
-            NewArchHasFocus().store(true);
+            const std::string xId = GetNewArchXComponentId(component);
+            SetNewArchHasFocus(xId, true);
           });
       if (focusRet != OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
         LOGF(LOG_WARN,
@@ -642,10 +709,10 @@ void PluginManager::Export(napi_env env, napi_value exports) {
 
       int32_t blurRet = OH_NativeXComponent_RegisterBlurEventCallback(
           nativeXComponent, [](OH_NativeXComponent *component, void *window) {
-            (void)component;
             (void)window;
-            NewArchHasFocus().store(false);
-            NewArchMouseDown().store(false);
+            const std::string xId = GetNewArchXComponentId(component);
+            SetNewArchHasFocus(xId, false);
+            SetNewArchMouseDown(xId, false);
             const std::string deviceId = BuildMouseDeviceId();
             int port = 0;
             if (ResolvePortForDevice(deviceId, libretro::InputSourceType::Mouse,
@@ -717,8 +784,8 @@ bool PluginManager::GetNewArchInputStats(NewArchInputStats &out) const {
   out.touchCount = TouchEventCount().load();
   out.mouseCount = MouseEventCount().load();
   out.keyCount = KeyEventCount().load();
-  out.hasFocus = NewArchHasFocus().load();
-  out.mouseDown = NewArchMouseDown().load();
+  out.hasFocus = AnyNewArchHasFocus();
+  out.mouseDown = AnyNewArchMouseDown();
   out.lastTouchType = LastTouchType().load();
   out.lastMouseAction = LastMouseAction().load();
   out.lastKeyAction = LastKeyAction().load();
