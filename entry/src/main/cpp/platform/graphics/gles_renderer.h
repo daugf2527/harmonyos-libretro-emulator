@@ -149,6 +149,7 @@ private:
   size_t pbo_timing_log_count_ = 0;
   size_t pbo_tex_timing_log_count_ = 0;
   size_t swap_timing_log_count_ = 0;
+  int swap_interval_ = 1;
 
   // XEngine State
   bool xengine_supported_ = false;

@@ -74,6 +74,7 @@ export const refactoredSetAudioSyncMode: (mode: number) => boolean; // 0=NonBloc
 
 // Video Config
 export const refactoredSetScalingMode: (mode: number) => boolean; // 0=Hardware, 1=Software, 2=GLES
+export const refactoredSetSwapInterval: (interval: number) => boolean; // 0=Disable VSync, 1=Enable VSync
 export const refactoredSetSoftwareMaxResolution: (maxWidth: number, maxHeight: number) => boolean;
 export const refactoredSetAIUpscale: (enabled: boolean) => boolean;
 export const refactoredSetHwRenderAllowed: (enabled: boolean) => boolean;

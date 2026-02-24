@@ -466,7 +466,7 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   ring_buffer_ = std::make_unique<RingBuffer>(buffer_capacity_samples);
 
   // 设定最小缓冲帧数 (100ms)。
-  // 移动端/模拟器回调抖动较大时，100ms 比 64ms 更稳，能显著降低掉帧爆音。
+  // 120ms 在部分场景会抬高低水位阈值，诱发过度跳帧；回退到 100ms 平衡延迟与稳定性。
   default_min_buffer_frames_.store(output_sample_rate_ / 10);
   min_buffer_frames_.store(default_min_buffer_frames_.load());
   minimum_latency_ms_.store(0);

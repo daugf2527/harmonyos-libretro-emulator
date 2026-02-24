@@ -1761,6 +1761,24 @@ static napi_value SetScalingMode(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+static napi_value SetSwapInterval(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[1];
+  if (!GetArgs(env, info, 1, 1, args, &argc, "SetSwapInterval")) {
+    return MakeBool(env, false);
+  }
+
+  int32_t interval = 1;
+  if (!GetInt32Arg(env, args[0], interval, "SetSwapInterval", "interval")) {
+    return MakeBool(env, false);
+  }
+
+  GetEngine()->SetSwapInterval(static_cast<int>(interval));
+  return MakeBool(env, true);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value SetSoftwareMaxResolution(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
@@ -1983,6 +2001,8 @@ void RegisterLibretroRefactoredNapi(napi_env env, napi_value exports) {
       // Video Config
       {"refactoredSetScalingMode", nullptr, SetScalingMode, nullptr, nullptr,
        nullptr, napi_default, nullptr},
+      {"refactoredSetSwapInterval", nullptr, SetSwapInterval, nullptr, nullptr,
+       nullptr, napi_default, nullptr},
       {"refactoredSetSoftwareMaxResolution", nullptr, SetSoftwareMaxResolution, nullptr, nullptr,
        nullptr, napi_default, nullptr},
       {"refactoredSetAIUpscale", nullptr, SetAIUpscale, nullptr, nullptr,
@@ -2050,5 +2070,5 @@ void RegisterLibretroRefactoredNapi(napi_env env, napi_value exports) {
        nullptr, napi_default, nullptr},
   };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
-  LOGF(LOG_INFO, " [NEW] LibretroRefactored NAPI registered (41 functions)");
+  LOGF(LOG_INFO, " [NEW] LibretroRefactored NAPI registered (42 functions)");
 }

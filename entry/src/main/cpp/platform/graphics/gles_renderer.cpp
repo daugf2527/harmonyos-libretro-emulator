@@ -22,6 +22,21 @@
 
 namespace libretro {
 
+namespace {
+#if defined(__x86_64__) || defined(__i386__)
+constexpr int kDefaultSwapInterval = 0;
+#else
+constexpr int kDefaultSwapInterval = 1;
+#endif
+
+constexpr size_t kDiagLogBurst = 3;
+constexpr size_t kDiagLogInterval = 600;
+
+int ClampSwapInterval(int interval) {
+  return interval <= 0 ? 0 : 1;
+}
+} // namespace
+
 unsigned GLESRenderer::BeginUploadScratch() {
   const unsigned ringSize = static_cast<unsigned>(upload_scratch_ring_.size());
   if (ringSize == 0) {
@@ -30,7 +45,7 @@ unsigned GLESRenderer::BeginUploadScratch() {
 
   auto ShouldLog = [](size_t &count) -> bool {
     count++;
-    return count <= 10 || (count % 120) == 0;
+    return count <= kDiagLogBurst || (count % kDiagLogInterval) == 0;
   };
   auto NowNs = []() -> uint64_t {
     struct timespec ts;
@@ -183,7 +198,8 @@ GLESRenderer::GLESRenderer()
     : program_(0, [](GLuint id) { glDeleteProgram(id); }),
       vao_(0, [](GLuint id) { glDeleteVertexArrays(1, &id); }),
       vbo_(0, [](GLuint id) { glDeleteBuffers(1, &id); }),
-      texture_(0, [](GLuint id) { glDeleteTextures(1, &id); }) {}
+      texture_(0, [](GLuint id) { glDeleteTextures(1, &id); }),
+      swap_interval_(kDefaultSwapInterval) {}
 
 GLESRenderer::~GLESRenderer() { Deinit(); }
 
@@ -308,8 +324,8 @@ bool GLESRenderer::RecreateSurface(OHNativeWindow *window) {
     egl_surface_ = EGL_NO_SURFACE;
     return false;
   }
-  // Default VSync on
-  eglSwapInterval(egl_display_, 1);
+  swap_interval_ = ClampSwapInterval(swap_interval_);
+  eglSwapInterval(egl_display_, swap_interval_);
 
   EGLint w = 0, h = 0;
   if (eglQuerySurface(egl_display_, egl_surface_, EGL_WIDTH, &w) &&
@@ -394,10 +410,13 @@ void GLESRenderer::SetXEngineEnabled(bool enabled) {
 // 动态设置 VSync
 void GLESRenderer::SetSwapInterval(int interval) {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
+  swap_interval_ = ClampSwapInterval(interval);
   if (egl_display_ != EGL_NO_DISPLAY && egl_context_ != EGL_NO_CONTEXT) {
-    eglSwapInterval(egl_display_, interval);
+    eglSwapInterval(egl_display_, swap_interval_);
     LOGF(LOG_INFO,
-                 "VSync set to: %{public}d", interval);
+                 "VSync set to: %{public}d", swap_interval_);
+  } else {
+    LOGF(LOG_INFO, "VSync pending apply: %{public}d", swap_interval_);
   }
 }
 
@@ -590,6 +609,10 @@ bool GLESRenderer::CreateEGLContext(OHNativeWindow *window) {
     egl_display_ = EGL_NO_DISPLAY;
     return false;
   }
+
+  swap_interval_ = ClampSwapInterval(swap_interval_);
+  eglSwapInterval(egl_display_, swap_interval_);
+  LOGF(LOG_INFO, "Swap interval initialized: %{public}d", swap_interval_);
 
   {
     EGLint w = 0, h = 0;
@@ -830,14 +853,15 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     GLenum err = glGetError();
     if (err != GL_NO_ERROR) {
       gl_error_log_count_++;
-      if (gl_error_log_count_ <= 5 || (gl_error_log_count_ % 120) == 0) {
+      if (gl_error_log_count_ <= kDiagLogBurst ||
+          (gl_error_log_count_ % kDiagLogInterval) == 0) {
         LOGF(LOG_ERROR,
              "GL error after %{public}s: 0x%{public}x", stage, err);
       }
     } else {
       gl_error_sample_log_count_++;
-      if (gl_error_sample_log_count_ <= 5 ||
-          (gl_error_sample_log_count_ % 120) == 0) {
+      if (gl_error_sample_log_count_ <= kDiagLogBurst ||
+          (gl_error_sample_log_count_ % kDiagLogInterval) == 0) {
         LOGF(LOG_INFO,
              "[GLES_DIAG] GL ok after %{public}s", stage);
       }
@@ -859,9 +883,10 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
   };
   auto ShouldLog = [](size_t &count) -> bool {
     count++;
-    return count <= 5 || (count % 120) == 0;
+    return count <= kDiagLogBurst || (count % kDiagLogInterval) == 0;
   };
-  if (render_stage_log_count_ < 10 || (render_stage_log_count_ % 120) == 0) {
+  if (render_stage_log_count_ < kDiagLogBurst ||
+      (render_stage_log_count_ % kDiagLogInterval) == 0) {
     render_stage_log_count_++;
     LOGF(LOG_INFO,
          "[GLES_DIAG] GLES frame begin: id=%{public}lu dupe=%{public}d size=%{public}ux%{public}u",
@@ -1018,7 +1043,8 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     }
   } else {
     egl_swap_log_count_++;
-    if (egl_swap_log_count_ <= 5 || (egl_swap_log_count_ % 120) == 0) {
+    if (egl_swap_log_count_ <= kDiagLogBurst ||
+        (egl_swap_log_count_ % kDiagLogInterval) == 0) {
       LOGF(LOG_INFO,
            "[GLES_DIAG] eglSwapBuffers ok: frame=%{public}lu", frameId);
     }
@@ -1031,7 +1057,8 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
          static_cast<unsigned>(swapEnd - swapStart));
   }
 
-  if (render_stage_log_count_ < 10 || (render_stage_log_count_ % 120) == 0) {
+  if (render_stage_log_count_ < kDiagLogBurst ||
+      (render_stage_log_count_ % kDiagLogInterval) == 0) {
     render_stage_log_count_++;
     LOGF(LOG_INFO,
          "[GLES_DIAG] GLES frame end: id=%{public}lu", frameId);

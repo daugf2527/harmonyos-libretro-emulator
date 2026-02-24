@@ -198,6 +198,7 @@ public:
 
   // --- 视频配置 ---
   void SetScalingMode(int mode); // 0=Hardware, 1=Software, 2=GLES
+  void SetSwapInterval(int interval); // 0=Disable VSync, 1=Enable VSync
   void SetSoftwareMaxResolution(unsigned maxWidth, unsigned maxHeight);
   void SetAIUpscale(bool enabled);
   void SetHwRenderAllowed(bool allowed);

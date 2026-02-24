@@ -3,6 +3,8 @@
 #include "common/file_security.h"
 #include "common/string_utils.h"
 #include "interfaces/graphics/i_renderer.h"
+#include <algorithm>
+#include <cmath>
 #include <chrono>
 #if defined(__has_include) &&                                                  \
     __has_include("../../platform/resource/rom_loader.h")
@@ -1785,24 +1787,48 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
     return;
   }
 
-  // Auto Frame Skip for Audio Stability
-  // 仅当音频缓冲低于低水位时才跳帧，避免在缓冲仍充足时误触发连续卡顿。
+  // Auto Frame Skip for Stability
+  // 1) 音频极低水位时跳帧，优先保音频连续性
+  // 2) 渲染背压（上一帧渲染明显超预算）时连续跳 1~2 帧，避免 swap 长阻塞拖慢主循环
   auto *audioBridge = AudioBridge::GetInstance();
   if (audioBridge && audioBridge->IsRunning()) {
     const size_t buffered_frames = audioBridge->GetBufferedFrames();
     const size_t min_frames = audioBridge->GetMinBufferFrames();
-    if (min_frames > 0 && buffered_frames < min_frames &&
-        g_engineInstance->skip_frame_counter_ < 2) {
+    const size_t low_water_frames =
+        (min_frames > 0) ? std::max<size_t>(min_frames / 6, 480) : 0;
+    const double target_fps =
+        (g_engineInstance->targetFps_ > 1.0) ? g_engineInstance->targetFps_
+                                             : 60.0;
+    const double target_frame_ms = 1000.0 / target_fps;
+    const int64_t last_render_ms =
+        g_engineInstance->lastVideoRenderMs_.load(std::memory_order_relaxed);
+    const int64_t render_slow_threshold_ms = static_cast<int64_t>(
+        std::max(24.0, std::ceil(target_frame_ms * 1.5)));
+    size_t underruns = 0;
+    size_t overruns = 0;
+    audioBridge->GetBufferStats(underruns, overruns);
+    const bool severe_low =
+        (low_water_frames > 0 && buffered_frames < low_water_frames);
+    const bool render_backpressure =
+        (last_render_ms >= render_slow_threshold_ms);
+    const bool should_skip = severe_low || render_backpressure;
+    const size_t skip_limit = render_backpressure ? 2 : 1;
+
+    if (should_skip && g_engineInstance->skip_frame_counter_ < skip_limit) {
       g_engineInstance->skip_frame_counter_++;
 
       static size_t skipLogCount = 0;
       if (++skipLogCount <= 3 || (skipLogCount % 60) == 0) {
         LOGF(LOG_WARN,
              "[Perf] Auto-skipping frame "
-             "(audio buffer=%{public}zu/%{public}zu frames, "
-             "usage=%{public}.1f%%)",
-             buffered_frames, min_frames,
-             audioBridge->GetBufferUsage() * 100.0f);
+             "(reason=%{public}s, audio=%{public}zu/%{public}zu/%{public}zu, "
+             "render_ms=%{public}lld, threshold_ms=%{public}lld, "
+             "usage=%{public}.1f%%, underruns=%{public}zu, budget=%{public}zu/%{public}zu)",
+             severe_low ? "audio_low" : "render_backpressure", buffered_frames,
+             low_water_frames, min_frames, static_cast<long long>(last_render_ms),
+             static_cast<long long>(render_slow_threshold_ms),
+             audioBridge->GetBufferUsage() * 100.0f, underruns,
+             g_engineInstance->skip_frame_counter_, skip_limit);
       }
 
       {
@@ -1971,7 +1997,10 @@ size_t LibretroEngine::OnAudioSampleBatch(const int16_t *data, size_t frames) {
     batch_count = g_engineInstance->stats_.audioBatchCalls;
   }
 
-  if (batch_count <= 5 || (batch_count % 300) == 0) {
+  static size_t audio_cb_diag_log_count = 0;
+  const bool shouldLogAudioCb =
+      (++audio_cb_diag_log_count <= 3) || (audio_cb_diag_log_count % 1200) == 0;
+  if (shouldLogAudioCb) {
     bool has_signal = false;
     if (data && actualFrames > 0) {
       size_t sample_check = actualFrames * 2;
@@ -2191,6 +2220,14 @@ void LibretroEngine::SetScalingMode(int mode) {
 
   LOGF(LOG_INFO, " [NEW] SetScalingMode: %{public}d (%{public}s)", mode,
        modeStr);
+}
+
+void LibretroEngine::SetSwapInterval(int interval) {
+  const int applied = (interval <= 0) ? 0 : 1;
+  videoPipeline_.SetSwapInterval(applied);
+  LOGF(LOG_INFO,
+       " [NEW] SetSwapInterval: req=%{public}d, applied=%{public}d", interval,
+       applied);
 }
 
 void LibretroEngine::SetSoftwareMaxResolution(unsigned maxWidth,
