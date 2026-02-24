@@ -465,9 +465,9 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   // 使用新的 RingBuffer (传入 Samples)
   ring_buffer_ = std::make_unique<RingBuffer>(buffer_capacity_samples);
 
-  // 设定最小缓冲帧数 (64ms, 约2-4帧视频，优先保证低延迟)
-  // 虽然这可能导致启动瞬间的轻微Underrun，但能显著降低操作延迟
-  default_min_buffer_frames_.store(output_sample_rate_ / 16);
+  // 设定最小缓冲帧数 (100ms)。
+  // 移动端/模拟器回调抖动较大时，100ms 比 64ms 更稳，能显著降低掉帧爆音。
+  default_min_buffer_frames_.store(output_sample_rate_ / 10);
   min_buffer_frames_.store(default_min_buffer_frames_.load());
   minimum_latency_ms_.store(0);
 
@@ -639,6 +639,14 @@ float AudioBridge::GetBufferUsage() const {
   }
 
   return ring_buffer_->GetUsage();
+}
+
+size_t AudioBridge::GetBufferedFrames() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!initialized_ || !ring_buffer_) {
+    return 0;
+  }
+  return ring_buffer_->AvailableRead() / 2;
 }
 
 void AudioBridge::GetBufferStats(size_t &underruns, size_t &overruns) const {

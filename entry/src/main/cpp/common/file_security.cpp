@@ -144,6 +144,7 @@ bool ValidateRomPath(const std::string &romPath) {
   const char *allowedRomDirs[] = {
       "/data/storage/el2/base/haps/entry/files/roms",   // 用户 ROM 目录
       "/data/storage/el2/base/haps/entry/files/system", // 系统目录（ROM 暂存）
+      "/data/storage/el2/base/haps/entry/files/temp_roms", // rawfile 解包临时目录
   };
 
   for (const char *allowedDir : allowedRomDirs) {

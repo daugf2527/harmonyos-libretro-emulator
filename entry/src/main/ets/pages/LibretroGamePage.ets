@@ -58,6 +58,10 @@ interface LibretroNapi {
     resMgr: object,
     dir: string
   ): string[];
+  refactoredGetRawFileListAsync(
+    resMgr: object,
+    dir?: string
+  ): Promise<string[]>;
   refactoredResetStats(): boolean;
   refactoredGetStats(): RawEngineStats;
   refactoredGetInputDebugStats(): InputDebugStats;
@@ -213,6 +217,7 @@ struct LibretroGamePage {
   private pendingStart: boolean = false;
   private switchToken: number = 0;
   private pendingSwitch: PendingSwitch | undefined = undefined;
+  private romListRefreshToken: number = 0;
   private lastStartOrSwitchAtMs: number = 0;
   private readonly startOrSwitchDebounceMs: number = 600;
   // 动态输入源列表
@@ -220,6 +225,12 @@ struct LibretroGamePage {
   
   // 可用核心列表
   private cores: CoreConfig[] = [
+    {
+      id: '2048',
+      name: '2048',
+      soFile: 'lib2048_libretro.so',
+      description: 'Libretro 2048'
+    },
     {
       id: 'gambatte',
       name: 'Gambatte (GB/GBC)',
@@ -403,7 +414,7 @@ struct LibretroGamePage {
   ];
   
   private roms: RomConfig[] = [];
-  private readonly noGameCores: string[] = ['mrboom'];
+  private readonly noGameCores: string[] = ['mrboom', '2048'];
   private readonly coreExtensionRules: CoreExtensionRule[] = [
     { coreId: 'gambatte', extensions: ['gb', 'gbc', 'dmg'] },
     { coreId: 'sameboy', extensions: ['gb', 'gbc'] },
@@ -471,6 +482,7 @@ struct LibretroGamePage {
   }
   
   aboutToDisappear() {
+    this.romListRefreshToken += 1;
     if (this.eventScope) {
       this.eventScope.dispose();
       this.eventScope = undefined;
@@ -810,7 +822,9 @@ struct LibretroGamePage {
     return this.roms.filter(rom => rom.coreId === currentCore.id);
   }
 
-  private refreshRomList() {
+  private async refreshRomList() {
+    const refreshToken = this.romListRefreshToken + 1;
+    this.romListRefreshToken = refreshToken;
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) {
       this.roms = this.buildRomConfigs([]);
@@ -820,11 +834,21 @@ struct LibretroGamePage {
 
     let files: string[] = [];
     try {
-      const rawList: string[] = nativeApi.refactoredGetRawFileList(context.resourceManager, 'roms');
+      const rawList: string[] = await nativeApi.refactoredGetRawFileListAsync(
+        context.resourceManager,
+        'roms'
+      );
+      if (refreshToken !== this.romListRefreshToken) {
+        return;
+      }
       files = rawList.filter(item => typeof item === 'string') as string[];
     } catch (err) {
       const msg = (err as Error).message || String(err);
       LogHelper.error('LibretroGame', 'ROM', `扫描 ROM 列表失败: ${msg}`);
+    }
+
+    if (refreshToken !== this.romListRefreshToken) {
+      return;
     }
 
     this.roms = this.buildRomConfigs(files);
@@ -1852,6 +1876,11 @@ struct LibretroGamePage {
         resMgr,
         filesDir
       );
+      LogHelper.info(
+        'LibretroGame',
+        'Engine',
+        `Resolved ROM path: ${resolved.romPath}, useResMgr=${resolved.useResMgr}`
+      );
       const ok = resolved.useResMgr ?
         await nativeApi.refactoredSwitchGameAsync(
           corePath,
@@ -1935,16 +1964,11 @@ struct LibretroGamePage {
     if (!this.isRawfilePath(romPath)) {
       return { romPath, useResMgr: false };
     }
-    if (this.isCueRawfile(romPath)) {
-      // CUE 需要处理关联文件，暂时保留 native rawfile 读取逻辑
-      return { romPath, useResMgr: true };
-    }
-    const extracted = await this.ensureBundledRomExtracted(
-      resMgr,
-      filesDir,
-      romPath
-    );
-    return { romPath: extracted, useResMgr: false };
+    // 对 rawfile ROM 一律走 native RawfileRomProcessor，避免前端落地路径不一致。
+    // native 侧会按需写入 temp_roms，并返回可用的 fullpath（兼容 need_fullpath core）。
+    void resMgr;
+    void filesDir;
+    return { romPath, useResMgr: true };
   }
 
   private isRawfilePath(path: string): boolean {

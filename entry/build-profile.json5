@@ -8,7 +8,7 @@
       "path": "./src/main/cpp/CMakeLists.txt",
       "arguments": "-DENABLE_GAME2048=OFF",
       "cppFlags": "",
-      "abiFilters": ["arm64-v8a"]  // 只编译 ARM64,不编译 x86_64
+      "abiFilters": ["x86_64"]  // 当前仅编译 x86_64（模拟器）
     }
   },
   "buildOptionSet": [

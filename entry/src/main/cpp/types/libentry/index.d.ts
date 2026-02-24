@@ -45,6 +45,7 @@ export function refactoredSwitchGameAsync(
   token?: number
 ): Promise<boolean>;
 export const refactoredGetRawFileList: (resMgr: object, dir?: string) => Array<string>;
+export const refactoredGetRawFileListAsync: (resMgr: object, dir?: string) => Promise<Array<string>>;
 export const refactoredInitEventBridge: (callback: (data: RefactoredEvent) => void) => boolean;
 export const refactoredSendInput: (port: number, id: number, pressed: boolean) => boolean;
 export const refactoredSendAnalog: (port: number, index: number, id: number, value: number) => boolean;

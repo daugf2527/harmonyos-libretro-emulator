@@ -1786,26 +1786,32 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
   }
 
   // Auto Frame Skip for Audio Stability
-  // 如果音频缓冲区低于 20% 且没有连续跳过超过 3 帧，则主动跳帧以优先保证音频处理
+  // 仅当音频缓冲低于低水位时才跳帧，避免在缓冲仍充足时误触发连续卡顿。
   auto *audioBridge = AudioBridge::GetInstance();
   if (audioBridge && audioBridge->IsRunning()) {
-      float usage = audioBridge->GetBufferUsage();
-      if (usage < 0.2f && g_engineInstance->skip_frame_counter_ < 3) {
-          g_engineInstance->skip_frame_counter_++;
-          
-          static size_t skipLogCount = 0;
-          if (++skipLogCount % 60 == 0) {
-             LOGF(LOG_WARN, "[Perf] Auto-skipping frame (audio usage=%{public}.1f%%)",
-                  usage * 100.0f);
-          }
+    const size_t buffered_frames = audioBridge->GetBufferedFrames();
+    const size_t min_frames = audioBridge->GetMinBufferFrames();
+    if (min_frames > 0 && buffered_frames < min_frames &&
+        g_engineInstance->skip_frame_counter_ < 2) {
+      g_engineInstance->skip_frame_counter_++;
 
-          {
-              std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-              g_engineInstance->stats_.videoDroppedFrames++;
-              g_engineInstance->stats_.videoRefreshCalls++;
-          }
-          return;
+      static size_t skipLogCount = 0;
+      if (++skipLogCount <= 3 || (skipLogCount % 60) == 0) {
+        LOGF(LOG_WARN,
+             "[Perf] Auto-skipping frame "
+             "(audio buffer=%{public}zu/%{public}zu frames, "
+             "usage=%{public}.1f%%)",
+             buffered_frames, min_frames,
+             audioBridge->GetBufferUsage() * 100.0f);
       }
+
+      {
+        std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
+        g_engineInstance->stats_.videoDroppedFrames++;
+        g_engineInstance->stats_.videoRefreshCalls++;
+      }
+      return;
+    }
   }
   g_engineInstance->skip_frame_counter_ = 0;
 

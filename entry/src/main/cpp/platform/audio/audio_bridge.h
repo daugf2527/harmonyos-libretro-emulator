@@ -60,6 +60,8 @@ public:
   bool IsPlaying() const;
 
   float GetBufferUsage() const;
+  size_t GetBufferedFrames() const;
+  size_t GetMinBufferFrames() const { return min_buffer_frames_.load(); }
   void GetBufferStats(size_t &underruns, size_t &overruns) const;
   void ResetBufferStats();
 

@@ -276,10 +276,10 @@ static bool GetArrayBufferArg(napi_env env, napi_value arg, void **data,
   return true;
 }
 
-static void ScanRawDirRecursive(napi_env env, NativeResourceManager *mgr,
-                                const std::string &rootDir,
-                                const std::string &currentSubDir,
-                                napi_value list, int &outIndex) {
+static void CollectRawDirRecursive(NativeResourceManager *mgr,
+                                   const std::string &rootDir,
+                                   const std::string &currentSubDir,
+                                   std::vector<std::string> &outFiles) {
   std::string fullPath = rootDir;
   if (!currentSubDir.empty()) {
     fullPath += "/" + currentSubDir;
@@ -306,16 +306,35 @@ static void ScanRawDirRecursive(napi_env env, NativeResourceManager *mgr,
     if (subDir) {
       // 如果成功打开，说明是目录，递归扫描
       OH_ResourceManager_CloseRawDir(subDir);
-      ScanRawDirRecursive(env, mgr, rootDir, relativePath, list, outIndex);
+      CollectRawDirRecursive(mgr, rootDir, relativePath, outFiles);
     } else {
       // 无法打开为目录，则视为文件
-      napi_value jsName;
-      napi_create_string_utf8(env, relativePath.c_str(), NAPI_AUTO_LENGTH,
-                              &jsName);
-      napi_set_element(env, list, outIndex++, jsName);
+      outFiles.push_back(relativePath);
     }
   }
   OH_ResourceManager_CloseRawDir(rawDir);
+}
+
+static napi_value BuildStringArray(napi_env env,
+                                   const std::vector<std::string> &files) {
+  napi_value list;
+  napi_create_array_with_length(env, files.size(), &list);
+  for (size_t i = 0; i < files.size(); ++i) {
+    napi_value jsName;
+    napi_create_string_utf8(env, files[i].c_str(), NAPI_AUTO_LENGTH, &jsName);
+    napi_set_element(env, list, i, jsName);
+  }
+  return list;
+}
+
+static napi_value MakeResolvedStringArrayPromise(
+    napi_env env, const std::vector<std::string> &files) {
+  napi_deferred deferred;
+  napi_value promise;
+  napi_create_promise(env, &deferred, &promise);
+  napi_value result = BuildStringArray(env, files);
+  napi_resolve_deferred(env, deferred, result);
+  return promise;
 }
 
 static napi_value GetRawFileList(napi_env env, napi_callback_info info) {
@@ -347,15 +366,125 @@ static napi_value GetRawFileList(napi_env env, napi_callback_info info) {
     return empty;
   }
 
-  napi_value list;
-  napi_create_array(env, &list);
-  int outIndex = 0;
-
-  // 使用递归扫描替代原来的单层扫描
-  ScanRawDirRecursive(env, mgr, dir, "", list, outIndex);
-
+  std::vector<std::string> files;
+  CollectRawDirRecursive(mgr, dir, "", files);
+  napi_value list = BuildStringArray(env, files);
   OH_ResourceManager_ReleaseNativeResourceManager(mgr);
   return list;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+struct RawFileListAsyncContext {
+  napi_env env = nullptr;
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  NativeResourceManager *mgr = nullptr;
+  std::string dir;
+  std::vector<std::string> files;
+};
+
+static void ExecuteGetRawFileListAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<RawFileListAsyncContext *>(data);
+  if (!ctx || !ctx->mgr) {
+    return;
+  }
+  CollectRawDirRecursive(ctx->mgr, ctx->dir, "", ctx->files);
+}
+
+static void CompleteGetRawFileListAsync(napi_env env, napi_status status,
+                                        void *data) {
+  auto *ctx = static_cast<RawFileListAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status != napi_ok) {
+    LOGF(LOG_ERROR,
+         "[NEW] GetRawFileListAsync work failed: status=%{public}d",
+         static_cast<int>(status));
+    ctx->files.clear();
+  }
+
+  napi_value result = BuildStringArray(env, ctx->files);
+  napi_resolve_deferred(env, ctx->deferred, result);
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  if (ctx->mgr) {
+    OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
+    ctx->mgr = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[2];
+  if (!GetArgs(env, info, 1, 2, args, &argc, "GetRawFileListAsync")) {
+    return MakeResolvedStringArrayPromise(env, {});
+  }
+
+  char dir[256] = "roms";
+  if (argc >= 2) {
+    if (!GetStringArg(env, args[1], dir, sizeof(dir), "GetRawFileListAsync",
+                      "dir")) {
+      return MakeResolvedStringArrayPromise(env, {});
+    }
+  }
+
+  NativeResourceManager *mgr =
+      OH_ResourceManager_InitNativeResourceManager(env, args[0]);
+  if (!mgr) {
+    LOGF(LOG_ERROR, "[NEW] GetRawFileListAsync: init resource manager failed");
+    return MakeResolvedStringArrayPromise(env, {});
+  }
+
+  auto *ctx = new RawFileListAsyncContext();
+  ctx->env = env;
+  ctx->mgr = mgr;
+  ctx->dir = dir;
+
+  napi_value promise;
+  napi_create_promise(env, &ctx->deferred, &promise);
+
+  napi_value resourceName;
+  napi_create_string_utf8(env, "GetRawFileListAsync", NAPI_AUTO_LENGTH,
+                          &resourceName);
+  napi_status createStatus =
+      napi_create_async_work(env, nullptr, resourceName,
+                             ExecuteGetRawFileListAsync,
+                             CompleteGetRawFileListAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    LOGF(LOG_ERROR, "[NEW] GetRawFileListAsync create work failed");
+    napi_value empty = BuildStringArray(env, {});
+    napi_resolve_deferred(env, ctx->deferred, empty);
+    if (ctx->mgr) {
+      OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
+      ctx->mgr = nullptr;
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] GetRawFileListAsync queue work failed");
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    napi_value empty = BuildStringArray(env, {});
+    napi_resolve_deferred(env, ctx->deferred, empty);
+    if (ctx->mgr) {
+      OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
+      ctx->mgr = nullptr;
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -1819,6 +1948,8 @@ void RegisterLibretroRefactoredNapi(napi_env env, napi_value exports) {
        napi_default, nullptr},
       {"refactoredGetRawFileList", nullptr, GetRawFileList, nullptr, nullptr,
        nullptr, napi_default, nullptr},
+      {"refactoredGetRawFileListAsync", nullptr, GetRawFileListAsync, nullptr, nullptr,
+       nullptr, napi_default, nullptr},
       {"refactoredInitEventBridge", nullptr, InitEventBridge, nullptr, nullptr,
        nullptr, napi_default, nullptr},
       {"refactoredSendInput", nullptr, SendInput, nullptr, nullptr, nullptr,
@@ -1919,5 +2050,5 @@ void RegisterLibretroRefactoredNapi(napi_env env, napi_value exports) {
        nullptr, napi_default, nullptr},
   };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
-  LOGF(LOG_INFO, " [NEW] LibretroRefactored NAPI registered (40 functions)");
+  LOGF(LOG_INFO, " [NEW] LibretroRefactored NAPI registered (41 functions)");
 }
