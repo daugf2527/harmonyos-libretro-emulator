@@ -74,6 +74,23 @@ LibretroEngine *GetEngineInstanceSnapshot() {
   return g_engineInstance.load(std::memory_order_acquire);
 }
 
+const char *SurfaceStateToString(int state) {
+  switch (state) {
+  case 0:
+    return "uninitialized";
+  case 1:
+    return "created";
+  case 2:
+    return "valid";
+  case 3:
+    return "paused";
+  case 4:
+    return "destroyed";
+  default:
+    return "unknown";
+  }
+}
+
 class EngineRendererAdapter : public interfaces::IRenderer {
 public:
   explicit EngineRendererAdapter(LibretroEngine *engine) : engine_(engine) {}
@@ -368,24 +385,31 @@ bool LibretroEngine::Start() {
   {
     std::lock_guard<std::mutex> lock(windowMutex_);
     windowSnapshot = window_;
-    if (windowSnapshot) {
-      OH_NativeWindow_NativeObjectReference(windowSnapshot);
-    }
   }
   if (windowSnapshot) {
+    uint64_t generation = surface_generation_.load(std::memory_order_acquire);
+    if (generation == 0) {
+      generation =
+          surface_generation_.fetch_add(1, std::memory_order_acq_rel) + 1;
+    }
+    if (surface_session_id_.load(std::memory_order_acquire) == 0) {
+      surface_session_id_.store(1, std::memory_order_release);
+    }
     if (!messageQueue_.Push(EngineMessage::MakeWindowMessage(
-            MessageType::WindowCreated, windowSnapshot))) {
+            MessageType::WindowCreated, windowSnapshot, false, generation))) {
       LOGF(LOG_WARN, "[NEW] WindowCreated dropped: message queue closed");
     }
     const int cachedW = last_window_width_.load();
     const int cachedH = last_window_height_.load();
+    surface_state_.store((cachedW > 0 && cachedH > 0) ? SurfaceState::VALID
+                                                      : SurfaceState::CREATED,
+                         std::memory_order_release);
     if (cachedW > 0 && cachedH > 0) {
       if (!messageQueue_.Push(
               EngineMessage::MakeWindowResizeMessage(cachedW, cachedH))) {
         LOGF(LOG_WARN, "[NEW] WindowResized dropped: message queue closed");
       }
     }
-    OH_NativeWindow_NativeObjectUnreference(windowSnapshot);
   }
   return true;
 }
@@ -530,9 +554,14 @@ void LibretroEngine::Reset() {
 
   videoPipeline_.ClearFrameCache();
   videoPipeline_.ForceReconfiguration();
+  frameBufferPool_.Clear();
   windowMessageDropLogCount_ = 0;
   windowResizeDropLogCount_ = 0;
   surfaceInvalidDropLogCount_ = 0;
+  surface_state_.store(SurfaceState::UNINITIALIZED, std::memory_order_release);
+  surface_session_id_.store(0, std::memory_order_release);
+  surface_generation_.store(0, std::memory_order_release);
+  lastAudioStatusEmitUs_.store(0, std::memory_order_release);
 
   // 6. 重置输入快照
   // 6. 重置输入快照
@@ -621,19 +650,32 @@ void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
        xcomponentId.c_str(), window, forceRebind ? 1 : 0);
 
   bool changed = false;
+  uint64_t generation = 0;
+  bool bumpSession = false;
+  bool generationBumped = false;
   {
     std::lock_guard<std::mutex> lock(windowMutex_);
     if (current_xcomponent_id_ != xcomponentId || window_ != window) {
       changed = true;
-      if (window_) {
-        OH_NativeWindow_NativeObjectUnreference(window_);
-      }
       window_ = window;
       current_xcomponent_id_ = xcomponentId;
-      if (window_) {
-        OH_NativeWindow_NativeObjectReference(window_);
-      }
+      bumpSession = true;
     }
+
+    const bool bumpGeneration = changed || (forceRebind && window != nullptr);
+    if (bumpGeneration) {
+      generation = surface_generation_.fetch_add(1, std::memory_order_acq_rel) + 1;
+      bumpSession = true;
+      generationBumped = true;
+    } else {
+      generation = surface_generation_.load(std::memory_order_acquire);
+    }
+  }
+  if (bumpSession) {
+    surface_session_id_.fetch_add(1, std::memory_order_acq_rel);
+  }
+  if (generationBumped && renderThread_) {
+    renderThread_->InvalidateFrameQueueForGeneration(generation);
   }
 
   if (changed) {
@@ -641,15 +683,23 @@ void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
     last_window_height_.store(0);
   }
 
-  surface_state_.store(window ? SurfaceState::CREATED
-                              : SurfaceState::DESTROYED);
+  if (!window) {
+    surface_state_.store(SurfaceState::DESTROYED, std::memory_order_release);
+  } else {
+    const int cachedW = last_window_width_.load(std::memory_order_acquire);
+    const int cachedH = last_window_height_.load(std::memory_order_acquire);
+    const SurfaceState next = (cachedW > 0 && cachedH > 0)
+                                  ? SurfaceState::VALID
+                                  : SurfaceState::CREATED;
+    surface_state_.store(next, std::memory_order_release);
+  }
 
-  // 句柄变化时发送 Created/Destroyed；句柄不变但 SurfaceChanged 时发送 Rebind。
-  const bool needRebindMessage = (!changed && forceRebind && window != nullptr);
-  if (changed) {
+  // 统一窗口事件：由 generation 显式驱动重绑，不再发送隐式 WindowRebind。
+  const bool needWindowMessage = changed || (forceRebind && window != nullptr);
+  if (needWindowMessage) {
     if (!messageQueue_.Push(EngineMessage::MakeWindowMessage(
             window ? MessageType::WindowCreated : MessageType::WindowDestroyed,
-            window))) {
+            window, false, generation))) {
       windowMessageDropLogCount_++;
       if (windowMessageDropLogCount_ <= 5 ||
           (windowMessageDropLogCount_ % 60) == 0) {
@@ -662,30 +712,9 @@ void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
              cachedH);
       }
     }
-  } else if (needRebindMessage) {
-    if (!messageQueue_.Push(EngineMessage::MakeWindowRebindMessage(window))) {
-      windowMessageDropLogCount_++;
-      if (windowMessageDropLogCount_ <= 5 ||
-          (windowMessageDropLogCount_ % 60) == 0) {
-        const int cachedW = last_window_width_.load();
-        const int cachedH = last_window_height_.load();
-        LOGF(LOG_WARN,
-             "[NEW] Window rebind dropped: queue closed (running=%{public}d, "
-             "state=%{public}d, cached=%{public}dx%{public}d)",
-             running_.load() ? 1 : 0, static_cast<int>(state_.load()), cachedW,
-             cachedH);
-      }
-    }
   }
 
-  if (window) {
-    // 窗口参数变更/系统重置配置时，强制重置 VideoPipeline 配置
-    // （即使 window 指针未变，也需要重新打 opt/重建 EGLSurface 等）
-    videoPipeline_.ForceReconfiguration();
-  } else {
-    // 窗口销毁时，不要在 UI 线程直接 Reset，防止 EGL 线程冲突
-    // 而是依赖 WindowDestroyed 消息在 GameLoop 中处理
-  }
+  // NativeWindow 生命周期只通过消息交给引擎线程/渲染线程处理。
 }
 
 void LibretroEngine::ClearNativeWindowIfMatch(const std::string &xcomponentId,
@@ -723,10 +752,41 @@ void LibretroEngine::OnNativeWindowResized(const std::string &xcomponentId,
       last_window_height_.store(height);
     }
   }
-  if (width > 0 && height > 0 && hasWindow) {
+  if (hasWindow) {
     // 只有在窗口有有效尺寸后，才允许进入渲染路径。
-    // 避免 SurfaceCreated 之后但尺寸未就绪时触发渲染导致的试探/异常。
-    surface_state_.store(SurfaceState::VALID);
+    // 无效尺寸（最小化/小窗过渡）进入 PAUSED，严格禁止提交 buffer。
+    const SurfaceState previous = surface_state_.load(std::memory_order_acquire);
+    if (width > 0 && height > 0) {
+      surface_state_.store(SurfaceState::VALID, std::memory_order_release);
+      if (previous != SurfaceState::VALID) {
+        const uint64_t generation =
+            surface_generation_.fetch_add(1, std::memory_order_acq_rel) + 1;
+        surface_session_id_.fetch_add(1, std::memory_order_acq_rel);
+        if (renderThread_) {
+          renderThread_->InvalidateFrameQueueForGeneration(generation);
+        }
+        OHNativeWindow *windowSnapshot = nullptr;
+        {
+          std::lock_guard<std::mutex> lock(windowMutex_);
+          windowSnapshot = window_;
+        }
+        if (windowSnapshot &&
+            !messageQueue_.Push(
+                EngineMessage::MakeWindowMessage(MessageType::WindowCreated,
+                                                 windowSnapshot, false,
+                                                 generation))) {
+          windowResizeDropLogCount_++;
+          if (windowResizeDropLogCount_ <= 5 ||
+              (windowResizeDropLogCount_ % 60) == 0) {
+            LOGF(LOG_WARN,
+                 "[NEW] WindowCreated on resize recovery dropped: gen=%{public}llu",
+                 static_cast<unsigned long long>(generation));
+          }
+        }
+      }
+    } else {
+      surface_state_.store(SurfaceState::PAUSED, std::memory_order_release);
+    }
   }
   if (hasWindow) {
     // 由引擎线程处理 Resize，避免 UI 线程触碰 EGL/GL。
@@ -1006,22 +1066,13 @@ void LibretroEngine::SetRenderThreadEnabled(bool enabled) {
     return;
   }
 
-  if (running_.load(std::memory_order_acquire)) {
+  if (!enabled) {
     LOGF(LOG_WARN,
-         "SetRenderThreadEnabled ignored while running: "
-         "current=%{public}d request=%{public}d",
-         current ? 1 : 0, enabled ? 1 : 0);
+         "SetRenderThreadEnabled(false) ignored: RenderThread is mandatory");
     return;
   }
-
-  render_thread_enabled_.store(enabled, std::memory_order_release);
-
-  if (renderThread_ && !enabled) {
-    renderThread_->SetEnabled(false);
-  }
-
-  LOGF(LOG_INFO, "Render thread enabled set to: %{public}d",
-       enabled ? 1 : 0);
+  // Keep API compatibility: render thread is always enabled in unified pipeline.
+  render_thread_enabled_.store(true, std::memory_order_release);
 }
 
 void LibretroEngine::SetNativeVSyncEnabled(bool enabled) {
@@ -1177,10 +1228,27 @@ void LibretroEngine::GameLoop() {
             audioBridge->ResetBufferStats();
             audioUsage = audioBridge->GetBufferUsage();
           }
+          const auto audioState = audioBridge ? audioBridge->GetRunState()
+                                              : AudioBridge::AudioRunState::INIT;
 
           // 获取视频管线丢帧统计
           size_t videoDrops = videoPipeline_.GetDropCount();
           videoPipeline_.ResetDropCount();
+          const auto renderModeState = videoPipeline_.GetRenderModeState();
+          const auto engineSurfaceState =
+              surface_state_.load(std::memory_order_acquire);
+          WindowSessionSnapshot windowSnapshot{};
+          if (renderThread_) {
+            windowSnapshot = renderThread_->GetWindowSessionSnapshot();
+          }
+          const uint64_t surfaceSessionId =
+              (windowSnapshot.sessionId != 0)
+                  ? windowSnapshot.sessionId
+                  : surface_session_id_.load(std::memory_order_acquire);
+          const uint64_t surfaceGeneration =
+              (windowSnapshot.generation != 0)
+                  ? windowSnapshot.generation
+                  : surface_generation_.load(std::memory_order_acquire);
 
           char fpsJson[256];
           snprintf(fpsJson, sizeof(fpsJson),
@@ -1199,6 +1267,19 @@ void LibretroEngine::GameLoop() {
                currentFps_, (unsigned long long)currentStats.videoDupeFrames,
                (unsigned long long)currentStats.videoNullFrames, videoDrops,
                audioUnderruns, audioOverruns, audioUsage * 100.0f);
+          LOGF(LOG_INFO,
+               " [Snapshot] sid=%{public}llu gen=%{public}llu "
+               "engine_window=%{public}s render_window=%{public}s "
+               "active=%{public}d size=%{public}dx%{public}d "
+               "render=%{public}s audio=%{public}s",
+               static_cast<unsigned long long>(surfaceSessionId),
+               static_cast<unsigned long long>(surfaceGeneration),
+               SurfaceStateToString(static_cast<int>(engineSurfaceState)),
+               WindowSessionStateToString(windowSnapshot.state),
+               windowSnapshot.active ? 1 : 0, windowSnapshot.width,
+               windowSnapshot.height,
+               VideoPipeline::RenderModeStateToString(renderModeState),
+               AudioBridge::AudioRunStateToString(audioState));
 
           eventBridge_.Emit("fps_update", fpsJson, false);
           frameCount_ = 0;
@@ -1229,10 +1310,7 @@ void LibretroEngine::GameLoop() {
     renderThread_->Stop();
   }
 
-  {
-    std::lock_guard<std::mutex> renderLock(renderMutex_);
-    videoPipeline_.DestroyHardwareRenderer(envState_);
-  }
+  // RenderThread::Stop() owns all renderer teardown. Keep engine side stateless.
   videoPipeline_.Reset();
 
   LOGF(LOG_INFO, " [NEW] GameLoop Thread Exit");
@@ -1528,12 +1606,10 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
           runtime.video_height = videoHeight_;
           runtime.video_max_width = videoMaxWidth_;
           runtime.video_max_height = videoMaxHeight_;
-          if (render_thread_enabled_.load(std::memory_order_relaxed) &&
-              renderThread_) {
+          if (renderThread_) {
             renderThread_->SetHwRenderRuntimeInfo(runtime);
           } else {
-            std::lock_guard<std::mutex> renderLock(renderMutex_);
-            videoPipeline_.OnHardwareGeometryChanged(envState_, runtime);
+            LOGF(LOG_ERROR, "AV runtime update ignored: render thread unavailable");
           }
         }
         // Sanity Check: 音频采样率保护
@@ -1617,108 +1693,74 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
   case MessageType::WindowRebind:
     if (++windowEventLogCount_ % 30 == 0) {
       LOGF(LOG_INFO, "[NEW] Message: %{public}s",
-           msg.type == MessageType::WindowRebind ? "WindowRebind"
+           msg.type == MessageType::WindowRebind ? "WindowRebind(legacy)"
                                                  : "WindowCreated");
     }
     {
-      const bool forceRebind =
-          (msg.type == MessageType::WindowRebind) ||
-          msg.payload.window.force_rebind;
-    if (render_thread_enabled_.load(std::memory_order_relaxed) && renderThread_) {
-      OHNativeWindow *windowSnapshot = nullptr;
-      {
-        std::lock_guard<std::mutex> lock(windowMutex_);
-        windowSnapshot = window_;
-        if (windowSnapshot) {
-          // Keep snapshot alive until render thread retains its own reference.
-          OH_NativeWindow_NativeObjectReference(windowSnapshot);
+      const uint64_t generation = msg.payload.window.generation;
+      const uint64_t latestGeneration =
+          surface_generation_.load(std::memory_order_acquire);
+      if (generation != 0 && generation != latestGeneration) {
+        if (ShouldLog(windowEventLogCount_, 3, 120)) {
+          LOGF(LOG_WARN,
+               "[NEW] Skip stale window message: type=%{public}d gen=%{public}llu latest=%{public}llu",
+               static_cast<int>(msg.type),
+               static_cast<unsigned long long>(generation),
+               static_cast<unsigned long long>(latestGeneration));
         }
+        break;
       }
-      renderThread_->SetWindow(windowSnapshot, forceRebind);
-      if (windowSnapshot) {
-        OH_NativeWindow_NativeObjectUnreference(windowSnapshot);
-      }
-      HwRenderRuntimeInfo runtime{};
-      runtime.video_width = videoWidth_;
-      runtime.video_height = videoHeight_;
-      runtime.video_max_width = videoMaxWidth_;
-      runtime.video_max_height = videoMaxHeight_;
-      renderThread_->SetHwRenderRuntimeInfo(runtime);
-      break;
-    }
-    if (hw_render_enabled_.load()) {
-      std::lock_guard<std::mutex> renderLock(renderMutex_);
-      OHNativeWindow *windowSnapshot = nullptr;
-      {
-        std::lock_guard<std::mutex> lock(windowMutex_);
-        windowSnapshot = window_;
-        if (windowSnapshot) {
-          OH_NativeWindow_NativeObjectReference(windowSnapshot);
+      if (renderThread_) {
+        OHNativeWindow *windowSnapshot = nullptr;
+        {
+          std::lock_guard<std::mutex> lock(windowMutex_);
+          windowSnapshot = window_;
         }
-      }
-      if (windowSnapshot) {
+        renderThread_->SetWindow(windowSnapshot, generation);
         HwRenderRuntimeInfo runtime{};
         runtime.video_width = videoWidth_;
         runtime.video_height = videoHeight_;
         runtime.video_max_width = videoMaxWidth_;
         runtime.video_max_height = videoMaxHeight_;
-        if (forceRebind) {
-          videoPipeline_.Reset();
-        }
-        videoPipeline_.InitializeHardwareRenderer(windowSnapshot, envState_,
-                                                  runtime);
-        OH_NativeWindow_NativeObjectUnreference(windowSnapshot);
-      } else if (forceRebind) {
-        videoPipeline_.Reset();
+        renderThread_->SetHwRenderRuntimeInfo(runtime);
+        break;
       }
-    }
-    break;
+      LOGF(LOG_ERROR, "Window message ignored: render thread unavailable");
+      break;
     }
   case MessageType::WindowResized: {
     const int width = msg.payload.windowSize.width;
     const int height = msg.payload.windowSize.height;
-    videoPipeline_.SetWindowSize(width, height);
-    if (render_thread_enabled_.load(std::memory_order_relaxed) && renderThread_) {
+    if (renderThread_) {
       renderThread_->SetWindowSize(width, height);
       break;
     }
-    if (hw_render_enabled_.load()) {
-      std::lock_guard<std::mutex> renderLock(renderMutex_);
-      OHNativeWindow *windowSnapshot = nullptr;
-      {
-        std::lock_guard<std::mutex> lock(windowMutex_);
-        windowSnapshot = window_;
-        if (windowSnapshot) {
-          OH_NativeWindow_NativeObjectReference(windowSnapshot);
-        }
-      }
-      if (windowSnapshot) {
-        videoPipeline_.OnHardwareWindowResized(windowSnapshot, width, height,
-                                               envState_);
-        OH_NativeWindow_NativeObjectUnreference(windowSnapshot);
-      }
-    }
+    LOGF(LOG_ERROR, "WindowResized ignored: render thread unavailable");
     break;
   }
   case MessageType::WindowDestroyed:
     if (++windowEventLogCount_ % 30 == 0) {
       LOGF(LOG_INFO, "[NEW] Message: WindowDestroyed");
     }
-    if (render_thread_enabled_.load(std::memory_order_relaxed) && renderThread_) {
-      renderThread_->SetWindow(nullptr, false);
+    {
+      const uint64_t generation = msg.payload.window.generation;
+      const uint64_t latestGeneration =
+          surface_generation_.load(std::memory_order_acquire);
+      if (generation != 0 && generation != latestGeneration) {
+        if (ShouldLog(windowEventLogCount_, 3, 120)) {
+          LOGF(LOG_WARN,
+               "[NEW] Skip stale window destroy: gen=%{public}llu latest=%{public}llu",
+               static_cast<unsigned long long>(generation),
+               static_cast<unsigned long long>(latestGeneration));
+        }
+        break;
+      }
+    }
+    if (renderThread_) {
+      renderThread_->SetWindow(nullptr, msg.payload.window.generation);
       break;
     }
-    if (hw_render_enabled_.load() || videoPipeline_.HasHardwareContext()) {
-      std::lock_guard<std::mutex> renderLock(renderMutex_);
-      videoPipeline_.OnHardwareWindowDestroyed(envState_);
-    }
-    // [FIX] Always reset native window state on destruction to prevent reuse issues
-    // even for software cores (which don't use DestroyHardwareRenderer)
-    if (msg.payload.window.window) {
-      VideoPipeline::ResetNativeWindow(msg.payload.window.window);
-    }
-    // [FIX] 在游戏线程清理 VideoPipeline (GLES 资源)
-    videoPipeline_.Reset();
+    LOGF(LOG_ERROR, "WindowDestroyed ignored: render thread unavailable");
     break;
   case MessageType::SyncTask:
     if (msg.payload.syncTask.task) {
@@ -1807,26 +1849,6 @@ void LibretroEngine::ProcessFrame() {
 
   const auto now = std::chrono::steady_clock::now();
 
-  if (envState_.IsHwRenderEnabled() &&
-      envState_.GetHwContextType() == RETRO_HW_CONTEXT_VULKAN) {
-    std::lock_guard<std::mutex> renderLock(renderMutex_);
-    OHNativeWindow *windowSnapshot = nullptr;
-    {
-      std::lock_guard<std::mutex> lock(windowMutex_);
-      windowSnapshot = window_;
-      if (windowSnapshot) {
-        OH_NativeWindow_NativeObjectReference(windowSnapshot);
-      }
-    }
-    videoPipeline_.HandleVulkanAcquire(
-        windowSnapshot, envState_,
-        [this]() { SetPhase(EnginePhase::VULKAN_ACQUIRE); },
-        [this]() { SetPhase(EnginePhase::PROCESS_FRAME); });
-    if (windowSnapshot) {
-      OH_NativeWindow_NativeObjectUnreference(windowSnapshot);
-    }
-  }
-
   // 进入 retro_run 上下文
   envState_.EnterRetroRun();
   if (stopRequested_.load()) {
@@ -1849,6 +1871,9 @@ void LibretroEngine::ProcessFrame() {
   if (auto cb = envState_.GetAudioBufferStatusCallback()) {
     auto *audioBridge = AudioBridge::GetInstance();
     const bool active = (audioBridge && audioBridge->IsRunning());
+    const auto audioState =
+        audioBridge ? audioBridge->GetRunState()
+                    : AudioBridge::AudioRunState::INIT;
     unsigned occupancy = 0;
     bool underrun_likely = false;
     size_t underruns = 0;
@@ -1864,24 +1889,35 @@ void LibretroEngine::ProcessFrame() {
       audioBridge->GetBufferStats(underruns, overruns);
     }
     cb(active, occupancy, underrun_likely);
-    char payload[96];
-    snprintf(payload, sizeof(payload),
-             "{\"active\": %s, \"occupancy\": %u, \"underrun\": %s, "
-             "\"underruns\": %zu, \"overruns\": %zu}",
-             active ? "true" : "false", occupancy,
-             underrun_likely ? "true" : "false", underruns, overruns);
-    eventBridge_.Emit("audio_status", payload, false);
-    if (++audioStatusLogCount_ <= 5 || (audioStatusLogCount_ % 300) == 0) {
-      LOGF(LOG_INFO,
-           "%{public}s AudioStatus: active=%{public}d, occupancy=%{public}u, "
-           "underrun=%{public}d, underruns=%{public}zu, overruns=%{public}zu",
-           kAudioChainPrefix, active ? 1 : 0, occupancy,
-           underrun_likely ? 1 : 0, underruns, overruns);
-    }
-
     const bool underrun_inc = underruns > lastAudioUnderruns_;
     const bool overrun_inc = overruns > lastAudioOverruns_;
     const bool low_buffer = active && occupancy <= 10;
+    const int64_t now_us = NowUs();
+    const int64_t last_emit_us =
+        lastAudioStatusEmitUs_.load(std::memory_order_acquire);
+    const bool emit_status = low_buffer || underrun_inc || overrun_inc ||
+                             (now_us - last_emit_us) >= 200000;
+    char payload[160];
+    snprintf(payload, sizeof(payload),
+             "{\"active\": %s, \"state\": \"%s\", \"occupancy\": %u, "
+             "\"underrun\": %s, \"underruns\": %zu, \"overruns\": %zu}",
+             active ? "true" : "false",
+             AudioBridge::AudioRunStateToString(audioState), occupancy,
+             underrun_likely ? "true" : "false", underruns, overruns);
+    if (emit_status) {
+      lastAudioStatusEmitUs_.store(now_us, std::memory_order_release);
+      eventBridge_.Emit("audio_status", payload, false);
+    }
+    if (emit_status &&
+        (++audioStatusLogCount_ <= 5 || (audioStatusLogCount_ % 300) == 0)) {
+      LOGF(LOG_INFO,
+           "%{public}s AudioStatus: active=%{public}d, state=%{public}s, "
+           "occupancy=%{public}u, underrun=%{public}d, underruns=%{public}zu, "
+           "overruns=%{public}zu",
+           kAudioChainPrefix, active ? 1 : 0,
+           AudioBridge::AudioRunStateToString(audioState), occupancy,
+           underrun_likely ? 1 : 0, underruns, overruns);
+    }
     if ((low_buffer || underrun_inc || overrun_inc) &&
         ShouldLog(audioLowLogCount_, 3, 120)) {
       const int64_t retro_ms =
@@ -2002,11 +2038,12 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
     return;
   }
 
-  if (g_engineInstance->render_thread_enabled_.load(std::memory_order_relaxed) &&
-      g_engineInstance->renderThread_) {
+  if (g_engineInstance->renderThread_) {
     VideoFramePacket packet{};
     packet.frameId =
         ++g_engineInstance->videoFrameSeq_;
+    packet.surfaceGeneration =
+        g_engineInstance->surface_generation_.load(std::memory_order_acquire);
     packet.timestampUs = NowUs();
     packet.width = width;
     packet.height = height;
@@ -2027,8 +2064,14 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
     } else {
       packet.kind = VideoFrameKind::SOFTWARE;
       const size_t bytes = pitch * height;
-      auto storage = std::make_shared<std::vector<uint8_t>>(bytes);
-      if (bytes > 0) {
+      auto storage = g_engineInstance->frameBufferPool_.Acquire(bytes);
+      if (!storage || storage->size() < bytes) {
+        std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
+        g_engineInstance->stats_.videoRefreshCalls++;
+        g_engineInstance->stats_.videoDroppedFrames++;
+        return;
+      }
+      if (bytes > 0 && data) {
         std::memcpy(storage->data(), data, bytes);
       }
       packet.storage = std::move(storage);
@@ -2049,180 +2092,22 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
     return;
   }
 
-  // Auto Frame Skip for Stability
-  // 1) 音频极低水位时跳帧，优先保音频连续性
-  // 2) 渲染背压（上一帧渲染明显超预算）时连续跳 1~2 帧，避免 swap 长阻塞拖慢主循环
-  auto *audioBridge = AudioBridge::GetInstance();
-  if (audioBridge && audioBridge->IsRunning()) {
-    const size_t buffered_frames = audioBridge->GetBufferedFrames();
-    const size_t min_frames = audioBridge->GetMinBufferFrames();
-    const size_t low_water_frames =
-        (min_frames > 0) ? std::max<size_t>(min_frames / 6, 480) : 0;
-    const double target_fps =
-        (g_engineInstance->targetFps_ > 1.0) ? g_engineInstance->targetFps_
-                                             : 60.0;
-    const double target_frame_ms = 1000.0 / target_fps;
-    const int64_t last_render_ms =
-        g_engineInstance->lastVideoRenderMs_.load(std::memory_order_relaxed);
-    const int64_t render_slow_threshold_ms = static_cast<int64_t>(
-        std::max(24.0, std::ceil(target_frame_ms * 1.5)));
-    size_t underruns = 0;
-    size_t overruns = 0;
-    audioBridge->GetBufferStats(underruns, overruns);
-    const bool severe_low =
-        (low_water_frames > 0 && buffered_frames < low_water_frames);
-    const bool render_backpressure =
-        (last_render_ms >= render_slow_threshold_ms);
-    const bool should_skip = severe_low || render_backpressure;
-    const size_t skip_limit = render_backpressure ? 2 : 1;
-
-    if (should_skip && g_engineInstance->skip_frame_counter_ < skip_limit) {
-      g_engineInstance->skip_frame_counter_++;
-
-      static size_t skipLogCount = 0;
-      if (++skipLogCount <= 3 || (skipLogCount % 60) == 0) {
-        LOGF(LOG_WARN,
-             "[Perf] Auto-skipping frame "
-             "(reason=%{public}s, audio=%{public}zu/%{public}zu/%{public}zu, "
-             "render_ms=%{public}lld, threshold_ms=%{public}lld, "
-             "usage=%{public}.1f%%, underruns=%{public}zu, budget=%{public}zu/%{public}zu)",
-             severe_low ? "audio_low" : "render_backpressure", buffered_frames,
-             low_water_frames, min_frames, static_cast<long long>(last_render_ms),
-             static_cast<long long>(render_slow_threshold_ms),
-             audioBridge->GetBufferUsage() * 100.0f, underruns,
-             g_engineInstance->skip_frame_counter_, skip_limit);
-      }
-
-      {
-        std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-        g_engineInstance->stats_.videoDroppedFrames++;
-        g_engineInstance->stats_.videoRefreshCalls++;
-      }
-      return;
-    }
-  }
   g_engineInstance->skip_frame_counter_ = 0;
-
-  const bool nullFrameRequested = (data == nullptr);
-
-  if (g_engineInstance->envState_.IsHwRenderEnabled()) {
-    if (data == RETRO_HW_FRAME_BUFFER_VALID) {
-      if (++g_engineInstance->videoRefreshLogCount_ % 120 == 0) {
-        LOGF(LOG_INFO, " [NEW] OnVideoRefresh (HW): valid framebuffer");
-      }
-      {
-        std::lock_guard<std::mutex> renderLock(g_engineInstance->renderMutex_);
-        g_engineInstance->videoPipeline_.SwapHardwareBuffers(
-            g_engineInstance->envState_);
-      }
-
-      {
-        std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-        g_engineInstance->stats_.videoRefreshCalls++;
-      }
-      return;
-    }
-    if (!data) {
-      if (++g_engineInstance->videoRefreshLogCount_ % 120 == 0) {
-        LOGF(LOG_INFO, " [NEW] OnVideoRefresh (HW): null frame");
-      }
-      {
-        std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-        g_engineInstance->stats_.videoRefreshCalls++;
-        g_engineInstance->stats_.videoNullFrames++;
-      }
-      return;
-    }
+  if (ShouldLog(g_engineInstance->videoRefreshLogCount_, 5, 120)) {
+    LOGF(LOG_ERROR,
+         "Drop frame: render thread unavailable (state=%{public}d, "
+         "hw=%{public}d, frame=%{public}ux%{public}u)",
+         static_cast<int>(g_engineInstance->state_.load()),
+         g_engineInstance->envState_.IsHwRenderEnabled() ? 1 : 0, width,
+         height);
   }
-
-  OHNativeWindow *window = nullptr;
-  {
-    std::lock_guard<std::mutex> lock(g_engineInstance->windowMutex_);
-    window = g_engineInstance->window_;
-    if (window) {
-      OH_NativeWindow_NativeObjectReference(window);
-    }
-  }
-  if (++g_engineInstance->videoRefreshLogCount_ % 300 == 0) {
-    LOGF(LOG_INFO,
-         " [NEW] OnVideoRefresh #%{public}zu: %{public}ux%{public}u "
-         "pitch=%{public}zu",
-         g_engineInstance->videoRefreshLogCount_, width, height, pitch);
-  }
-
-  VideoPipeline::RenderMetrics metrics{};
-  constexpr int64_t kSlowVideoRenderMs = 50;
-  g_engineInstance->SetPhase(EnginePhase::VIDEO_RENDER);
-  const auto renderStart = std::chrono::steady_clock::now();
-  const auto result = g_engineInstance->videoPipeline_.Render(
-      window, data, width, height, pitch, &metrics);
-  const auto renderMs = std::chrono::duration_cast<std::chrono::milliseconds>(
-                            std::chrono::steady_clock::now() - renderStart)
-                            .count();
-  if (g_engineInstance) {
-    g_engineInstance->lastVideoRenderMs_.store(renderMs,
-                                               std::memory_order_relaxed);
-    g_engineInstance->lastVideoRenderResult_.store(static_cast<int>(result),
-                                                   std::memory_order_relaxed);
-    g_engineInstance->lastVideoRenderWidth_.store(width,
-                                                  std::memory_order_relaxed);
-    g_engineInstance->lastVideoRenderHeight_.store(height,
-                                                   std::memory_order_relaxed);
-    g_engineInstance->lastVideoRenderPitch_.store(pitch,
-                                                  std::memory_order_relaxed);
-  }
-  if (renderMs >= kSlowVideoRenderMs &&
-      ShouldLog(g_engineInstance->slowVideoRenderLogCount_, 3, 120)) {
-    LOGF(LOG_WARN,
-         "[Perf] Slow video render: %{public}lld ms (%{public}ux%{public}u, "
-         "pitch=%{public}zu, result=%{public}d)",
-         static_cast<long long>(renderMs), width, height, pitch,
-         static_cast<int>(result));
-  }
-  g_engineInstance->SetPhase(EnginePhase::RETRO_RUN);
-
   {
     std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
     g_engineInstance->stats_.videoRefreshCalls++;
-    if (nullFrameRequested) {
+    if (!data) {
       g_engineInstance->stats_.videoNullFrames++;
     }
-    if (result == VideoPipeline::RenderResult::DUPED) {
-      g_engineInstance->stats_.videoDupeFrames++;
-    }
-    if (result == VideoPipeline::RenderResult::DROPPED) {
-      g_engineInstance->stats_.videoDroppedFrames++;
-    }
-
-    g_engineInstance->stats_.nwRequestBufferCalls +=
-        metrics.nwRequestBufferCalls;
-    g_engineInstance->stats_.nwRequestBufferFailures +=
-        metrics.nwRequestBufferFailures;
-    g_engineInstance->stats_.nwFlushBufferCalls += metrics.nwFlushBufferCalls;
-    g_engineInstance->stats_.nwFlushBufferFailures +=
-        metrics.nwFlushBufferFailures;
-    g_engineInstance->stats_.nwAbortBufferCalls += metrics.nwAbortBufferCalls;
-    g_engineInstance->stats_.nbFromWindowBufferFailures +=
-        metrics.nbFromWindowBufferFailures;
-    g_engineInstance->stats_.nbMapFailures += metrics.nbMapFailures;
-    g_engineInstance->stats_.nbUnmapFailures += metrics.nbUnmapFailures;
-    g_engineInstance->stats_.fenceWaitCalls += metrics.fenceWaitCalls;
-    g_engineInstance->stats_.fenceWaitFailures += metrics.fenceWaitFailures;
-    g_engineInstance->stats_.fenceTimeoutCount += metrics.fenceTimeoutCount;
-
-    if (metrics.frameTimeUs > 0) {
-      if (metrics.frameTimeUs < g_engineInstance->stats_.frameTimeMin) {
-        g_engineInstance->stats_.frameTimeMin = metrics.frameTimeUs;
-      }
-      if (metrics.frameTimeUs > g_engineInstance->stats_.frameTimeMax) {
-        g_engineInstance->stats_.frameTimeMax = metrics.frameTimeUs;
-      }
-      g_engineInstance->stats_.frameTimeSum += metrics.frameTimeUs;
-      g_engineInstance->stats_.frameCount++;
-    }
-  }
-  if (window) {
-    OH_NativeWindow_NativeObjectUnreference(window);
+    g_engineInstance->stats_.videoDroppedFrames++;
   }
 }
 
@@ -2346,39 +2231,35 @@ bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
            g_engineInstance->hw_render_enabled_.load() ? 1 : 0,
            static_cast<int>(cb.context_type), cb.cache_context ? 1 : 0);
     }
-    if (g_engineInstance->hw_render_enabled_.load()) {
-      bool hasWindow = false;
-      {
-        std::lock_guard<std::mutex> lock(g_engineInstance->windowMutex_);
-        hasWindow = (g_engineInstance->window_ != nullptr);
+    OHNativeWindow *windowSnapshot = nullptr;
+    {
+      std::lock_guard<std::mutex> lock(g_engineInstance->windowMutex_);
+      windowSnapshot = g_engineInstance->window_;
+    }
+    uint64_t generation =
+        g_engineInstance->surface_generation_.load(std::memory_order_acquire);
+    if (windowSnapshot) {
+      generation = g_engineInstance->surface_generation_.fetch_add(
+                       1, std::memory_order_acq_rel) +
+                   1;
+      g_engineInstance->surface_session_id_.fetch_add(1,
+                                                      std::memory_order_acq_rel);
+      if (g_engineInstance->renderThread_) {
+        g_engineInstance->renderThread_->InvalidateFrameQueueForGeneration(
+            generation);
       }
-      if (hasWindow) {
-        std::lock_guard<std::mutex> renderLock(g_engineInstance->renderMutex_);
-        OHNativeWindow *windowSnapshot = nullptr;
-        {
-          std::lock_guard<std::mutex> lock(g_engineInstance->windowMutex_);
-          windowSnapshot = g_engineInstance->window_;
-          if (windowSnapshot) {
-            OH_NativeWindow_NativeObjectReference(windowSnapshot);
-          }
-        }
-        if (windowSnapshot) {
-          HwRenderRuntimeInfo runtime{};
-          runtime.video_width = g_engineInstance->videoWidth_;
-          runtime.video_height = g_engineInstance->videoHeight_;
-          runtime.video_max_width = g_engineInstance->videoMaxWidth_;
-          runtime.video_max_height = g_engineInstance->videoMaxHeight_;
-          g_engineInstance->videoPipeline_.InitializeHardwareRenderer(
-              windowSnapshot, g_engineInstance->envState_, runtime);
-          OH_NativeWindow_NativeObjectUnreference(windowSnapshot);
-        }
-      }
+    }
+    HwRenderRuntimeInfo runtime{};
+    runtime.video_width = g_engineInstance->videoWidth_;
+    runtime.video_height = g_engineInstance->videoHeight_;
+    runtime.video_max_width = g_engineInstance->videoMaxWidth_;
+    runtime.video_max_height = g_engineInstance->videoMaxHeight_;
+    if (g_engineInstance->renderThread_) {
+      // HW 渲染开关变更通过 generation 显式驱动窗口重绑，保持串行化。
+      g_engineInstance->renderThread_->SetWindow(windowSnapshot, generation);
+      g_engineInstance->renderThread_->SetHwRenderRuntimeInfo(runtime);
     } else {
-      if (g_engineInstance->videoPipeline_.HasHardwareContext()) {
-        std::lock_guard<std::mutex> renderLock(g_engineInstance->renderMutex_);
-        g_engineInstance->videoPipeline_.DestroyHardwareRenderer(
-            g_engineInstance->envState_);
-      }
+      LOGF(LOG_ERROR, "HW render update ignored: render thread unavailable");
     }
   }
 
@@ -2409,13 +2290,10 @@ bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
       runtime.video_height = g_engineInstance->videoHeight_;
       runtime.video_max_width = g_engineInstance->videoMaxWidth_;
       runtime.video_max_height = g_engineInstance->videoMaxHeight_;
-      if (g_engineInstance->render_thread_enabled_.load(std::memory_order_relaxed) &&
-          g_engineInstance->renderThread_) {
+      if (g_engineInstance->renderThread_) {
         g_engineInstance->renderThread_->SetHwRenderRuntimeInfo(runtime);
       } else {
-        std::lock_guard<std::mutex> renderLock(g_engineInstance->renderMutex_);
-        g_engineInstance->videoPipeline_.OnHardwareGeometryChanged(
-            g_engineInstance->envState_, runtime);
+        LOGF(LOG_ERROR, "Geometry HW update ignored: render thread unavailable");
       }
     }
     char payload[96];
@@ -2482,6 +2360,16 @@ void LibretroEngine::SetScalingMode(int mode) {
     modeStr = "HARDWARE";
     break;
   }
+
+#if defined(__i386__) || defined(__x86_64__)
+  if (sm != VideoPipeline::ScalingMode::GLES_SCALING) {
+    LOGF(LOG_WARN,
+         " [NEW] SetScalingMode override on x86: req=%{public}d (%{public}s) -> GLES",
+         mode, modeStr);
+    sm = VideoPipeline::ScalingMode::GLES_SCALING;
+    modeStr = "GLES";
+  }
+#endif
 
   videoPipeline_.SetScalingMode(sm);
 

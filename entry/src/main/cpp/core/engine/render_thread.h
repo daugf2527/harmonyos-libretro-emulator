@@ -3,6 +3,7 @@
 
 #include "bounded_latest_frame_queue.h"
 #include "video_pipeline.h"
+#include "window_session.h"
 #include "platform/sync/native_vsync_driver.h"
 #include <atomic>
 #include <condition_variable>
@@ -47,6 +48,16 @@ struct RenderThreadStats {
   uint64_t queueDepthMax = 0;
 };
 
+struct WindowSessionSnapshot {
+  uint64_t sessionId = 0;
+  uint64_t generation = 0;
+  WindowSessionState state = WindowSessionState::DETACHED;
+  int width = 0;
+  int height = 0;
+  bool active = false;
+  bool hasWindow = false;
+};
+
 class RenderThread {
 public:
   RenderThread(VideoPipeline &pipeline, EnvState &envState);
@@ -66,7 +77,8 @@ public:
   bool Start();
   void Stop();
 
-  void SetWindow(OHNativeWindow *window, bool forceRebind = false);
+  void SetWindow(OHNativeWindow *window, uint64_t generation = 0);
+  void InvalidateFrameQueueForGeneration(uint64_t generation);
   void SetWindowSize(int width, int height);
   void SetHwRenderRuntimeInfo(const HwRenderRuntimeInfo &runtime);
 
@@ -74,6 +86,7 @@ public:
 
   RenderThreadStats GetStats() const;
   void ResetStats();
+  WindowSessionSnapshot GetWindowSessionSnapshot() const;
 
 private:
   enum class ControlType : uint8_t {
@@ -87,7 +100,7 @@ private:
   struct ControlMessage {
     ControlType type = ControlType::TICK;
     OHNativeWindow *window = nullptr;
-    bool forceRebind = false;
+    uint64_t generation = 0;
     int width = 0;
     int height = 0;
     int64_t timestampUs = 0;
@@ -97,14 +110,16 @@ private:
   void ThreadMain();
   void PushControl(ControlMessage &&message);
   void HandleControl(const ControlMessage &message);
-  void HandleSetWindow(OHNativeWindow *window, bool forceRebind);
+  void HandleSetWindow(OHNativeWindow *window, uint64_t generation);
   void HandleResize(int width, int height);
   void HandleTick();
   void HandleRuntimeChanged(const HwRenderRuntimeInfo &runtime);
+  bool HasPendingLifecycleControl() const;
 
   void StartVSyncIfNeeded();
   void StopVSync();
   void RequestNextVSync();
+  void PublishWindowSessionSnapshot();
 
   void MergeRenderMetrics(const VideoPipeline::RenderMetrics &metrics);
 
@@ -122,7 +137,16 @@ private:
   std::deque<ControlMessage> controlQueue_;
 
   std::thread renderThread_;
-  OHNativeWindow *window_ = nullptr;
+  WindowSession windowSession_{};
+  std::atomic<uint64_t> windowSessionIdSnapshot_{0};
+  std::atomic<uint64_t> windowGenerationSnapshot_{0};
+  std::atomic<int> windowStateSnapshot_{
+      static_cast<int>(WindowSessionState::DETACHED)};
+  std::atomic<int> windowWidthSnapshot_{0};
+  std::atomic<int> windowHeightSnapshot_{0};
+  std::atomic<bool> windowActiveSnapshot_{false};
+  std::atomic<bool> windowHasHandleSnapshot_{false};
+  std::atomic<uint64_t> staleGenerationDropLogCount_{0};
   HwRenderRuntimeInfo hwRuntime_{};
 
   NativeVSyncDriver nativeVsyncDriver_;

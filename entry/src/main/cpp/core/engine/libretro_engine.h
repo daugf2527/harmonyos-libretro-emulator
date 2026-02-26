@@ -17,6 +17,7 @@
 #include "core_state_manager.h"
 #include "engine_messages.h"
 #include "event_bridge.h"
+#include "frame_buffer_pool.h"
 #include "input_manager.h"
 #include "input_port_router.h"
 #include "message_queue.h"
@@ -326,6 +327,7 @@ private:
   // 核心管理
   CoreLoader coreLoader_;
   VideoPipeline videoPipeline_;
+  FrameBufferPool frameBufferPool_{3};
   EnvState envState_; // Libretro 环境状态
   std::atomic<EnginePhase> phase_{EnginePhase::IDLE};
   std::atomic<int64_t> phaseStartUs_{0};
@@ -350,9 +352,12 @@ private:
     UNINITIALIZED,
     CREATED,
     VALID,
+    PAUSED,
     DESTROYED,
   };
   std::atomic<SurfaceState> surface_state_{SurfaceState::UNINITIALIZED};
+  std::atomic<uint64_t> surface_session_id_{0};
+  std::atomic<uint64_t> surface_generation_{0};
   std::atomic<int> last_window_width_{0};
   std::atomic<int> last_window_height_{0};
 
@@ -408,6 +413,7 @@ private:
   std::atomic<unsigned> lastVideoRenderHeight_{0};
   std::atomic<size_t> lastVideoRenderPitch_{0};
   std::atomic<uint64_t> videoFrameSeq_{0};
+  std::atomic<int64_t> lastAudioStatusEmitUs_{0};
   size_t lastAudioUnderruns_{0};
   size_t lastAudioOverruns_{0};
   std::atomic<bool> hw_render_enabled_{false};

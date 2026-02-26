@@ -18,6 +18,7 @@ enum class VideoFrameKind : uint8_t {
 struct VideoFramePacket {
   VideoFrameKind kind = VideoFrameKind::NULL_FRAME;
   uint64_t frameId = 0;
+  uint64_t surfaceGeneration = 0;
   int64_t timestampUs = 0;
   unsigned width = 0;
   unsigned height = 0;

@@ -23,7 +23,9 @@ int64_t NowUs() {
 } // namespace
 
 RenderThread::RenderThread(VideoPipeline &pipeline, EnvState &envState)
-    : videoPipeline_(pipeline), envState_(envState) {}
+    : videoPipeline_(pipeline), envState_(envState) {
+  PublishWindowSessionSnapshot();
+}
 
 RenderThread::~RenderThread() { Stop(); }
 
@@ -88,15 +90,22 @@ void RenderThread::Stop() {
   }
 }
 
-void RenderThread::SetWindow(OHNativeWindow *window, bool forceRebind) {
+void RenderThread::SetWindow(OHNativeWindow *window, uint64_t generation) {
   ControlMessage message;
   message.type = ControlType::SET_WINDOW;
   message.window = window;
-  message.forceRebind = forceRebind;
+  message.generation = generation;
   if (message.window) {
     OH_NativeWindow_NativeObjectReference(message.window);
   }
   PushControl(std::move(message));
+}
+
+void RenderThread::InvalidateFrameQueueForGeneration(uint64_t generation) {
+  frameQueue_.Clear();
+  if (generation > 0) {
+    staleGenerationDropLogCount_.store(0, std::memory_order_release);
+  }
 }
 
 void RenderThread::SetWindowSize(int width, int height) {
@@ -153,6 +162,19 @@ void RenderThread::ResetStats() {
   frameQueue_.ResetStats();
 }
 
+WindowSessionSnapshot RenderThread::GetWindowSessionSnapshot() const {
+  WindowSessionSnapshot out{};
+  out.sessionId = windowSessionIdSnapshot_.load(std::memory_order_acquire);
+  out.generation = windowGenerationSnapshot_.load(std::memory_order_acquire);
+  out.state = static_cast<WindowSessionState>(
+      windowStateSnapshot_.load(std::memory_order_acquire));
+  out.width = windowWidthSnapshot_.load(std::memory_order_acquire);
+  out.height = windowHeightSnapshot_.load(std::memory_order_acquire);
+  out.active = windowActiveSnapshot_.load(std::memory_order_acquire);
+  out.hasWindow = windowHasHandleSnapshot_.load(std::memory_order_acquire);
+  return out;
+}
+
 void RenderThread::ThreadMain() {
   StartVSyncIfNeeded();
   if (nativeVsyncActive_.load(std::memory_order_acquire)) {
@@ -207,7 +229,7 @@ void RenderThread::ThreadMain() {
   }
 
   StopVSync();
-  HandleSetWindow(nullptr, false);
+  HandleSetWindow(nullptr, 0);
   frameQueue_.Clear();
 }
 
@@ -260,7 +282,7 @@ void RenderThread::PushControl(ControlMessage &&message) {
 void RenderThread::HandleControl(const ControlMessage &message) {
   switch (message.type) {
   case ControlType::SET_WINDOW:
-    HandleSetWindow(message.window, message.forceRebind);
+    HandleSetWindow(message.window, message.generation);
     break;
   case ControlType::RESIZE:
     HandleResize(message.width, message.height);
@@ -276,63 +298,169 @@ void RenderThread::HandleControl(const ControlMessage &message) {
   }
 }
 
-void RenderThread::HandleSetWindow(OHNativeWindow *window, bool forceRebind) {
-  if (window_ == window && !forceRebind) {
+void RenderThread::HandleSetWindow(OHNativeWindow *window,
+                                   uint64_t generation) {
+  static uint32_t windowSessionLogCount = 0;
+  const bool generationChanged =
+      (generation > 0 && generation != windowSession_.generation);
+  if (windowSession_.window == window && generationChanged) {
+    static uint32_t generationOnlyRebindLogCount = 0;
+    const uint32_t n = ++generationOnlyRebindLogCount;
+    if (n <= 5 || (n % 120) == 0) {
+      LOGF(LOG_INFO,
+           "WindowSession generation rebind: sid=%{public}llu old_gen=%{public}llu new_gen=%{public}llu",
+           static_cast<unsigned long long>(windowSession_.sessionId),
+           static_cast<unsigned long long>(windowSession_.generation),
+           static_cast<unsigned long long>(generation));
+    }
+  }
+  if (windowSession_.window == window && !generationChanged) {
     if (window) {
       OH_NativeWindow_NativeObjectUnreference(window);
     }
     return;
   }
 
-  // Drop queued frames on window lifecycle mutation to avoid stale surface use.
+  // Any lifecycle mutation invalidates in-flight frames from previous generation.
   frameQueue_.Clear();
-
-  if (forceRebind && window_ == window && window_) {
-    const bool softwareOnly =
-        !envState_.IsHwRenderEnabled() && !videoPipeline_.HasHardwareContext();
-    if (softwareOnly) {
-      // Software path does not need destructive teardown for same window.
-      // Re-apply configuration only.
-      videoPipeline_.ForceReconfiguration();
-      OH_NativeWindow_NativeObjectUnreference(window);
-      return;
-    }
-    LOGF(LOG_INFO, "RenderThread: force window rebind %{public}p", window);
+  if (generation > 0) {
+    windowSession_.generation = generation;
+  } else {
+    windowSession_.generation++;
   }
+  windowSession_.sessionId++;
+  windowSession_.active = false;
+  // 必须等待当前代际的有效 Resize 才允许渲染，避免沿用旧尺寸过早 RequestBuffer。
+  windowSession_.width = 0;
+  windowSession_.height = 0;
 
-  if (window_) {
+  if (windowSession_.window) {
     if (envState_.IsHwRenderEnabled() || videoPipeline_.HasHardwareContext()) {
       videoPipeline_.OnHardwareWindowDestroyed(envState_);
     }
-    VideoPipeline::ResetNativeWindow(window_);
-    OH_NativeWindow_NativeObjectUnreference(window_);
-    window_ = nullptr;
+    VideoPipeline::ResetNativeWindow(windowSession_.window);
+    OH_NativeWindow_NativeObjectUnreference(windowSession_.window);
+    windowSession_.window = nullptr;
     videoPipeline_.Reset();
   }
 
-  window_ = window;
-  if (!window_) {
+  windowSession_.window = window;
+  if (!windowSession_.window) {
+    windowSession_.state = WindowSessionState::DESTROYED;
+    const uint32_t n = ++windowSessionLogCount;
+    if (n <= 5 || (n % 60) == 0) {
+      LOGF(LOG_INFO,
+           "WindowSession update: sid=%{public}llu gen=%{public}llu state=%{public}s active=%{public}d size=%{public}dx%{public}d window=%{public}p",
+           static_cast<unsigned long long>(windowSession_.sessionId),
+           static_cast<unsigned long long>(windowSession_.generation),
+           WindowSessionStateToString(windowSession_.state),
+           windowSession_.active ? 1 : 0, windowSession_.width,
+           windowSession_.height, windowSession_.window);
+    }
+    PublishWindowSessionSnapshot();
     return;
   }
 
+  windowSession_.state = WindowSessionState::ATTACHED_PENDING_SIZE;
+  windowSession_.active = false;
   videoPipeline_.ForceReconfiguration();
 
   if (envState_.IsHwRenderEnabled()) {
-    videoPipeline_.InitializeHardwareRenderer(window_, envState_, hwRuntime_);
+    videoPipeline_.InitializeHardwareRenderer(windowSession_.window, envState_,
+                                              hwRuntime_);
   }
+  const uint32_t n = ++windowSessionLogCount;
+  if (n <= 5 || (n % 60) == 0) {
+    LOGF(LOG_INFO,
+         "WindowSession update: sid=%{public}llu gen=%{public}llu state=%{public}s active=%{public}d size=%{public}dx%{public}d window=%{public}p",
+         static_cast<unsigned long long>(windowSession_.sessionId),
+         static_cast<unsigned long long>(windowSession_.generation),
+         WindowSessionStateToString(windowSession_.state),
+         windowSession_.active ? 1 : 0, windowSession_.width,
+         windowSession_.height, windowSession_.window);
+  }
+  PublishWindowSessionSnapshot();
 }
 
 void RenderThread::HandleResize(int width, int height) {
+  static uint32_t windowResizeLogCount = 0;
+  windowSession_.width = width;
+  windowSession_.height = height;
+  videoPipeline_.SetWindowSize(width, height);
+
   if (width <= 0 || height <= 0) {
+    windowSession_.active = false;
+    windowSession_.state = windowSession_.window ? WindowSessionState::PAUSED_SURFACE
+                                                 : WindowSessionState::DETACHED;
+    const uint32_t n = ++windowResizeLogCount;
+    if (n <= 5 || (n % 120) == 0) {
+      LOGF(LOG_INFO,
+           "WindowSession resize: sid=%{public}llu gen=%{public}llu state=%{public}s active=%{public}d size=%{public}dx%{public}d",
+           static_cast<unsigned long long>(windowSession_.sessionId),
+           static_cast<unsigned long long>(windowSession_.generation),
+           WindowSessionStateToString(windowSession_.state),
+           windowSession_.active ? 1 : 0, windowSession_.width,
+           windowSession_.height);
+    }
+    PublishWindowSessionSnapshot();
     return;
   }
-  videoPipeline_.SetWindowSize(width, height);
-  if (window_ && envState_.IsHwRenderEnabled()) {
-    videoPipeline_.OnHardwareWindowResized(window_, width, height, envState_);
+
+  if (!windowSession_.window) {
+    windowSession_.active = false;
+    windowSession_.state = WindowSessionState::DETACHED;
+    const uint32_t n = ++windowResizeLogCount;
+    if (n <= 5 || (n % 120) == 0) {
+      LOGF(LOG_INFO,
+           "WindowSession resize: sid=%{public}llu gen=%{public}llu state=%{public}s active=%{public}d size=%{public}dx%{public}d",
+           static_cast<unsigned long long>(windowSession_.sessionId),
+           static_cast<unsigned long long>(windowSession_.generation),
+           WindowSessionStateToString(windowSession_.state),
+           windowSession_.active ? 1 : 0, windowSession_.width,
+           windowSession_.height);
+    }
+    PublishWindowSessionSnapshot();
+    return;
   }
+
+  windowSession_.active = true;
+  windowSession_.state = WindowSessionState::READY;
+  if (envState_.IsHwRenderEnabled()) {
+    videoPipeline_.OnHardwareWindowResized(windowSession_.window, width, height,
+                                           envState_);
+  }
+  const uint32_t n = ++windowResizeLogCount;
+  if (n <= 5 || (n % 120) == 0) {
+    LOGF(LOG_INFO,
+         "WindowSession resize: sid=%{public}llu gen=%{public}llu state=%{public}s active=%{public}d size=%{public}dx%{public}d",
+         static_cast<unsigned long long>(windowSession_.sessionId),
+         static_cast<unsigned long long>(windowSession_.generation),
+         WindowSessionStateToString(windowSession_.state),
+         windowSession_.active ? 1 : 0, windowSession_.width,
+         windowSession_.height);
+  }
+  PublishWindowSessionSnapshot();
 }
 
 void RenderThread::HandleTick() {
+  if (HasPendingLifecycleControl()) {
+    static uint32_t deferredTickLogCount = 0;
+    const uint32_t n = ++deferredTickLogCount;
+    if (n <= 5 || (n % 120) == 0) {
+      LOGF(LOG_INFO, "Render tick deferred: pending lifecycle controls");
+    }
+    bool requestVsync = false;
+    {
+      std::lock_guard<std::mutex> lock(statsMutex_);
+      stats_.renderTickNoFrame++;
+      requestVsync = nativeVsyncActive_.load(std::memory_order_acquire);
+    }
+    if (requestVsync) {
+      RequestNextVSync();
+    }
+    return;
+  }
+
   VideoFramePacket packet;
   if (!frameQueue_.PopLatest(packet)) {
     bool requestVsync = false;
@@ -347,7 +475,32 @@ void RenderThread::HandleTick() {
     return;
   }
 
-  if (!window_) {
+  if (!windowSession_.IsRenderable()) {
+    bool requestVsync = false;
+    {
+      std::lock_guard<std::mutex> lock(statsMutex_);
+      stats_.droppedFrames++;
+      requestVsync = nativeVsyncActive_.load(std::memory_order_acquire);
+    }
+    if (requestVsync) {
+      RequestNextVSync();
+    }
+    return;
+  }
+
+  if (packet.surfaceGeneration != 0 &&
+      packet.surfaceGeneration != windowSession_.generation) {
+    const uint64_t staleCount =
+        staleGenerationDropLogCount_.fetch_add(1, std::memory_order_acq_rel) +
+        1;
+    if (staleCount <= 5 || (staleCount % 120) == 0) {
+      LOGF(LOG_INFO,
+           "Drop stale frame: frame_gen=%{public}llu session_gen=%{public}llu sid=%{public}llu kind=%{public}d",
+           static_cast<unsigned long long>(packet.surfaceGeneration),
+           static_cast<unsigned long long>(windowSession_.generation),
+           static_cast<unsigned long long>(windowSession_.sessionId),
+           static_cast<int>(packet.kind));
+    }
     bool requestVsync = false;
     {
       std::lock_guard<std::mutex> lock(statsMutex_);
@@ -394,8 +547,9 @@ void RenderThread::HandleTick() {
   }
 
   VideoPipeline::RenderMetrics metrics{};
-  const auto result = videoPipeline_.Render(window_, pixels, packet.width,
-                                            packet.height, packet.pitch,
+  const auto result = videoPipeline_.Render(windowSession_.window, pixels,
+                                            packet.width, packet.height,
+                                            packet.pitch,
                                             &metrics);
   MergeRenderMetrics(metrics);
 
@@ -415,9 +569,21 @@ void RenderThread::HandleTick() {
 
 void RenderThread::HandleRuntimeChanged(const HwRenderRuntimeInfo &runtime) {
   hwRuntime_ = runtime;
-  if (window_ && envState_.IsHwRenderEnabled()) {
+  if (windowSession_.window && windowSession_.active &&
+      envState_.IsHwRenderEnabled()) {
     videoPipeline_.OnHardwareGeometryChanged(envState_, runtime);
   }
+}
+
+bool RenderThread::HasPendingLifecycleControl() const {
+  std::lock_guard<std::mutex> lock(controlMutex_);
+  for (const auto &message : controlQueue_) {
+    if (message.type != ControlType::TICK &&
+        message.type != ControlType::STOP) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void RenderThread::StartVSyncIfNeeded() {
@@ -460,6 +626,21 @@ void RenderThread::RequestNextVSync() {
     nativeVsyncActive_.store(false, std::memory_order_release);
     controlCond_.notify_one();
   }
+}
+
+void RenderThread::PublishWindowSessionSnapshot() {
+  windowSessionIdSnapshot_.store(windowSession_.sessionId,
+                                 std::memory_order_release);
+  windowGenerationSnapshot_.store(windowSession_.generation,
+                                  std::memory_order_release);
+  windowStateSnapshot_.store(static_cast<int>(windowSession_.state),
+                             std::memory_order_release);
+  windowWidthSnapshot_.store(windowSession_.width, std::memory_order_release);
+  windowHeightSnapshot_.store(windowSession_.height, std::memory_order_release);
+  windowActiveSnapshot_.store(windowSession_.active,
+                              std::memory_order_release);
+  windowHasHandleSnapshot_.store(windowSession_.window != nullptr,
+                                 std::memory_order_release);
 }
 
 void RenderThread::MergeRenderMetrics(const VideoPipeline::RenderMetrics &metrics) {

@@ -2,6 +2,7 @@
 #define LIBRETRO_ENGINE_ENGINE_MESSAGES_H
 
 #include <cstring>
+#include <cstdint>
 #include <memory>
 #include <native_window/external_window.h>
 #include <string>
@@ -26,7 +27,7 @@ enum class MessageType {
   Stop,       // 停止请求
   WindowCreated,   // 窗口已创建
   WindowDestroyed, // 窗口已销毁
-  WindowRebind,    // 窗口重绑（句柄可能不变，Surface 语义已变化）
+  WindowRebind,    // 兼容旧链路的遗留消息（新链路请使用 WindowCreated+generation）
   WindowResized,   // 窗口尺寸变化
   SetVideoFormat,  // 设置视频格式
   SyncTask         // 同步任务（在 Engine 线程执行）
@@ -57,7 +58,8 @@ struct EngineMessageTouch {
 
 struct EngineMessageWindow {
   OHNativeWindow *window;
-  bool force_rebind;
+  bool force_rebind; // legacy 字段：新链路不再依赖隐式重绑
+  uint64_t generation;
 };
 
 struct EngineMessageWindowSize {
@@ -110,16 +112,21 @@ struct EngineMessage {
 
   // 辅助构造函数：Window 消息
   static EngineMessage MakeWindowMessage(MessageType type, OHNativeWindow *window,
-                                         bool force_rebind = false) {
+                                         bool force_rebind = false,
+                                         uint64_t generation = 0) {
     EngineMessage msg{};
     msg.type = type;
     msg.payload.window.window = window;
     msg.payload.window.force_rebind = force_rebind;
+    msg.payload.window.generation = generation;
     return msg;
   }
 
-  static EngineMessage MakeWindowRebindMessage(OHNativeWindow *window) {
-    return MakeWindowMessage(MessageType::WindowRebind, window, true);
+  static EngineMessage MakeWindowRebindMessage(OHNativeWindow *window,
+                                               uint64_t generation = 0) {
+    // 保留仅用于兼容旧消息源；新代码请使用 MakeWindowMessage(WindowCreated,...)
+    return MakeWindowMessage(MessageType::WindowRebind, window, true,
+                             generation);
   }
 
   static EngineMessage MakeWindowResizeMessage(int width, int height) {

@@ -139,9 +139,27 @@ public:
    * @brief 设置缩放模式
    */
   void SetScalingMode(ScalingMode mode) {
+    // Windows 模拟器（x86/x86_64）禁用非 GLES 路径，避免 NativeWindow
+    // RequestBuffer 在高压下触发系统侧崩溃。
+#if defined(__i386__) || defined(__x86_64__)
+    if (mode != ScalingMode::GLES_SCALING) {
+      mode = ScalingMode::GLES_SCALING;
+    }
+#endif
     if (scaling_mode_.load() != mode) {
       scaling_mode_.store(mode);
       geometry_changed_.store(true);
+      if (mode == ScalingMode::SOFTWARE_SCALING) {
+        const auto state = GetRenderModeState();
+        if (state != RenderModeState::DEGRADED_TO_SW &&
+            state != RenderModeState::RECOVERING) {
+          SetRenderModeState(RenderModeState::SW_READY);
+        }
+      } else if (mode == ScalingMode::GLES_SCALING) {
+        SetRenderModeState(RenderModeState::GLES_READY);
+      } else {
+        SetRenderModeState(RenderModeState::HW_READY);
+      }
     }
   }
 
@@ -184,6 +202,20 @@ public:
     DUPED,
     DROPPED,
   };
+
+  enum class RenderModeState : uint8_t {
+    SW_READY = 0,
+    GLES_READY = 1,
+    HW_READY = 2,
+    DEGRADED_TO_SW = 3,
+    RECOVERING = 4,
+  };
+
+  static const char *RenderModeStateToString(RenderModeState state);
+  RenderModeState GetRenderModeState() const {
+    return static_cast<RenderModeState>(
+        render_mode_state_.load(std::memory_order_acquire));
+  }
 
   struct RenderMetrics {
     uint64_t nwRequestBufferCalls = 0;
@@ -266,6 +298,28 @@ private:
                          unsigned width, unsigned height, size_t pitch,
                          bool isDupeRequest, RenderMetrics *m,
                          const std::chrono::steady_clock::time_point &start);
+  enum class PreflightDropReason {
+    NONE = 0,
+    NULL_WINDOW,
+    INVALID_WINDOW_SIZE,
+    INVALID_FRAME,
+    CPU_BACKPRESSURE,
+  };
+  static const char *PreflightDropReasonToString(PreflightDropReason reason);
+  PreflightDropReason EvaluateRenderPreflight(OHNativeWindow *window,
+                                              unsigned width, unsigned height,
+                                              size_t pitch, ScalingMode mode,
+                                              bool isDupeRequest) const;
+  void UpdateCpuBackpressure(int64_t requestUs, bool requestFailed);
+  float ResolveSourceAspect(unsigned width, unsigned height) const;
+  void EnsureCpuLayout(unsigned width, unsigned height, int dstWidth,
+                       int dstHeight);
+  void MarkHardwarePathFailure(const char *reason);
+  void MarkHardwarePathRecovered(const char *reason);
+  void SetRenderModeState(RenderModeState state);
+  void EnterDegradedMode(ScalingMode sourceMode, const char *reason);
+  void MaybeRecoverDegradedMode(ScalingMode &mode,
+                                const std::chrono::steady_clock::time_point &now);
 
   enum class GlesState {
     UNINITIALIZED,
@@ -293,6 +347,25 @@ private:
   // Retry logic for geometry configuration
   unsigned retry_count_ = 0;
   std::chrono::steady_clock::time_point last_retry_time_{};
+  std::chrono::steady_clock::time_point cpu_backpressure_until_{};
+  uint32_t cpu_request_slow_streak_ = 0;
+  uint32_t preflight_drop_log_count_ = 0;
+  struct CpuLayoutCache {
+    bool valid = false;
+    unsigned src_width = 0;
+    unsigned src_height = 0;
+    int dst_width = 0;
+    int dst_height = 0;
+    float src_aspect = 0.0f;
+    int scaled_width = 0;
+    int scaled_height = 0;
+    int offset_x = 0;
+    int offset_y = 0;
+    bool has_black_bars = false;
+  } cpu_layout_cache_;
+  uint32_t cpu_layout_recalc_log_count_ = 0;
+  uint32_t hw_failure_streak_ = 0;
+  uint32_t hw_failure_log_count_ = 0;
   // Default to GLES_SCALING as it provides the best balance of performance
   // (60FPS) and quality (Sharp)
   std::atomic<ScalingMode> scaling_mode_{ScalingMode::GLES_SCALING};
@@ -345,6 +418,13 @@ private:
   size_t vk_acquire_outdated_count_{0};
   size_t vk_present_fail_count_{0};
   std::chrono::steady_clock::time_point last_vk_swapchain_recreate_time_{};
+  std::atomic<int> render_mode_state_{
+      static_cast<int>(RenderModeState::GLES_READY)};
+  ScalingMode degraded_from_mode_{ScalingMode::SOFTWARE_SCALING};
+  std::chrono::steady_clock::time_point degrade_recover_after_{};
+  uint32_t degrade_recover_attempts_{0};
+  uint32_t degrade_recover_failures_{0};
+  uint32_t degrade_state_log_count_{0};
 
 public:
   void SetCanDupe(bool canDupe) {
@@ -394,12 +474,33 @@ public:
     config_log_count_ = 0;
     last_config_log_time_ = std::chrono::steady_clock::time_point{};
     render_log_count_ = 0;
+    cpu_backpressure_until_ = std::chrono::steady_clock::time_point{};
+    cpu_request_slow_streak_ = 0;
+    preflight_drop_log_count_ = 0;
+    cpu_layout_cache_ = CpuLayoutCache{};
+    cpu_layout_recalc_log_count_ = 0;
+    hw_failure_streak_ = 0;
+    hw_failure_log_count_ = 0;
     window_state_manager_.Reset();
     vk_sync_index_ = 0;
     vk_acquire_fail_count_ = 0;
     vk_acquire_outdated_count_ = 0;
     vk_present_fail_count_ = 0;
     last_vk_swapchain_recreate_time_ = std::chrono::steady_clock::time_point{};
+    degraded_from_mode_ = ScalingMode::SOFTWARE_SCALING;
+    degrade_recover_after_ = std::chrono::steady_clock::time_point{};
+    degrade_recover_attempts_ = 0;
+    degrade_recover_failures_ = 0;
+    degrade_state_log_count_ = 0;
+    const ScalingMode currentMode = scaling_mode_.load();
+    RenderModeState state = RenderModeState::SW_READY;
+    if (currentMode == ScalingMode::GLES_SCALING) {
+      state = RenderModeState::GLES_READY;
+    } else if (currentMode == ScalingMode::HARDWARE_SCALING) {
+      state = RenderModeState::HW_READY;
+    }
+    render_mode_state_.store(static_cast<int>(state),
+                             std::memory_order_release);
     if (software_backend_) {
       software_backend_->Reset();
     }

@@ -32,7 +32,9 @@ set(CORE_SOURCES
 # Core层: 重构后的引擎核心 (Phase 1)
 set(REFACTORED_ENGINE_SOURCES
     core/engine/libretro_engine.cpp
+    core/engine/frame_buffer_pool.cpp
     core/engine/render_thread.cpp
+    core/engine/window_session.cpp
     core/engine/video_pipeline.cpp
     core/engine/window_state_manager.cpp
     core/engine/event_bridge.cpp

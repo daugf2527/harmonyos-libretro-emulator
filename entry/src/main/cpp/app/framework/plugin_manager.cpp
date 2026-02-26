@@ -368,57 +368,6 @@ static bool HandleNewArchKeyEvent(OH_NativeXComponent *component) {
   return keyboardDispatched || joypadDispatched;
 }
 
-std::mutex &NewArchWindowMutex() {
-  static std::mutex *m = new std::mutex();
-  return *m;
-}
-
-std::unordered_map<std::string, OHNativeWindow *> &NewArchWindowById() {
-  static std::unordered_map<std::string, OHNativeWindow *> *m =
-      new std::unordered_map<std::string, OHNativeWindow *>();
-  return *m;
-}
-
-void StoreNewArchWindowForId(const std::string &xId, OHNativeWindow *w) {
-  if (xId.empty()) {
-    return;
-  }
-  std::lock_guard<std::mutex> lock(NewArchWindowMutex());
-  auto &map = NewArchWindowById();
-  auto it = map.find(xId);
-  if (it != map.end()) {
-    if (it->second == w) {
-      return;
-    }
-    if (it->second) {
-      OH_NativeWindow_NativeObjectUnreference(it->second);
-    }
-    map.erase(it);
-  }
-  if (w) {
-    OH_NativeWindow_NativeObjectReference(w);
-  }
-  map[xId] = w;
-}
-
-OHNativeWindow *RemoveNewArchWindowForIdIfMatch(const std::string &xId,
-                                                OHNativeWindow *match) {
-  if (xId.empty()) {
-    return nullptr;
-  }
-  std::lock_guard<std::mutex> lock(NewArchWindowMutex());
-  auto &map = NewArchWindowById();
-  auto it = map.find(xId);
-  if (it == map.end()) {
-    return nullptr;
-  }
-  if (match != nullptr && it->second != match) {
-    return nullptr;
-  }
-  OHNativeWindow *w = it->second;
-  map.erase(it);
-  return w;
-}
 } // namespace
 
 PluginManager *PluginManager::GetInstance() {
@@ -429,17 +378,6 @@ PluginManager *PluginManager::GetInstance() {
 PluginManager::~PluginManager() {
   LOGF(LOG_INFO, "~PluginManager");
   nativeXComponentMap_.clear();
-
-  {
-    std::lock_guard<std::mutex> lock(NewArchWindowMutex());
-    auto &map = NewArchWindowById();
-    for (auto &kv : map) {
-      if (kv.second) {
-        OH_NativeWindow_NativeObjectUnreference(kv.second);
-      }
-    }
-    map.clear();
-  }
   ClearAllNewArchPointerStates();
 }
 
@@ -504,7 +442,6 @@ void PluginManager::Export(napi_env env, napi_value exports) {
           return;
         }
         const std::string xId = GetNewArchXComponentId(component);
-        StoreNewArchWindowForId(xId, static_cast<OHNativeWindow *>(window));
         LOGF(LOG_INFO,
              " [NEW_ARCH] Surface Created: %{public}s window=%{public}p",
              xId.c_str(), window);
@@ -515,8 +452,7 @@ void PluginManager::Export(napi_env env, napi_value exports) {
         uint64_t height = 0;
         if (OH_NativeXComponent_GetXComponentSize(component, window, &width,
                                                   &height) ==
-                OH_NATIVEXCOMPONENT_RESULT_SUCCESS &&
-            width > 0 && height > 0) {
+            OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
           libretro::LibretroEngine::GetInstance()->OnNativeWindowResized(
               xId, static_cast<int>(width), static_cast<int>(height));
         }
@@ -527,7 +463,6 @@ void PluginManager::Export(napi_env env, napi_value exports) {
           return;
         }
         const std::string xId = GetNewArchXComponentId(component);
-        StoreNewArchWindowForId(xId, static_cast<OHNativeWindow *>(window));
         uint64_t width = 0, height = 0;
         (void)OH_NativeXComponent_GetXComponentSize(component, window, &width,
                                                     &height);
@@ -535,35 +470,20 @@ void PluginManager::Export(napi_env env, napi_value exports) {
              " [NEW_ARCH] Surface Changed: %{public}s %{public}lux%{public}lu",
              xId.c_str(), width, height);
         auto *engine = libretro::LibretroEngine::GetInstance();
-        // SurfaceChanged 可能在 window 指针不变时发生，强制触发渲染侧重绑。
+        // SurfaceChanged 可能在 window 指针不变时发生，显式触发 generation 切换。
         engine->SetNativeWindow(xId, (OHNativeWindow *)window, true);
-        if (width > 0 && height > 0) {
-          engine->OnNativeWindowResized(xId, static_cast<int>(width),
-                                        static_cast<int>(height));
-        }
+        engine->OnNativeWindowResized(xId, static_cast<int>(width),
+                                      static_cast<int>(height));
       };
       callback.OnSurfaceDestroyed = [](OH_NativeXComponent *component,
                                        void *window) {
         const std::string xId = GetNewArchXComponentId(component);
-        OHNativeWindow *argWindow = static_cast<OHNativeWindow *>(window);
-        OHNativeWindow *storedWindow = nullptr;
-        if (argWindow) {
-          storedWindow = RemoveNewArchWindowForIdIfMatch(xId, argWindow);
-        } else {
-          storedWindow = RemoveNewArchWindowForIdIfMatch(xId, nullptr);
-        }
-        OHNativeWindow *destroyed = argWindow ? argWindow : storedWindow;
+        OHNativeWindow *destroyed = static_cast<OHNativeWindow *>(window);
         LOGF(LOG_INFO,
              " [NEW_ARCH] Surface Destroyed: %{public}s window=%{public}p",
              xId.c_str(), destroyed);
-        if (destroyed) {
-          libretro::LibretroEngine::GetInstance()->ClearNativeWindowIfMatch(
-              xId, destroyed);
-        }
-
-        if (storedWindow) {
-          OH_NativeWindow_NativeObjectUnreference(storedWindow);
-        }
+        libretro::LibretroEngine::GetInstance()->ClearNativeWindowIfMatch(
+            xId, destroyed);
         ClearNewArchPointerState(xId);
       };
       callback.DispatchTouchEvent = [](OH_NativeXComponent *component,

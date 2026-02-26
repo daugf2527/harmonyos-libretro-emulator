@@ -104,6 +104,9 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
     resume_on_interrupt_ = false;
     workgroup_token_ = 0;
   }
+  pending_interrupt_pause_.store(false, std::memory_order_release);
+  pending_interrupt_resume_.store(false, std::memory_order_release);
+  pending_interrupt_stop_.store(false, std::memory_order_release);
   {
     std::lock_guard<std::mutex> lock(callback_mutex_);
     shutting_down_ = false;
@@ -274,6 +277,9 @@ bool AudioPlayer::Start() {
     is_playing_ = true;
     resume_on_interrupt_ = false;
   }
+  pending_interrupt_pause_.store(false, std::memory_order_release);
+  pending_interrupt_resume_.store(false, std::memory_order_release);
+  pending_interrupt_stop_.store(false, std::memory_order_release);
   LOGF(LOG_INFO, "%{public}s AudioPlayer started", kAudioChainPrefix);
 
   return true;
@@ -308,6 +314,9 @@ bool AudioPlayer::Pause() {
     is_playing_ = false;
     resume_on_interrupt_ = false;
   }
+  pending_interrupt_pause_.store(false, std::memory_order_release);
+  pending_interrupt_resume_.store(false, std::memory_order_release);
+  pending_interrupt_stop_.store(false, std::memory_order_release);
   LOGF(LOG_INFO, "%{public}s AudioPlayer paused", kAudioChainPrefix);
 
   return true;
@@ -341,6 +350,9 @@ bool AudioPlayer::Stop() {
     is_playing_ = false;
     resume_on_interrupt_ = false;
   }
+  pending_interrupt_pause_.store(false, std::memory_order_release);
+  pending_interrupt_resume_.store(false, std::memory_order_release);
+  pending_interrupt_stop_.store(false, std::memory_order_release);
 
   // 清空缓冲区
   if (ring_buffer_) {
@@ -355,6 +367,48 @@ bool AudioPlayer::Stop() {
 bool AudioPlayer::IsPlaying() const {
   std::lock_guard<std::mutex> lock(state_mutex_);
   return is_playing_;
+}
+
+bool AudioPlayer::PauseFromInterrupt() {
+  OH_AudioRenderer *renderer = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    renderer = renderer_;
+    if (!renderer) {
+      return false;
+    }
+    if (!is_playing_) {
+      return true;
+    }
+  }
+
+  OH_AudioStream_Result result = OH_AudioRenderer_Pause(renderer);
+  if (result != AUDIOSTREAM_SUCCESS) {
+    LOGF(LOG_WARN, "%{public}s Deferred interrupt pause failed: %{public}d",
+         kAudioChainPrefix, result);
+    return false;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    is_playing_ = false;
+  }
+  return true;
+}
+
+void AudioPlayer::ProcessPendingInterruptActions() {
+  if (pending_interrupt_stop_.exchange(false, std::memory_order_acq_rel)) {
+    (void)Stop();
+    return;
+  }
+
+  if (pending_interrupt_pause_.exchange(false, std::memory_order_acq_rel)) {
+    (void)PauseFromInterrupt();
+  }
+
+  if (pending_interrupt_resume_.exchange(false, std::memory_order_acq_rel)) {
+    (void)Start();
+  }
 }
 
 // OHAudio 回调: 写入数据 (API 12+ 推荐)
@@ -781,6 +835,7 @@ int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
                                       void *userData,
                                       OH_AudioInterrupt_ForceType type,
                                       OH_AudioInterrupt_Hint hint) {
+  (void)renderer;
   auto *player = static_cast<AudioPlayer *>(userData);
   if (!player) {
     return 0;
@@ -797,19 +852,15 @@ int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
   // 根据中断类型处理
   switch (hint) {
   case AUDIOSTREAM_INTERRUPT_HINT_PAUSE:
-    // 音频焦点丢失,暂停播放
+    // 音频焦点丢失：回调线程只打标记，Pause 在安全线程执行
     {
       std::lock_guard<std::mutex> lock(player->state_mutex_);
       if (player->is_playing_) {
         player->resume_on_interrupt_ = true;
-        player->is_playing_ = false;
-        // 注意: 这里不调用 OH_AudioRenderer_Pause，因为系统可能已经暂停了流
-        // 但为了状态同步，最好还是调一下，或者只更新 flag
-        // 官方文档建议在回调中不要执行耗时操作，Pause 可能是阻塞的？
-        // 通常 Pause 是安全的。
-        OH_AudioRenderer_Pause(renderer);
       }
     }
+    player->pending_interrupt_resume_.store(false, std::memory_order_release);
+    player->pending_interrupt_pause_.store(true, std::memory_order_release);
     {
       std::lock_guard<std::mutex> lock(player->state_mutex_);
       LOGF(LOG_INFO,
@@ -819,7 +870,7 @@ int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
     break;
 
   case AUDIOSTREAM_INTERRUPT_HINT_RESUME: {
-    // 音频焦点恢复,可以继续播放
+    // 音频焦点恢复：仅标记恢复请求，在安全线程执行 Start
     bool resume = false;
     {
       std::lock_guard<std::mutex> lock(player->state_mutex_);
@@ -832,18 +883,21 @@ int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
            kAudioChainPrefix, resume ? 1 : 0);
     }
     if (resume) {
-      player->Start(); // Start 更新 is_playing_ 并调用 OH_AudioRenderer_Start
+      player->pending_interrupt_pause_.store(false, std::memory_order_release);
+      player->pending_interrupt_resume_.store(true, std::memory_order_release);
     }
     break;
   }
 
   case AUDIOSTREAM_INTERRUPT_HINT_STOP:
-    // 音频焦点永久丢失,停止播放
+    // 音频焦点永久丢失：仅打标记，在安全线程执行 Stop
     {
       std::lock_guard<std::mutex> lock(player->state_mutex_);
-      player->is_playing_ = false;
       player->resume_on_interrupt_ = false;
     }
+    player->pending_interrupt_pause_.store(false, std::memory_order_release);
+    player->pending_interrupt_resume_.store(false, std::memory_order_release);
+    player->pending_interrupt_stop_.store(true, std::memory_order_release);
     LOGF(LOG_INFO, "%{public}s Audio stopped due to interrupt",
          kAudioChainPrefix);
     break;
@@ -913,6 +967,9 @@ void AudioPlayer::Cleanup() {
       builder_ = nullptr;
     }
   }
+  pending_interrupt_pause_.store(false, std::memory_order_release);
+  pending_interrupt_resume_.store(false, std::memory_order_release);
+  pending_interrupt_stop_.store(false, std::memory_order_release);
 
   ring_buffer_ = nullptr;
   running_ = nullptr;
