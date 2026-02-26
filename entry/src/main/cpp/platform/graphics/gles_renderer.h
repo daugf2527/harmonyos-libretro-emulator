@@ -13,6 +13,7 @@
 
 #include <functional>
 #include <mutex>
+#include <atomic>
 
 namespace libretro {
 
@@ -62,6 +63,13 @@ private:
 
 class GLESRenderer {
 public:
+  enum class SwapFailureKind : uint8_t {
+    NONE = 0,
+    RECOVERABLE_SURFACE = 1,
+    CONTEXT_LOST = 2,
+    FATAL = 3,
+  };
+
   GLESRenderer();
   ~GLESRenderer();
 
@@ -78,11 +86,20 @@ public:
   // Swap Interval Control (VSync)
   // interval: 0 = Disable VSync (Turbo), 1 = Enable VSync (Normal)
   void SetSwapInterval(int interval);
+  void SetDiagnosticsEnabled(bool enabled);
+  bool IsDiagnosticsEnabled() const { return diag_enabled_; }
 
   // XEngine Control
   void SetXEngineEnabled(bool enabled);
   bool IsXEngineSupported() const { return xengine_supported_; }
   bool IsHealthy() const { return healthy_; }
+  SwapFailureKind GetLastSwapFailureKind() const {
+    return static_cast<SwapFailureKind>(
+        last_swap_failure_kind_.load(std::memory_order_acquire));
+  }
+  EGLint GetLastEglError() const {
+    return static_cast<EGLint>(last_egl_error_.load(std::memory_order_acquire));
+  }
 
 private:
   unsigned BeginUploadScratch();
@@ -143,6 +160,7 @@ private:
   size_t pbo_fence_state_log_count_ = 0;
   size_t render_stage_log_count_ = 0;
   size_t egl_swap_log_count_ = 0;
+  size_t egl_swap_error_log_count_ = 0;
   size_t gl_error_sample_log_count_ = 0;
   unsigned long render_frame_id_ = 0;
   size_t pbo_wait_timeout_log_count_ = 0;
@@ -150,6 +168,7 @@ private:
   size_t pbo_tex_timing_log_count_ = 0;
   size_t swap_timing_log_count_ = 0;
   int swap_interval_ = 1;
+  bool diag_enabled_ = false;
 
   // XEngine State
   bool xengine_supported_ = false;
@@ -157,6 +176,9 @@ private:
   void *xengine_handle_ = nullptr;
 
   bool healthy_ = true;
+  std::atomic<int> last_swap_failure_kind_{
+      static_cast<int>(SwapFailureKind::NONE)};
+  std::atomic<int> last_egl_error_{static_cast<int>(EGL_SUCCESS)};
 
   // XEngine Function Pointers
   typedef const GLubyte *(*PFN_HMS_XEG_GETSTRING)(GLenum name);

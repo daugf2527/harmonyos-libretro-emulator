@@ -1540,6 +1540,17 @@ static napi_value GetStats(napi_env env, napi_callback_info info) {
   SET_STAT(frameTimeMin);
   SET_STAT(frameTimeMax);
   SET_STAT(frameTimeSum);
+  SET_STAT(queuePushed);
+  SET_STAT(queuePopped);
+  SET_STAT(queueDroppedOldest);
+  SET_STAT(queueDroppedStaleOnPop);
+  SET_STAT(queueDepthMax);
+  SET_STAT(renderTickNoFrame);
+  SET_STAT(renderThreadRenderedFrames);
+  SET_STAT(renderThreadDroppedFrames);
+  SET_STAT(vsyncCallbacks);
+  SET_STAT(vsyncFallbackTicks);
+  SET_STAT(vsyncRequestFailures);
   
   // 音频缓冲统计
   auto *audioBridge = libretro::AudioBridge::GetInstance();

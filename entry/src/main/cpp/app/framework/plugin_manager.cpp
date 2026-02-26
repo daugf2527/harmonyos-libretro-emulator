@@ -535,7 +535,8 @@ void PluginManager::Export(napi_env env, napi_value exports) {
              " [NEW_ARCH] Surface Changed: %{public}s %{public}lux%{public}lu",
              xId.c_str(), width, height);
         auto *engine = libretro::LibretroEngine::GetInstance();
-        engine->SetNativeWindow(xId, (OHNativeWindow *)window);
+        // SurfaceChanged 可能在 window 指针不变时发生，强制触发渲染侧重绑。
+        engine->SetNativeWindow(xId, (OHNativeWindow *)window, true);
         if (width > 0 && height > 0) {
           engine->OnNativeWindowResized(xId, static_cast<int>(width),
                                         static_cast<int>(height));

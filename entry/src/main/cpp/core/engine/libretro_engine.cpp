@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <chrono>
+#include <cstring>
 #if defined(__has_include) &&                                                  \
     __has_include("../../platform/resource/rom_loader.h")
 #include "../../platform/resource/rom_loader.h"
@@ -235,6 +236,12 @@ LibretroEngine::LibretroEngine() {
         SetControllerPortDevice(port, device);
       });
   rendererInterface_ = std::make_unique<EngineRendererAdapter>(this);
+  renderThread_ = std::make_unique<RenderThread>(videoPipeline_, envState_);
+  renderThread_->SetEnabled(render_thread_enabled_.load(std::memory_order_relaxed));
+  renderThread_->SetNativeVSyncEnabled(
+      native_vsync_enabled_.load(std::memory_order_relaxed));
+  videoPipeline_.SetGlesDiagnosticsEnabled(
+      gles_diag_enabled_.load(std::memory_order_relaxed));
   // Initialize CoreStateManager
   stateManager_ = std::make_unique<CoreStateManager>(coreLoader_);
   // Initialize DiskController
@@ -348,6 +355,12 @@ bool LibretroEngine::Start() {
 
   running_ = true;
   gameThread_ = std::thread(&LibretroEngine::GameLoop, this);
+  if (renderThread_ && render_thread_enabled_.load(std::memory_order_relaxed)) {
+    renderThread_->SetEnabled(true);
+    renderThread_->SetNativeVSyncEnabled(
+        native_vsync_enabled_.load(std::memory_order_relaxed));
+    renderThread_->Start();
+  }
   LOGF(LOG_INFO, " [NEW] Engine Thread Started");
   startInProgress_.store(false);
 
@@ -413,6 +426,9 @@ bool LibretroEngine::Stop() {
                            [this]() { return gameLoopExited_.load(); });
   }
   if (!exited) {
+    if (renderThread_) {
+      renderThread_->Stop();
+    }
     stopTimedOut_.store(true);
     LOGF(LOG_ERROR, "[NEW] Stop timeout after %{public}u ms", STOP_TIMEOUT_MS);
     const EnginePhase currentPhase = phase_.load(std::memory_order_acquire);
@@ -430,6 +446,9 @@ bool LibretroEngine::Stop() {
 
   if (gameThread_.joinable()) {
     gameThread_.join();
+  }
+  if (renderThread_) {
+    renderThread_->Stop();
   }
 
   running_ = false;
@@ -454,6 +473,10 @@ void LibretroEngine::Reset() {
            "[NEW] Reset aborted: stop did not complete, skip destructive cleanup");
       return;
     }
+  }
+  if (renderThread_) {
+    renderThread_->Stop();
+    renderThread_->ResetStats();
   }
 
   stopRequested_.store(false);
@@ -590,9 +613,12 @@ bool LibretroEngine::LoadGame(const std::string &gamePath,
 }
 
 void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
-                                     OHNativeWindow *window) {
-  LOGF(LOG_INFO, "[NEW] Engine: SetNativeWindow %{public}s %{public}p",
-       xcomponentId.c_str(), window);
+                                     OHNativeWindow *window,
+                                     bool forceRebind) {
+  LOGF(LOG_INFO,
+       "[NEW] Engine: SetNativeWindow %{public}s %{public}p "
+       "(force=%{public}d)",
+       xcomponentId.c_str(), window, forceRebind ? 1 : 0);
 
   bool changed = false;
   {
@@ -618,8 +644,8 @@ void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
   surface_state_.store(window ? SurfaceState::CREATED
                               : SurfaceState::DESTROYED);
 
-  // 仅当句柄真正变化时通知引擎线程，避免 OnSurfaceChanged
-  // 重复触发导致资源反复重建。
+  // 句柄变化时发送 Created/Destroyed；句柄不变但 SurfaceChanged 时发送 Rebind。
+  const bool needRebindMessage = (!changed && forceRebind && window != nullptr);
   if (changed) {
     if (!messageQueue_.Push(EngineMessage::MakeWindowMessage(
             window ? MessageType::WindowCreated : MessageType::WindowDestroyed,
@@ -631,6 +657,20 @@ void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
         const int cachedH = last_window_height_.load();
         LOGF(LOG_WARN,
              "[NEW] Window message dropped: queue closed (running=%{public}d, "
+             "state=%{public}d, cached=%{public}dx%{public}d)",
+             running_.load() ? 1 : 0, static_cast<int>(state_.load()), cachedW,
+             cachedH);
+      }
+    }
+  } else if (needRebindMessage) {
+    if (!messageQueue_.Push(EngineMessage::MakeWindowRebindMessage(window))) {
+      windowMessageDropLogCount_++;
+      if (windowMessageDropLogCount_ <= 5 ||
+          (windowMessageDropLogCount_ % 60) == 0) {
+        const int cachedW = last_window_width_.load();
+        const int cachedH = last_window_height_.load();
+        LOGF(LOG_WARN,
+             "[NEW] Window rebind dropped: queue closed (running=%{public}d, "
              "state=%{public}d, cached=%{public}dx%{public}d)",
              running_.load() ? 1 : 0, static_cast<int>(state_.load()), cachedW,
              cachedH);
@@ -663,7 +703,7 @@ void LibretroEngine::ClearNativeWindowIfMatch(const std::string &xcomponentId,
   }
 
   if (match) {
-    SetNativeWindow(xcomponentId, nullptr);
+    SetNativeWindow(xcomponentId, nullptr, false);
   }
 }
 
@@ -752,9 +792,27 @@ bool LibretroEngine::SendVirtualAnalog(int port, int index, int id,
 bool LibretroEngine::DispatchKeyboardEvent(bool down, unsigned keycode,
                                            uint32_t character,
                                            uint16_t key_modifiers) {
-  bool dispatched = false;
-  (void)ExecuteSyncTask(
-      [this, &dispatched, down, keycode, character, key_modifiers]() {
+  auto dispatchNow = [this, down, keycode, character, key_modifiers]() -> bool {
+    if (!coreLoader_.IsLoaded()) {
+      return false;
+    }
+    const ::retro_keyboard_callback *callback = envState_.GetKeyboardCallback();
+    if (!callback || !callback->callback) {
+      return false;
+    }
+    callback->callback(down, keycode, character, key_modifiers);
+    return true;
+  };
+
+  // Engine 线程或未运行状态下，直接执行（避免无意义排队）。
+  if (g_engineThreadInstance == this ||
+      !running_.load(std::memory_order_acquire)) {
+    return dispatchNow();
+  }
+
+  // 输入线程（如 UI/MMI）禁止同步等待 Engine，避免 APP_INPUT_BLOCK。
+  auto syncTask = std::make_shared<EngineSyncTask>(
+      [this, down, keycode, character, key_modifiers]() {
         if (!coreLoader_.IsLoaded()) {
           return;
         }
@@ -764,10 +822,13 @@ bool LibretroEngine::DispatchKeyboardEvent(bool down, unsigned keycode,
           return;
         }
         callback->callback(down, keycode, character, key_modifiers);
-        dispatched = true;
-      },
-      kSyncTaskTimeoutMs);
-  return dispatched;
+      });
+
+  if (!messageQueue_.Push(EngineMessage::MakeSyncTaskMessage(syncTask))) {
+    LOGF(LOG_WARN, "[NEW] DispatchKeyboardEvent dropped: message queue closed");
+    return false;
+  }
+  return true;
 }
 
 void LibretroEngine::SendPointer(int port, int16_t x, int16_t y, bool pressed) {
@@ -938,6 +999,108 @@ void LibretroEngine::SetHwRenderAllowed(bool allowed) {
   LOGF(LOG_INFO, "HW render allowed set to: %{public}d", allowed ? 1 : 0);
 }
 
+void LibretroEngine::SetRenderThreadEnabled(bool enabled) {
+  const bool current =
+      render_thread_enabled_.load(std::memory_order_acquire);
+  if (current == enabled) {
+    return;
+  }
+
+  if (running_.load(std::memory_order_acquire)) {
+    LOGF(LOG_WARN,
+         "SetRenderThreadEnabled ignored while running: "
+         "current=%{public}d request=%{public}d",
+         current ? 1 : 0, enabled ? 1 : 0);
+    return;
+  }
+
+  render_thread_enabled_.store(enabled, std::memory_order_release);
+
+  if (renderThread_ && !enabled) {
+    renderThread_->SetEnabled(false);
+  }
+
+  LOGF(LOG_INFO, "Render thread enabled set to: %{public}d",
+       enabled ? 1 : 0);
+}
+
+void LibretroEngine::SetNativeVSyncEnabled(bool enabled) {
+  native_vsync_enabled_.store(enabled, std::memory_order_release);
+  if (renderThread_) {
+    renderThread_->SetNativeVSyncEnabled(enabled);
+  }
+  LOGF(LOG_INFO, "Native VSync enabled set to: %{public}d",
+       enabled ? 1 : 0);
+}
+
+void LibretroEngine::SetGlesDiagEnabled(bool enabled) {
+  gles_diag_enabled_.store(enabled, std::memory_order_release);
+  videoPipeline_.SetGlesDiagnosticsEnabled(enabled);
+  LOGF(LOG_INFO, "GLES diagnostics enabled set to: %{public}d",
+       enabled ? 1 : 0);
+}
+
+RuntimeStats LibretroEngine::GetStats() const {
+  RuntimeStats snapshot;
+  {
+    std::lock_guard<std::mutex> lock(statsMutex_);
+    snapshot = stats_;
+  }
+
+  if (render_thread_enabled_.load(std::memory_order_acquire) && renderThread_) {
+    const auto renderStats = renderThread_->GetStats();
+    snapshot.videoDroppedFrames += renderStats.droppedFrames;
+    snapshot.nwRequestBufferCalls += renderStats.nwRequestBufferCalls;
+    snapshot.nwRequestBufferFailures += renderStats.nwRequestBufferFailures;
+    snapshot.nwFlushBufferCalls += renderStats.nwFlushBufferCalls;
+    snapshot.nwFlushBufferFailures += renderStats.nwFlushBufferFailures;
+    snapshot.nwAbortBufferCalls += renderStats.nwAbortBufferCalls;
+    snapshot.nbFromWindowBufferFailures +=
+        renderStats.nbFromWindowBufferFailures;
+    snapshot.nbMapFailures += renderStats.nbMapFailures;
+    snapshot.nbUnmapFailures += renderStats.nbUnmapFailures;
+    snapshot.fenceWaitCalls += renderStats.fenceWaitCalls;
+    snapshot.fenceWaitFailures += renderStats.fenceWaitFailures;
+    snapshot.fenceTimeoutCount += renderStats.fenceTimeoutCount;
+
+    if (renderStats.frameTimeCount > 0) {
+      if (snapshot.frameCount == 0 || snapshot.frameTimeMin == UINT64_MAX ||
+          renderStats.frameTimeMin < snapshot.frameTimeMin) {
+        snapshot.frameTimeMin = renderStats.frameTimeMin;
+      }
+      if (renderStats.frameTimeMax > snapshot.frameTimeMax) {
+        snapshot.frameTimeMax = renderStats.frameTimeMax;
+      }
+      snapshot.frameTimeSum += renderStats.frameTimeSum;
+      snapshot.frameCount += renderStats.frameTimeCount;
+    }
+
+    snapshot.queuePushed = renderStats.queuePushed;
+    snapshot.queuePopped = renderStats.queuePopped;
+    snapshot.queueDroppedOldest = renderStats.queueDroppedOldest;
+    snapshot.queueDroppedStaleOnPop = renderStats.queueDroppedStaleOnPop;
+    snapshot.queueDepthMax = renderStats.queueDepthMax;
+    snapshot.renderTickNoFrame = renderStats.renderTickNoFrame;
+    snapshot.renderThreadRenderedFrames = renderStats.renderedFrames;
+    snapshot.renderThreadDroppedFrames = renderStats.droppedFrames;
+    snapshot.vsyncCallbacks = renderStats.vsyncCallbacks;
+    snapshot.vsyncFallbackTicks = renderStats.vsyncFallbackTicks;
+    snapshot.vsyncRequestFailures = renderStats.vsyncRequestFailures;
+  }
+
+  return snapshot;
+}
+
+void LibretroEngine::ResetStats() {
+  {
+    std::lock_guard<std::mutex> lock(statsMutex_);
+    stats_.Reset();
+  }
+  if (renderThread_) {
+    renderThread_->ResetStats();
+  }
+}
+
 bool LibretroEngine::InitializeEventBridge(napi_env env, napi_value callback) {
   return eventBridge_.Initialize(env, callback);
 }
@@ -1060,6 +1223,10 @@ void LibretroEngine::GameLoop() {
       }
       SetPhase(EnginePhase::IDLE);
     }
+  }
+
+  if (renderThread_) {
+    renderThread_->Stop();
   }
 
   {
@@ -1356,13 +1523,18 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
         videoPipeline_.SetTargetFps(targetFps_);
         audioSampleRate_ = avInfo.timing.sample_rate;
         if (hw_render_enabled_.load()) {
-          std::lock_guard<std::mutex> renderLock(renderMutex_);
           HwRenderRuntimeInfo runtime{};
           runtime.video_width = videoWidth_;
           runtime.video_height = videoHeight_;
           runtime.video_max_width = videoMaxWidth_;
           runtime.video_max_height = videoMaxHeight_;
-          videoPipeline_.OnHardwareGeometryChanged(envState_, runtime);
+          if (render_thread_enabled_.load(std::memory_order_relaxed) &&
+              renderThread_) {
+            renderThread_->SetHwRenderRuntimeInfo(runtime);
+          } else {
+            std::lock_guard<std::mutex> renderLock(renderMutex_);
+            videoPipeline_.OnHardwareGeometryChanged(envState_, runtime);
+          }
         }
         // Sanity Check: 音频采样率保护
         if (audioSampleRate_ < 8000.0 || audioSampleRate_ > 192000.0) {
@@ -1442,8 +1614,37 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     break;
   }
   case MessageType::WindowCreated:
+  case MessageType::WindowRebind:
     if (++windowEventLogCount_ % 30 == 0) {
-      LOGF(LOG_INFO, "[NEW] Message: WindowCreated");
+      LOGF(LOG_INFO, "[NEW] Message: %{public}s",
+           msg.type == MessageType::WindowRebind ? "WindowRebind"
+                                                 : "WindowCreated");
+    }
+    {
+      const bool forceRebind =
+          (msg.type == MessageType::WindowRebind) ||
+          msg.payload.window.force_rebind;
+    if (render_thread_enabled_.load(std::memory_order_relaxed) && renderThread_) {
+      OHNativeWindow *windowSnapshot = nullptr;
+      {
+        std::lock_guard<std::mutex> lock(windowMutex_);
+        windowSnapshot = window_;
+        if (windowSnapshot) {
+          // Keep snapshot alive until render thread retains its own reference.
+          OH_NativeWindow_NativeObjectReference(windowSnapshot);
+        }
+      }
+      renderThread_->SetWindow(windowSnapshot, forceRebind);
+      if (windowSnapshot) {
+        OH_NativeWindow_NativeObjectUnreference(windowSnapshot);
+      }
+      HwRenderRuntimeInfo runtime{};
+      runtime.video_width = videoWidth_;
+      runtime.video_height = videoHeight_;
+      runtime.video_max_width = videoMaxWidth_;
+      runtime.video_max_height = videoMaxHeight_;
+      renderThread_->SetHwRenderRuntimeInfo(runtime);
+      break;
     }
     if (hw_render_enabled_.load()) {
       std::lock_guard<std::mutex> renderLock(renderMutex_);
@@ -1461,16 +1662,26 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
         runtime.video_height = videoHeight_;
         runtime.video_max_width = videoMaxWidth_;
         runtime.video_max_height = videoMaxHeight_;
+        if (forceRebind) {
+          videoPipeline_.Reset();
+        }
         videoPipeline_.InitializeHardwareRenderer(windowSnapshot, envState_,
                                                   runtime);
         OH_NativeWindow_NativeObjectUnreference(windowSnapshot);
+      } else if (forceRebind) {
+        videoPipeline_.Reset();
       }
     }
     break;
+    }
   case MessageType::WindowResized: {
     const int width = msg.payload.windowSize.width;
     const int height = msg.payload.windowSize.height;
     videoPipeline_.SetWindowSize(width, height);
+    if (render_thread_enabled_.load(std::memory_order_relaxed) && renderThread_) {
+      renderThread_->SetWindowSize(width, height);
+      break;
+    }
     if (hw_render_enabled_.load()) {
       std::lock_guard<std::mutex> renderLock(renderMutex_);
       OHNativeWindow *windowSnapshot = nullptr;
@@ -1492,6 +1703,10 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
   case MessageType::WindowDestroyed:
     if (++windowEventLogCount_ % 30 == 0) {
       LOGF(LOG_INFO, "[NEW] Message: WindowDestroyed");
+    }
+    if (render_thread_enabled_.load(std::memory_order_relaxed) && renderThread_) {
+      renderThread_->SetWindow(nullptr, false);
+      break;
     }
     if (hw_render_enabled_.load() || videoPipeline_.HasHardwareContext()) {
       std::lock_guard<std::mutex> renderLock(renderMutex_);
@@ -1783,6 +1998,53 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
         g_engineInstance->stats_.videoNullFrames++;
       }
       g_engineInstance->stats_.videoDroppedFrames++;
+    }
+    return;
+  }
+
+  if (g_engineInstance->render_thread_enabled_.load(std::memory_order_relaxed) &&
+      g_engineInstance->renderThread_) {
+    VideoFramePacket packet{};
+    packet.frameId =
+        ++g_engineInstance->videoFrameSeq_;
+    packet.timestampUs = NowUs();
+    packet.width = width;
+    packet.height = height;
+    packet.pitch = pitch;
+    packet.pixelFormat = g_engineInstance->videoPipeline_.GetPixelFormat();
+
+    if (g_engineInstance->envState_.IsHwRenderEnabled()) {
+      if (data == RETRO_HW_FRAME_BUFFER_VALID) {
+        packet.kind = VideoFrameKind::HW_SWAP;
+      } else if (!data) {
+        packet.kind = VideoFrameKind::HW_NULL;
+      } else {
+        packet.kind = VideoFrameKind::HW_NULL;
+      }
+    } else if (!data) {
+      packet.kind = VideoFrameKind::NULL_FRAME;
+      packet.isDupe = true;
+    } else {
+      packet.kind = VideoFrameKind::SOFTWARE;
+      const size_t bytes = pitch * height;
+      auto storage = std::make_shared<std::vector<uint8_t>>(bytes);
+      if (bytes > 0) {
+        std::memcpy(storage->data(), data, bytes);
+      }
+      packet.storage = std::move(storage);
+    }
+
+    const bool enqueueOk = g_engineInstance->renderThread_->EnqueueFrame(
+        std::move(packet));
+    {
+      std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
+      g_engineInstance->stats_.videoRefreshCalls++;
+      if (!data) {
+        g_engineInstance->stats_.videoNullFrames++;
+      }
+      if (!enqueueOk) {
+        g_engineInstance->stats_.videoDroppedFrames++;
+      }
     }
     return;
   }
@@ -2142,14 +2404,19 @@ bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
     float aspect = g_engineInstance->envState_.GetGeometryAspectRatio();
     g_engineInstance->videoPipeline_.SetGeometry(bw, bh, aspect);
     if (g_engineInstance->hw_render_enabled_.load()) {
-      std::lock_guard<std::mutex> renderLock(g_engineInstance->renderMutex_);
       HwRenderRuntimeInfo runtime{};
       runtime.video_width = g_engineInstance->videoWidth_;
       runtime.video_height = g_engineInstance->videoHeight_;
       runtime.video_max_width = g_engineInstance->videoMaxWidth_;
       runtime.video_max_height = g_engineInstance->videoMaxHeight_;
-      g_engineInstance->videoPipeline_.OnHardwareGeometryChanged(
-          g_engineInstance->envState_, runtime);
+      if (g_engineInstance->render_thread_enabled_.load(std::memory_order_relaxed) &&
+          g_engineInstance->renderThread_) {
+        g_engineInstance->renderThread_->SetHwRenderRuntimeInfo(runtime);
+      } else {
+        std::lock_guard<std::mutex> renderLock(g_engineInstance->renderMutex_);
+        g_engineInstance->videoPipeline_.OnHardwareGeometryChanged(
+            g_engineInstance->envState_, runtime);
+      }
     }
     char payload[96];
     snprintf(

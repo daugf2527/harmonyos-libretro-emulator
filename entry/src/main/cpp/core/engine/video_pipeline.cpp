@@ -215,6 +215,17 @@ bool ShouldLog(size_t &counter, size_t burst, size_t interval) {
   return (counter % interval) == 0;
 }
 
+bool ShouldLog(uint32_t &counter, uint32_t burst, uint32_t interval) {
+  counter++;
+  if (counter <= burst) {
+    return true;
+  }
+  if (interval == 0) {
+    return false;
+  }
+  return (counter % interval) == 0;
+}
+
 void BuildHwRenderConfig(const retro_hw_render_callback &cb,
                          HwRenderConfig &out) {
   if (cb.context_type == RETRO_HW_CONTEXT_OPENGLES2) {
@@ -493,7 +504,18 @@ void VideoPipeline::EnsureWindowConfiguredIfNeeded(OHNativeWindow *window,
     }
     if (!result.usage_ok || !result.swap_ok || !result.source_ok ||
         !result.scaling_ok) {
-      geometry_changed_.store(true);
+      // Do not force per-frame reconfiguration on optional opt failures.
+      // Continuous HandleOpt retries can destabilize producer/consumer state.
+      static uint32_t optPartialFailLogCount = 0;
+      optPartialFailLogCount++;
+      if (optPartialFailLogCount <= 5 || (optPartialFailLogCount % 120) == 0) {
+        LOGF(LOG_WARN,
+             "Window opts partial failure: usage=%{public}d swap=%{public}d "
+             "source=%{public}d scaling=%{public}d (geometry_ok=%{public}d)",
+             result.usage_ok ? 1 : 0, result.swap_ok ? 1 : 0,
+             result.source_ok ? 1 : 0, result.scaling_ok ? 1 : 0,
+             geometryOk ? 1 : 0);
+      }
     }
   }
 
@@ -514,82 +536,168 @@ VideoPipeline::RenderResult
 VideoPipeline::RenderGLES(OHNativeWindow *window, const void *data,
                           unsigned width, unsigned height, size_t pitch,
                           bool isDupeRequest) {
-  // 1. 处理 Surface Lost
+  const auto now = std::chrono::steady_clock::now();
+  auto scheduleRetry = [this, &now](size_t failures) {
+    int delayMs = 100;
+    if (failures > 3) {
+      delayMs = 1000;
+    } else if (failures > 1) {
+      delayMs = 300;
+    }
+    gles_next_retry_time_ = now + std::chrono::milliseconds(delayMs);
+  };
+  auto enterReady = [this]() {
+    gles_state_ = GlesState::READY;
+    gles_swap_fail_count_ = 0;
+    gles_surface_recreate_failures_ = 0;
+    gles_full_reinit_failures_ = 0;
+    last_gles_init_fail_time_ = std::chrono::steady_clock::time_point{};
+    gles_next_retry_time_ = std::chrono::steady_clock::time_point{};
+    gles_renderer_.SetXEngineEnabled(xengine_enabled_.load());
+    xengine_dirty_.store(false);
+  };
+  auto degradeToSoftware = [this]() {
+    if (scaling_mode_.load(std::memory_order_acquire) ==
+        ScalingMode::GLES_SCALING) {
+      scaling_mode_.store(ScalingMode::SOFTWARE_SCALING,
+                          std::memory_order_release);
+      geometry_changed_.store(true, std::memory_order_release);
+      gles_auto_degrade_count_++;
+      LOGF(LOG_ERROR,
+           "GLES recovery exhausted, degrade to SOFTWARE_SCALING "
+           "(count=%{public}zu)",
+           gles_auto_degrade_count_);
+    }
+    gles_state_ = GlesState::FATAL;
+  };
+
+  if (!window) {
+    if (gles_state_ != GlesState::WAIT_WINDOW) {
+      gles_state_ = GlesState::WAIT_WINDOW;
+      if (ShouldLog(render_log_count_, 3, 60)) {
+        LOGF(LOG_WARN, "GLES entering WAIT_WINDOW (null window)");
+      }
+    }
+    drop_count_++;
+    return RenderResult::DROPPED;
+  }
+  if (gles_state_ == GlesState::WAIT_WINDOW) {
+    gles_state_ = GlesState::UNINITIALIZED;
+    gles_next_retry_time_ = std::chrono::steady_clock::time_point{};
+  }
+
+  if (gles_next_retry_time_.time_since_epoch().count() > 0 &&
+      now < gles_next_retry_time_) {
+    drop_count_++;
+    return RenderResult::DROPPED;
+  }
+
   if (gles_state_ == GlesState::SURFACE_LOST) {
-    if (!gles_renderer_.RecreateSurface(window)) {
+    gles_surface_recreate_attempts_++;
+    if (gles_renderer_.RecreateSurface(window)) {
+      if (ShouldLog(render_log_count_, 3, 60)) {
+        LOGF(LOG_INFO, "GLES surface recreate recovered: attempts=%{public}zu",
+             gles_surface_recreate_attempts_);
+      }
+      enterReady();
+    } else {
       gles_swap_fail_count_++;
-      if (gles_swap_fail_count_ <= 5 || (gles_swap_fail_count_ % 60) == 0) {
-        LOGF(LOG_WARN, "GLES surface recreate failed (count=%{public}u)",
-             gles_swap_fail_count_);
+      gles_surface_recreate_failures_++;
+      scheduleRetry(gles_surface_recreate_failures_);
+      if (gles_surface_recreate_failures_ >= 3) {
+        gles_state_ = GlesState::UNINITIALIZED;
+        if (ShouldLog(render_log_count_, 3, 30)) {
+          LOGF(LOG_WARN,
+               "GLES surface recreate escalate to full reinit: fail=%{public}zu",
+               gles_surface_recreate_failures_);
+        }
+      } else if (ShouldLog(render_log_count_, 3, 60)) {
+        LOGF(LOG_WARN, "GLES surface recreate failed: fail=%{public}zu",
+             gles_surface_recreate_failures_);
       }
       drop_count_++;
       return RenderResult::DROPPED;
     }
-    gles_state_ = GlesState::READY;
   }
 
-  // 2. 初始化 (如果需要)
-  if (gles_state_ == GlesState::UNINITIALIZED) {
-    // Retry cooldown (2 seconds)
-    auto now = std::chrono::steady_clock::now();
-    if (last_gles_init_fail_time_.time_since_epoch().count() > 0) {
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_gles_init_fail_time_).count();
-        if (elapsed < 2) {
-             drop_count_++;
-             return RenderResult::DROPPED;
-        }
-    }
-
+  if (gles_state_ == GlesState::CONTEXT_LOST ||
+      gles_state_ == GlesState::UNINITIALIZED) {
+    gles_full_reinit_attempts_++;
+    gles_renderer_.Deinit();
     if (gles_renderer_.Init(window)) {
-      gles_state_ = GlesState::READY;
-      gles_swap_fail_count_ = 0;
-      last_gles_init_fail_time_ = std::chrono::steady_clock::time_point{};
-      gles_renderer_.SetXEngineEnabled(xengine_enabled_.load());
-      xengine_dirty_.store(false);
+      if (ShouldLog(render_log_count_, 3, 30)) {
+        LOGF(LOG_INFO,
+             "GLES full reinit recovered: attempts=%{public}zu fail=%{public}zu",
+             gles_full_reinit_attempts_, gles_full_reinit_failures_);
+      }
+      enterReady();
     } else {
-      LOGF(LOG_ERROR, "GLES Init failed, will retry later");
-      gles_state_ = GlesState::UNINITIALIZED;
+      gles_full_reinit_failures_++;
+      gles_swap_fail_count_++;
       last_gles_init_fail_time_ = now;
+      gles_state_ = GlesState::UNINITIALIZED;
+      scheduleRetry(gles_full_reinit_failures_);
+      if (gles_full_reinit_failures_ >= 5) {
+        degradeToSoftware();
+      }
+      if (ShouldLog(render_log_count_, 3, 30)) {
+        LOGF(LOG_ERROR, "GLES full reinit failed: fail=%{public}zu",
+             gles_full_reinit_failures_);
+      }
       drop_count_++;
       return RenderResult::DROPPED;
     }
   }
 
-  // 3. 处理 XEngine 开关更新
+  if (gles_state_ == GlesState::FATAL) {
+    if (ShouldLog(render_log_count_, 3, 120)) {
+      LOGF(LOG_WARN, "GLES in FATAL state, dropping frame");
+    }
+    drop_count_++;
+    return RenderResult::DROPPED;
+  }
+
   if (xengine_dirty_.exchange(false)) {
     gles_renderer_.SetXEngineEnabled(xengine_enabled_.load());
   }
 
-  // 4. 渲染
-  if (gles_state_ == GlesState::READY) {
-    float aspect = geometry_aspect_ratio_;
-    if (!(aspect > 0.0f) && geometry_base_width_ > 0 &&
-        geometry_base_height_ > 0) {
-      aspect = static_cast<float>(geometry_base_width_) /
-               static_cast<float>(geometry_base_height_);
-    }
-
-    gles_renderer_.Render(data, width, height, pitch, pixel_format_, aspect, isDupeRequest);
-
-    // 检查健康状态 (Swap 失败检测)
-    if (!gles_renderer_.IsHealthy()) {
-      gles_swap_fail_count_++;
-      if (gles_swap_fail_count_ <= 5 || (gles_swap_fail_count_ % 60) == 0) {
-        LOGF(LOG_WARN,
-             "GLES swap unhealthy (count=%{public}u), mark surface lost",
-             gles_swap_fail_count_);
-      }
-      gles_state_ = GlesState::SURFACE_LOST;
-      drop_count_++;
-      return RenderResult::DROPPED;
-    }
-
-    frame_count_++;
-    return isDupeRequest ? RenderResult::DUPED : RenderResult::RENDERED;
+  if (gles_state_ != GlesState::READY) {
+    drop_count_++;
+    return RenderResult::DROPPED;
   }
 
-  drop_count_++;
-  return RenderResult::DROPPED;
+  float aspect = geometry_aspect_ratio_;
+  if (!(aspect > 0.0f) && geometry_base_width_ > 0 &&
+      geometry_base_height_ > 0) {
+    aspect = static_cast<float>(geometry_base_width_) /
+             static_cast<float>(geometry_base_height_);
+  }
+
+  gles_renderer_.Render(data, width, height, pitch, pixel_format_, aspect,
+                        isDupeRequest);
+
+  if (!gles_renderer_.IsHealthy()) {
+    gles_swap_fail_count_++;
+    const auto kind = gles_renderer_.GetLastSwapFailureKind();
+    const EGLint err = gles_renderer_.GetLastEglError();
+    if (kind == GLESRenderer::SwapFailureKind::CONTEXT_LOST) {
+      gles_state_ = GlesState::CONTEXT_LOST;
+    } else {
+      gles_state_ = GlesState::SURFACE_LOST;
+    }
+    scheduleRetry(gles_swap_fail_count_);
+    if (ShouldLog(render_log_count_, 3, 60)) {
+      LOGF(LOG_WARN,
+           "GLES unhealthy: kind=%{public}d err=0x%{public}X fail=%{public}u",
+           static_cast<int>(kind), static_cast<unsigned>(err),
+           gles_swap_fail_count_);
+    }
+    drop_count_++;
+    return RenderResult::DROPPED;
+  }
+
+  frame_count_++;
+  return isDupeRequest ? RenderResult::DUPED : RenderResult::RENDERED;
 }
 
 VideoPipeline::RenderResult
@@ -621,9 +729,7 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
       m->nwAbortBufferCalls++;
       OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
     }
-    if (ret != NATIVE_ERROR_NO_BUFFER) {
-      geometry_changed_.store(true);
-    }
+    // Avoid forcing per-frame HandleOpt retries on transient queue pressure.
     return RenderResult::DROPPED;
   }
 
@@ -647,7 +753,6 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
 
       m->nwAbortBufferCalls++;
       OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
-      geometry_changed_.store(true);
       drop_count_++;
       return RenderResult::DROPPED;
     }
@@ -675,7 +780,6 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     if (nativeBuffer) {
       OH_NativeBuffer_Unreference(nativeBuffer);
     }
-    geometry_changed_.store(true);
     drop_count_++;
     return RenderResult::DROPPED;
   }
@@ -703,7 +807,6 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     OH_NativeBuffer_Unmap(nativeBuffer);
     OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
     OH_NativeBuffer_Unreference(nativeBuffer);
-    geometry_changed_.store(true);
     drop_count_++;
     return RenderResult::DROPPED;
   }
@@ -845,14 +948,16 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     m->nwAbortBufferCalls++;
     OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
     OH_NativeBuffer_Unreference(nativeBuffer);
-    geometry_changed_.store(true);
     drop_count_++;
     return RenderResult::DROPPED;
   }
-  OH_NativeBuffer_Unreference(nativeBuffer);
 
   // 5. 提交
-  ::Region region{nullptr, 0};
+  // NOTE: some emulator/driver paths are unstable with null dirty region.
+  // Provide an explicit full-frame damage rect.
+  ::Region::Rect fullDamageRect{0, 0, static_cast<uint32_t>(std::max(1, dstWidth)),
+                                static_cast<uint32_t>(std::max(1, dstHeight))};
+  ::Region region{&fullDamageRect, 1};
   m->nwFlushBufferCalls++;
   ret =
       OH_NativeWindow_NativeWindowFlushBuffer(window, buffer, fenceFd, region);
@@ -866,10 +971,11 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     }
     m->nwAbortBufferCalls++;
     OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
-    geometry_changed_.store(true);
+    OH_NativeBuffer_Unreference(nativeBuffer);
     drop_count_++;
     return RenderResult::DROPPED;
   }
+  OH_NativeBuffer_Unreference(nativeBuffer);
 
   // Check total time and log breakdown if slow (> 20ms)
   long long totalUs =
@@ -965,6 +1071,9 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
       gles_state_ = GlesState::UNINITIALIZED;
     }
     gles_swap_fail_count_ = 0;
+    gles_surface_recreate_failures_ = 0;
+    gles_full_reinit_failures_ = 0;
+    gles_next_retry_time_ = std::chrono::steady_clock::time_point{};
 
     result = software_backend_->RenderFrame(window, data, width, height, pitch,
                                             isDupeRequest, m, start);

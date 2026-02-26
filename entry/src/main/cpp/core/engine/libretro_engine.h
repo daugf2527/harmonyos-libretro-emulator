@@ -20,6 +20,7 @@
 #include "input_manager.h"
 #include "input_port_router.h"
 #include "message_queue.h"
+#include "render_thread.h"
 #include "video_pipeline.h"
 
 namespace interfaces {
@@ -66,6 +67,19 @@ struct RuntimeStats {
   uint64_t frameTimeSum = 0;
   uint64_t frameCount = 0;
 
+  // RenderThread + Queue 统计
+  uint64_t queuePushed = 0;
+  uint64_t queuePopped = 0;
+  uint64_t queueDroppedOldest = 0;
+  uint64_t queueDroppedStaleOnPop = 0;
+  uint64_t queueDepthMax = 0;
+  uint64_t renderTickNoFrame = 0;
+  uint64_t renderThreadRenderedFrames = 0;
+  uint64_t renderThreadDroppedFrames = 0;
+  uint64_t vsyncCallbacks = 0;
+  uint64_t vsyncFallbackTicks = 0;
+  uint64_t vsyncRequestFailures = 0;
+
   void Reset() {
     videoRefreshCalls = videoNullFrames = videoDupeFrames = videoDroppedFrames =
         0;
@@ -77,6 +91,10 @@ struct RuntimeStats {
     frameTimeMin = UINT64_MAX;
     frameTimeMax = 0;
     frameTimeSum = frameCount = 0;
+    queuePushed = queuePopped = queueDroppedOldest = 0;
+    queueDroppedStaleOnPop = queueDepthMax = 0;
+    renderTickNoFrame = renderThreadRenderedFrames = renderThreadDroppedFrames = 0;
+    vsyncCallbacks = vsyncFallbackTicks = vsyncRequestFailures = 0;
   }
 };
 
@@ -136,7 +154,8 @@ public:
   bool LoadGame(const std::string &gamePath,
                 std::shared_ptr<std::vector<uint8_t>> data = nullptr);
 
-  void SetNativeWindow(const std::string &xcomponentId, OHNativeWindow *window);
+  void SetNativeWindow(const std::string &xcomponentId, OHNativeWindow *window,
+                       bool forceRebind = false);
   void ClearNativeWindowIfMatch(const std::string &xcomponentId,
                                 OHNativeWindow *destroyedWindow);
 
@@ -202,6 +221,9 @@ public:
   void SetSoftwareMaxResolution(unsigned maxWidth, unsigned maxHeight);
   void SetAIUpscale(bool enabled);
   void SetHwRenderAllowed(bool allowed);
+  void SetRenderThreadEnabled(bool enabled);
+  void SetNativeVSyncEnabled(bool enabled);
+  void SetGlesDiagEnabled(bool enabled);
 
   bool SetCoreOption(const std::string &key, const std::string &value);
   std::string GetCoreOptionsJson() const;
@@ -313,6 +335,7 @@ private:
   std::unique_ptr<InputManager> inputManager_;
   std::unique_ptr<InputPortRouter> inputPortRouter_;
   std::unique_ptr<interfaces::IRenderer> rendererInterface_;
+  std::unique_ptr<RenderThread> renderThread_;
   std::unique_ptr<CoreStateManager> stateManager_;
   std::unique_ptr<DiskController> diskController_;
 
@@ -384,23 +407,21 @@ private:
   std::atomic<unsigned> lastVideoRenderWidth_{0};
   std::atomic<unsigned> lastVideoRenderHeight_{0};
   std::atomic<size_t> lastVideoRenderPitch_{0};
+  std::atomic<uint64_t> videoFrameSeq_{0};
   size_t lastAudioUnderruns_{0};
   size_t lastAudioOverruns_{0};
   std::atomic<bool> hw_render_enabled_{false};
+  std::atomic<bool> render_thread_enabled_{true};
+  std::atomic<bool> native_vsync_enabled_{true};
+  std::atomic<bool> gles_diag_enabled_{false};
   size_t slowRetroRunLogCount_{0};
   size_t slowVideoRenderLogCount_{0};
   size_t skip_frame_counter_{0};
 
 public:
   // 统计接口
-  RuntimeStats GetStats() const {
-    std::lock_guard<std::mutex> lock(statsMutex_);
-    return stats_;
-  }
-  void ResetStats() {
-    std::lock_guard<std::mutex> lock(statsMutex_);
-    stats_.Reset();
-  }
+  RuntimeStats GetStats() const;
+  void ResetStats();
 };
 
 } // namespace libretro

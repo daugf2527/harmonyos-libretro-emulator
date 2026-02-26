@@ -35,6 +35,53 @@ constexpr size_t kDiagLogInterval = 600;
 int ClampSwapInterval(int interval) {
   return interval <= 0 ? 0 : 1;
 }
+
+bool ShouldLogSwapError(size_t &count) {
+  count++;
+  return count <= 5 || (count % 120) == 0;
+}
+
+bool IsRecoverableSwapError(EGLint err) {
+  return err == EGL_BAD_SURFACE || err == EGL_BAD_NATIVE_WINDOW ||
+         err == EGL_BAD_MATCH;
+}
+
+const char *EglErrorName(EGLint err) {
+  switch (err) {
+  case EGL_SUCCESS:
+    return "EGL_SUCCESS";
+  case EGL_NOT_INITIALIZED:
+    return "EGL_NOT_INITIALIZED";
+  case EGL_BAD_ACCESS:
+    return "EGL_BAD_ACCESS";
+  case EGL_BAD_ALLOC:
+    return "EGL_BAD_ALLOC";
+  case EGL_BAD_ATTRIBUTE:
+    return "EGL_BAD_ATTRIBUTE";
+  case EGL_BAD_CONTEXT:
+    return "EGL_BAD_CONTEXT";
+  case EGL_BAD_CONFIG:
+    return "EGL_BAD_CONFIG";
+  case EGL_BAD_CURRENT_SURFACE:
+    return "EGL_BAD_CURRENT_SURFACE";
+  case EGL_BAD_DISPLAY:
+    return "EGL_BAD_DISPLAY";
+  case EGL_BAD_SURFACE:
+    return "EGL_BAD_SURFACE";
+  case EGL_BAD_MATCH:
+    return "EGL_BAD_MATCH";
+  case EGL_BAD_PARAMETER:
+    return "EGL_BAD_PARAMETER";
+  case EGL_BAD_NATIVE_PIXMAP:
+    return "EGL_BAD_NATIVE_PIXMAP";
+  case EGL_BAD_NATIVE_WINDOW:
+    return "EGL_BAD_NATIVE_WINDOW";
+  case EGL_CONTEXT_LOST:
+    return "EGL_CONTEXT_LOST";
+  default:
+    return "EGL_UNKNOWN";
+  }
+}
 } // namespace
 
 unsigned GLESRenderer::BeginUploadScratch() {
@@ -262,6 +309,10 @@ bool GLESRenderer::Init(OHNativeWindow *window) {
 
   window_ = window;
   healthy_ = true;
+  last_egl_error_.store(static_cast<int>(EGL_SUCCESS),
+                        std::memory_order_release);
+  last_swap_failure_kind_.store(static_cast<int>(SwapFailureKind::NONE),
+                                std::memory_order_release);
   LOGF(LOG_INFO,
                "GLESRenderer initialized successfully");
   return true;
@@ -298,6 +349,11 @@ bool GLESRenderer::RecreateSurface(OHNativeWindow *window) {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
   if (!window) {
     healthy_ = false;
+    last_egl_error_.store(static_cast<int>(EGL_BAD_NATIVE_WINDOW),
+                          std::memory_order_release);
+    last_swap_failure_kind_.store(
+        static_cast<int>(SwapFailureKind::RECOVERABLE_SURFACE),
+        std::memory_order_release);
     return false;
   }
   if (egl_display_ == EGL_NO_DISPLAY || egl_context_ == EGL_NO_CONTEXT) {
@@ -310,6 +366,10 @@ bool GLESRenderer::RecreateSurface(OHNativeWindow *window) {
   if (egl_surface_ == EGL_NO_SURFACE) {
     EGLint err = eglGetError();
     healthy_ = false;
+    last_egl_error_.store(static_cast<int>(err), std::memory_order_release);
+    last_swap_failure_kind_.store(
+        static_cast<int>(SwapFailureKind::RECOVERABLE_SURFACE),
+        std::memory_order_release);
     LOGF(LOG_ERROR,
                  "Failed to recreate EGL surface: 0x%{public}x", err);
     return false;
@@ -318,6 +378,10 @@ bool GLESRenderer::RecreateSurface(OHNativeWindow *window) {
   if (!eglMakeCurrent(egl_display_, egl_surface_, egl_surface_, egl_context_)) {
     EGLint err = eglGetError();
     healthy_ = false;
+    last_egl_error_.store(static_cast<int>(err), std::memory_order_release);
+    last_swap_failure_kind_.store(
+        static_cast<int>(SwapFailureKind::RECOVERABLE_SURFACE),
+        std::memory_order_release);
     LOGF(LOG_ERROR,
          "Failed to make EGL current after surface recreate: 0x%{public}x", err);
     eglDestroySurface(egl_display_, egl_surface_);
@@ -341,6 +405,10 @@ bool GLESRenderer::RecreateSurface(OHNativeWindow *window) {
 
   window_ = window;
   healthy_ = true;
+  last_egl_error_.store(static_cast<int>(EGL_SUCCESS),
+                        std::memory_order_release);
+  last_swap_failure_kind_.store(static_cast<int>(SwapFailureKind::NONE),
+                                std::memory_order_release);
   return true;
 }
 
@@ -420,9 +488,19 @@ void GLESRenderer::SetSwapInterval(int interval) {
   }
 }
 
+void GLESRenderer::SetDiagnosticsEnabled(bool enabled) {
+  std::lock_guard<std::recursive_mutex> lock(mutex_);
+  diag_enabled_ = enabled;
+  LOGF(LOG_INFO, "GLES diagnostics: %{public}s", enabled ? "ON" : "OFF");
+}
+
 void GLESRenderer::Deinit() {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
   healthy_ = true;
+  last_egl_error_.store(static_cast<int>(EGL_SUCCESS),
+                        std::memory_order_release);
+  last_swap_failure_kind_.store(static_cast<int>(SwapFailureKind::NONE),
+                                std::memory_order_release);
   if (xengine_handle_) {
     dlclose(xengine_handle_);
     xengine_handle_ = nullptr;
@@ -500,6 +578,7 @@ void GLESRenderer::Deinit() {
   render_skip_log_count_ = 0;
   render_debug_log_count_ = 0;
   gl_error_log_count_ = 0;
+  egl_swap_error_log_count_ = 0;
 }
 
 bool GLESRenderer::CreateEGLContext(OHNativeWindow *window) {
@@ -849,7 +928,12 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     glUniform1i(uniform_swizzle_loc_, swizzleRB ? 1 : 0);
   }
 
+  const bool diagEnabled = diag_enabled_;
+
   auto LogGlError = [&](const char *stage) {
+    if (!diagEnabled) {
+      return;
+    }
     GLenum err = glGetError();
     if (err != GL_NO_ERROR) {
       gl_error_log_count_++;
@@ -869,6 +953,9 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
   };
 
   auto ClearGlErrors = [&]() {
+    if (!diagEnabled) {
+      return;
+    }
     while (glGetError() != GL_NO_ERROR) {
     }
   };
@@ -885,8 +972,8 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     count++;
     return count <= kDiagLogBurst || (count % kDiagLogInterval) == 0;
   };
-  if (render_stage_log_count_ < kDiagLogBurst ||
-      (render_stage_log_count_ % kDiagLogInterval) == 0) {
+  if (diagEnabled && (render_stage_log_count_ < kDiagLogBurst ||
+      (render_stage_log_count_ % kDiagLogInterval) == 0)) {
     render_stage_log_count_++;
     LOGF(LOG_INFO,
          "[GLES_DIAG] GLES frame begin: id=%{public}lu dupe=%{public}d size=%{public}ux%{public}u",
@@ -898,7 +985,7 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     const int rowLength = static_cast<int>(pitch / bpp);
     const size_t dataSize = pitch * height;
 
-    if (ShouldLog(render_param_log_count_)) {
+    if (diagEnabled && ShouldLog(render_param_log_count_)) {
       unsigned long tid = static_cast<unsigned long>(pthread_self());
       LOGF(LOG_INFO,
            "[GLES_DIAG] GLES render params: data=%{public}p size=%{public}ux%{public}u "
@@ -910,7 +997,7 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
            viewport_width_, viewport_height_, window_, tid);
     }
 
-    if (ShouldLog(render_ctx_log_count_)) {
+    if (diagEnabled && ShouldLog(render_ctx_log_count_)) {
       EGLDisplay curDisplay = eglGetCurrentDisplay();
       EGLContext curContext = eglGetCurrentContext();
       EGLSurface curDraw = eglGetCurrentSurface(EGL_DRAW);
@@ -927,8 +1014,12 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     // For some Harmony devices/simulators, PBO upload path can produce noisy
     // driver-side diagnostics. Use direct texture upload for stable behavior.
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    const GLenum errUnpackBind = glGetError();
-    if (errUnpackBind != GL_NO_ERROR && ShouldLog(pbo_error_log_count_)) {
+    GLenum errUnpackBind = GL_NO_ERROR;
+    if (diagEnabled) {
+      errUnpackBind = glGetError();
+    }
+    if (diagEnabled && errUnpackBind != GL_NO_ERROR &&
+        ShouldLog(pbo_error_log_count_)) {
       LOGF(LOG_WARN,
            "[GLES_DIAG] direct upload: unbind unpack buffer failed err=0x%{public}X",
            static_cast<unsigned>(errUnpackBind));
@@ -943,14 +1034,16 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
       unpackAlignment = 2;
     }
 
-    GLint prevUnpackAlignment = 0;
+    GLint prevUnpackAlignment = 4;
     GLint prevUnpackRowLength = 0;
-    glGetIntegerv(GL_UNPACK_ALIGNMENT, &prevUnpackAlignment);
-    glGetIntegerv(GL_UNPACK_ROW_LENGTH, &prevUnpackRowLength);
+    if (diagEnabled) {
+      glGetIntegerv(GL_UNPACK_ALIGNMENT, &prevUnpackAlignment);
+      glGetIntegerv(GL_UNPACK_ROW_LENGTH, &prevUnpackRowLength);
+    }
     glPixelStorei(GL_UNPACK_ALIGNMENT, unpackAlignment);
     glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength);
     LogGlError("pixel_store");
-    if (ShouldLog(pbo_unpack_log_count_)) {
+    if (diagEnabled && ShouldLog(pbo_unpack_log_count_)) {
       GLint curAlign = 0;
       GLint curRowLen = 0;
       glGetIntegerv(GL_UNPACK_ALIGNMENT, &curAlign);
@@ -976,8 +1069,11 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
 
     // Direct Texture Upload from client memory
     GLint boundTex = 0;
-    glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTex);
-    const GLenum errTexBind = glGetError();
+    GLenum errTexBind = GL_NO_ERROR;
+    if (diagEnabled) {
+      glGetIntegerv(GL_TEXTURE_BINDING_2D, &boundTex);
+      errTexBind = glGetError();
+    }
 
     const bool useTexImage = (width != tex_width_ || height != tex_height_ ||
         format != current_format_);
@@ -993,7 +1089,7 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
                       pixelType, data);
     }
     const uint64_t texEnd = NowNs();
-    if (ShouldLog(pbo_tex_log_count_)) {
+    if (diagEnabled && ShouldLog(pbo_tex_log_count_)) {
       LOGF(LOG_INFO,
            "[GLES_DIAG] tex upload (direct): path=%{public}s size=%{public}ux%{public}u "
            "fmt=%{public}d type=%{public}u bound_tex=%{public}d "
@@ -1003,7 +1099,7 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
            static_cast<unsigned>(pixelType), boundTex,
            static_cast<unsigned>(errTexBind));
     }
-    if (ShouldLog(pbo_tex_timing_log_count_)) {
+    if (diagEnabled && ShouldLog(pbo_tex_timing_log_count_)) {
       LOGF(LOG_INFO,
            "[GLES_DIAG] tex time (direct): frame=%{public}lu path=%{public}s "
            "ns=%{public}u",
@@ -1033,23 +1129,48 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
   const uint64_t swapEnd = NowNs();
   if (!swapOk) {
     EGLint err = eglGetError();
+    last_egl_error_.store(static_cast<int>(err), std::memory_order_release);
     if (err == EGL_CONTEXT_LOST) {
-      LOGF(LOG_ERROR,
-                   "EGL Context Lost!");
       healthy_ = false;
+      last_swap_failure_kind_.store(static_cast<int>(SwapFailureKind::CONTEXT_LOST),
+                                    std::memory_order_release);
+      if (ShouldLogSwapError(egl_swap_error_log_count_)) {
+        LOGF(LOG_ERROR, "EGL Context Lost: 0x%{public}x (%{public}s)", err,
+             EglErrorName(err));
+      }
+    } else if (IsRecoverableSwapError(err)) {
+      healthy_ = false;
+      last_swap_failure_kind_.store(
+          static_cast<int>(SwapFailureKind::RECOVERABLE_SURFACE),
+          std::memory_order_release);
+      if (ShouldLogSwapError(egl_swap_error_log_count_)) {
+        LOGF(LOG_WARN,
+             "eglSwapBuffers recoverable failure: 0x%{public}x (%{public}s), "
+             "mark surface lost",
+             err, EglErrorName(err));
+      }
     } else {
-      LOGF(LOG_ERROR,
-                   "eglSwapBuffers failed: 0x%{public}x", err);
+      healthy_ = false;
+      last_swap_failure_kind_.store(static_cast<int>(SwapFailureKind::FATAL),
+                                    std::memory_order_release);
+      if (ShouldLogSwapError(egl_swap_error_log_count_)) {
+        LOGF(LOG_ERROR, "eglSwapBuffers failed: 0x%{public}x (%{public}s)",
+             err, EglErrorName(err));
+      }
     }
   } else {
+    last_egl_error_.store(static_cast<int>(EGL_SUCCESS),
+                          std::memory_order_release);
+    last_swap_failure_kind_.store(static_cast<int>(SwapFailureKind::NONE),
+                                  std::memory_order_release);
     egl_swap_log_count_++;
-    if (egl_swap_log_count_ <= kDiagLogBurst ||
-        (egl_swap_log_count_ % kDiagLogInterval) == 0) {
+    if (diagEnabled && (egl_swap_log_count_ <= kDiagLogBurst ||
+        (egl_swap_log_count_ % kDiagLogInterval) == 0)) {
       LOGF(LOG_INFO,
            "[GLES_DIAG] eglSwapBuffers ok: frame=%{public}lu", frameId);
     }
   }
-  if (ShouldLog(swap_timing_log_count_)) {
+  if (diagEnabled && ShouldLog(swap_timing_log_count_)) {
     LOGF(LOG_INFO,
          "[GLES_DIAG] eglSwapBuffers time: frame=%{public}lu ok=%{public}d "
          "ns=%{public}u",
@@ -1057,8 +1178,8 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
          static_cast<unsigned>(swapEnd - swapStart));
   }
 
-  if (render_stage_log_count_ < kDiagLogBurst ||
-      (render_stage_log_count_ % kDiagLogInterval) == 0) {
+  if (diagEnabled && (render_stage_log_count_ < kDiagLogBurst ||
+      (render_stage_log_count_ % kDiagLogInterval) == 0)) {
     render_stage_log_count_++;
     LOGF(LOG_INFO,
          "[GLES_DIAG] GLES frame end: id=%{public}lu", frameId);

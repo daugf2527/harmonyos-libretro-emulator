@@ -32,6 +32,7 @@ set(CORE_SOURCES
 # Core层: 重构后的引擎核心 (Phase 1)
 set(REFACTORED_ENGINE_SOURCES
     core/engine/libretro_engine.cpp
+    core/engine/render_thread.cpp
     core/engine/video_pipeline.cpp
     core/engine/window_state_manager.cpp
     core/engine/event_bridge.cpp
@@ -59,6 +60,10 @@ set(PLATFORM_GRAPHICS_SOURCES
     platform/graphics/vulkan_loader.cpp
     platform/graphics/vulkan_context.cpp
     platform/graphics/vulkan_presenter.cpp
+)
+
+set(PLATFORM_SYNC_SOURCES
+    platform/sync/native_vsync_driver.cpp
 )
 
 if (${OHOS_ARCH} STREQUAL "arm64-v8a" OR ${OHOS_ARCH} STREQUAL "armeabi-v7a")
@@ -94,6 +99,7 @@ add_library(entry SHARED
     ${REFACTORED_ENGINE_SOURCES}
     ${PLATFORM_AUDIO_SOURCES}
     ${PLATFORM_GRAPHICS_SOURCES}
+    ${PLATFORM_SYNC_SOURCES}
     ${PLATFORM_RESOURCE_SOURCES}
     ${APP_FRAMEWORK_SOURCES}
     ${APP_NAPI_SOURCES}

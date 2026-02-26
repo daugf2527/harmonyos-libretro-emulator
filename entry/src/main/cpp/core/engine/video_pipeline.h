@@ -175,6 +175,10 @@ public:
     gles_renderer_.SetSwapInterval(interval);
   }
 
+  void SetGlesDiagnosticsEnabled(bool enabled) {
+    gles_renderer_.SetDiagnosticsEnabled(enabled);
+  }
+
   enum class RenderResult {
     RENDERED,
     DUPED,
@@ -267,6 +271,9 @@ private:
     UNINITIALIZED,
     READY,
     SURFACE_LOST,
+    CONTEXT_LOST,
+    WAIT_WINDOW,
+    FATAL,
   };
 
   unsigned base_width_ = 0;
@@ -315,7 +322,13 @@ private:
   GLESRenderer gles_renderer_;
   GlesState gles_state_ = GlesState::UNINITIALIZED;
   unsigned gles_swap_fail_count_ = 0;
+  size_t gles_surface_recreate_attempts_ = 0;
+  size_t gles_surface_recreate_failures_ = 0;
+  size_t gles_full_reinit_attempts_ = 0;
+  size_t gles_full_reinit_failures_ = 0;
+  size_t gles_auto_degrade_count_ = 0;
   std::chrono::steady_clock::time_point last_gles_init_fail_time_{};
+  std::chrono::steady_clock::time_point gles_next_retry_time_{};
   uint32_t config_log_count_ = 0;
   std::chrono::steady_clock::time_point last_config_log_time_{};
   uint32_t render_log_count_ = 0;
@@ -371,7 +384,13 @@ public:
       gles_state_ = GlesState::UNINITIALIZED;
     }
     gles_swap_fail_count_ = 0;
+    gles_surface_recreate_attempts_ = 0;
+    gles_surface_recreate_failures_ = 0;
+    gles_full_reinit_attempts_ = 0;
+    gles_full_reinit_failures_ = 0;
+    gles_auto_degrade_count_ = 0;
     last_gles_init_fail_time_ = std::chrono::steady_clock::time_point{};
+    gles_next_retry_time_ = std::chrono::steady_clock::time_point{};
     config_log_count_ = 0;
     last_config_log_time_ = std::chrono::steady_clock::time_point{};
     render_log_count_ = 0;
