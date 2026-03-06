@@ -921,8 +921,14 @@ void AudioPlayer::Cleanup() {
     renderer = renderer_;
   }
 
+  bool stopSucceeded = false;
   if (renderer) {
-    OH_AudioRenderer_Stop(renderer);
+    OH_AudioStream_Result stopResult = OH_AudioRenderer_Stop(renderer);
+    stopSucceeded = (stopResult == AUDIOSTREAM_SUCCESS);
+    if (!stopSucceeded) {
+      LOGF(LOG_WARN, "%{public}s AudioRenderer Stop failed: %{public}d, attempting Release anyway",
+           kAudioChainPrefix, static_cast<int>(stopResult));
+    }
   }
 
   {

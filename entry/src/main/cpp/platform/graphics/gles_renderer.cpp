@@ -911,9 +911,9 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     pixelType = GL_UNSIGNED_SHORT_5_6_5;
     break;
   case RETRO_PIXEL_FORMAT_0RGB1555:
-    alignment = 2;         // 16-bit
+    alignment = 2;
     internalFormat = GL_RGB5_A1;
-    pixelFormat = GL_RGBA; // 0RGB is 5551
+    pixelFormat = GL_RGBA;
     pixelType = GL_UNSIGNED_SHORT_5_5_5_1;
     break;
   case RETRO_PIXEL_FORMAT_XRGB8888:
@@ -989,6 +989,18 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     const int bpp = (alignment == 2) ? 2 : 4;
     const int rowLength = static_cast<int>(pitch / bpp);
     const size_t dataSize = pitch * height;
+
+    const void *uploadData = data;
+    thread_local std::vector<uint16_t> rgb1555_conv_buf;
+    if (format == RETRO_PIXEL_FORMAT_0RGB1555 && data) {
+      const size_t pixelCount = dataSize / 2;
+      rgb1555_conv_buf.resize(pixelCount);
+      const auto *src = static_cast<const uint16_t *>(data);
+      for (size_t i = 0; i < pixelCount; ++i) {
+        rgb1555_conv_buf[i] = static_cast<uint16_t>((src[i] << 1) | 1);
+      }
+      uploadData = rgb1555_conv_buf.data();
+    }
 
     if (diagEnabled && ShouldLog(render_param_log_count_)) {
       unsigned long tid = static_cast<unsigned long>(pthread_self());
@@ -1085,13 +1097,13 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
     const uint64_t texStart = NowNs();
     if (useTexImage) {
       glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, width, height, 0,
-                   pixelFormat, pixelType, data);
+                   pixelFormat, pixelType, uploadData);
       tex_width_ = width;
       tex_height_ = height;
       current_format_ = format;
     } else {
       glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, pixelFormat,
-                      pixelType, data);
+                      pixelType, uploadData);
     }
     const uint64_t texEnd = NowNs();
     if (diagEnabled && ShouldLog(pbo_tex_log_count_)) {

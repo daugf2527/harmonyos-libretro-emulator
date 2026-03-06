@@ -827,9 +827,29 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   napi_value resourceName;
   napi_create_string_utf8(env, "SwitchGameAsync", NAPI_AUTO_LENGTH,
                           &resourceName);
-  napi_create_async_work(env, nullptr, resourceName, ExecuteSwitchGame,
-                         CompleteSwitchGame, ctx, &ctx->work);
-  napi_queue_async_work(env, ctx->work);
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteSwitchGame,
+      CompleteSwitchGame, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    LOGF(LOG_ERROR, "[NEW] SwitchGameAsync create work failed");
+    napi_value falseVal;
+    napi_get_boolean(env, false, &falseVal);
+    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] SwitchGameAsync queue work failed");
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    napi_value falseVal;
+    napi_get_boolean(env, false, &falseVal);
+    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    delete ctx;
+    return promise;
+  }
 
   return promise;
   NAPI_TRY_CATCH_END(env, nullptr)

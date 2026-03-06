@@ -90,8 +90,10 @@ bool GraphicsContext::CreateContext(const GraphicsConfig &config) {
                    depth, stencil);
       depth = 0;
       stencil = 0;
-      attribs[13] = 0;
-      attribs[15] = 0;
+      for (int i = 0; attribs[i] != EGL_NONE; i += 2) {
+        if (attribs[i] == EGL_DEPTH_SIZE) attribs[i + 1] = 0;
+        if (attribs[i] == EGL_STENCIL_SIZE) attribs[i + 1] = 0;
+      }
       currentConfig_.depth_bits = 0;
       currentConfig_.stencil_bits = 0;
       if (!eglChooseConfig(egl_display_, attribs, &egl_config_, 1, &numConfigs) ||
