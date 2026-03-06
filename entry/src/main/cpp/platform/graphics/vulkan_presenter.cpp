@@ -20,12 +20,7 @@ uint32_t MaskToCount(uint32_t mask) {
   if (mask == 0) {
     return 1;
   }
-  uint32_t count = 0;
-  while (mask) {
-    ++count;
-    mask >>= 1;
-  }
-  return count;
+  return 32 - static_cast<uint32_t>(__builtin_clz(mask));
 }
 
 bool ShouldLog(size_t &counter, size_t burst, size_t interval) {

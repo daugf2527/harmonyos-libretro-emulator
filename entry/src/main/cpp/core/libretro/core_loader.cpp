@@ -27,6 +27,7 @@ void PreloadGraphicsLibs() {
     const char *libs[] = {"libGLESv3.so", "libGLESv2.so", "libGLESv1_CM.so",
                           "libEGL.so"};
     for (const char *lib : libs) {
+      // handle intentionally leaked: keeps GL symbols loaded for core's lifetime
       void *handle = dlopen(lib, RTLD_NOW | RTLD_LOCAL);
       if (handle) {
         LOGF(LOG_INFO, "Preloaded graphics lib: %{public}s", lib);
@@ -102,9 +103,11 @@ bool CoreLoader::LoadCore(const std::string &corePath) {
     LOGF(LOG_ERROR,
                  "File does not exist or cannot be accessed: %{public}s",
                  corePath.c_str());
+    char errBuf[128] = {};
+    strerror_r(errno, errBuf, sizeof(errBuf));
     LOGF(LOG_ERROR,
-                 "errno: %{public}d (%{public}s)", errno, strerror(errno));
-    SetLastError("stat", strerror(errno));
+                 "errno: %{public}d (%{public}s)", errno, errBuf);
+    SetLastError("stat", errBuf);
     return false;
   }
   LOGF(LOG_INFO,

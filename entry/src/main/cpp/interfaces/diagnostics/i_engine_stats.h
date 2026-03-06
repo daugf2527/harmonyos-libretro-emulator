@@ -10,30 +10,30 @@
 namespace interfaces {
 
 struct EngineStats {
-  int64_t videoRefreshCalls;
-  int64_t videoNullFrames;
-  int64_t videoDupeFrames;
-  int64_t videoDroppedFrames;
-  int64_t audioBatchCalls;
-  int64_t audioFramesIn;
-  int64_t nwRequestBufferCalls;
-  int64_t nwRequestBufferFailures;
-  int64_t nwFlushBufferCalls;
-  int64_t nwFlushBufferFailures;
-  int64_t nwAbortBufferCalls;
-  int64_t nbFromWindowBufferFailures;
-  int64_t nbMapFailures;
-  int64_t nbUnmapFailures;
-  int64_t fenceWaitCalls;
-  int64_t fenceWaitFailures;
-  int64_t fenceTimeoutCount;
-  int64_t frameCount;
-  double frameTimeMin;
-  double frameTimeMax;
-  double frameTimeSum;
-  int64_t audioBufferUsage;
-  int64_t audioUnderruns;
-  int64_t audioOverruns;
+  int64_t videoRefreshCalls = 0;
+  int64_t videoNullFrames = 0;
+  int64_t videoDupeFrames = 0;
+  int64_t videoDroppedFrames = 0;
+  int64_t audioBatchCalls = 0;
+  int64_t audioFramesIn = 0;
+  int64_t nwRequestBufferCalls = 0;
+  int64_t nwRequestBufferFailures = 0;
+  int64_t nwFlushBufferCalls = 0;
+  int64_t nwFlushBufferFailures = 0;
+  int64_t nwAbortBufferCalls = 0;
+  int64_t nbFromWindowBufferFailures = 0;
+  int64_t nbMapFailures = 0;
+  int64_t nbUnmapFailures = 0;
+  int64_t fenceWaitCalls = 0;
+  int64_t fenceWaitFailures = 0;
+  int64_t fenceTimeoutCount = 0;
+  int64_t frameCount = 0;
+  double frameTimeMin = 0.0;
+  double frameTimeMax = 0.0;
+  double frameTimeSum = 0.0;
+  int64_t audioBufferUsage = 0;
+  int64_t audioUnderruns = 0;
+  int64_t audioOverruns = 0;
 };
 
 /**

@@ -82,6 +82,9 @@ ROMLoadResult ROMLoader::LoadFromRawFile(
     return result;
 }
 
+// IMPORTANT: returned retro_game_info contains raw pointers (.path, .data) into
+// `result`. Caller MUST keep `result` alive for the entire duration that
+// retro_game_info is used (until after retro_load_game returns).
 retro_game_info ROMLoader::CreateGameInfo(
     const ROMLoadResult& result,
     bool need_fullpath

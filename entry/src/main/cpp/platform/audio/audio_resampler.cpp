@@ -81,8 +81,7 @@ size_t AudioResampler::Resample(const int16_t *in, size_t in_frames,
   if (!in || !out || in_frames == 0 || current_ratio_ <= 0.0)
     return 0;
 
-  if (!history_init_) {
-    // 将首样本重复填入历史，避免第一次访问负索引时崩溃
+  if (!history_init_ && in_frames >= 1) {
     int16_t l0 = in[0];
     int16_t r0 = in[1];
     hist_l_[0] = hist_l_[1] = hist_l_[2] = hist_l_[3] = l0;
