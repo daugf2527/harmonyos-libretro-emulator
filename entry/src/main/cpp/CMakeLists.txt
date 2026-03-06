@@ -88,11 +88,17 @@ set(APP_FRAMEWORK_SOURCES
     app/framework/plugin_manager.cpp
 )
 
-# Application层: NAPI入口
+# Application层: NAPI入口 (libretro_engine_napi 已拆分为领域模块)
 set(APP_NAPI_SOURCES
     app/napi/module_init.cpp
     app/napi/core_loader_napi.cpp
     app/napi/libretro_engine_napi.cpp
+    app/napi/engine_lifecycle_napi.cpp
+    app/napi/engine_input_napi.cpp
+    app/napi/engine_video_napi.cpp
+    app/napi/engine_state_napi.cpp
+    app/napi/engine_disk_napi.cpp
+    app/napi/engine_query_napi.cpp
 )
 
 add_library(entry SHARED
