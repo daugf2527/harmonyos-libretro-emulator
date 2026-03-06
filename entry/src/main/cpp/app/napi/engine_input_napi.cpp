@@ -1,5 +1,10 @@
 #include "engine_napi_common.h"
+#include "core/engine/input_manager.h"
 #include "interfaces/input/i_input_manager.h"
+
+using libretro::InputManager;
+
+static InputManager *GetInput() { return InputManager::GetInstance(); }
 
 static napi_value SendInput(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
@@ -19,8 +24,8 @@ static napi_value SendInput(napi_env env, napi_callback_info info) {
     return MakeBool(env, false);
   }
 
-  auto *input = GetEngine()->GetInputInterface();
-  if (!input || !GetEngine()->CanSendVirtual(port)) {
+  auto *input = GetInput();
+  if (!input || !input->CanSendVirtual(port)) {
     return MakeBool(env, false);
   }
   const bool ok = input->SendInput(port, id, pressed);
@@ -55,8 +60,8 @@ static napi_value SendAnalog(napi_env env, napi_callback_info info) {
     value = -32768.0;
   }
 
-  auto *input = GetEngine()->GetInputInterface();
-  if (!input || !GetEngine()->CanSendVirtual(port)) {
+  auto *input = GetInput();
+  if (!input || !input->CanSendVirtual(port)) {
     return MakeBool(env, false);
   }
   const bool ok =
@@ -92,7 +97,7 @@ static napi_value AssignPortSource(napi_env env, napi_callback_info info) {
     deviceId = idBuf;
   }
 
-  auto *input = GetEngine()->GetInputInterface();
+  auto *input = GetInput();
   if (!input) {
     return MakeBool(env, false);
   }
@@ -114,7 +119,7 @@ static napi_value UnassignPort(napi_env env, napi_callback_info info) {
     return MakeBool(env, false);
   }
 
-  auto *input = GetEngine()->GetInputInterface();
+  auto *input = GetInput();
   if (!input) {
     return MakeBool(env, false);
   }
@@ -125,7 +130,7 @@ static napi_value UnassignPort(napi_env env, napi_callback_info info) {
 
 static napi_value ListInputDevices(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
-  auto *input = GetEngine()->GetInputInterface();
+  auto *input = GetInput();
   std::vector<interfaces::InputDeviceInfo> devices;
   if (input) {
     devices = input->ListInputDevices();
@@ -174,7 +179,7 @@ static napi_value SendSensor(napi_env env, napi_callback_info info) {
     return MakeBool(env, false);
   }
 
-  auto *input = GetEngine()->GetInputInterface();
+  auto *input = GetInput();
   if (!input) {
     return MakeBool(env, false);
   }
@@ -205,7 +210,7 @@ static napi_value SetControllerPortDevice(napi_env env, napi_callback_info info)
     return MakeBool(env, false);
   }
 
-  auto *input = GetEngine()->GetInputInterface();
+  auto *input = GetInput();
   if (!input) {
     return MakeBool(env, false);
   }

@@ -192,6 +192,31 @@ void InputManager::SetControllerPortDeviceCallback(
   controller_port_device_callback_ = std::move(callback);
 }
 
+bool InputManager::CanSendVirtual(int port) const {
+  if (!portRouter_) {
+    return false;
+  }
+  return portRouter_->CanSendVirtual(port);
+}
+
+bool InputManager::ResolvePortForDevice(const std::string &deviceId,
+                                        InputSourceType sourceType,
+                                        int &outPort) {
+  if (!portRouter_) {
+    return false;
+  }
+  return portRouter_->ResolvePortForDevice(deviceId, sourceType, outPort);
+}
+
+void InputManager::RecordInputDevice(const std::string &deviceId,
+                                     InputSourceType sourceType,
+                                     const std::string &name) {
+  if (!portRouter_) {
+    return;
+  }
+  portRouter_->RecordDeviceSeen(deviceId, sourceType, name);
+}
+
 // --- Static Callbacks ---
 
 void InputManager::OnInputPoll() {

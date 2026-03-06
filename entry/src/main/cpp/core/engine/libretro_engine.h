@@ -23,6 +23,7 @@
 #include "message_queue.h"
 #include "render_thread.h"
 #include "video_pipeline.h"
+#include "window_guard.h"
 
 namespace interfaces {
 class IInputManager;
@@ -167,26 +168,10 @@ public:
   void OnNativeWindowResized(const std::string &xcomponentId, int width,
                              int height);
 
-  void SendInput(int port, int id, bool pressed);
-  void SendAnalog(int port, int index, int id, int16_t value);
-  bool SendVirtualInput(int port, int id, bool pressed);
-  bool SendVirtualAnalog(int port, int index, int id, int16_t value);
   bool DispatchKeyboardEvent(bool down, unsigned keycode, uint32_t character,
                              uint16_t key_modifiers);
-  void SendPointer(int port, int16_t x, int16_t y, bool pressed);
-  void SendSensor(int port, int id, float value);
-  bool AssignPortSource(int port, InputSourceType sourceType,
-                        const std::string &deviceId);
-  bool UnassignPortSource(int port);
-  bool ResolvePortForDevice(const std::string &deviceId,
-                            InputSourceType sourceType, int &outPort);
-  void RecordInputDevice(const std::string &deviceId,
-                         InputSourceType sourceType, const std::string &name);
-  std::vector<InputDeviceInfo> ListInputDevices() const;
-  bool CanSendVirtual(int port) const;
   bool SetFilesDir(const std::string &filesDir);
   std::string GetFilesDir() const;
-  interfaces::IInputManager *GetInputInterface() const;
   interfaces::IRenderer *GetRendererInterface() const;
 
   // --- SaveState 接口 ---
@@ -345,7 +330,7 @@ private:
   // Render/EGL 保护锁：与 windowMutex_ 同时使用时必须先锁 renderMutex_
   std::mutex renderMutex_;
   std::mutex windowMutex_;
-  OHNativeWindow *window_{nullptr};
+  WindowGuard windowGuard_;
   std::string current_xcomponent_id_;
 
   enum class SurfaceState {

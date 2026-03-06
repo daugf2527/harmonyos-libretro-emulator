@@ -381,11 +381,8 @@ bool LibretroEngine::Start() {
   LOGF(LOG_INFO, " [NEW] Engine Thread Started");
   startInProgress_.store(false);
 
-  OHNativeWindow *windowSnapshot = nullptr;
-  {
-    std::lock_guard<std::mutex> lock(windowMutex_);
-    windowSnapshot = window_;
-  }
+  auto scopedWindowInit = windowGuard_.AcquireWindow();
+  OHNativeWindow *windowSnapshot = scopedWindowInit.Get();
   if (windowSnapshot) {
     uint64_t generation = surface_generation_.load(std::memory_order_acquire);
     if (generation == 0) {
@@ -655,9 +652,10 @@ void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
   bool generationBumped = false;
   {
     std::lock_guard<std::mutex> lock(windowMutex_);
-    if (current_xcomponent_id_ != xcomponentId || window_ != window) {
+    auto currentWindow = windowGuard_.AcquireWindow();
+    if (current_xcomponent_id_ != xcomponentId || currentWindow.Get() != window) {
       changed = true;
-      window_ = window;
+      windowGuard_.SetWindow(window);
       current_xcomponent_id_ = xcomponentId;
       bumpSession = true;
     }
@@ -722,12 +720,13 @@ void LibretroEngine::ClearNativeWindowIfMatch(const std::string &xcomponentId,
   bool match = false;
   {
     std::lock_guard<std::mutex> lock(windowMutex_);
+    auto currentWindow = windowGuard_.AcquireWindow();
     if (current_xcomponent_id_ != xcomponentId) {
       match = false;
     } else if (destroyedWindow) {
-      match = (window_ == destroyedWindow);
+      match = (currentWindow.Get() == destroyedWindow);
     } else {
-      match = (window_ != nullptr);
+      match = (currentWindow.Get() != nullptr);
     }
   }
 
@@ -744,7 +743,8 @@ void LibretroEngine::OnNativeWindowResized(const std::string &xcomponentId,
   bool hasWindow = false;
   {
     std::lock_guard<std::mutex> lock(windowMutex_);
-    hasWindow = (window_ != nullptr && current_xcomponent_id_ == xcomponentId);
+    auto currentWindow = windowGuard_.AcquireWindow();
+    hasWindow = (currentWindow.Get() != nullptr && current_xcomponent_id_ == xcomponentId);
   }
   if (width > 0 && height > 0) {
     if (hasWindow) {
@@ -765,11 +765,8 @@ void LibretroEngine::OnNativeWindowResized(const std::string &xcomponentId,
         if (renderThread_) {
           renderThread_->InvalidateFrameQueueForGeneration(generation);
         }
-        OHNativeWindow *windowSnapshot = nullptr;
-        {
-          std::lock_guard<std::mutex> lock(windowMutex_);
-          windowSnapshot = window_;
-        }
+        auto scopedWindowResize = windowGuard_.AcquireWindow();
+        OHNativeWindow *windowSnapshot = scopedWindowResize.Get();
         if (windowSnapshot &&
             !messageQueue_.Push(
                 EngineMessage::MakeWindowMessage(MessageType::WindowCreated,
@@ -816,39 +813,6 @@ void LibretroEngine::OnNativeWindowResized(const std::string &xcomponentId,
   }
 }
 
-void LibretroEngine::SendInput(int port, int id, bool pressed) {
-  if (inputManager_) {
-    inputManager_->SendInput(port, id, pressed);
-  }
-}
-
-void LibretroEngine::SendAnalog(int port, int index, int id, int16_t value) {
-  if (inputManager_) {
-    inputManager_->SendAnalog(port, index, id, value);
-  }
-}
-
-bool LibretroEngine::SendVirtualInput(int port, int id, bool pressed) {
-  if (!inputPortRouter_ || !inputPortRouter_->CanSendVirtual(port)) {
-    return false;
-  }
-  if (inputManager_) {
-    return inputManager_->SendInput(port, id, pressed);
-  }
-  return false;
-}
-
-bool LibretroEngine::SendVirtualAnalog(int port, int index, int id,
-                                       int16_t value) {
-  if (!inputPortRouter_ || !inputPortRouter_->CanSendVirtual(port)) {
-    return false;
-  }
-  if (inputManager_) {
-    return inputManager_->SendAnalog(port, index, id, value);
-  }
-  return false;
-}
-
 bool LibretroEngine::DispatchKeyboardEvent(bool down, unsigned keycode,
                                            uint32_t character,
                                            uint16_t key_modifiers) {
@@ -889,65 +853,6 @@ bool LibretroEngine::DispatchKeyboardEvent(bool down, unsigned keycode,
     return false;
   }
   return true;
-}
-
-void LibretroEngine::SendPointer(int port, int16_t x, int16_t y, bool pressed) {
-  if (inputManager_) {
-    inputManager_->SendPointer(port, x, y, pressed);
-  }
-}
-
-void LibretroEngine::SendSensor(int port, int id, float value) {
-  if (inputManager_) {
-    inputManager_->SendSensor(port, id, value);
-  }
-}
-
-bool LibretroEngine::AssignPortSource(int port, InputSourceType sourceType,
-                                      const std::string &deviceId) {
-  if (!inputPortRouter_) {
-    return false;
-  }
-  return inputPortRouter_->AssignPort(port, sourceType, deviceId);
-}
-
-bool LibretroEngine::UnassignPortSource(int port) {
-  if (!inputPortRouter_) {
-    return false;
-  }
-  return inputPortRouter_->UnassignPort(port);
-}
-
-bool LibretroEngine::ResolvePortForDevice(const std::string &deviceId,
-                                          InputSourceType sourceType,
-                                          int &outPort) {
-  if (!inputPortRouter_) {
-    return false;
-  }
-  return inputPortRouter_->ResolvePortForDevice(deviceId, sourceType, outPort);
-}
-
-void LibretroEngine::RecordInputDevice(const std::string &deviceId,
-                                       InputSourceType sourceType,
-                                       const std::string &name) {
-  if (!inputPortRouter_) {
-    return;
-  }
-  inputPortRouter_->RecordDeviceSeen(deviceId, sourceType, name);
-}
-
-std::vector<InputDeviceInfo> LibretroEngine::ListInputDevices() const {
-  if (!inputPortRouter_) {
-    return {};
-  }
-  return inputPortRouter_->ListDevices();
-}
-
-bool LibretroEngine::CanSendVirtual(int port) const {
-  if (!inputPortRouter_) {
-    return false;
-  }
-  return inputPortRouter_->CanSendVirtual(port);
 }
 
 bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
@@ -1010,10 +915,6 @@ std::string LibretroEngine::GetFilesDir() const {
   }
   const char *dir = envState_.GetBaseDir();
   return dir ? std::string(dir) : "";
-}
-
-interfaces::IInputManager *LibretroEngine::GetInputInterface() const {
-  return inputManager_.get();
 }
 
 interfaces::IRenderer *LibretroEngine::GetRendererInterface() const {
@@ -1713,11 +1614,8 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
         break;
       }
       if (renderThread_) {
-        OHNativeWindow *windowSnapshot = nullptr;
-        {
-          std::lock_guard<std::mutex> lock(windowMutex_);
-          windowSnapshot = window_;
-        }
+        auto scopedWindowRt = windowGuard_.AcquireWindow();
+        OHNativeWindow *windowSnapshot = scopedWindowRt.Get();
         renderThread_->SetWindow(windowSnapshot, generation);
         HwRenderRuntimeInfo runtime{};
         runtime.video_width = videoWidth_;
@@ -2015,11 +1913,8 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
     g_engineInstance->surfaceInvalidDropLogCount_++;
     if (g_engineInstance->surfaceInvalidDropLogCount_ <= 5 ||
         (g_engineInstance->surfaceInvalidDropLogCount_ % 120) == 0) {
-      OHNativeWindow *windowSnapshot = nullptr;
-      {
-        std::lock_guard<std::mutex> lock(g_engineInstance->windowMutex_);
-        windowSnapshot = g_engineInstance->window_;
-      }
+      auto scopedWindowLog = g_engineInstance->windowGuard_.AcquireWindow();
+      OHNativeWindow *windowSnapshot = scopedWindowLog.Get();
       const int cachedW = g_engineInstance->last_window_width_.load();
       const int cachedH = g_engineInstance->last_window_height_.load();
       LOGF(LOG_WARN,
@@ -2233,11 +2128,8 @@ bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
            g_engineInstance->hw_render_enabled_.load() ? 1 : 0,
            static_cast<int>(cb.context_type), cb.cache_context ? 1 : 0);
     }
-    OHNativeWindow *windowSnapshot = nullptr;
-    {
-      std::lock_guard<std::mutex> lock(g_engineInstance->windowMutex_);
-      windowSnapshot = g_engineInstance->window_;
-    }
+    auto scopedWindowHw = g_engineInstance->windowGuard_.AcquireWindow();
+    OHNativeWindow *windowSnapshot = scopedWindowHw.Get();
     uint64_t generation =
         g_engineInstance->surface_generation_.load(std::memory_order_acquire);
     if (windowSnapshot) {
