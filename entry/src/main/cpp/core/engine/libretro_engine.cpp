@@ -370,7 +370,7 @@ bool LibretroEngine::Start() {
   gameLoopExited_.store(false);
   TransitionTo(EngineState::STARTING);
 
-  running_ = true;
+  running_.store(true);
   gameThread_ = std::thread(&LibretroEngine::GameLoop, this);
   if (renderThread_ && render_thread_enabled_.load(std::memory_order_relaxed)) {
     renderThread_->SetEnabled(true);
@@ -475,7 +475,7 @@ bool LibretroEngine::Stop() {
     renderThread_->Stop();
   }
 
-  running_ = false;
+  running_.store(false);
   TransitionTo(EngineState::STOPPED);
   stopRequested_.store(false);
   stopTimedOut_.store(false);

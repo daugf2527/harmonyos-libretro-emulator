@@ -116,7 +116,7 @@ private:
 
   // EGL State
   EGLDisplay egl_display_ = EGL_NO_DISPLAY;
-  EGLConfig egl_config_;
+  EGLConfig egl_config_ = nullptr;
   EGLContext egl_context_ = EGL_NO_CONTEXT;
   EGLSurface egl_surface_ = EGL_NO_SURFACE;
 

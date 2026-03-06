@@ -104,6 +104,10 @@ bool CoreStateManager::SetSRAM(const std::vector<uint8_t> &data) {
     return false;
   }
   size_t copySize = std::min(size, data.size());
+  if (copySize < data.size()) {
+    LOGF(LOG_WARN, "SetSRAM: input truncated from %{public}zu to %{public}zu bytes",
+         data.size(), copySize);
+  }
   std::memcpy(ptr, data.data(), copySize);
   return true;
 }

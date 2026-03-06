@@ -1360,14 +1360,14 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
   }
 
   if (frame_count_ % 60 == 0) {
-    long long totalUs =
+    long long perfTotalUs =
         std::chrono::duration_cast<std::chrono::microseconds>(t6 - start)
             .count();
     long long convUs =
         std::chrono::duration_cast<std::chrono::microseconds>(t5 - t4).count();
     LOGF(LOG_INFO,
          "Perf: Total=%{public}lld us, Conv=%{public}lld us, Mode=%{public}d",
-         totalUs, convUs, static_cast<int>(scaling_mode_.load()));
+         perfTotalUs, convUs, static_cast<int>(scaling_mode_.load()));
   }
   frame_count_++;
   return isDupeRequest ? RenderResult::DUPED : RenderResult::RENDERED;

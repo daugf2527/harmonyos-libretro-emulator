@@ -644,6 +644,10 @@ void PixelConverter::ConvertAndScale(const void *srcData, PixelFormat srcFormat,
                                      size_t srcPitch, void *destData,
                                      PixelFormat destFormat, unsigned destWidth,
                                      unsigned destHeight, unsigned destStride) {
+  if (!srcData || !destData || srcWidth == 0 || srcHeight == 0 ||
+      destWidth == 0 || destHeight == 0) {
+    return;
+  }
   if (destStride == 0) {
     destStride = destWidth;
   }

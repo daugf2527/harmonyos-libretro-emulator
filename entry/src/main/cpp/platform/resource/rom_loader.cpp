@@ -186,7 +186,7 @@ std::string ROMLoader::UriToPath(const std::string& uri) {
     }
     
     // 验证 URI 格式
-    unsigned int length = uri.length();
+    uint32_t length = static_cast<uint32_t>(uri.length());
     if (!OH_FileUri_IsValidUri(uri.c_str(), length)) {
         LOGF(LOG_ERROR, "Invalid URI format: %{public}s", uri.c_str());
         return "";

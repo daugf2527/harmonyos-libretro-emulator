@@ -108,8 +108,8 @@ bool CoreLoader::LoadCore(const std::string &corePath) {
     return false;
   }
   LOGF(LOG_INFO,
-               "File found! Size: %{public}ld bytes, Mode: %{public}o",
-               (long)fileStat.st_size, fileStat.st_mode);
+               "File found! Size: %{public}lld bytes, Mode: %{public}o",
+               static_cast<long long>(fileStat.st_size), fileStat.st_mode);
 
   // 1. 使用 dlopen 加载动态库 (仅 RTLD_LOCAL，避免符号污染)
   std::string dlopenErr;

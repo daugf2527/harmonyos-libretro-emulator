@@ -2,7 +2,6 @@
 #define LIBRETRO_ENGINE_BOUNDED_LATEST_FRAME_QUEUE_H
 
 #include "video_frame_packet.h"
-#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -43,7 +42,6 @@ public:
     if (queue_.size() > stats_.depthMax) {
       stats_.depthMax = queue_.size();
     }
-    cond_.notify_one();
     return true;
   }
 
@@ -85,7 +83,6 @@ public:
 
 private:
   mutable std::mutex mutex_;
-  std::condition_variable cond_;
   std::deque<VideoFramePacket> queue_;
   size_t capacity_ = 2;
   Stats stats_{};
