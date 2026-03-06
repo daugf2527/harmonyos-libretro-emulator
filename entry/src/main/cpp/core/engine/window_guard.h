@@ -92,18 +92,15 @@ public:
   }
 
   /**
-   * @brief Deprecated: Use AcquireWindow instead.
-   */
-  OHNativeWindow *PeekWindow() {
-    return window_;
-  }
-
-  /**
    * @brief 获取锁引用，由调用方控制临界区
    */
   std::mutex &GetMutex() { return mutex_; }
 
 private:
+  OHNativeWindow *PeekWindow() {
+    return window_;
+  }
+
   OHNativeWindow *window_;
   std::mutex mutex_;
 };

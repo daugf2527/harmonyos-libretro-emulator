@@ -46,6 +46,12 @@ static bool ReadFile(const std::string &path, std::vector<uint8_t> &data,
     error = "stat failed";
     return false;
   }
+  constexpr off_t kMaxElfSize = 256 * 1024 * 1024;
+  if (st.st_size > kMaxElfSize) {
+    close(fd);
+    error = "file too large";
+    return false;
+  }
   data.resize(static_cast<size_t>(st.st_size));
   size_t total = 0;
   while (total < data.size()) {

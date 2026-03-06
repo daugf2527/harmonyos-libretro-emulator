@@ -30,7 +30,8 @@ std::vector<std::string> ParseCueReferencedFiles(const std::vector<uint8_t>& cue
                        [](unsigned char c) {
                          return static_cast<char>(std::toupper(c));
                        });
-        if (upper.rfind("FILE", 0) == 0) {
+        if (upper.rfind("FILE", 0) == 0 &&
+            (upper.size() == 4 || std::isspace(static_cast<unsigned char>(upper[4])))) {
             // Format: FILE "filename.bin" BINARY
             // or: FILE filename.bin BINARY
             

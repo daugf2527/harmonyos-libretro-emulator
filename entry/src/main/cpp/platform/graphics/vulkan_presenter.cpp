@@ -373,6 +373,7 @@ void VulkanPresenter::LockQueue() { queue_mutex_.lock(); }
 
 void VulkanPresenter::UnlockQueue() { queue_mutex_.unlock(); }
 
+
 void VulkanPresenter::SetSignalSemaphore(VkSemaphore semaphore) {
   const uint32_t index = sync_index_.load();
   std::lock_guard<std::mutex> lock(state_mutex_);
@@ -477,10 +478,11 @@ bool VulkanPresenter::SubmitFrame(FrameState &state, uint32_t image_index) {
       static_cast<uint32_t>(signal_semaphores.size());
   submit.pSignalSemaphores = signal_semaphores.data();
 
-  LockQueue();
-  const VkResult submit_res =
-      api_.queue_submit(queue_, 1, &submit, state.submit_fence);
-  UnlockQueue();
+  VkResult submit_res;
+  {
+    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
+    submit_res = api_.queue_submit(queue_, 1, &submit, state.submit_fence);
+  }
   if (submit_res != VK_SUCCESS) {
     if (ShouldLog(submit_fail_count_, 3, 60)) {
       LOGF(LOG_ERROR, "vkQueueSubmit failed: %{public}d", submit_res);
@@ -496,7 +498,11 @@ bool VulkanPresenter::SubmitFrame(FrameState &state, uint32_t image_index) {
   present.pSwapchains = &swapchain_;
   present.pImageIndices = &image_index;
 
-  const VkResult present_res = api_.queue_present_khr(present_queue_, &present);
+  VkResult present_res;
+  {
+    std::lock_guard<std::mutex> queue_lock(queue_mutex_);
+    present_res = api_.queue_present_khr(present_queue_, &present);
+  }
   if (present_res == VK_ERROR_OUT_OF_DATE_KHR ||
       present_res == VK_SUBOPTIMAL_KHR) {
     if (ShouldLog(present_out_of_date_count_, 3, 60)) {

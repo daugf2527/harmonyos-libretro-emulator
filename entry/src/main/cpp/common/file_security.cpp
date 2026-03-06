@@ -27,7 +27,7 @@ bool ValidatePath(const std::string &inputPath,
 
   if (!resolvedRootPtr) {
     LOGF(LOG_ERROR,
-                 "realpath failed for allowed root: %s", allowedRoot.c_str());
+                 "realpath failed for allowed root: %{public}s", allowedRoot.c_str());
     return false;
   }
 
@@ -52,7 +52,7 @@ bool ValidatePath(const std::string &inputPath,
 
   // realpath 失败，可能是文件不存在，尝试校验父目录
   LOGF(LOG_WARN,
-               "realpath failed for input: %s (may not exist yet)",
+               "realpath failed for input: %{public}s (may not exist yet)",
                inputPath.c_str());
   if (inputPath.find("..") != std::string::npos) {
     return false;
@@ -72,12 +72,12 @@ bool ValidatePath(const std::string &inputPath,
   char *resolvedParentPtr = realpath(parent.c_str(), resolvedParent);
   if (!resolvedParentPtr) {
     LOGF(LOG_ERROR,
-                 "realpath failed for input parent: %s", parent.c_str());
+                 "realpath failed for input parent: %{public}s", parent.c_str());
     // 允许父目录尚不存在的路径，但必须是绝对路径且在允许根目录下
     if (inputPath[0] == '/' && inputPath.find("..") == std::string::npos &&
         IsUnderRoot(inputPath)) {
       LOGF(LOG_WARN,
-           "Allowing path under root even though parent is missing: %s",
+           "Allowing path under root even though parent is missing: %{public}s",
            inputPath.c_str());
       return true;
     }
@@ -88,7 +88,7 @@ bool ValidatePath(const std::string &inputPath,
 
   if (!isValid) {
     LOGF(LOG_ERROR,
-                 "Path Traversal Detected! Input: %s, Allowed Root: %s",
+                 "Path Traversal Detected! Input: %{public}s, Allowed Root: %{public}s",
                  inputPath.c_str(), resolvedRoot);
   }
 
@@ -110,13 +110,13 @@ bool ValidateCorePath(const std::string &corePath) {
   for (const char *allowedDir : allowedCoreDirs) {
     if (ValidatePath(corePath, allowedDir)) {
       LOGF(LOG_INFO,
-                   "Core path validated: %s", corePath.c_str());
+                   "Core path validated: %{public}s", corePath.c_str());
       return true;
     }
   }
 
   LOGF(LOG_ERROR,
-               "Core path rejected (not in allowed directories): %s",
+               "Core path rejected (not in allowed directories): %{public}s",
                corePath.c_str());
   return false;
 }
@@ -132,11 +132,11 @@ bool ValidateRomPath(const std::string &romPath) {
     // 只需确保没有路径遍历字符
     if (romPath.find("..") != std::string::npos) {
       LOGF(LOG_ERROR,
-                   "ROM rawfile path contains ..: %s", romPath.c_str());
+                   "ROM rawfile path contains ..: %{public}s", romPath.c_str());
       return false;
     }
     LOGF(LOG_INFO,
-                 "ROM rawfile path validated: %s", romPath.c_str());
+                 "ROM rawfile path validated: %{public}s", romPath.c_str());
     return true;
   }
 
@@ -150,13 +150,13 @@ bool ValidateRomPath(const std::string &romPath) {
   for (const char *allowedDir : allowedRomDirs) {
     if (ValidatePath(romPath, allowedDir)) {
       LOGF(LOG_INFO,
-                   "ROM file path validated: %s", romPath.c_str());
+                   "ROM file path validated: %{public}s", romPath.c_str());
       return true;
     }
   }
 
   LOGF(LOG_ERROR,
-               "ROM path rejected (not in allowed directories): %s",
+               "ROM path rejected (not in allowed directories): %{public}s",
                romPath.c_str());
   return false;
 }

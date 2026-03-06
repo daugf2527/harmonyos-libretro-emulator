@@ -54,7 +54,12 @@ bool TempFileManager::WriteTempRom(const std::string& rawfilePath, const std::ve
 }
 
 bool TempFileManager::WriteDependencyFile(const std::string& relativePath, const std::string& parentTempDir, const std::vector<uint8_t>& data) {
-    if (parentTempDir.empty()) {
+    if (parentTempDir.empty() || relativePath.empty()) {
+        return false;
+    }
+
+    if (relativePath.find("..") != std::string::npos) {
+        LOGF(LOG_ERROR, "Path traversal detected in dependency path: %{public}s", relativePath.c_str());
         return false;
     }
 

@@ -78,7 +78,7 @@ static inline int16_t fetch_channel(const int16_t *in, size_t in_frames,
 
 size_t AudioResampler::Resample(const int16_t *in, size_t in_frames,
                                 int16_t *out) {
-  if (!in || !out || in_frames == 0)
+  if (!in || !out || in_frames == 0 || current_ratio_ <= 0.0)
     return 0;
 
   if (!history_init_) {

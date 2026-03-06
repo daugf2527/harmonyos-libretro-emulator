@@ -523,23 +523,26 @@ void GLESRenderer::Deinit() {
                                     EGL_NO_SURFACE, egl_context_);
   }
 
-  // Reset GL objects (deletes them)
-  texture_.reset();
-  program_.reset();
-  vbo_.reset();
-  vao_.reset();
+  if (!contextCurrent) {
+    LOGF(LOG_WARN, "EGL context not current during Deinit, skipping GL resource cleanup");
+  } else {
+    texture_.reset();
+    program_.reset();
+    vbo_.reset();
+    vao_.reset();
 
-  for (auto &f : upload_fence_ring_) {
-    if (f) {
-      glDeleteSync(f);
-      f = nullptr;
+    for (auto &f : upload_fence_ring_) {
+      if (f) {
+        glDeleteSync(f);
+        f = nullptr;
+      }
     }
-  }
 
-  for (auto &pbo : pbo_ring_) {
-    if (pbo != 0) {
-      glDeleteBuffers(1, &pbo);
-      pbo = 0;
+    for (auto &pbo : pbo_ring_) {
+      if (pbo != 0) {
+        glDeleteBuffers(1, &pbo);
+        pbo = 0;
+      }
     }
   }
 
