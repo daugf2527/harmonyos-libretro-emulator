@@ -757,6 +757,8 @@ bool GLESRenderer::CreateProgram() {
     LOGF(LOG_ERROR,
                  "Program link error: %{public}s", log);
     glDeleteProgram(p);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
     return false;
   }
 

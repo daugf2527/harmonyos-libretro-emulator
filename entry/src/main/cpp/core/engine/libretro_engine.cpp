@@ -1360,7 +1360,9 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     if (coreLoader_.IsLoaded()) {
       LOGF(LOG_INFO, "[NEW] Unloading previous core before loading new one");
       UnloadGameIfNeeded("switch_core");
-      coreLoader_.GetDeinit()();
+      if (coreLoader_.GetDeinit()) {
+        coreLoader_.GetDeinit()();
+      }
       coreLoader_.UnloadCore();
     }
     envState_.ResetCoreState();

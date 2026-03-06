@@ -192,7 +192,7 @@ static void Convert0RGB1555ToBGRA8888_NEON(const uint16_t *src, uint32_t *dest,
     uint16x8_t pixels = vld1q_u16(src + i);
 
     uint16x8_t r5 = vshrq_n_u16(pixels, 10);
-    uint16x8_t g5 = vshrq_n_u16(vshlq_n_u16(pixels, 5), 11);
+    uint16x8_t g5 = vandq_u16(vshrq_n_u16(pixels, 5), vdupq_n_u16(0x1F));
     uint16x8_t b5 = vandq_u16(pixels, vdupq_n_u16(0x1F));
 
     uint16x8_t r8 = vshlq_n_u16(r5, 3);
@@ -279,9 +279,9 @@ static void Convert0RGB1555ToRGBA8888_NEON(const uint16_t *src, uint32_t *dest,
     uint16x8_t pixels = vld1q_u16(src + i);
 
     // 提取 R, G, B 分量 (5-5-5)
-    uint16x8_t r5 = vshrq_n_u16(pixels, 10); // 右移 10 位,得到 R (5位)
-    uint16x8_t g5 = vshrq_n_u16(vshlq_n_u16(pixels, 5), 11); // 提取 G (5位)
-    uint16x8_t b5 = vandq_u16(pixels, vdupq_n_u16(0x1F)); // 掩码提取 B (5位)
+    uint16x8_t r5 = vshrq_n_u16(pixels, 10);
+    uint16x8_t g5 = vandq_u16(vshrq_n_u16(pixels, 5), vdupq_n_u16(0x1F));
+    uint16x8_t b5 = vandq_u16(pixels, vdupq_n_u16(0x1F));
 
     // 扩展到 8 位
     uint16x8_t r8 = vshlq_n_u16(r5, 3); // 5位 -> 8位 (左移 3)
@@ -644,6 +644,9 @@ void PixelConverter::ConvertAndScale(const void *srcData, PixelFormat srcFormat,
                                      size_t srcPitch, void *destData,
                                      PixelFormat destFormat, unsigned destWidth,
                                      unsigned destHeight, unsigned destStride) {
+  if (destStride == 0) {
+    destStride = destWidth;
+  }
   static uint64_t convertLogCount = 0;
   convertLogCount++;
   struct ConvertLogKey {

@@ -811,7 +811,6 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   if (token == 0) {
     token = switch_token.fetch_add(1) + 1;
   }
-  switch_token.store(token);
 
   auto *ctx = new SwitchGameAsyncContext();
   ctx->env = env;

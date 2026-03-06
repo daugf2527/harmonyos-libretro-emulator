@@ -236,7 +236,8 @@ static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
     for (size_t i = 0; i < dyn_count; ++i) {
       if (dyn[i].d_tag == DT_NEEDED) {
         const size_t needed_offset = static_cast<size_t>(dyn[i].d_un.d_val);
-        if (needed_offset > data.size() - strtab_offset) {
+        if (strtab_offset > data.size() ||
+            needed_offset > data.size() - strtab_offset) {
           result.error = "ELF64 DT_NEEDED offset out of range";
           return result;
         }
@@ -320,7 +321,8 @@ static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
     for (size_t i = 0; i < dyn_count; ++i) {
       if (dyn[i].d_tag == DT_NEEDED) {
         const size_t needed_offset = static_cast<size_t>(dyn[i].d_un.d_val);
-        if (needed_offset > data.size() - strtab_offset) {
+        if (strtab_offset > data.size() ||
+            needed_offset > data.size() - strtab_offset) {
           result.error = "ELF32 DT_NEEDED offset out of range";
           return result;
         }
