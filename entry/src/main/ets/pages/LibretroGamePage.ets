@@ -679,11 +679,16 @@ struct LibretroGamePage {
     deviceId: string = ''
   ) {
     let ok = false;
-    if (sourceType === InputSourceType.None) {
-      ok = nativeApi.refactoredUnassignPort(portId);
-    } else {
-      // 必须确保传递字符串，避免 NAPI 因 undefined 参数崩溃
-      ok = nativeApi.refactoredAssignPortSource(portId, sourceType, deviceId ?? '');
+    try {
+      if (sourceType === InputSourceType.None) {
+        ok = nativeApi.refactoredUnassignPort?.(portId) ?? false;
+      } else {
+        // 必须确保传递字符串，避免 NAPI 因 undefined 参数崩溃
+        ok = nativeApi.refactoredAssignPortSource?.(portId, sourceType, deviceId ?? '') ?? false;
+      }
+    } catch (e) {
+      LogHelper.warn('LibretroGame', 'Input', `端口映射调用异常: ${(e as Error).message}`);
+      ok = false;
     }
     if (updateState) {
       this.updatePortAssignment(portId, sourceType, deviceId);
@@ -1866,8 +1871,8 @@ struct LibretroGamePage {
 
       nativeApi.refactoredClearLastErrorInfo();
       
-      let abiPath = deviceInfo.abiList === 'x86_64' ? 'x86_64' : 'arm64';
-      const corePath = `${bundleCodeDir}/libs/${abiPath}/${core.soFile}`;
+      const corePath = await this.resolveCorePath(bundleCodeDir, core.soFile);
+      LogHelper.info('LibretroGame', 'Engine', `加载 Core: ${corePath}`);
       LogHelper.info('LibretroGame', 'Engine', `加载 ROM: ${rom.file}`);
       token = this.switchToken + 1;
       this.switchToken = token;
@@ -1951,6 +1956,47 @@ struct LibretroGamePage {
     const step = err.step ? ` step=${err.step}` : '';
     const message = err.message ? ` message=${err.message}` : '';
     return `${prefix} failed: reason=${err.reason}${step}${message}`;
+  }
+
+  private buildCoreAbiCandidates(): string[] {
+    const rawAbiList = String(deviceInfo.abiList ?? '').toLowerCase();
+    const candidates: string[] = [];
+    const addCandidate = (abi: string) => {
+      if (!abi || candidates.indexOf(abi) >= 0) {
+        return;
+      }
+      candidates.push(abi);
+    };
+
+    if (rawAbiList.indexOf('x86_64') >= 0) {
+      addCandidate('x86_64');
+    } else {
+      addCandidate('arm64');
+      addCandidate('arm64-v8a');
+    }
+    addCandidate('arm64');
+    addCandidate('arm64-v8a');
+    addCandidate('x86_64');
+    return candidates;
+  }
+
+  private async resolveCorePath(bundleCodeDir: string, soFile: string): Promise<string> {
+    const abiCandidates = this.buildCoreAbiCandidates();
+    for (let i = 0; i < abiCandidates.length; i++) {
+      const abi = abiCandidates[i];
+      const path = `${bundleCodeDir}/libs/${abi}/${soFile}`;
+      if (await this.fileExists(path)) {
+        LogHelper.info('LibretroGame', 'Engine', `Core path resolved: abi=${abi}, path=${path}`);
+        return path;
+      }
+    }
+    const fallback = `${bundleCodeDir}/libs/${abiCandidates[0]}/${soFile}`;
+    LogHelper.warn(
+      'LibretroGame',
+      'Engine',
+      `Core path fallback (not found): ${fallback}, abiList=${String(deviceInfo.abiList ?? '')}`
+    );
+    return fallback;
   }
 
   private async resolveRomPathForSwitch(

@@ -48,6 +48,11 @@ interface CoreExtensionRule {
   requiresExactName?: string;
 }
 
+interface CoreDependencyHint {
+  coreId: string;
+  hint: string;
+}
+
 // 核心配置接口
 interface CoreConfig {
   id: string;
@@ -77,13 +82,33 @@ interface TestResult {
   error?: string;
 }
 
+enum AutoTestLevel {
+  PASS = 'PASS',
+  SKIP = 'SKIP',
+  FAIL = 'FAIL'
+}
+
+enum AutoTestDomain {
+  ENGINE = 'ENGINE',
+  RESOURCE = 'RESOURCE',
+  DEPENDENCY = 'DEPENDENCY',
+  TIMEOUT = 'TIMEOUT',
+  LIFECYCLE = 'LIFECYCLE',
+  UNKNOWN = 'UNKNOWN'
+}
+
 // 自动化测试结果接口
 interface AutoTestResult {
   coreName: string;
   romName: string;
   success: boolean;
   fps: number;
+  level: AutoTestLevel;
+  domain: AutoTestDomain;
+  stage: string;
+  code: string;
   message: string;
+  detail?: string;
 }
 
 @Entry
@@ -296,6 +321,11 @@ struct TestGambatte {
   // 可用的 ROM 列表
   private roms: RomConfig[] = [];
   private readonly noGameCores: string[] = ['mrboom'];
+  private readonly dependencyHints: CoreDependencyHint[] = [
+    { coreId: 'melonds', hint: '需要 system/bios7.bin, bios9.bin, firmware.bin' },
+    { coreId: 'mednafen_psx_hw', hint: '需要有效 PSX BIOS 文件' },
+    { coreId: 'pcsx_rearmed', hint: '建议提供 PSX BIOS 文件以提升兼容性' }
+  ];
   private readonly coreExtensionRules: CoreExtensionRule[] = [
     { coreId: 'gambatte', extensions: ['gb', 'gbc', 'dmg'] },
     { coreId: 'sameboy', extensions: ['gb', 'gbc'] },
@@ -534,6 +564,15 @@ struct TestGambatte {
         .fontWeight(FontWeight.Bold)
         .margin({ bottom: 10 })
 
+      Text(
+        `PASS ${this.countAutoTestByLevel(AutoTestLevel.PASS)} | ` +
+        `SKIP ${this.countAutoTestByLevel(AutoTestLevel.SKIP)} | ` +
+        `FAIL ${this.countAutoTestByLevel(AutoTestLevel.FAIL)}`
+      )
+        .fontSize(12)
+        .fontColor(Color.Gray)
+        .margin({ bottom: 8 })
+
       List() {
         ForEach(this.autoTestResults, (item: AutoTestResult) => {
           ListItem() {
@@ -550,18 +589,27 @@ struct TestGambatte {
               .layoutWeight(1)
 
               Column() {
-                Text(item.success ? 'PASS' : 'FAIL')
+                Text(item.level)
                   .fontSize(14)
-                  .fontColor(item.success ? '#4CAF50' : '#F44336')
+                  .fontColor(
+                    item.level === AutoTestLevel.PASS
+                      ? '#4CAF50'
+                      : (item.level === AutoTestLevel.SKIP ? '#FB8C00' : '#F44336')
+                  )
                   .fontWeight(FontWeight.Bold)
-                if (item.success) {
+                Text(`${item.domain} · ${item.code}`)
+                  .fontSize(10)
+                  .fontColor(Color.Gray)
+                  .maxLines(1)
+                  .textOverflow({ overflow: TextOverflow.Ellipsis })
+                if (item.level === AutoTestLevel.PASS) {
                   Text(`FPS: ${item.fps.toFixed(1)}`)
                     .fontSize(12)
                     .fontColor('#4CAF50')
                 } else {
                   Text(item.message)
                     .fontSize(10)
-                    .fontColor('#F44336')
+                    .fontColor(item.level === AutoTestLevel.SKIP ? '#FB8C00' : '#F44336')
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
@@ -696,10 +744,7 @@ struct TestGambatte {
 
       const stopOk = nativeApi.refactoredStopEngineAsync();
       if (stopOk) {
-        const stopped = await nativeApi.refactoredWaitForStateAsync(
-          EngineState.STOPPED,
-          timeoutMs
-        );
+        const stopped = await this.waitEngineQuiesced(timeoutMs);
         if (!stopped) {
           throw new Error('停止超时');
         }
@@ -801,13 +846,14 @@ struct TestGambatte {
         this.autoTestResults.push(result);
       } catch (e) {
         const err = e as Error;
-        this.autoTestResults.push({
-          coreName: item.core.name,
-          romName: item.rom?.name || 'No ROM',
-          success: false,
-          fps: 0,
-          message: `执行异常: ${err.message}`
-        });
+        this.autoTestResults.push(this.makeFailResult(
+          item.core.name,
+          item.rom?.name || 'No ROM',
+          'run_single_case',
+          'auto_test_exception',
+          `执行异常: ${err.message}`,
+          AutoTestDomain.LIFECYCLE
+        ));
         LogHelper.error('TestGambatte', 'AutoTest', `测试项异常: ${err.message}`);
       }
 
@@ -826,13 +872,13 @@ struct TestGambatte {
     
     // 检查是否跳过
     if (!rom && !this.noGameCores.includes(core.id)) {
-      return {
-        coreName: core.name,
-        romName: '无可用 ROM',
-        success: false,
-        fps: 0,
-        message: '跳过: 缺少 ROM'
-      };
+      return this.makeSkipResult(
+        core.name,
+        '无可用 ROM',
+        'precheck',
+        'skip_no_rom',
+        '跳过: 缺少 ROM'
+      );
     }
 
     LogHelper.info('TestGambatte', 'AutoTest', `>>> 测试开始: ${core.name} | ${romName}`);
@@ -841,18 +887,16 @@ struct TestGambatte {
     nativeApi.refactoredClearLastErrorInfo();
     const stopOk = nativeApi.refactoredStopEngineAsync();
     if (stopOk) {
-      const stopped = await nativeApi.refactoredWaitForStateAsync(
-        EngineState.STOPPED,
-        timeoutMs
-      );
+      const stopped = await this.waitEngineQuiesced(timeoutMs);
       if (!stopped) {
-        return {
-          coreName: core.name,
-          romName: romName,
-          success: false,
-          fps: 0,
-          message: 'Stop 超时'
-        };
+        return this.makeFailResult(
+          core.name,
+          romName,
+          'stop_before_start',
+          'stop_timeout',
+          'Stop 超时',
+          AutoTestDomain.TIMEOUT
+        );
       }
     }
 
@@ -869,74 +913,74 @@ struct TestGambatte {
       // Start Engine
       const startOk = nativeApi.refactoredStartEngine();
       if (!startOk) {
-        return {
-          coreName: core.name,
-          romName: romName,
-          success: false,
-          fps: 0,
-          message: 'Start Engine Failed'
-        };
+        return this.classifyFromLastError(
+          core,
+          romName,
+          'start_engine',
+          'start_engine_failed',
+          'Start Engine Failed'
+        );
       }
       const setDirOk = nativeApi.refactoredSetFilesDir(filesDir);
       if (!setDirOk) {
-        return {
-          coreName: core.name,
-          romName: romName,
-          success: false,
-          fps: 0,
-          message: 'Set FilesDir Failed'
-        };
+        return this.classifyFromLastError(
+          core,
+          romName,
+          'set_files_dir',
+          'set_files_dir_failed',
+          'Set FilesDir Failed'
+        );
       }
       
       // Load Core
       const loadCoreOk = nativeApi.refactoredLoadCore(corePath);
       if (!loadCoreOk) {
-        return {
-          coreName: core.name,
-          romName: romName,
-          success: false,
-          fps: 0,
-          message: 'Load Core Failed'
-        };
+        return this.classifyFromLastError(
+          core,
+          romName,
+          'load_core',
+          'load_core_submit_failed',
+          'Load Core Failed'
+        );
       }
       const coreReady = await nativeApi.refactoredWaitForStateAsync(
         EngineState.CORE_LOADED,
         timeoutMs
       );
       if (!coreReady) {
-        return {
-          coreName: core.name,
-          romName: romName,
-          success: false,
-          fps: 0,
-          message: this.formatLastError('LoadCore')
-        };
+        return this.classifyFromLastError(
+          core,
+          romName,
+          'wait_core_loaded',
+          'wait_core_loaded_timeout',
+          this.formatLastError('LoadCore')
+        );
       }
 
       // Load ROM (如果有)
       if (rom) {
         const loadRomOk = nativeApi.refactoredLoadRom(rom.file, resMgr);
         if (!loadRomOk) {
-          return {
-            coreName: core.name,
-            romName: romName,
-            success: false,
-            fps: 0,
-            message: 'Load ROM Failed'
-          };
+          return this.classifyFromLastError(
+            core,
+            romName,
+            'load_rom',
+            'load_rom_submit_failed',
+            'Load ROM Failed'
+          );
         }
         const running = await nativeApi.refactoredWaitForStateAsync(
           EngineState.RUNNING,
           timeoutMs
         );
         if (!running) {
-          return {
-            coreName: core.name,
-            romName: romName,
-            success: false,
-            fps: 0,
-            message: this.formatLastError('LoadRom')
-          };
+          return this.classifyFromLastError(
+            core,
+            romName,
+            'wait_running',
+            'wait_running_timeout',
+            this.formatLastError('LoadRom')
+          );
         }
       } else if (this.noGameCores.includes(core.id)) {
         const running = await nativeApi.refactoredWaitForStateAsync(
@@ -944,13 +988,13 @@ struct TestGambatte {
           timeoutMs
         );
         if (!running) {
-          return {
-            coreName: core.name,
-            romName: romName,
-            success: false,
-            fps: 0,
-            message: this.formatLastError('LoadCore')
-          };
+          return this.classifyFromLastError(
+            core,
+            romName,
+            'wait_running_no_rom',
+            'wait_running_timeout_no_rom',
+            this.formatLastError('LoadCore')
+          );
         }
       }
 
@@ -976,24 +1020,201 @@ struct TestGambatte {
       
       LogHelper.info('TestGambatte', 'AutoTest', `<<< 测试结束: ${core.name} | FPS: ${maxFps}`);
 
-      return {
-        coreName: core.name,
-        romName: romName,
-        success: true, // 只要没抛出异常且 Load 成功，暂时认为 Success
-        fps: maxFps,
-        message: 'Pass'
-      };
+      return this.makePassResult(core.name, romName, maxFps);
 
     } catch (e) {
       throw e as Error;
     } finally {
       // 再次确保清理
       nativeApi.refactoredStopEngineAsync();
-      await nativeApi.refactoredWaitForStateAsync(
-        EngineState.STOPPED,
-        2000
-      );
+      await this.waitEngineQuiesced(2000);
     }
+  }
+
+  private async waitEngineQuiesced(timeoutMs: number): Promise<boolean> {
+    const stopped = await nativeApi.refactoredWaitForStateAsync(
+      EngineState.STOPPED,
+      timeoutMs
+    );
+    if (stopped) {
+      return true;
+    }
+    // 引擎未运行时可能保持 INIT，不一定进入 STOPPED。
+    return nativeApi.refactoredWaitForStateAsync(EngineState.INIT, 0);
+  }
+
+  private makePassResult(coreName: string, romName: string, fps: number): AutoTestResult {
+    return {
+      coreName: coreName,
+      romName: romName,
+      success: true,
+      fps: fps,
+      level: AutoTestLevel.PASS,
+      domain: AutoTestDomain.ENGINE,
+      stage: 'lifecycle',
+      code: 'engine_lifecycle_ok',
+      message: '生命周期通过'
+    };
+  }
+
+  private makeSkipResult(
+    coreName: string,
+    romName: string,
+    stage: string,
+    code: string,
+    message: string
+  ): AutoTestResult {
+    return {
+      coreName: coreName,
+      romName: romName,
+      success: false,
+      fps: 0,
+      level: AutoTestLevel.SKIP,
+      domain: AutoTestDomain.RESOURCE,
+      stage: stage,
+      code: code,
+      message: message
+    };
+  }
+
+  private makeFailResult(
+    coreName: string,
+    romName: string,
+    stage: string,
+    code: string,
+    message: string,
+    domain: AutoTestDomain,
+    detail?: string
+  ): AutoTestResult {
+    return {
+      coreName: coreName,
+      romName: romName,
+      success: false,
+      fps: 0,
+      level: AutoTestLevel.FAIL,
+      domain: domain,
+      stage: stage,
+      code: code,
+      message: message,
+      detail: detail
+    };
+  }
+
+  private countAutoTestByLevel(level: AutoTestLevel): number {
+    return this.autoTestResults.filter(item => item.level === level).length;
+  }
+
+  private findDependencyHint(coreId: string): string | undefined {
+    const hit = this.dependencyHints.find(item => item.coreId === coreId);
+    return hit?.hint;
+  }
+
+  private classifyFromLastError(
+    core: CoreConfig,
+    romName: string,
+    stage: string,
+    fallbackCode: string,
+    fallbackMessage: string
+  ): AutoTestResult {
+    const err: EngineErrorInfo = nativeApi.refactoredGetLastErrorInfo();
+    const reason = (err?.reason || '').trim();
+    const step = (err?.step || '').trim();
+    const rawMessage = (err?.message || '').trim();
+    const lowerMessage = rawMessage.toLowerCase();
+    const dependencyHint = this.findDependencyHint(core.id);
+
+    let domain: AutoTestDomain = AutoTestDomain.UNKNOWN;
+    let code = reason || fallbackCode;
+    let message = fallbackMessage;
+
+    if (reason.length === 0) {
+      domain = AutoTestDomain.UNKNOWN;
+    } else if (
+      reason === 'stop_timeout' ||
+      reason === 'switch_wait_stopped_timeout' ||
+      reason === 'switch_wait_core_loaded_timeout' ||
+      reason === 'switch_wait_running_timeout'
+    ) {
+      domain = AutoTestDomain.TIMEOUT;
+      message = `超时: ${reason}`;
+    } else if (
+      reason === 'start_in_progress' ||
+      reason === 'start_blocked_stop_in_progress' ||
+      reason === 'switch_cancelled' ||
+      reason === 'switch_start_failed' ||
+      reason === 'switch_stop_failed'
+    ) {
+      domain = AutoTestDomain.LIFECYCLE;
+      message = `生命周期冲突: ${reason}`;
+    } else if (
+      reason === 'rawfile_resource_manager_missing' ||
+      reason === 'rawfile_resource_manager_init_failed' ||
+      reason === 'rawfile_rom_process_failed' ||
+      reason === 'rom_path_invalid' ||
+      reason === 'empty_rom_path' ||
+      reason === 'rom_data_missing' ||
+      reason === 'need_fullpath_missing_path' ||
+      reason === 'need_fullpath_rawfile' ||
+      reason === 'rom_path_too_long' ||
+      reason === 'rom_load_queue_closed' ||
+      reason === 'files_dir_path_too_long' ||
+      reason === 'files_dir_queue_closed' ||
+      reason === 'files_dir_env_set_failed' ||
+      reason === 'files_dir_set_ignored_state'
+    ) {
+      domain = AutoTestDomain.RESOURCE;
+      if (reason === 'rawfile_rom_process_failed') {
+        if (lowerMessage.includes('size: 0') || lowerMessage.includes('invalid rawfile size')) {
+          code = 'rom_rawfile_empty';
+          message = 'ROM 资源为空文件';
+        } else if (lowerMessage.includes('failed to read rom file')) {
+          code = 'rom_rawfile_read_failed';
+          message = 'ROM 资源读取失败';
+        } else {
+          message = 'ROM 资源处理失败';
+        }
+      } else {
+        message = `资源问题: ${reason}`;
+      }
+    } else if (
+      reason === 'core_load_failed' ||
+      reason === 'core_path_too_long' ||
+      reason === 'core_load_queue_closed' ||
+      reason === 'core_not_loaded'
+    ) {
+      domain = AutoTestDomain.ENGINE;
+      message = `核心加载失败: ${reason}`;
+    } else if (
+      reason === 'load_game_failed' ||
+      reason === 'no_game_load_failed'
+    ) {
+      if (
+        lowerMessage.includes('bios') ||
+        lowerMessage.includes('firmware') ||
+        dependencyHint !== undefined
+      ) {
+        domain = AutoTestDomain.DEPENDENCY;
+        code = 'core_dependency_missing';
+        message = dependencyHint || '核心依赖缺失（BIOS/firmware）';
+      } else {
+        domain = AutoTestDomain.ENGINE;
+        message = '核心执行 load_game 失败';
+      }
+    } else {
+      domain = AutoTestDomain.UNKNOWN;
+      message = `未知错误: ${reason}`;
+    }
+
+    const detail = `${step || stage}${rawMessage ? ` | ${rawMessage}` : ''}`;
+    return this.makeFailResult(
+      core.name,
+      romName,
+      stage,
+      code,
+      message,
+      domain,
+      detail
+    );
   }
 
   private formatLastError(prefix: string): string {

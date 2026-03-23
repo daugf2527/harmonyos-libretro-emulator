@@ -246,6 +246,8 @@ public:
   bool WaitForState(EngineState target, uint32_t timeoutMs);
   EngineErrorInfo GetLastErrorInfo() const;
   void ClearLastErrorInfo();
+  void SetLastErrorInfo(const std::string &reason, const std::string &step,
+                        const std::string &message);
 
 private:
   enum class EnginePhase : uint8_t {
@@ -287,8 +289,6 @@ private:
   // --- 状态转换辅助 ---
   void TransitionTo(EngineState newState);
   void UnloadGameIfNeeded(const char *reason);
-  void SetLastErrorInfo(const std::string &reason, const std::string &step,
-                        const std::string &message);
   void DetectCoreQuirks();
   bool ExecuteSyncTask(const std::function<void()> &task, uint32_t timeoutMs);
 

@@ -344,10 +344,14 @@ bool LibretroEngine::Start() {
   LOGF(LOG_INFO, " [NEW] LibretroEngine::Start() called");
   if (startInProgress_.exchange(true)) {
     LOGF(LOG_WARN, "[NEW] Start ignored: start already in progress");
+    SetLastErrorInfo("start_in_progress", "Start",
+                     "Start ignored: start already in progress");
     return false;
   }
   if (stopInProgress_.load()) {
     LOGF(LOG_WARN, "[NEW] Start ignored: stop in progress");
+    SetLastErrorInfo("start_blocked_stop_in_progress", "Start",
+                     "Start ignored: stop in progress");
     startInProgress_.store(false);
     return false;
   }
@@ -606,6 +610,8 @@ bool LibretroEngine::LoadCore(const std::string &corePath) {
     LOGF(LOG_ERROR,
          "[NEW] LoadCore rejected: path too long (%{public}zu >= %{public}zu)",
          corePath.size(), EngineMessageLoadPath::kPathCapacity);
+    SetLastErrorInfo("core_path_too_long", "LoadCore",
+                     "core path exceeds EngineMessageLoadPath capacity");
     return false;
   }
   // 自动启动引擎（如果未运行）
@@ -616,6 +622,8 @@ bool LibretroEngine::LoadCore(const std::string &corePath) {
   if (!messageQueue_.Push(
           EngineMessage::MakeLoadMessage(MessageType::LoadCore, corePath))) {
     LOGF(LOG_WARN, "[NEW] LoadCore dropped: message queue closed");
+    SetLastErrorInfo("core_load_queue_closed", "LoadCore",
+                     "LoadCore message queue closed");
     return false;
   }
   return true;
@@ -628,11 +636,15 @@ bool LibretroEngine::LoadGame(const std::string &gamePath,
     LOGF(LOG_ERROR,
          "[NEW] LoadRom rejected: path too long (%{public}zu >= %{public}zu)",
          gamePath.size(), EngineMessageLoadPath::kPathCapacity);
+    SetLastErrorInfo("rom_path_too_long", "LoadGame",
+                     "rom path exceeds EngineMessageLoadPath capacity");
     return false;
   }
   if (!messageQueue_.Push(EngineMessage::MakeLoadMessage(MessageType::LoadRom,
                                                          gamePath, data))) {
     LOGF(LOG_WARN, "[NEW] LoadRom dropped: message queue closed");
+    SetLastErrorInfo("rom_load_queue_closed", "LoadGame",
+                     "LoadGame message queue closed");
     return false;
   }
   return true;
@@ -861,6 +873,8 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
     LOGF(LOG_ERROR,
          "[NEW] SetFilesDir rejected: path too long (%{public}zu >= %{public}zu)",
          filesDir.size(), EngineMessageLoadPath::kPathCapacity);
+    SetLastErrorInfo("files_dir_path_too_long", "SetFilesDir",
+                     "filesDir exceeds EngineMessageLoadPath capacity");
     return false;
   }
   const EngineState st = state_.load();
@@ -868,6 +882,8 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
       st == EngineState::STOPPING) {
     LOGF(LOG_WARN, "[NEW] SetFilesDir ignored after core loaded: %{public}s",
          filesDir.c_str());
+    SetLastErrorInfo("files_dir_set_ignored_state", "SetFilesDir",
+                     "SetFilesDir ignored due current engine state");
     return false;
   }
 
@@ -880,6 +896,8 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
       std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
       pendingFilesDir_.clear();
       LOGF(LOG_WARN, "[NEW] SetFilesDir dropped: message queue closed");
+      SetLastErrorInfo("files_dir_queue_closed", "SetFilesDir",
+                       "SetFilesDir queue closed");
       return false;
     }
     if (!messageQueue_.Push(EngineMessage::MakeLoadMessage(
@@ -887,6 +905,8 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
       std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
       pendingFilesDir_.clear();
       LOGF(LOG_WARN, "[NEW] SetFilesDir dropped: message queue closed");
+      SetLastErrorInfo("files_dir_queue_closed", "SetFilesDir",
+                       "SetFilesDir queue closed");
       return false;
     }
     return true;
@@ -895,6 +915,8 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
   // 引擎未运行时可直接设置（无并发读写）
   if (!envState_.SetBaseDir(filesDir)) {
     LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set from ArkTS failed");
+    SetLastErrorInfo("files_dir_env_set_failed", "SetFilesDir",
+                     "EnvState::SetBaseDir failed");
     return false;
   }
   {

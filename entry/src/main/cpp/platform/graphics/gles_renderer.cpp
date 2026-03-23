@@ -210,35 +210,33 @@ void GLESRenderer::EndUploadScratch(unsigned slot) {
 
 // 顶点着色器：全屏四边形
 // 简单的 Pass-through Shader，将顶点坐标和纹理坐标传递给片段着色器
-static const char *VERTEX_SHADER_SOURCE = R"(
-    #version 300 es
-    layout(location = 0) in vec2 a_position;
-    layout(location = 1) in vec2 a_texCoord;
-    out vec2 v_texCoord;
-    void main() {
-        gl_Position = vec4(a_position, 0.0, 1.0);
-        v_texCoord = a_texCoord;
-    }
+static const char *VERTEX_SHADER_SOURCE = R"(#version 300 es
+layout(location = 0) in vec2 a_position;
+layout(location = 1) in vec2 a_texCoord;
+out vec2 v_texCoord;
+void main() {
+    gl_Position = vec4(a_position, 0.0, 1.0);
+    v_texCoord = a_texCoord;
+}
 )";
 
 // 片段着色器：支持通道交换 (Swizzle)
-static const char *FRAGMENT_SHADER_SOURCE = R"(
-    #version 300 es
-    precision mediump float;
-    in vec2 v_texCoord;
-    layout(location = 0) out vec4 outColor;
-    uniform sampler2D s_texture;
-    uniform int u_swizzle_rb; // 0 = Normal, 1 = Swap Red/Blue
+static const char *FRAGMENT_SHADER_SOURCE = R"(#version 300 es
+precision mediump float;
+in vec2 v_texCoord;
+layout(location = 0) out vec4 outColor;
+uniform sampler2D s_texture;
+uniform int u_swizzle_rb; // 0 = Normal, 1 = Swap Red/Blue
 
-    void main() {
-        vec4 texColor = texture(s_texture, v_texCoord);
-        // 强制 Alpha = 1.0
-        if (u_swizzle_rb == 1) {
-             outColor = vec4(texColor.b, texColor.g, texColor.r, 1.0);
-        } else {
-             outColor = vec4(texColor.rgb, 1.0);
-        }
+void main() {
+    vec4 texColor = texture(s_texture, v_texCoord);
+    // 强制 Alpha = 1.0
+    if (u_swizzle_rb == 1) {
+         outColor = vec4(texColor.b, texColor.g, texColor.r, 1.0);
+    } else {
+         outColor = vec4(texColor.rgb, 1.0);
     }
+}
 )";
 
 GLESRenderer::GLESRenderer()

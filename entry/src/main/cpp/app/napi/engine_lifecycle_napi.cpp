@@ -70,6 +70,9 @@ static bool LoadRomDataFromRawfileIfNeeded(
   }
   if (!resMgrValue) {
     LOGF(LOG_ERROR, "[NEW] ResourceManager missing for rawfile ROM");
+    GetEngine()->SetLastErrorInfo("rawfile_resource_manager_missing",
+                                  "LoadRomDataFromRawfileIfNeeded",
+                                  "ResourceManager is required for rawfile ROM");
     return false;
   }
 
@@ -77,6 +80,9 @@ static bool LoadRomDataFromRawfileIfNeeded(
       OH_ResourceManager_InitNativeResourceManager(env, resMgrValue);
   if (!mng) {
     LOGF(LOG_WARN, "[NEW] Failed to init ResourceManager for rawfile ROM");
+    GetEngine()->SetLastErrorInfo("rawfile_resource_manager_init_failed",
+                                  "LoadRomDataFromRawfileIfNeeded",
+                                  "OH_ResourceManager_InitNativeResourceManager failed");
     return false;
   }
 
@@ -87,6 +93,9 @@ static bool LoadRomDataFromRawfileIfNeeded(
     LOGF(LOG_ERROR,
          "[NEW] ROM rawfile load failed: %{public}s",
          result.error_message.c_str());
+    GetEngine()->SetLastErrorInfo("rawfile_rom_process_failed",
+                                  "LoadRomDataFromRawfileIfNeeded",
+                                  result.error_message);
     OH_ResourceManager_ReleaseNativeResourceManager(mng);
     return false;
   }
@@ -356,6 +365,7 @@ struct SwitchGameAsyncContext {
   std::shared_ptr<std::vector<uint8_t>> romData;
   uint32_t timeoutMs = 0;
   uint64_t token = 0;
+  uint64_t callerToken = 0;
   bool result = false;
 };
 
@@ -410,11 +420,26 @@ static bool WaitForStateWithToken(EngineState target, uint32_t timeoutMs,
   return false;
 }
 
+static void EnsureLastErrorIfEmpty(const std::string &reason,
+                                   const std::string &step,
+                                   const std::string &message) {
+  auto err = GetEngine()->GetLastErrorInfo();
+  if (!err.reason.empty()) {
+    return;
+  }
+  GetEngine()->SetLastErrorInfo(reason, step, message);
+}
+
 static void RecoverAfterSwitchFailure(uint32_t timeoutMs, uint64_t token) {
+  auto preservedError = GetEngine()->GetLastErrorInfo();
   if (!IsLatestSwitchToken(token)) {
     return;
   }
   const bool stopped = GetEngine()->Stop();
+  auto stopError = GetEngine()->GetLastErrorInfo();
+  if (stopError.reason.empty() && !preservedError.reason.empty()) {
+    stopError = preservedError;
+  }
   if (!stopped) {
     LOGF(LOG_ERROR,
          "[NEW] RecoverAfterSwitchFailure: stop timeout, skip reset to avoid lifecycle overlap");
@@ -422,6 +447,10 @@ static void RecoverAfterSwitchFailure(uint32_t timeoutMs, uint64_t token) {
   }
   (void)GetEngine()->WaitForState(EngineState::STOPPED, timeoutMs);
   GetEngine()->Reset();
+  if (!stopError.reason.empty()) {
+    GetEngine()->SetLastErrorInfo(stopError.reason, stopError.step,
+                                  stopError.message);
+  }
 }
 
 static void ExecuteSwitchGame(napi_env env, void *data) {
@@ -431,6 +460,8 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
   }
 
   if (!AcquireSwitchToken(ctx->token)) {
+    EnsureLastErrorIfEmpty("switch_cancelled", "AcquireSwitchToken",
+                           "stale switch token before acquire");
     ctx->result = false;
     return;
   }
@@ -440,6 +471,8 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
   } guard{ctx->token};
 
   if (!IsLatestSwitchToken(ctx->token)) {
+    EnsureLastErrorIfEmpty("switch_cancelled", "SwitchToken",
+                           "stale switch token after acquire");
     ctx->result = false;
     return;
   }
@@ -450,11 +483,15 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
   if (currentState != EngineState::INIT &&
       currentState != EngineState::STOPPED) {
     if (!GetEngine()->Stop()) {
+      EnsureLastErrorIfEmpty("switch_stop_failed", "Stop",
+                             "Stop() returned false before switch");
       ctx->result = false;
       return;
     }
     if (!WaitForStateWithToken(EngineState::STOPPED, ctx->timeoutMs,
                                ctx->token)) {
+      EnsureLastErrorIfEmpty("switch_wait_stopped_timeout", "WaitForState",
+                             "timeout waiting STOPPED before switch");
       RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
       ctx->result = false;
       return;
@@ -462,51 +499,69 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
   }
 
   if (!IsLatestSwitchToken(ctx->token)) {
+    EnsureLastErrorIfEmpty("switch_cancelled", "SwitchToken",
+                           "stale switch token before start");
     ctx->result = false;
     return;
   }
 
   if (!GetEngine()->Start()) {
+    EnsureLastErrorIfEmpty("switch_start_failed", "Start",
+                           "Start() returned false");
     RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
     ctx->result = false;
     return;
   }
 
   if (!GetEngine()->SetFilesDir(ctx->filesDir)) {
+    EnsureLastErrorIfEmpty("switch_set_files_dir_failed", "SetFilesDir",
+                           "SetFilesDir() returned false");
     RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
     ctx->result = false;
     return;
   }
 
   if (!IsLatestSwitchToken(ctx->token)) {
+    EnsureLastErrorIfEmpty("switch_cancelled", "SwitchToken",
+                           "stale switch token before load core");
     ctx->result = false;
     return;
   }
 
   if (!GetEngine()->LoadCore(ctx->corePath)) {
+    EnsureLastErrorIfEmpty("switch_load_core_failed", "LoadCore",
+                           "LoadCore() returned false");
     RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
     ctx->result = false;
     return;
   }
   if (!WaitForStateWithToken(EngineState::CORE_LOADED, ctx->timeoutMs,
                              ctx->token)) {
+    EnsureLastErrorIfEmpty("switch_wait_core_loaded_timeout", "WaitForState",
+                           "timeout waiting CORE_LOADED");
     RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
     ctx->result = false;
     return;
   }
 
   if (!IsLatestSwitchToken(ctx->token)) {
+    EnsureLastErrorIfEmpty("switch_cancelled", "SwitchToken",
+                           "stale switch token before load game");
     ctx->result = false;
     return;
   }
 
   if (!GetEngine()->LoadGame(ctx->romPath, ctx->romData)) {
+    EnsureLastErrorIfEmpty("switch_load_game_failed", "LoadGame",
+                           "LoadGame() returned false");
     RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
     ctx->result = false;
     return;
   }
   if (!WaitForStateWithToken(EngineState::RUNNING, ctx->timeoutMs,
                              ctx->token)) {
+    EnsureLastErrorIfEmpty("switch_wait_running_timeout", "WaitForState",
+                           "timeout waiting RUNNING");
     RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
     ctx->result = false;
     return;
@@ -558,6 +613,7 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   napi_value resMgrValue = nullptr;
   uint32_t timeoutMs = 5000;
   uint64_t token = 0;
+  uint64_t callerToken = 0;
   int timeoutIndex = -1;
   int tokenIndex = -1;
 
@@ -592,7 +648,7 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
       return MakeResolvedPromise(env, false);
     }
     if (tokenValue > 0) {
-      token = static_cast<uint64_t>(tokenValue);
+      callerToken = static_cast<uint64_t>(tokenValue);
     }
   }
 
@@ -611,8 +667,14 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     return MakeResolvedPromise(env, true);
   }
 
-  if (token == 0) {
-    token = switch_token.fetch_add(1) + 1;
+  // 使用 native 全局递增 token 作为并发仲裁依据，避免前端局部 token
+  // 与 native 全局 token 不同源导致误判 stale。
+  token = switch_token.fetch_add(1) + 1;
+  if (callerToken > 0) {
+    LOGF(LOG_INFO,
+         "[NEW] SwitchGameAsync token mapped: caller=%{public}llu, native=%{public}llu",
+         static_cast<unsigned long long>(callerToken),
+         static_cast<unsigned long long>(token));
   }
 
   auto *ctx = new SwitchGameAsyncContext();

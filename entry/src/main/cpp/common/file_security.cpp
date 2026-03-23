@@ -103,6 +103,7 @@ bool ValidateCorePath(const std::string &corePath) {
   // 允许的 Core 目录列表
   const char *allowedCoreDirs[] = {
       "/data/storage/el1/bundle/libs",                 // 应用内置库
+      "/data/storage/el2/base/haps/entry/libs",        // Stage 模式代码目录（新系统机型）
       "/data/storage/el2/base/haps/entry/files/cores", // 用户下载的核心
   };
 
