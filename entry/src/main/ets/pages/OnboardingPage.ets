@@ -1,0 +1,689 @@
+import { router } from '@kit.ArkUI'
+import { abilityAccessCtrl, bundleManager, Permissions } from '@kit.AbilityKit'
+import { BusinessError } from '@kit.BasicServicesKit'
+
+type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED'
+
+interface PermissionItem {
+  key: string
+  label: string
+  status: PermissionStatus
+}
+
+interface ColorTokens {
+  background: string
+  surfaceContainer: string
+  surfaceContainerHigh: string
+  surfaceContainerHighest: string
+  surfaceContainerLow: string
+  primary: string
+  onSurface: string
+  onSurfaceVariant: string
+  outlineVariant: string
+  outline: string
+  secondary: string
+}
+
+const Colors: ColorTokens = {
+  background: '#000000',
+  surfaceContainer: '#191919',
+  surfaceContainerHigh: '#1F1F1F',
+  surfaceContainerHighest: '#262626',
+  surfaceContainerLow: '#131313',
+  primary: '#00FF41',
+  onSurface: '#E5E5E5',
+  onSurfaceVariant: '#ABABAB',
+  outlineVariant: '#484848',
+  outline: '#757575',
+  secondary: '#9D9E9E',
+}
+
+function createRange(size: number): number[] {
+  const values: number[] = []
+  let index: number = 0
+  while (index < size) {
+    values.push(index)
+    index += 1
+  }
+  return values
+}
+
+@Entry
+@Component
+struct OnboardingPage {
+  @State private currentStep: number = 1
+  @State private stepOpacity: number = 1
+  @State private stepOffsetY: number = 0
+  @State private scanLineOffsetY: number = 0
+  @State private startButtonPressed: boolean = false
+  @State private authorizeButtonPressed: boolean = false
+  @State private permissionRequesting: boolean = false
+  @State private permissions: PermissionItem[] = [
+    { key: 'READ_MEDIA_IMAGES', label: 'DIRECTORY_READ', status: 'PENDING' },
+    { key: 'READ_MEDIA_VIDEO', label: 'MEDIA_METADATA', status: 'PENDING' },
+  ]
+  @State private protocolStatus: string = 'PENDING'
+  private readonly horizontalGridIndexes: number[] = createRange(120)
+  private readonly verticalGridIndexes: number[] = createRange(120)
+  private scanLineTimer: number = -1
+
+  aboutToAppear() {
+    this.refreshPermissionStatus()
+    this.startScanLineAnimation()
+  }
+
+  aboutToDisappear() {
+    this.stopScanLineAnimation()
+  }
+
+  private switchToStep2(): void {
+    if (this.currentStep === 2) {
+      return
+    }
+    this.startButtonPressed = false
+    const paramOut: AnimateParam = { duration: 350, curve: Curve.EaseInOut }
+    const paramIn: AnimateParam = { duration: 350, curve: Curve.EaseInOut }
+    animateTo(paramOut, () => {
+      this.stepOpacity = 0
+      this.stepOffsetY = 20
+    })
+    setTimeout(() => {
+      this.currentStep = 2
+      this.stepOffsetY = 20
+      this.scanLineOffsetY = 0
+      this.stepOpacity = 0
+      animateTo(paramIn, () => {
+        this.stepOpacity = 1
+        this.stepOffsetY = 0
+      })
+      setTimeout(() => {
+        if (this.currentStep === 2 && this.stepOpacity < 1) {
+          this.stepOpacity = 1
+          this.stepOffsetY = 0
+        }
+      }, 380)
+    }, 350)
+  }
+
+  private async requestPermission(): Promise<void> {
+    if (this.permissionRequesting) {
+      return
+    }
+    this.authorizeButtonPressed = false
+    this.permissionRequesting = true
+    const atManager = abilityAccessCtrl.createAtManager()
+    const perms: Permissions[] = ['ohos.permission.READ_MEDIA']
+    try {
+      const result = await atManager.requestPermissionsFromUser(getContext(this), perms)
+      const granted = this.isAllGrantedFromResult(result)
+      this.applyPermissionState(granted ? 'GRANTED' : 'DENIED')
+      if (granted) {
+        router.replaceUrl({ url: 'pages/LibretroGamePage' })
+      }
+    } catch (err) {
+      const bizError = err as BusinessError
+      console.error(`requestPermissionsFromUser failed: ${bizError.code}, ${bizError.message}`)
+      this.applyPermissionState('DENIED')
+    } finally {
+      this.permissionRequesting = false
+    }
+  }
+
+  private skipPermission(): void {
+    this.applyPermissionState('DENIED')
+  }
+
+  private async refreshPermissionStatus(): Promise<void> {
+    const granted = await this.checkPermissionGranted('ohos.permission.READ_MEDIA')
+    this.applyPermissionState(granted ? 'GRANTED' : 'PENDING')
+  }
+
+  private async checkPermissionGranted(permission: Permissions): Promise<boolean> {
+    try {
+      const atManager = abilityAccessCtrl.createAtManager()
+      const bundleInfo = await bundleManager.getBundleInfoForSelf(bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION)
+      const tokenId = Number(bundleInfo.appInfo.accessTokenId)
+      const grantStatus = await atManager.checkAccessToken(tokenId, permission)
+      return grantStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED
+    } catch (err) {
+      const bizError = err as BusinessError
+      console.error(`checkAccessToken failed: ${bizError.code}, ${bizError.message}`)
+      return false
+    }
+  }
+
+  private extractAuthResults(result: Object): number[] {
+    const requestResult = result as Record<string, Object>
+    const authResultsRaw = requestResult['authResults']
+    if (!Array.isArray(authResultsRaw)) {
+      return []
+    }
+    return authResultsRaw.map((item: Object) => Number(item))
+  }
+
+  private isAllGrantedFromResult(result: Object): boolean {
+    const authResults = this.extractAuthResults(result)
+    if (authResults.length === 0) {
+      return false
+    }
+    return authResults.every((status: number) => status === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED)
+  }
+
+  private applyPermissionState(status: PermissionStatus): void {
+    this.permissions = this.permissions.map((item: PermissionItem): PermissionItem => {
+      return { key: item.key, label: item.label, status: status }
+    })
+    if (status === 'GRANTED') {
+      this.protocolStatus = 'VERIFIED'
+      return
+    }
+    if (status === 'DENIED') {
+      this.protocolStatus = 'DENIED'
+      return
+    }
+    this.protocolStatus = 'PENDING'
+  }
+
+  private getPermissionStatusText(item: PermissionItem): string {
+    if (item.status === 'GRANTED') {
+      return `${item.label}: GRANTED`
+    }
+    if (item.status === 'DENIED') {
+      return `${item.label}: DENIED`
+    }
+    return `${item.label}: PENDING...`
+  }
+
+  private getPermissionDotColor(item: PermissionItem): string {
+    if (item.status === 'GRANTED') {
+      return Colors.primary
+    }
+    if (item.status === 'DENIED') {
+      return '#BA573F'
+    }
+    return Colors.outlineVariant
+  }
+
+  private startScanLineAnimation(): void {
+    if (this.scanLineTimer !== -1) {
+      clearInterval(this.scanLineTimer)
+      this.scanLineTimer = -1
+    }
+    this.scanLineOffsetY = 0
+    this.scanLineTimer = setInterval(() => {
+      if (this.currentStep !== 2) {
+        this.scanLineOffsetY = 0
+        return
+      }
+      const nextOffset = this.scanLineOffsetY + 1
+      this.scanLineOffsetY = nextOffset > 191 ? 0 : nextOffset
+    }, 16)
+  }
+
+  private stopScanLineAnimation(): void {
+    if (this.scanLineTimer !== -1) {
+      clearInterval(this.scanLineTimer)
+      this.scanLineTimer = -1
+    }
+  }
+
+  private onStartButtonTouch(event: Object): void {
+    const eventType = Number((event as Record<string, Object>)['type'])
+    if (eventType === TouchType.Down) {
+      this.startButtonPressed = true
+      return
+    }
+    if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
+      this.startButtonPressed = false
+    }
+  }
+
+  private onAuthorizeButtonTouch(event: Object): void {
+    const eventType = Number((event as Record<string, Object>)['type'])
+    if (eventType === TouchType.Down) {
+      this.authorizeButtonPressed = true
+      return
+    }
+    if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
+      this.authorizeButtonPressed = false
+    }
+  }
+
+  build() {
+    Column() {
+      this.Header()
+
+      Stack() {
+        this.PrecisionGrid(40, '#1A484848', 0.5)
+
+        Column() {
+          if (this.currentStep === 1) {
+            this.Step1Content()
+          } else {
+            this.Step2Content()
+          }
+        }
+        .width('100%')
+        .constraintSize({ maxWidth: 520 })
+        .justifyContent(FlexAlign.Center)
+        .alignItems(HorizontalAlign.Center)
+        .opacity(this.stepOpacity)
+        .translate({ y: this.stepOffsetY })
+        .align(Alignment.Center)
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 32, right: 32 })
+
+      this.Footer()
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Colors.background)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+  }
+
+  @Builder
+  private PrecisionGrid(gridSize: number, lineColor: string, lineWidth: number = 1) {
+    Stack() {
+      Column({ space: Math.max(0, gridSize - lineWidth) }) {
+        ForEach(this.horizontalGridIndexes, (item: number) => {
+          Row()
+            .width('100%')
+            .height(lineWidth)
+            .backgroundColor(lineColor)
+        }, (item: number) => `h-${item}`)
+      }
+      .width('100%')
+      .height('100%')
+
+      Row({ space: Math.max(0, gridSize - lineWidth) }) {
+        ForEach(this.verticalGridIndexes, (item: number) => {
+          Column()
+            .width(lineWidth)
+            .height('100%')
+            .backgroundColor(lineColor)
+        }, (item: number) => `v-${item}`)
+      }
+      .width('100%')
+      .height('100%')
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  private Header() {
+    Row() {
+      Row({ space: 6 }) {
+        Text('\uE322')
+          .fontFamily('MaterialSymbolsOutlined')
+          .fontSize(14)
+          .fontColor(Colors.primary)
+        Text('EMU_CORE_v1.0')
+          .fontFamily('monospace')
+          .fontSize(14)
+          .fontColor(Colors.primary)
+          .letterSpacing(3)
+      }
+
+      Row({ space: 16 }) {
+        Text(this.currentStep === 1 ? 'BOOT_SEQUENCE: 01' : 'STEP 02')
+          .fontFamily('Inter')
+          .fontSize(12)
+          .fontColor(Colors.secondary)
+          .fontWeight(FontWeight.Medium)
+          .letterSpacing(0)
+
+        Text('\uE4CE')
+          .fontFamily('MaterialSymbolsOutlined')
+          .fontSize(12)
+          .fontColor(Colors.primary)
+      }
+      .alignItems(VerticalAlign.Center)
+    }
+    .width('100%')
+    .height(56)
+    .padding({ left: 24, right: 24 })
+    .justifyContent(FlexAlign.SpaceBetween)
+    .alignItems(VerticalAlign.Center)
+    .backdropBlur(24)
+    .backgroundColor('#D9000000')
+    .border({ width: { bottom: 1 }, color: '#33484848', style: BorderStyle.Solid })
+  }
+
+  @Builder
+  private Step1Content() {
+    Column({ space: 0 }) {
+      // Icon
+      Stack() {
+        Column()
+          .width(96)
+          .height(96)
+          .backgroundColor(Colors.surfaceContainer)
+          .borderRadius(8)
+          .border({ width: 0.5, color: '#66484848', style: BorderStyle.Solid })
+
+        Text('\uE021')
+          .fontFamily('MaterialSymbolsOutlined')
+          .fontSize(48)
+          .fontColor(Colors.primary)
+
+        Row()
+          .width(6)
+          .height(6)
+          .borderRadius(3)
+          .backgroundColor(Colors.primary)
+          .position({ x: 88, y: -4 })
+      }
+      .width(96)
+      .height(96)
+      .margin({ bottom: 48 })
+
+      // Title + subtitle
+      Column({ space: 16 }) {
+        Text('一键找回你的童年游戏')
+          .fontSize(30)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Colors.onSurface)
+          .textAlign(TextAlign.Center)
+
+        Text('系统已准备就绪。自动扫描本地存储、云端库及映射驱动器。')
+          .fontSize(14)
+          .fontColor(Colors.onSurfaceVariant)
+          .lineHeight(22)
+          .textAlign(TextAlign.Center)
+          .maxLines(3)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .constraintSize({ maxWidth: 320 })
+      }
+      .width('100%')
+      .margin({ bottom: 64 })
+
+      // CTA button
+      Button({ type: ButtonType.Normal }) {
+        Stack() {
+          Row({ space: 12 }) {
+            Row()
+              .width(6)
+              .height(6)
+              .borderRadius(3)
+              .backgroundColor(Colors.primary)
+
+            Text('立即开启')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Colors.primary)
+              .letterSpacing(4)
+          }
+          .alignItems(VerticalAlign.Center)
+          .justifyContent(FlexAlign.Center)
+          .align(Alignment.Center)
+
+          Row()
+            .width(4)
+            .height(4)
+            .border({ width: { top: 1, left: 1 }, color: Colors.primary, style: BorderStyle.Solid })
+            .align(Alignment.TopStart)
+
+          Row()
+            .width(4)
+            .height(4)
+            .border({ width: { right: 1, bottom: 1 }, color: Colors.primary, style: BorderStyle.Solid })
+            .align(Alignment.BottomEnd)
+        }
+        .width('100%')
+        .height('100%')
+      }
+      .width(164)
+      .height(48)
+      .backgroundColor(this.startButtonPressed ? Colors.surfaceContainerHighest : Color.Transparent)
+      .border({ width: 1, color: Colors.outline, style: BorderStyle.Solid })
+      .borderRadius(6)
+      .margin({ bottom: 96 })
+      .onTouch((event) => this.onStartButtonTouch(event as Object))
+      .onClick(() => this.switchToStep2())
+
+      // Status bar
+      Row() {
+        Column({ space: 4 }) {
+          Text('Status').fontSize(10).fontColor('#FF666666').letterSpacing(2)
+          Text('READY_STABLE').fontSize(10).fontFamily('monospace').fontColor('#FF9D9E9E')
+        }
+        .alignItems(HorizontalAlign.Start)
+
+        Column({ space: 4 }) {
+          Text('Module').fontSize(10).fontColor('#FF666666').letterSpacing(2)
+          Text('CORE_INT_V1').fontSize(10).fontFamily('monospace').fontColor('#FF9D9E9E')
+        }
+        .alignItems(HorizontalAlign.Center)
+
+        Column({ space: 4 }) {
+          Text('Latency').fontSize(10).fontColor('#FF666666').letterSpacing(2)
+          Text('0.02ms').fontSize(10).fontFamily('monospace').fontColor(Colors.primary)
+        }
+        .alignItems(HorizontalAlign.End)
+      }
+      .width('100%')
+      .constraintSize({ maxWidth: 460 })
+      .padding({ left: 32, right: 32 })
+      .justifyContent(FlexAlign.SpaceBetween)
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private Step2Content() {
+    Column({ space: 0 }) {
+      // Section header
+      Column({ space: 16 }) {
+        Row({ space: 8 }) {
+          Row()
+            .width(3)
+            .height(16)
+            .backgroundColor(Colors.primary)
+
+          Text('Authorization Required')
+            .fontSize(12)
+            .fontFamily('monospace')
+            .fontColor(Colors.primary)
+            .letterSpacing(3)
+        }
+        .alignItems(VerticalAlign.Center)
+
+        Text('允许访问文件，才能导入你手机里的游戏')
+          .fontSize(24)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(Colors.onSurface)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        Text('EMU_CORE 需要读取存储权限以检索 ROM 镜像并管理着色器缓存数据。')
+          .fontSize(14)
+          .fontColor(Colors.onSurfaceVariant)
+          .lineHeight(22)
+          .maxLines(3)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+      .constraintSize({ maxWidth: 460 })
+      .padding({ left: 32, right: 32 })
+      .margin({ bottom: 48 })
+
+      // Folder icon panel
+      Stack() {
+        Column()
+          .width(216)
+          .height(216)
+          .borderRadius(108)
+          .backgroundColor('#0D00FF41')
+          .blur(24)
+          .align(Alignment.Center)
+
+        Stack() {
+          this.PrecisionGrid(20, '#1A484848', 0.5)
+
+          Column({ space: 16 }) {
+            Text('\uE2C7')
+              .fontFamily('MaterialSymbolsOutlined')
+              .fontSize(72)
+              .fontColor(Colors.primary)
+
+            Row({ space: 4 }) {
+              Row().width(4).height(4).backgroundColor(Colors.primary)
+              Row().width(4).height(4).backgroundColor(Colors.outlineVariant)
+              Row().width(4).height(4).backgroundColor(Colors.outlineVariant)
+            }
+          }
+          .alignItems(HorizontalAlign.Center)
+          .justifyContent(FlexAlign.Center)
+          .align(Alignment.Center)
+
+          Row()
+            .width('100%')
+            .height(1)
+            .backgroundColor('#3300FF41')
+            .shadow({ radius: 15, color: '#6600FF41', offsetX: 0, offsetY: 0 })
+            .align(Alignment.Top)
+            .translate({ y: this.scanLineOffsetY })
+        }
+        .width(192)
+        .height(192)
+          .backgroundColor(Colors.surfaceContainerLow)
+          .borderRadius(8)
+          .border({ width: 0.5, color: '#66484848', style: BorderStyle.Solid })
+          .align(Alignment.Center)
+
+        Row()
+          .width(16)
+          .height(16)
+          .border({ width: { top: 1, left: 1 }, color: '#4D00D635', style: BorderStyle.Solid })
+          .align(Alignment.TopStart)
+          .margin({ top: 16, left: 16 })
+
+        Row()
+          .width(16)
+          .height(16)
+          .border({ width: { right: 1, bottom: 1 }, color: '#4D00D635', style: BorderStyle.Solid })
+          .align(Alignment.BottomEnd)
+          .margin({ right: 16, bottom: 16 })
+      }
+      .width(240)
+      .height(240)
+      .margin({ bottom: 48 })
+
+      // Permission list
+      Column({ space: 0 }) {
+        Row() {
+          Text('System Access Protocol')
+            .fontSize(10)
+            .fontFamily('monospace')
+            .fontColor('#FF666666')
+            .letterSpacing(1)
+
+          Text(this.protocolStatus)
+            .fontSize(10)
+            .fontFamily('monospace')
+            .fontColor(this.protocolStatus === 'VERIFIED' ? Colors.primary : (this.protocolStatus === 'DENIED' ? '#FFBA573F' : Colors.outlineVariant))
+            .letterSpacing(1)
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+        .margin({ bottom: 12 })
+
+        ForEach(this.permissions, (item: PermissionItem) => {
+          Row({ space: 12 }) {
+            Row()
+              .width(6)
+              .height(6)
+              .borderRadius(3)
+              .backgroundColor(this.getPermissionDotColor(item))
+
+            Text(this.getPermissionStatusText(item))
+              .fontSize(12)
+              .fontFamily('monospace')
+              .fontColor(Colors.onSurfaceVariant)
+          }
+          .width('100%')
+          .alignItems(VerticalAlign.Center)
+          .margin({ bottom: 8 })
+        }, (item: PermissionItem) => item.key)
+      }
+      .width('100%')
+      .constraintSize({ maxWidth: 460 })
+      .padding(16)
+      .backgroundColor(Colors.surfaceContainerLow)
+      .borderRadius(4)
+      .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+      .margin({ left: 32, right: 32, bottom: 48 })
+
+      // Buttons
+      Column({ space: 24 }) {
+        Button({ type: ButtonType.Normal }) {
+          Row({ space: 8 }) {
+            Text('授权')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Colors.onSurface)
+              .letterSpacing(4)
+
+            Text('\uE5CC')
+              .fontFamily('MaterialSymbolsOutlined')
+              .fontSize(20)
+              .fontColor(Colors.primary)
+              .translate({ x: this.authorizeButtonPressed ? 2 : 0 })
+          }
+          .alignItems(VerticalAlign.Center)
+          .justifyContent(FlexAlign.Center)
+        }
+        .width('100%')
+        .height(56)
+        .backgroundColor(this.authorizeButtonPressed ? Colors.surfaceContainerHighest : Color.Transparent)
+        .border({ width: 1, color: Colors.outline, style: BorderStyle.Solid })
+        .borderRadius(0)
+        .enabled(!this.permissionRequesting)
+        .onTouch((event) => this.onAuthorizeButtonTouch(event as Object))
+        .onClick(() => this.requestPermission())
+
+        Text('暂不授权，稍后在设置中手动开启')
+          .fontSize(10)
+          .fontColor(this.protocolStatus === 'DENIED' ? '#FFABABAB' : '#FF666666')
+          .letterSpacing(2)
+          .onClick(() => this.skipPermission())
+      }
+      .width('100%')
+      .constraintSize({ maxWidth: 460 })
+      .padding({ left: 32, right: 32 })
+      .alignItems(HorizontalAlign.Center)
+    }
+    .width('100%')
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private Footer() {
+    Row() {
+      Text('Kinetic Obsidian Protocol • Build 2405.01')
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontColor('#66666666')
+        .letterSpacing(3)
+    }
+    .width('100%')
+    .height(48)
+    .padding({ left: 32, right: 32 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .border({ width: { top: 1 }, color: '#1A484848', style: BorderStyle.Solid })
+  }
+}
+
+@Preview
+@Component
+struct OnboardingPagePreview {
+  build() {
+    OnboardingPage()
+  }
+}

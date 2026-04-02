@@ -1,6 +1,9 @@
 {
   "src": [
+    "pages/OnboardingPage",
     "pages/Index",
+    "pages/StitchImportTaskPage",
+    "pages/ImportTaskOverlayPage",
     "pages/CoreLoaderTest",
     "pages/TestGambatte",
     "pages/LibretroGamePage",

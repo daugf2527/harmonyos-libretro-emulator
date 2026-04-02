@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="./assets/css/local-fonts.css" rel="stylesheet"/>
+<link href="./assets/css/tailwind.generated.css" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 20px;
+        }
+        body {
+            background-color: #000000;
+            color: #e5e5e5;
+            font-family: 'Inter', sans-serif;
+        }
+        .vanta-accent {
+            width: 2px;
+            height: 2px;
+            background-color: #00FF41;
+        }
+        .transition-state {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .hidden-state {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(0.95);
+            position: absolute;
+        }
+        .visible-state {
+            opacity: 1;
+            pointer-events: auto;
+            transform: scale(1);
+            position: relative;
+        }
+    </style>
+</head>
+<body class="overflow-hidden min-h-[884px] h-screen">
+<!-- Top Navigation Bar (Shared Component) -->
+<header class="bg-black text-[#00FF41] font-['Inter'] tracking-tighter uppercase text-xs font-semibold border-b border-zinc-900/50 flex justify-between items-center w-full px-6 py-4 fixed top-0 z-[60]">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00FF41]">terminal</span>
+<span class="text-[#00FF41] font-mono tracking-widest text-sm">EMU_OS // 0.1</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-zinc-500 hover:bg-zinc-900 transition-colors px-2 py-1 rounded cursor-pointer">SYS_MONITOR</span>
+<span class="material-symbols-outlined text-[#00FF41] cursor-pointer">settings_input_component</span>
+</div>
+</header>
+<!-- Background Grid Context (Blurred) -->
+<main class="w-full h-screen pt-16 pb-20 px-8 filter blur-2xl transition-all duration-700 select-none pointer-events-none opacity-20">
+<div class="flex justify-between items-start mb-12">
+<div class="bg-surface-container p-4 rounded-sm border-l-2 border-primary">
+<div class="text-[10px] text-on-surface-variant font-mono mb-2 uppercase tracking-widest">System Load</div>
+<div class="grid grid-cols-8 gap-1">
+<div class="w-1.5 h-4 bg-primary"></div>
+<div class="w-1.5 h-3 bg-primary/40"></div>
+<div class="w-1.5 h-6 bg-primary"></div>
+<div class="w-1.5 h-2 bg-primary/20"></div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="aspect-[3/4] bg-zinc-900/50 border border-white/5"></div>
+<div class="aspect-[3/4] bg-zinc-900/50 border border-white/5"></div>
+</div>
+</main>
+<!-- Unified Task Feedback System Overlay -->
+<div class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md">
+<!-- Container with Precision 0.5px border simulation -->
+<div class="w-[400px] bg-[#0A0A0A] border border-white/10 shadow-2xl relative overflow-hidden transition-all duration-500 min-h-[220px]">
+<!-- Active Progress State -->
+<div class="transition-state visible-state p-8" id="importing-state">
+<div class="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent"></div>
+<div class="flex justify-between items-end mb-6">
+<div>
+<div class="text-[10px] font-mono text-primary mb-1 tracking-widest uppercase">Executing Task</div>
+<h2 class="text-on-surface font-medium text-lg leading-none tracking-tight">正在导入 1/3</h2>
+</div>
+<div class="text-[10px] font-mono text-on-surface-variant mb-0.5">EST: 02:45</div>
+</div>
+<div class="space-y-4">
+<div class="h-[3px] w-full bg-surface-container-highest overflow-hidden">
+<div class="h-full bg-primary w-[33%] shadow-[0_0_8px_rgba(0,255,65,0.4)] animate-[pulse_2s_infinite]"></div>
+</div>
+<div class="flex justify-between items-center text-[11px] font-mono text-on-surface-variant uppercase tracking-tighter">
+<div class="flex items-center gap-2">
+<span class="w-1 h-1 bg-primary rounded-full animate-ping"></span>
+<span>Source: EXT_DISK_A</span>
+</div>
+<div>24.4 MB/s</div>
+</div>
+</div>
+<div class="mt-8 flex justify-end">
+<button class="px-6 py-2 border border-outline/30 text-[10px] font-bold tracking-widest uppercase hover:bg-surface-container-highest transition-colors active:scale-95 text-on-surface-variant" onclick="toggleState('error')">
+                    Cancel Task
+                </button>
+<!-- Hidden trigger for success demo -->
+<button class="ml-2 opacity-0 w-4 h-4" onclick="toggleState('success')"></button>
+</div>
+<div class="absolute bottom-0 left-0 w-full bg-surface-container-low px-8 py-2 border-t border-white/5 flex justify-between items-center">
+<span class="text-[9px] text-zinc-600 font-mono">PROCESS_ID: 0x882A_IMPORT</span>
+<span class="text-[9px] text-zinc-600 font-mono animate-pulse">VERIFYING_CHECKSUM...</span>
+</div>
+</div>
+<!-- Success Feedback State -->
+<div class="transition-state hidden-state p-8 flex flex-col items-center justify-center text-center" id="success-state">
+<div class="w-12 h-12 rounded-full border border-primary/20 bg-primary/5 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-primary text-3xl">check_circle</span>
+</div>
+<h2 class="text-on-surface text-lg font-medium mb-1">导入成功</h2>
+<p class="text-on-surface-variant text-sm mb-6">3个项目已成功添加至游戏库</p>
+<button class="w-full py-2 bg-primary/10 border border-primary/30 text-primary text-[11px] font-bold uppercase tracking-widest hover:bg-primary/20 transition-all" onclick="toggleState('importing')">
+                返回控制台
+            </button>
+</div>
+<!-- Failure Feedback State -->
+<div class="transition-state hidden-state p-8 flex flex-col items-center justify-center text-center" id="error-state">
+<div class="w-12 h-12 rounded-full border border-error/20 bg-error/5 flex items-center justify-center mb-4">
+<span class="material-symbols-outlined text-error text-3xl">warning</span>
+</div>
+<h2 class="text-on-surface text-lg font-medium mb-1">导入失败</h2>
+<p class="text-on-surface-variant text-sm mb-6">文件格式不支持或数据包已损坏</p>
+<div class="flex gap-2 w-full">
+<button class="flex-1 py-2 border border-outline/30 text-on-surface-variant text-[10px] font-bold uppercase tracking-widest hover:bg-surface-container-highest transition-all" onclick="toggleState('importing')">
+                    取消
+                </button>
+<button class="flex-1 py-2 bg-error/10 border border-error/30 text-error text-[10px] font-bold uppercase tracking-widest hover:bg-error/20 transition-all flex items-center justify-center gap-2" onclick="toggleState('importing')">
+<span class="material-symbols-outlined text-[14px]">refresh</span>
+                    再试一次
+                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Navigation Bar (Shared Component) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-8 bg-black/95 backdrop-blur-xl border-t border-zinc-900/50">
+<div class="flex flex-col items-center justify-center text-zinc-600 pt-2 pb-4 hover:text-zinc-300 cursor-pointer">
+<span class="material-symbols-outlined mb-1">grid_view</span>
+<span class="font-['Inter'] text-[10px] font-bold tracking-[0.1em]">LIBRARY</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-600 pt-2 pb-4 hover:text-zinc-300 cursor-pointer">
+<span class="material-symbols-outlined mb-1">explore</span>
+<span class="font-['Inter'] text-[10px] font-bold tracking-[0.1em]">EXPLORE</span>
+</div>
+<div class="flex flex-col items-center justify-center text-white border-t-2 border-[#00FF41] -mt-[1px] pt-2 pb-4 cursor-pointer">
+<span class="material-symbols-outlined mb-1">tune</span>
+<span class="font-['Inter'] text-[10px] font-bold tracking-[0.1em]">SYSTEM</span>
+</div>
+</nav>
+<script>
+    function toggleState(state) {
+        const importing = document.getElementById('importing-state');
+        const success = document.getElementById('success-state');
+        const error = document.getElementById('error-state');
+
+        // Reset all
+        [importing, success, error].forEach(el => {
+            el.classList.remove('visible-state');
+            el.classList.add('hidden-state');
+        });
+
+        // Show target
+        if (state === 'importing') {
+            importing.classList.add('visible-state');
+            importing.classList.remove('hidden-state');
+        } else if (state === 'success') {
+            success.classList.add('visible-state');
+            success.classList.remove('hidden-state');
+        } else if (state === 'error') {
+            error.classList.add('visible-state');
+            error.classList.remove('hidden-state');
+        }
+    }
+</script>
+</body></html>

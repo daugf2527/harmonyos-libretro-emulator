@@ -17,64 +17,121 @@
 struct Index {
   build() {
     Column() {
-      // Gambatte 测试按钮
-      Row() {
-        Button('测试 Gambatte 核心')
-          .fontSize(18)
-          .width('80%')
-          .height(60)
-          .backgroundColor('#FF6B35')
-          .onClick(() => {
-            // 导航到 Gambatte 测试页面
-            this.getUIContext().getRouter().pushUrl({
-              url: 'pages/TestGambatte'
-            }).catch((err: Error) => {
-              console.error(`[Index] Router error: ${err.message}`);
-            });
-          })
-      }
-      .margin({ top: 10 })
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
-      
-      // 通用 Libretro 游戏页面按钮
-      Row() {
-        Button('通用 Libretro 游戏')
-          .fontSize(18)
-          .width('80%')
-          .height(60)
-          .backgroundColor('#4CAF50')
-          .onClick(() => {
-            // 导航到通用 Libretro 游戏页面
-            this.getUIContext().getRouter().pushUrl({
-              url: 'pages/LibretroGamePage'
-            }).catch((err: Error) => {
-              console.error(`[Index] Router error: ${err.message}`);
-            });
-          })
-      }
-      .margin({ top: 10 })
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
+        // Onboarding 引导页按钮
+        Row() {
+          Button('Onboarding 引导页')
+            .fontSize(18)
+            .width('80%')
+            .height(60)
+            .backgroundColor('#00A651')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({
+                url: 'pages/OnboardingPage'
+              }).catch((err: Error) => {
+                console.error(`[Index] Router error: ${err.message}`);
+              });
+            })
+        }
+        .margin({ top: 10 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
 
-      // 新架构测试页面按钮
-      Row() {
-        Button('新架构测试')
-          .fontSize(18)
-          .width('80%')
-          .height(60)
-          .backgroundColor('#9C27B0')
-          .onClick(() => {
-            this.getUIContext().getRouter().pushUrl({
-              url: 'pages/LibretroNewArchTestPage'
-            }).catch((err: Error) => {
-              console.error(`[Index] Router error: ${err.message}`);
-            });
-          })
-      }
-      .margin({ top: 10 })
-      .width('100%')
-      .justifyContent(FlexAlign.Center)
+        // 导入任务反馈页（1:1 还原）
+        Row() {
+          Button('导入任务反馈页（1:1）')
+            .fontSize(18)
+            .width('80%')
+            .height(60)
+            .backgroundColor('#111111')
+            .fontColor('#00FF41')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({
+                url: 'pages/ImportTaskOverlayPage'
+              }).catch((err: Error) => {
+                console.error(`[Index] Router error: ${err.message}`);
+              });
+            })
+        }
+        .margin({ top: 10 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+
+        // Stitch 导入任务页（Web，先用同页全屏覆盖避免路由缓存问题）
+        Row() {
+          Button('Stitch 导入任务页（Web）')
+            .fontSize(18)
+            .width('80%')
+            .height(60)
+            .backgroundColor('#0A0A0A')
+            .fontColor('#00FF41')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({
+                url: 'pages/StitchImportTaskPage'
+              }).catch((err: Error) => {
+                console.error(`[Index] Router error: ${err.message}`);
+              });
+            })
+        }
+        .margin({ top: 10 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+
+        // Gambatte 测试按钮
+        Row() {
+          Button('测试 Gambatte 核心')
+            .fontSize(18)
+            .width('80%')
+            .height(60)
+            .backgroundColor('#FF6B35')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({
+                url: 'pages/TestGambatte'
+              }).catch((err: Error) => {
+                console.error(`[Index] Router error: ${err.message}`);
+              });
+            })
+        }
+        .margin({ top: 10 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+
+        // 通用 Libretro 游戏页面按钮
+        Row() {
+          Button('通用 Libretro 游戏')
+            .fontSize(18)
+            .width('80%')
+            .height(60)
+            .backgroundColor('#4CAF50')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({
+                url: 'pages/LibretroGamePage'
+              }).catch((err: Error) => {
+                console.error(`[Index] Router error: ${err.message}`);
+              });
+            })
+        }
+        .margin({ top: 10 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+
+        // 新架构测试页面按钮
+        Row() {
+          Button('新架构测试')
+            .fontSize(18)
+            .width('80%')
+            .height(60)
+            .backgroundColor('#9C27B0')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({
+                url: 'pages/LibretroNewArchTestPage'
+              }).catch((err: Error) => {
+                console.error(`[Index] Router error: ${err.message}`);
+              });
+            })
+        }
+        .margin({ top: 10 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
     }
     .width('100%')
     .height('100%')
