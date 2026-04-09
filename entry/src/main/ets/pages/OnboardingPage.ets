@@ -1,6 +1,7 @@
 import { router } from '@kit.ArkUI'
 import { abilityAccessCtrl, bundleManager, Permissions } from '@kit.AbilityKit'
 import { BusinessError } from '@kit.BasicServicesKit'
+import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
 
 type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED'
 
@@ -8,6 +9,10 @@ interface PermissionItem {
   key: string
   label: string
   status: PermissionStatus
+}
+
+interface PermissionRequestResult {
+  authResults?: number[]
 }
 
 interface ColorTokens {
@@ -24,29 +29,7 @@ interface ColorTokens {
   secondary: string
 }
 
-const Colors: ColorTokens = {
-  background: '#000000',
-  surfaceContainer: '#191919',
-  surfaceContainerHigh: '#1F1F1F',
-  surfaceContainerHighest: '#262626',
-  surfaceContainerLow: '#131313',
-  primary: '#00FF41',
-  onSurface: '#E5E5E5',
-  onSurfaceVariant: '#ABABAB',
-  outlineVariant: '#484848',
-  outline: '#757575',
-  secondary: '#9D9E9E',
-}
-
-function createRange(size: number): number[] {
-  const values: number[] = []
-  let index: number = 0
-  while (index < size) {
-    values.push(index)
-    index += 1
-  }
-  return values
-}
+const Colors: ColorTokens = EmuColors
 
 @Entry
 @Component
@@ -63,8 +46,8 @@ struct OnboardingPage {
     { key: 'READ_MEDIA_VIDEO', label: 'MEDIA_METADATA', status: 'PENDING' },
   ]
   @State private protocolStatus: string = 'PENDING'
-  private readonly horizontalGridIndexes: number[] = createRange(120)
-  private readonly verticalGridIndexes: number[] = createRange(120)
+  private readonly horizontalGridIndexes: number[] = createIndexRange(120)
+  private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private scanLineTimer: number = -1
 
   aboutToAppear() {
@@ -152,16 +135,14 @@ struct OnboardingPage {
     }
   }
 
-  private extractAuthResults(result: Object): number[] {
-    const requestResult = result as Record<string, Object>
-    const authResultsRaw = requestResult['authResults']
-    if (!Array.isArray(authResultsRaw)) {
+  private extractAuthResults(result: PermissionRequestResult): number[] {
+    if (!Array.isArray(result.authResults)) {
       return []
     }
-    return authResultsRaw.map((item: Object) => Number(item))
+    return result.authResults.map((item: number): number => Number(item))
   }
 
-  private isAllGrantedFromResult(result: Object): boolean {
+  private isAllGrantedFromResult(result: PermissionRequestResult): boolean {
     const authResults = this.extractAuthResults(result)
     if (authResults.length === 0) {
       return false
@@ -227,8 +208,8 @@ struct OnboardingPage {
     }
   }
 
-  private onStartButtonTouch(event: Object): void {
-    const eventType = Number((event as Record<string, Object>)['type'])
+  private onStartButtonTouch(event: TouchEvent): void {
+    const eventType = Number(event.type)
     if (eventType === TouchType.Down) {
       this.startButtonPressed = true
       return
@@ -238,8 +219,8 @@ struct OnboardingPage {
     }
   }
 
-  private onAuthorizeButtonTouch(event: Object): void {
-    const eventType = Number((event as Record<string, Object>)['type'])
+  private onAuthorizeButtonTouch(event: TouchEvent): void {
+    const eventType = Number(event.type)
     if (eventType === TouchType.Down) {
       this.authorizeButtonPressed = true
       return
@@ -441,7 +422,7 @@ struct OnboardingPage {
       .border({ width: 1, color: Colors.outline, style: BorderStyle.Solid })
       .borderRadius(6)
       .margin({ bottom: 96 })
-      .onTouch((event) => this.onStartButtonTouch(event as Object))
+      .onTouch((event: TouchEvent) => this.onStartButtonTouch(event))
       .onClick(() => this.switchToStep2())
 
       // Status bar
@@ -644,7 +625,7 @@ struct OnboardingPage {
         .border({ width: 1, color: Colors.outline, style: BorderStyle.Solid })
         .borderRadius(0)
         .enabled(!this.permissionRequesting)
-        .onTouch((event) => this.onAuthorizeButtonTouch(event as Object))
+        .onTouch((event: TouchEvent) => this.onAuthorizeButtonTouch(event))
         .onClick(() => this.requestPermission())
 
         Text('暂不授权，稍后在设置中手动开启')

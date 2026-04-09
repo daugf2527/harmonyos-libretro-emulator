@@ -2,6 +2,8 @@
   "src": [
     "pages/OnboardingPage",
     "pages/Index",
+    "pages/ImportEntryPage",
+    "pages/LibraryPage",
     "pages/StitchImportTaskPage",
     "pages/ImportTaskOverlayPage",
     "pages/CoreLoaderTest",

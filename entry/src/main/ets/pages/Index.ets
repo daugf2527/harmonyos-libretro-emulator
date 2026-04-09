@@ -17,6 +17,25 @@
 struct Index {
   build() {
     Column() {
+        Row() {
+          Button('产品入口：导入主页')
+            .fontSize(18)
+            .width('80%')
+            .height(60)
+            .backgroundColor('#00FF41')
+            .fontColor('#000000')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({
+                url: 'pages/ImportEntryPage'
+              }).catch((err: Error) => {
+                console.error(`[Index] Router error: ${err.message}`);
+              });
+            })
+        }
+        .margin({ top: 10 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+
         // Onboarding 引导页按钮
         Row() {
           Button('Onboarding 引导页')
@@ -124,6 +143,25 @@ struct Index {
             .onClick(() => {
               this.getUIContext().getRouter().pushUrl({
                 url: 'pages/LibretroNewArchTestPage'
+              }).catch((err: Error) => {
+                console.error(`[Index] Router error: ${err.message}`);
+              });
+            })
+        }
+        .margin({ top: 10 })
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+
+        Row() {
+          Button('产品入口：游戏库')
+            .fontSize(18)
+            .width('80%')
+            .height(60)
+            .backgroundColor('#0A0A0A')
+            .fontColor('#00FF41')
+            .onClick(() => {
+              this.getUIContext().getRouter().pushUrl({
+                url: 'pages/LibraryPage'
               }).catch((err: Error) => {
                 console.error(`[Index] Router error: ${err.message}`);
               });

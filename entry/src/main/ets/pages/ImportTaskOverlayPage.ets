@@ -1,3 +1,7 @@
+import { router } from '@kit.ArkUI'
+import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
+
 type FeedbackState = 'IMPORTING' | 'SUCCESS' | 'ERROR'
 
 interface ImportOverlayColors {
@@ -16,56 +20,28 @@ interface ImportOverlayColors {
   secondary: string
 }
 
-interface BottomNavItem {
-  key: string
-  iconCode: string
-  label: string
-  isActive: boolean
-}
-
-function createRange(size: number): number[] {
-  const values: number[] = []
-  let index: number = 0
-  while (index < size) {
-    values.push(index)
-    index += 1
-  }
-  return values
-}
-
-const Colors: ImportOverlayColors = {
-  background: '#000000',
-  surfaceContainerLowest: '#000000',
-  surfaceContainerLow: '#131313',
-  surfaceContainer: '#191919',
-  surfaceContainerHigh: '#1F1F1F',
-  surfaceContainerHighest: '#262626',
-  primary: '#00FF41',
-  error: '#ED7F64',
-  onSurface: '#E5E5E5',
-  onSurfaceVariant: '#ABABAB',
-  outline: '#757575',
-  outlineVariant: '#484848',
-  secondary: '#9D9E9E'
-}
+const Colors: ImportOverlayColors = EmuColors
 
 @Entry
 @Component
 struct ImportTaskOverlayPage {
   @State private feedbackState: FeedbackState = 'IMPORTING'
-  @State private showCancelResultDialog: boolean = false
   @State private overlayOpacity: number = 1
   @State private overlayScale: number = 1
   @State private cancelPressed: boolean = false
   @State private confirmPressed: boolean = false
   @State private retryPressed: boolean = false
-  @State private cancelDialogDismissPressed: boolean = false
-  @State private cancelDialogRetryPressed: boolean = false
   @State private pulseDotVisible: boolean = true
+  @State private etaText: string = 'EST: 02:45'
+  @State private sourceText: string = 'Source: EXT_DISK_A'
+  @State private transferRateText: string = '24.4 MB/s'
+  @State private processStatusText: string = 'VERIFYING_CHECKSUM...'
+  @State private processIdText: string = 'PROCESS_ID: 0x882A_IMPORT'
   private pulseTimer: number = -1
-  private readonly horizontalGridIndexes: number[] = createRange(120)
-  private readonly verticalGridIndexes: number[] = createRange(120)
-  private readonly navItems: BottomNavItem[] = [
+  private importTimer: number = -1
+  private readonly horizontalGridIndexes: number[] = createIndexRange(120)
+  private readonly verticalGridIndexes: number[] = createIndexRange(120)
+  private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconCode: '\uE2C8', label: 'LIBRARY', isActive: false },
     { key: 'explore', iconCode: '\uE8D6', label: 'EXPLORE', isActive: false },
     { key: 'system', iconCode: '\uE429', label: 'SYSTEM', isActive: true }
@@ -73,10 +49,12 @@ struct ImportTaskOverlayPage {
 
   aboutToAppear(): void {
     this.startPulseTimer()
+    this.startImportSimulation()
   }
 
   aboutToDisappear(): void {
     this.stopPulseTimer()
+    this.stopImportSimulation()
   }
 
   private startPulseTimer(): void {
@@ -94,6 +72,47 @@ struct ImportTaskOverlayPage {
     if (this.pulseTimer !== -1) {
       clearInterval(this.pulseTimer)
       this.pulseTimer = -1
+    }
+  }
+
+  private applyImportProgress(nextProgress: number): void {
+    this.transferRateText = `${(18 + Math.random() * 14).toFixed(1)} MB/s`
+    this.processStatusText = 'VERIFYING_CHECKSUM...'
+    this.sourceText = 'Source: EXT_DISK_A'
+
+    const etaSeconds = Math.max(0, Math.ceil((100 - nextProgress) / 8))
+    const minutes = Math.floor(etaSeconds / 60).toString().padStart(2, '0')
+    const seconds = (etaSeconds % 60).toString().padStart(2, '0')
+    this.etaText = `EST: ${minutes}:${seconds}`
+  }
+
+  private startImportSimulation(reset: boolean = true): void {
+    this.stopImportSimulation()
+    if (reset) {
+      this.etaText = 'EST: 02:45'
+      this.sourceText = 'Source: EXT_DISK_A'
+      this.transferRateText = '24.4 MB/s'
+      this.processStatusText = 'VERIFYING_CHECKSUM...'
+      this.processIdText = 'PROCESS_ID: 0x882A_IMPORT'
+      this.feedbackState = 'IMPORTING'
+    }
+    this.importTimer = setInterval(() => {
+      const nextProgress = Math.min(33, Number(Math.random() * 6) + 28)
+      this.applyImportProgress(nextProgress)
+
+      if (nextProgress >= 33) {
+        this.stopImportSimulation()
+        setTimeout(() => {
+          this.switchState('SUCCESS')
+        }, 900)
+      }
+    }, 220)
+  }
+
+  private stopImportSimulation(): void {
+    if (this.importTimer !== -1) {
+      clearInterval(this.importTimer)
+      this.importTimer = -1
     }
   }
 
@@ -149,89 +168,38 @@ struct ImportTaskOverlayPage {
     }
   }
 
-  private onCancelDialogDismissTouch(event: TouchEvent): void {
-    const eventType = Number(event.type)
-    if (eventType === TouchType.Down) {
-      this.cancelDialogDismissPressed = true
-      return
-    }
-    if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
-      this.cancelDialogDismissPressed = false
-    }
-  }
-
-  private onCancelDialogRetryTouch(event: TouchEvent): void {
-    const eventType = Number(event.type)
-    if (eventType === TouchType.Down) {
-      this.cancelDialogRetryPressed = true
-      return
-    }
-    if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
-      this.cancelDialogRetryPressed = false
-    }
-  }
-
   build() {
     Stack() {
       Column() {
-        this.TopHeader()
+        EmuHeaderBar({
+          titleText: 'EMU_OS // 0.1',
+          titleIcon: '\uE8B8',
+          rightLabel: 'SYS_MONITOR',
+          rightIcon: '\uE8B8',
+          activeTextColor: EmuColors.primary,
+          mutedTextColor: '#7A7A7A',
+          iconSize: 18,
+          rightIconSize: 18
+        })
         this.BackgroundWorkspace()
-        this.BottomNavigation()
+        EmuBottomNav({
+          items: this.navItems,
+          activeFontColor: '#FFFFFFFF',
+          inactiveFontColor: '#FF1F1F1F',
+          indicatorStyle: 'line',
+          overallOpacity: 0.14,
+          backgroundColor: '#78000000'
+        })
       }
       .width('100%')
       .height('100%')
 
       this.ImportOverlay()
-
-      if (this.showCancelResultDialog) {
-        this.CancelTaskResultDialog()
-      }
     }
     .width('100%')
     .height('100%')
     .backgroundColor(Colors.background)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-  }
-
-  @Builder
-  private TopHeader() {
-    Row() {
-      Row({ space: 10 }) {
-        Text('\uE322')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontColor(Colors.primary)
-          .fontSize(20)
-
-        Text('EMU_OS // 0.1')
-          .fontFamily('monospace')
-          .fontSize(14)
-          .fontColor(Colors.primary)
-          .letterSpacing(2.4)
-      }
-      .alignItems(VerticalAlign.Center)
-
-      Row({ space: 16 }) {
-        Text('SYS_MONITOR')
-          .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor('#888888')
-          .letterSpacing(1.2)
-
-        Text('\uE8B8')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontColor(Colors.primary)
-          .fontSize(20)
-      }
-      .alignItems(VerticalAlign.Center)
-    }
-    .width('100%')
-    .height(56)
-    .padding({ left: 24, right: 24 })
-    .justifyContent(FlexAlign.SpaceBetween)
-    .alignItems(VerticalAlign.Center)
-    .backdropBlur(24)
-    .backgroundColor('#D9000000')
-    .border({ width: { bottom: 1 }, color: '#33484848', style: BorderStyle.Solid })
   }
 
   @Builder
@@ -286,8 +254,8 @@ struct ImportTaskOverlayPage {
     }
     .width('100%')
     .layoutWeight(1)
-    .blur(22)
-    .opacity(0.2)
+    .blur(28)
+    .opacity(0.06)
   }
 
   @Builder
@@ -332,7 +300,10 @@ struct ImportTaskOverlayPage {
         Row()
           .width('100%')
           .height(1)
-          .backgroundColor('#4D00FF41')
+          .linearGradient({
+            angle: 90,
+            colors: [[0x00000000, 0.0], [0x4D00FF41, 0.5], [0x00000000, 1.0]]
+          })
 
         if (this.feedbackState === 'IMPORTING') {
           this.ImportingState()
@@ -344,14 +315,15 @@ struct ImportTaskOverlayPage {
       }
       .width('100%')
       .constraintSize({ maxWidth: 400, minHeight: 220 })
-      .backgroundColor('#FF0A0A0A')
-      .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
-      .shadow({ radius: 32, color: '#66000000', offsetX: 0, offsetY: 8 })
+      .backgroundColor('#FF080808')
+      .border({ width: 0.5, color: '#1AFFFFFF', style: BorderStyle.Solid })
+      .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 6 })
       .clip(true)
       .opacity(this.overlayOpacity)
       .scale({ x: this.overlayScale, y: this.overlayScale })
-      .margin({ left: 24, right: 24 })
+      .margin({ left: 20, right: 20 })
       .align(Alignment.Center)
+      .translate({ y: 88 })
     }
     .width('100%')
     .height('100%')
@@ -375,7 +347,7 @@ struct ImportTaskOverlayPage {
         }
         .alignItems(HorizontalAlign.Start)
 
-        Text('EST: 02:45')
+        Text(this.etaText)
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(Colors.onSurfaceVariant)
@@ -410,7 +382,7 @@ struct ImportTaskOverlayPage {
             .backgroundColor(Colors.primary)
             .opacity(this.pulseDotVisible ? 1 : 0.3)
 
-          Text('Source: EXT_DISK_A')
+          Text(this.sourceText)
             .fontSize(11)
             .fontFamily('monospace')
             .fontColor(Colors.onSurfaceVariant)
@@ -418,7 +390,7 @@ struct ImportTaskOverlayPage {
         }
         .alignItems(VerticalAlign.Center)
 
-        Text('24.4 MB/s')
+        Text(this.transferRateText)
           .fontSize(11)
           .fontFamily('monospace')
           .fontColor(Colors.onSurfaceVariant)
@@ -440,14 +412,9 @@ struct ImportTaskOverlayPage {
           .scale({ x: this.cancelPressed ? 0.95 : 1, y: this.cancelPressed ? 0.95 : 1 })
           .onTouch((event: TouchEvent) => this.onCancelTouch(event))
           .onClick(() => {
-            this.showCancelResultDialog = true
+            this.stopImportSimulation()
+            this.switchState('ERROR')
           })
-
-        Button(' ')
-          .opacity(0.01)
-          .width(10)
-          .height(10)
-          .onClick(() => this.switchState('SUCCESS'))
       }
       .width('100%')
       .justifyContent(FlexAlign.End)
@@ -455,12 +422,12 @@ struct ImportTaskOverlayPage {
       .margin({ bottom: 22 })
 
       Row() {
-        Text('PROCESS_ID: 0x882A_IMPORT')
+        Text(this.processIdText)
           .fontSize(9)
           .fontFamily('monospace')
           .fontColor('#FF666666')
 
-        Text('VERIFYING_CHECKSUM...')
+        Text(this.processStatusText)
           .fontSize(9)
           .fontFamily('monospace')
           .fontColor('#FF666666')
@@ -468,14 +435,14 @@ struct ImportTaskOverlayPage {
       }
       .width('100%')
       .height(30)
-      .padding({ left: 16, right: 16 })
+      .padding({ left: 32, right: 32, top: 8, bottom: 8 })
       .backgroundColor(Colors.surfaceContainerLow)
       .border({ width: { top: 0.5 }, color: '#1AFFFFFF', style: BorderStyle.Solid })
       .justifyContent(FlexAlign.SpaceBetween)
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .padding({ left: 28, right: 28, top: 26 })
+    .padding({ left: 32, right: 32, top: 32 })
   }
 
   @Builder
@@ -518,10 +485,12 @@ struct ImportTaskOverlayPage {
         .border({ width: 0.5, color: '#4D00FF41', style: BorderStyle.Solid })
         .scale({ x: this.confirmPressed ? 0.95 : 1, y: this.confirmPressed ? 0.95 : 1 })
         .onTouch((event: TouchEvent) => this.onConfirmTouch(event))
-        .onClick(() => this.switchState('IMPORTING'))
+        .onClick(() => {
+          router.replaceUrl({ url: 'pages/LibraryPage' })
+        })
     }
     .width('100%')
-    .padding(28)
+    .padding(32)
     .alignItems(HorizontalAlign.Center)
   }
 
@@ -564,7 +533,7 @@ struct ImportTaskOverlayPage {
           .fontColor(Colors.onSurfaceVariant)
           .backgroundColor(Color.Transparent)
           .border({ width: 0.5, color: '#4D757575', style: BorderStyle.Solid })
-          .onClick(() => this.switchState('IMPORTING'))
+          .onClick(() => this.startImportSimulation())
 
         Button('再试一次')
           .layoutWeight(1)
@@ -577,157 +546,15 @@ struct ImportTaskOverlayPage {
           .border({ width: 0.5, color: '#4DED7F64', style: BorderStyle.Solid })
           .scale({ x: this.retryPressed ? 0.95 : 1, y: this.retryPressed ? 0.95 : 1 })
           .onTouch((event: TouchEvent) => this.onRetryTouch(event))
-          .onClick(() => this.switchState('IMPORTING'))
+          .onClick(() => this.startImportSimulation())
       }
       .width('100%')
     }
     .width('100%')
-    .padding(28)
+    .padding(32)
     .alignItems(HorizontalAlign.Center)
   }
 
-  @Builder
-  private CancelTaskResultDialog() {
-    Stack() {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor('#B3000000')
-        .backdropBlur(16)
-
-      Column({ space: 0 }) {
-        Row() {
-          Text('\uE002')
-            .fontFamily('MaterialSymbolsOutlined')
-            .fontSize(34)
-            .fontColor('#FF9A81')
-        }
-        .width(60)
-        .height(60)
-        .borderRadius(16)
-        .backgroundColor('#1A170F10')
-        .border({ width: 0.5, color: '#4D763329', style: BorderStyle.Solid })
-        .justifyContent(FlexAlign.Center)
-        .alignItems(VerticalAlign.Center)
-        .margin({ bottom: 28 })
-
-        Text('导入失败')
-          .fontSize(48)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(Colors.onSurface)
-          .lineHeight(56)
-          .margin({ bottom: 10 })
-
-        Text('文件格式不支持或数据包已损坏')
-          .fontSize(14)
-          .lineHeight(22)
-          .fontColor('#FFA0A4AB')
-          .textAlign(TextAlign.Center)
-          .margin({ bottom: 42 })
-
-        Row({ space: 12 }) {
-          Button({ type: ButtonType.Normal }) {
-            Text('取消')
-              .fontSize(12)
-              .fontWeight(FontWeight.Bold)
-              .fontFamily('monospace')
-              .fontColor('#FFE6E8EB')
-          }
-            .width(202)
-            .height(40)
-            .backgroundColor(this.cancelDialogDismissPressed ? Colors.surfaceContainerHighest : Color.Transparent)
-            .border({ width: 0.5, color: '#4D3D444D', style: BorderStyle.Solid })
-            .scale({
-              x: this.cancelDialogDismissPressed ? 0.95 : 1,
-              y: this.cancelDialogDismissPressed ? 0.95 : 1
-            })
-            .onTouch((event: TouchEvent) => this.onCancelDialogDismissTouch(event))
-            .onClick(() => {
-              this.showCancelResultDialog = false
-              this.cancelDialogDismissPressed = false
-            })
-
-          Button({ type: ButtonType.Normal }) {
-            Row({ space: 8 }) {
-              Text('\uE5D5')
-                .fontFamily('MaterialSymbolsOutlined')
-                .fontSize(16)
-                .fontColor('#FFFF8F74')
-              Text('再试一次')
-                .fontSize(12)
-                .fontWeight(FontWeight.Bold)
-                .fontFamily('monospace')
-                .fontColor('#FFFF8F74')
-            }
-            .justifyContent(FlexAlign.Center)
-            .alignItems(VerticalAlign.Center)
-          }
-            .width(202)
-            .height(40)
-            .backgroundColor(this.cancelDialogRetryPressed ? '#3D4A1F19' : '#2B3A1612')
-            .border({ width: 0.5, color: '#4D8D3C30', style: BorderStyle.Solid })
-            .scale({
-              x: this.cancelDialogRetryPressed ? 0.95 : 1,
-              y: this.cancelDialogRetryPressed ? 0.95 : 1
-            })
-            .onTouch((event: TouchEvent) => this.onCancelDialogRetryTouch(event))
-            .onClick(() => {
-              this.showCancelResultDialog = false
-              this.cancelDialogRetryPressed = false
-            })
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-      }
-      .width('100%')
-      .constraintSize({ maxWidth: 540, minHeight: 388 })
-      .padding({ left: 40, right: 40, top: 52, bottom: 40 })
-      .backgroundColor('#FF05080D')
-      .border({ width: 0.5, color: '#3A49505A', style: BorderStyle.Solid })
-      .margin({ left: 24, right: 24 })
-      .alignItems(HorizontalAlign.Center)
-      .align(Alignment.Center)
-    }
-    .width('100%')
-    .height('100%')
-  }
-
-  @Builder
-  private BottomNavigation() {
-    Row() {
-      ForEach(this.navItems, (item: BottomNavItem) => {
-        Column({ space: 3 }) {
-          Text(item.iconCode)
-            .fontFamily('MaterialSymbolsOutlined')
-            .fontSize(20)
-            .fontColor(item.isActive ? '#FFFFFFFF' : '#FF666666')
-
-          Text(item.label)
-            .fontSize(10)
-            .fontFamily('monospace')
-            .fontWeight(FontWeight.Bold)
-            .fontColor(item.isActive ? '#FFFFFFFF' : '#FF666666')
-            .letterSpacing(1.2)
-        }
-        .layoutWeight(1)
-        .height(56)
-        .padding({ top: 9, bottom: 10 })
-        .justifyContent(FlexAlign.Center)
-        .alignItems(HorizontalAlign.Center)
-        .border({
-          width: { top: item.isActive ? 2 : 0 },
-          color: item.isActive ? Colors.primary : Color.Transparent,
-          style: BorderStyle.Solid
-        })
-      }, (item: BottomNavItem) => item.key)
-    }
-    .width('100%')
-    .height(56)
-    .padding({ left: 24, right: 24 })
-    .backgroundColor('#F2000000')
-    .backdropBlur(20)
-    .border({ width: { top: 0.5 }, color: '#33262626', style: BorderStyle.Solid })
-  }
 }
 
 @Preview
