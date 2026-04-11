@@ -1,8 +1,9 @@
 import { EmuColors, EmuMetrics } from '../common/EmuUiTokens'
+import { EmuIcon } from './EmuIcon'
 
 export interface EmuBottomNavItem {
   key: string
-  iconCode: string
+  iconName: string
   label: string
   isActive: boolean
 }
@@ -14,7 +15,7 @@ export struct EmuBottomNav {
   @Prop inactiveFontColor: string = '#FF666666'
   @Prop indicatorStyle: string = 'line'
   @Prop overallOpacity: number = 1
-  @Prop backgroundColor: string = '#F2000000'
+  @Prop panelBackgroundColor: string = '#F2000000'
   onItemClick?: (key: string) => void
 
   private isDotIndicator(): boolean {
@@ -26,15 +27,16 @@ export struct EmuBottomNav {
       ForEach(this.items, (item: EmuBottomNavItem) => {
         Stack() {
           Column({ space: 3 }) {
-            Text(item.iconCode)
-              .fontFamily('MaterialSymbolsOutlined')
-              .fontSize(24)
-              .fontColor(item.isActive ? this.activeFontColor : this.inactiveFontColor)
+            EmuIcon({
+              name: item.iconName,
+              tone: item.isActive ? 'primary' : 'muted',
+              size: 24,
+              opacityValue: item.isActive ? 1 : 0.42
+            })
 
             Text(item.label)
               .fontSize(10)
-              .fontFamily('monospace')
-              .fontWeight(FontWeight.Bold)
+              .fontWeight(FontWeight.Medium)
               .fontColor(item.isActive ? this.activeFontColor : this.inactiveFontColor)
               .letterSpacing(1.2)
           }
@@ -68,7 +70,7 @@ export struct EmuBottomNav {
     .width('100%')
     .height(EmuMetrics.bottomNavHeight)
     .padding({ left: 24, right: 24 })
-    .backgroundColor(this.backgroundColor)
+    .backgroundColor(this.panelBackgroundColor)
     .backdropBlur(20)
     .border({
       width: { top: 0.5 },

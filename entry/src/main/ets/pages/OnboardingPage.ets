@@ -1,6 +1,7 @@
 import { router } from '@kit.ArkUI'
 import { abilityAccessCtrl, bundleManager, Permissions } from '@kit.AbilityKit'
 import { BusinessError } from '@kit.BasicServicesKit'
+import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
 
 type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED'
@@ -11,25 +12,7 @@ interface PermissionItem {
   status: PermissionStatus
 }
 
-interface PermissionRequestResult {
-  authResults?: number[]
-}
-
-interface ColorTokens {
-  background: string
-  surfaceContainer: string
-  surfaceContainerHigh: string
-  surfaceContainerHighest: string
-  surfaceContainerLow: string
-  primary: string
-  onSurface: string
-  onSurfaceVariant: string
-  outlineVariant: string
-  outline: string
-  secondary: string
-}
-
-const Colors: ColorTokens = EmuColors
+const Colors = EmuColors
 
 @Entry
 @Component
@@ -98,7 +81,7 @@ struct OnboardingPage {
     const perms: Permissions[] = ['ohos.permission.READ_MEDIA']
     try {
       const result = await atManager.requestPermissionsFromUser(getContext(this), perms)
-      const granted = this.isAllGrantedFromResult(result)
+      const granted = this.isAllGrantedFromResult(result.authResults)
       this.applyPermissionState(granted ? 'GRANTED' : 'DENIED')
       if (granted) {
         router.replaceUrl({ url: 'pages/LibretroGamePage' })
@@ -135,19 +118,19 @@ struct OnboardingPage {
     }
   }
 
-  private extractAuthResults(result: PermissionRequestResult): number[] {
-    if (!Array.isArray(result.authResults)) {
+  private extractAuthResults(authResults: number[] | undefined): number[] {
+    if (!Array.isArray(authResults)) {
       return []
     }
-    return result.authResults.map((item: number): number => Number(item))
+    return authResults.map((item: number): number => Number(item))
   }
 
-  private isAllGrantedFromResult(result: PermissionRequestResult): boolean {
-    const authResults = this.extractAuthResults(result)
-    if (authResults.length === 0) {
+  private isAllGrantedFromResult(authResults: number[] | undefined): boolean {
+    const normalizedResults = this.extractAuthResults(authResults)
+    if (normalizedResults.length === 0) {
       return false
     }
-    return authResults.every((status: number) => status === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED)
+    return normalizedResults.every((status: number) => status === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED)
   }
 
   private applyPermissionState(status: PermissionStatus): void {
@@ -297,10 +280,10 @@ struct OnboardingPage {
   private Header() {
     Row() {
       Row({ space: 6 }) {
-        Text('\uE322')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontSize(14)
-          .fontColor(Colors.primary)
+        EmuIcon({
+          name: 'memory',
+          size: 14
+        })
         Text('EMU_CORE_v1.0')
           .fontFamily('monospace')
           .fontSize(14)
@@ -316,10 +299,10 @@ struct OnboardingPage {
           .fontWeight(FontWeight.Medium)
           .letterSpacing(0)
 
-        Text('\uE4CE')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontSize(12)
-          .fontColor(Colors.primary)
+        EmuIcon({
+          name: 'settings_input_component',
+          size: 12
+        })
       }
       .alignItems(VerticalAlign.Center)
     }
@@ -345,10 +328,10 @@ struct OnboardingPage {
           .borderRadius(8)
           .border({ width: 0.5, color: '#66484848', style: BorderStyle.Solid })
 
-        Text('\uE021')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontSize(48)
-          .fontColor(Colors.primary)
+        EmuIcon({
+          name: 'sports_esports',
+          size: 48
+        })
 
         Row()
           .width(6)
@@ -507,10 +490,10 @@ struct OnboardingPage {
           this.PrecisionGrid(20, '#1A484848', 0.5)
 
           Column({ space: 16 }) {
-            Text('\uE2C7')
-              .fontFamily('MaterialSymbolsOutlined')
-              .fontSize(72)
-              .fontColor(Colors.primary)
+            EmuIcon({
+              name: 'folder_open',
+              size: 72
+            })
 
             Row({ space: 4 }) {
               Row().width(4).height(4).backgroundColor(Colors.primary)
@@ -610,10 +593,10 @@ struct OnboardingPage {
               .fontColor(Colors.onSurface)
               .letterSpacing(4)
 
-            Text('\uE5CC')
-              .fontFamily('MaterialSymbolsOutlined')
-              .fontSize(20)
-              .fontColor(Colors.primary)
+            EmuIcon({
+              name: 'chevron_right',
+              size: 20
+            })
               .translate({ x: this.authorizeButtonPressed ? 2 : 0 })
           }
           .alignItems(VerticalAlign.Center)

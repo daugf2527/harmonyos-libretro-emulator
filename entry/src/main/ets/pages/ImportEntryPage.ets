@@ -40,10 +40,10 @@ struct ImportEntryPage {
     { x: 286, y: 526, size: 2, opacity: 0.12 }
   ]
   private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconCode: '\uE2C8', label: 'LIBRARY', isActive: true },
-    { key: 'engine', iconCode: '\uE8B8', label: 'ENGINE', isActive: false },
-    { key: 'input', iconCode: '\uE338', label: 'INPUT', isActive: false },
-    { key: 'system', iconCode: '\uE429', label: 'SYSTEM', isActive: false }
+    { key: 'library', iconName: 'grid_view', label: 'LIBRARY', isActive: true },
+    { key: 'engine', iconName: 'terminal', label: 'ENGINE', isActive: false },
+    { key: 'input', iconName: 'sports_esports', label: 'INPUT', isActive: false },
+    { key: 'system', iconName: 'tune', label: 'SYSTEM', isActive: false }
   ]
 
   aboutToAppear(): void {
@@ -162,7 +162,8 @@ struct ImportEntryPage {
       EmuHeaderBar({
         titleText: 'EMU_CORE_v1.0',
         rightLabel: 'NETWORK: ONLINE',
-        rightIcon: '\uE9B2',
+        titleIcon: 'memory',
+        rightIcon: 'settings_input_component',
         activeTextColor: EmuColors.primary,
         mutedTextColor: '#646464',
         iconSize: 16,
@@ -202,7 +203,7 @@ struct ImportEntryPage {
         inactiveFontColor: '#FF666666',
         indicatorStyle: 'dot',
         overallOpacity: 0.86,
-        backgroundColor: '#E8000000'
+        panelBackgroundColor: '#E8000000'
       })
     }
     .width('100%')

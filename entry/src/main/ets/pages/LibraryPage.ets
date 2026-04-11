@@ -4,6 +4,7 @@ import { EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuBottomNav } from '../components/EmuBottomNav'
 import { PlatformChipBar } from '../components/PlatformChipBar'
 import { GameCard } from '../components/GameCard'
+import { EmuIcon } from '../components/EmuIcon'
 import { LibrarySection } from '../components/LibrarySection'
 import { EmuColors } from '../common/EmuUiTokens'
 
@@ -13,34 +14,38 @@ interface LibraryGameItem {
   subtitle: string
   platform: string
   coverColor: string
+  coverKey: string
 }
 
 @Entry
 @Component
 struct LibraryPage {
-  @State private selectedPlatform: string = 'NES'
+  @State private selectedPlatform: string = 'FC'
   @State private searchKeyword: string = ''
   @State private selectedGameId: string = 'metroid-fusion'
   private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconCode: '\uE2C8', label: 'LIBRARY', isActive: true },
-    { key: 'explore', iconCode: '\uE8D6', label: 'EXPLORE', isActive: false },
-    { key: 'system', iconCode: '\uE429', label: 'SYSTEM', isActive: false }
+    { key: 'library', iconName: 'grid_view', label: 'LIBRARY', isActive: true },
+    { key: 'engine', iconName: 'terminal', label: 'ENGINE', isActive: false },
+    { key: 'input', iconName: 'sports_esports', label: 'INPUT', isActive: false },
+    { key: 'system', iconName: 'tune', label: 'SYSTEM', isActive: false }
   ]
-  private readonly platforms: string[] = ['NES', 'GBA', 'SNES', 'MD']
+  private readonly platforms: string[] = ['FC', 'GBA', 'SNES', 'MD']
   private readonly recentGames: LibraryGameItem[] = [
     {
       id: 'metroid-fusion',
       title: '银河战士 融合',
       subtitle: 'METROID FUSION',
       platform: 'GBA',
-      coverColor: '#274530'
+      coverColor: '#274530',
+      coverKey: 'metroid_fusion'
     },
     {
       id: 'zelda-triforce',
       title: '塞尔达传说：众神三角',
       subtitle: 'THE LEGEND OF ZELDA',
       platform: 'SNES',
-      coverColor: '#27405E'
+      coverColor: '#27405E',
+      coverKey: 'zelda_triforce'
     }
   ]
   private readonly allGames: LibraryGameItem[] = [
@@ -49,21 +54,23 @@ struct LibraryPage {
       title: '恶魔城：晓月圆舞曲',
       subtitle: 'Castlevania: Aria of Sorrow',
       platform: 'GBA',
-      coverColor: '#4E2A41'
+      coverColor: '#4E2A41',
+      coverKey: 'aria_of_sorrow'
     },
     {
       id: 'chrono-trigger',
       title: '时空之轮',
       subtitle: 'Chrono Trigger',
       platform: 'SNES',
-      coverColor: '#5A4331'
+      coverColor: '#5A4331',
+      coverKey: 'chrono_trigger'
     }
   ]
 
   private get filteredGames(): LibraryGameItem[] {
     const keyword = this.searchKeyword.trim().toLowerCase()
     return this.allGames.filter((item: LibraryGameItem) => {
-      const matchedPlatform = item.platform === this.selectedPlatform
+      const matchedPlatform = this.selectedPlatform === 'FC' || item.platform === this.selectedPlatform
       if (!matchedPlatform) {
         return false
       }
@@ -79,10 +86,12 @@ struct LibraryPage {
   private SearchAndFilter() {
     Column({ space: 16 }) {
       Row({ space: 12 }) {
-        Text('\uE8B6')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontSize(18)
-          .fontColor(EmuColors.onSurfaceVariant)
+        EmuIcon({
+          name: 'search',
+          tone: 'muted',
+          size: 18,
+          opacityValue: 0.9
+        })
 
         Text('搜索游戏库')
           .fontSize(14)
@@ -160,9 +169,10 @@ struct LibraryPage {
             subtitle: item.subtitle,
             platform: item.platform,
             coverColor: item.coverColor,
+            coverKey: item.coverKey,
             isActive: item.id === this.selectedGameId,
             variant: 'recent',
-            onClick: () => {
+            onCardClick: () => {
               this.selectedGameId = item.id
             }
           })
@@ -183,8 +193,9 @@ struct LibraryPage {
           subtitle: item.subtitle,
           platform: item.platform,
           coverColor: item.coverColor,
+          coverKey: item.coverKey,
           variant: 'list',
-          onClick: () => {
+          onCardClick: () => {
             router.pushUrl({ url: 'pages/LibretroGamePage' })
           }
         })
@@ -226,8 +237,8 @@ struct LibraryPage {
     Column() {
       EmuHeaderBar({
         titleText: 'EMU_OS // 0.1',
-        titleIcon: '\uE8B8',
-        rightIcon: '\uE8B8'
+        titleIcon: 'terminal',
+        rightIcon: 'settings_input_component'
       })
 
       Stack() {

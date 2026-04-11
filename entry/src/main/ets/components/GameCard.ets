@@ -1,4 +1,5 @@
 import { EmuColors, EmuRadius } from '../common/EmuUiTokens'
+import { EmuCoverArt } from './EmuCoverArt'
 
 export type GameCardVariant = 'recent' | 'list'
 
@@ -8,16 +9,20 @@ export struct GameCard {
   @Prop subtitle: string = ''
   @Prop platform: string = ''
   @Prop coverColor: string = '#2C2C2C'
+  @Prop coverKey: string = ''
   @Prop isActive: boolean = false
   @Prop variant: GameCardVariant = 'recent'
-  onClick?: () => void
+  onCardClick?: () => void
 
   build() {
-    if (this.variant === 'recent') {
-      this.RecentCard()
-      return
+    Stack() {
+      if (this.variant === 'recent') {
+        this.RecentCard()
+      } else {
+        this.ListCard()
+      }
     }
-    this.ListCard()
+    .width(this.variant === 'recent' ? 176 : '100%')
   }
 
   @Builder
@@ -34,6 +39,13 @@ export struct GameCard {
             color: this.isActive ? EmuColors.primary : EmuColors.outlineVariant,
             style: BorderStyle.Solid
           })
+          .clip(true)
+
+        EmuCoverArt({ coverKey: this.coverKey })
+          .width(176)
+          .height(234)
+          .clip(true)
+          .borderRadius(EmuRadius.lg)
 
         if (this.isActive) {
           Row()
@@ -78,21 +90,31 @@ export struct GameCard {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .width(176)
-    .opacity(this.isActive ? 1 : 0.45)
     .onClick(() => {
-      this.onClick?.()
+      this.onCardClick?.()
     })
   }
 
   @Builder
   private ListCard() {
     Row({ space: 16 }) {
-      Column()
+      Stack() {
+        Column()
+          .width('100%')
+          .height('100%')
+          .backgroundColor(this.coverColor)
+          .borderRadius(EmuRadius.md)
+          .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
+          .clip(true)
+
+        EmuCoverArt({ coverKey: this.coverKey })
+          .width('100%')
+          .height('100%')
+          .clip(true)
+          .borderRadius(EmuRadius.md)
+      }
         .width('28%')
         .aspectRatio(4 / 3)
-        .backgroundColor(this.coverColor)
-        .borderRadius(EmuRadius.md)
-        .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
 
       Column({ space: 4 }) {
         Text(this.title)
@@ -120,9 +142,8 @@ export struct GameCard {
     }
     .width('100%')
     .padding({ top: 8, bottom: 8, left: 8, right: 8 })
-    .opacity(0.45)
     .onClick(() => {
-      this.onClick?.()
+      this.onCardClick?.()
     })
   }
 }

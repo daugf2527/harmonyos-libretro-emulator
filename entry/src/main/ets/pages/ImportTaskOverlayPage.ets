@@ -1,26 +1,12 @@
 import { router } from '@kit.ArkUI'
+import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
 
 type FeedbackState = 'IMPORTING' | 'SUCCESS' | 'ERROR'
 
-interface ImportOverlayColors {
-  background: string
-  surfaceContainerLowest: string
-  surfaceContainerLow: string
-  surfaceContainer: string
-  surfaceContainerHigh: string
-  surfaceContainerHighest: string
-  primary: string
-  error: string
-  onSurface: string
-  onSurfaceVariant: string
-  outline: string
-  outlineVariant: string
-  secondary: string
-}
-
-const Colors: ImportOverlayColors = EmuColors
+const Colors = EmuColors
 
 @Entry
 @Component
@@ -42,9 +28,9 @@ struct ImportTaskOverlayPage {
   private readonly horizontalGridIndexes: number[] = createIndexRange(120)
   private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconCode: '\uE2C8', label: 'LIBRARY', isActive: false },
-    { key: 'explore', iconCode: '\uE8D6', label: 'EXPLORE', isActive: false },
-    { key: 'system', iconCode: '\uE429', label: 'SYSTEM', isActive: true }
+    { key: 'library', iconName: 'grid_view', label: 'LIBRARY', isActive: false },
+    { key: 'explore', iconName: 'explore', label: 'EXPLORE', isActive: false },
+    { key: 'system', iconName: 'tune', label: 'SYSTEM', isActive: true }
   ]
 
   aboutToAppear(): void {
@@ -173,9 +159,9 @@ struct ImportTaskOverlayPage {
       Column() {
         EmuHeaderBar({
           titleText: 'EMU_OS // 0.1',
-          titleIcon: '\uE8B8',
+          titleIcon: 'terminal',
           rightLabel: 'SYS_MONITOR',
-          rightIcon: '\uE8B8',
+          rightIcon: 'settings_input_component',
           activeTextColor: EmuColors.primary,
           mutedTextColor: '#7A7A7A',
           iconSize: 18,
@@ -184,11 +170,11 @@ struct ImportTaskOverlayPage {
         this.BackgroundWorkspace()
         EmuBottomNav({
           items: this.navItems,
-          activeFontColor: '#FFFFFFFF',
-          inactiveFontColor: '#FF1F1F1F',
+          activeFontColor: '#FFE5E5E5',
+          inactiveFontColor: '#FF666666',
           indicatorStyle: 'line',
-          overallOpacity: 0.14,
-          backgroundColor: '#78000000'
+          overallOpacity: 1,
+          panelBackgroundColor: '#F2000000'
         })
       }
       .width('100%')
@@ -323,7 +309,6 @@ struct ImportTaskOverlayPage {
       .scale({ x: this.overlayScale, y: this.overlayScale })
       .margin({ left: 20, right: 20 })
       .align(Alignment.Center)
-      .translate({ y: 88 })
     }
     .width('100%')
     .height('100%')
@@ -449,10 +434,10 @@ struct ImportTaskOverlayPage {
   private SuccessState() {
     Column({ space: 0 }) {
       Row() {
-        Text('\uE86C')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontSize(30)
-          .fontColor(Colors.primary)
+        EmuIcon({
+          name: 'check_circle',
+          size: 30
+        })
       }
       .width(48)
       .height(48)
@@ -498,10 +483,10 @@ struct ImportTaskOverlayPage {
   private ErrorState() {
     Column({ space: 0 }) {
       Row() {
-        Text('\uE002')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontSize(30)
-          .fontColor(Colors.error)
+        EmuIcon({
+          name: 'warning',
+          size: 30
+        })
       }
       .width(48)
       .height(48)

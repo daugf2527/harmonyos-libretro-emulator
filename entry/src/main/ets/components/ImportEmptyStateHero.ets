@@ -1,4 +1,5 @@
 import { EmuColors, EmuRadius, EmuSpacing } from '../common/EmuUiTokens'
+import { EmuIcon } from './EmuIcon'
 
 @Component
 export struct ImportEmptyStateHero {
@@ -14,8 +15,8 @@ export struct ImportEmptyStateHero {
     Column() {
       Stack() {
         Column()
-          .width(112)
-          .height(132)
+          .width(120)
+          .height(140)
           .backgroundColor(EmuColors.background)
           .borderRadius(EmuRadius.sm)
           .border({
@@ -25,20 +26,22 @@ export struct ImportEmptyStateHero {
           })
 
         Column()
-          .width(78)
-          .height(72)
+          .width(90)
+          .height(82)
           .border({
             width: 1,
             color: '#66484848',
             style: BorderStyle.Dashed
           })
           .align(Alignment.Center)
-          .margin({ bottom: 16 })
+          .margin({ bottom: 18 })
 
-        Text('\uE164')
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontSize(34)
-          .fontColor('#665E5E5E')
+        EmuIcon({
+          name: 'eject',
+          tone: 'outline',
+          size: 34
+        })
+          .opacity(0.86)
           .align(Alignment.Center)
 
         Row()
@@ -46,18 +49,18 @@ export struct ImportEmptyStateHero {
           .height(5)
           .borderRadius(2.5)
           .backgroundColor(EmuColors.primary)
-          .position({ x: 109, y: -3 })
+          .position({ x: 117, y: -3 })
 
         Row()
           .width(3)
           .height(3)
           .borderRadius(1.5)
           .backgroundColor('#66484848')
-          .position({ x: -1, y: 130 })
+          .position({ x: -1, y: 138 })
       }
-      .width(112)
-      .height(132)
-      .margin({ bottom: 54 })
+      .width(120)
+      .height(140)
+      .margin({ bottom: 52 })
       .shadow({
         radius: this.particleBoosted ? 12 : 4,
         color: this.particleBoosted ? '#1800FF41' : '#0800FF41',
@@ -66,19 +69,19 @@ export struct ImportEmptyStateHero {
       })
 
       Text('一键导入游戏，重温经典')
-        .fontSize(22)
+        .fontSize(24)
         .fontWeight(FontWeight.Medium)
         .fontColor(EmuColors.onSurface)
         .textAlign(TextAlign.Center)
-        .margin({ bottom: 10 })
+        .margin({ bottom: 12 })
 
       Text('系统未检测到可用镜像。请选择本地 ROM 或 ISO 文件开始模拟。')
-        .fontSize(12)
-        .lineHeight(19)
+        .fontSize(14)
+        .lineHeight(22)
         .fontColor(EmuColors.onSurfaceVariant)
         .textAlign(TextAlign.Center)
         .constraintSize({ maxWidth: 304 })
-        .margin({ bottom: 34 })
+        .margin({ bottom: 36 })
 
       if (this.isScanning) {
         Column({ space: 8 }) {
@@ -130,10 +133,10 @@ export struct ImportEmptyStateHero {
             .fontColor(EmuColors.onSurface)
             .letterSpacing(2)
 
-          Text('\uE145')
-            .fontFamily('MaterialSymbolsOutlined')
-            .fontSize(18)
-            .fontColor(EmuColors.primary)
+          EmuIcon({
+            name: 'add_circle',
+            size: 18
+          })
         }
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
@@ -159,10 +162,10 @@ export struct ImportEmptyStateHero {
       })
 
       Text('仅支持你合法拥有的游戏')
-        .fontSize(9)
+        .fontSize(10)
         .fontColor('#454545')
         .letterSpacing(1.2)
-        .margin({ top: 44 })
+        .margin({ top: 48 })
     }
     .width('100%')
     .padding({ top: 24, bottom: 24 })

@@ -3,13 +3,14 @@ import {
   EmuMetrics,
   createIndexRange
 } from '../common/EmuUiTokens'
+import { EmuIcon } from './EmuIcon'
 
 @Component
 export struct EmuHeaderBar {
   @Prop titleText: string = 'EMU_CORE_v1.0'
-  @Prop titleIcon: string = '\uE322'
+  @Prop titleIcon: string = 'memory'
   @Prop rightLabel: string = ''
-  @Prop rightIcon: string = '\uE8B8'
+  @Prop rightIcon: string = 'settings_input_component'
   @Prop activeTextColor: string = ''
   @Prop mutedTextColor: string = '#888888'
   @Prop iconSize: number = 18
@@ -18,10 +19,10 @@ export struct EmuHeaderBar {
   build() {
     Row() {
       Row({ space: 6 }) {
-        Text(this.titleIcon)
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontColor(this.activeTextColor.length > 0 ? this.activeTextColor : EmuColors.primary)
-          .fontSize(this.iconSize)
+        EmuIcon({
+          name: this.titleIcon,
+          size: this.iconSize
+        })
 
         Text(this.titleText)
           .fontFamily('monospace')
@@ -35,15 +36,14 @@ export struct EmuHeaderBar {
         if (this.rightLabel.length > 0) {
           Text(this.rightLabel)
             .fontSize(10)
-            .fontFamily('monospace')
             .fontColor(this.mutedTextColor)
             .letterSpacing(0.8)
         }
 
-        Text(this.rightIcon)
-          .fontFamily('MaterialSymbolsOutlined')
-          .fontColor(this.activeTextColor.length > 0 ? this.activeTextColor : EmuColors.primary)
-          .fontSize(this.rightIconSize)
+        EmuIcon({
+          name: this.rightIcon,
+          size: this.rightIconSize
+        })
       }
       .alignItems(VerticalAlign.Center)
     }
