@@ -26,22 +26,24 @@ export struct EmuBottomNav {
     Row() {
       ForEach(this.items, (item: EmuBottomNavItem) => {
         Stack() {
-          Column({ space: 3 }) {
+          Column({ space: 4 }) {
             EmuIcon({
               name: item.iconName,
               tone: item.isActive ? 'primary' : 'muted',
-              size: 24,
-              opacityValue: item.isActive ? 1 : 0.42
+              size: item.isActive ? 24 : 23,
+              opacityValue: item.isActive ? 1 : 0.46
             })
 
             Text(item.label)
               .fontSize(10)
-              .fontWeight(FontWeight.Medium)
+              .fontWeight(item.isActive ? FontWeight.Bold : FontWeight.Medium)
+              .fontFamily('monospace')
               .fontColor(item.isActive ? this.activeFontColor : this.inactiveFontColor)
-              .letterSpacing(1.2)
+              .letterSpacing(1.4)
+              .opacity(item.isActive ? 1 : 0.88)
           }
           .height(EmuMetrics.bottomNavHeight)
-          .padding({ top: 12, bottom: 18 })
+          .padding({ top: 14, bottom: 16 })
           .justifyContent(FlexAlign.Center)
           .alignItems(HorizontalAlign.Center)
 
@@ -52,7 +54,7 @@ export struct EmuBottomNav {
               .borderRadius(2)
               .backgroundColor(EmuColors.primary)
               .align(Alignment.Top)
-              .margin({ top: 8 })
+              .margin({ top: 10 })
           }
         }
         .layoutWeight(1)

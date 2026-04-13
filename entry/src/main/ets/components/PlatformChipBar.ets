@@ -1,4 +1,4 @@
-import { EmuColors, EmuRadius } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
 
 @Component
 export struct PlatformChipBar {
@@ -12,19 +12,21 @@ export struct PlatformChipBar {
 
   build() {
     Scroll() {
-      Row({ space: 8 }) {
+      Row({ space: 12 }) {
         ForEach(this.items, (item: string) => {
           Button(item)
             .fontSize(11)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.isSelected(item) ? '#000000' : EmuColors.onSurfaceVariant)
-            .padding({ left: 24, right: 24, top: 6, bottom: 6 })
-            .height(32)
-            .backgroundColor(this.isSelected(item) ? EmuColors.primary : EmuColors.surfaceContainerHigh)
-            .borderRadius(EmuRadius.pill)
+            .fontFamily('monospace')
+            .fontColor(this.isSelected(item) ? '#FF000000' : '#FF9D9E9E')
+            .letterSpacing(0.4)
+            .width(102)
+            .height(42)
+            .backgroundColor(this.isSelected(item) ? EmuColors.primary : '#171717')
+            .borderRadius(18)
             .border({
               width: this.isSelected(item) ? 0 : 0.5,
-              color: EmuColors.outlineVariant,
+              color: '#44757575',
               style: BorderStyle.Solid
             })
             .onClick(() => {

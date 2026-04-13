@@ -8,7 +8,7 @@ export struct LibrarySection {
   build() {
     Row() {
       Text(this.title)
-        .fontSize(14)
+        .fontSize(18)
         .fontWeight(FontWeight.Medium)
         .fontColor(EmuColors.onSurface)
 
@@ -17,7 +17,7 @@ export struct LibrarySection {
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(EmuColors.primary)
-          .letterSpacing(1.1)
+          .letterSpacing(1.4)
       }
     }
     .width('100%')

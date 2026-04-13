@@ -1,11 +1,10 @@
 import { router } from '@kit.ArkUI'
-import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
-import { EmuBottomNavItem } from '../components/EmuBottomNav'
-import { EmuBottomNav } from '../components/EmuBottomNav'
-import { PlatformChipBar } from '../components/PlatformChipBar'
-import { GameCard } from '../components/GameCard'
+import { EmuHeaderBar } from '../components/EmuAppShell'
+import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
+import { GameCard } from '../components/GameCard'
 import { LibrarySection } from '../components/LibrarySection'
+import { PlatformChipBar } from '../components/PlatformChipBar'
 import { EmuColors } from '../common/EmuUiTokens'
 
 interface LibraryGameItem {
@@ -22,7 +21,6 @@ interface LibraryGameItem {
 struct LibraryPage {
   @State private selectedPlatform: string = 'FC'
   @State private searchKeyword: string = ''
-  @State private selectedGameId: string = 'metroid-fusion'
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: 'LIBRARY', isActive: true },
     { key: 'engine', iconName: 'terminal', label: 'ENGINE', isActive: false },
@@ -69,61 +67,84 @@ struct LibraryPage {
 
   private get filteredGames(): LibraryGameItem[] {
     const keyword = this.searchKeyword.trim().toLowerCase()
+    if (keyword.length === 0) {
+      return this.allGames
+    }
     return this.allGames.filter((item: LibraryGameItem) => {
-      const matchedPlatform = this.selectedPlatform === 'FC' || item.platform === this.selectedPlatform
-      if (!matchedPlatform) {
-        return false
-      }
-      if (keyword.length === 0) {
-        return true
-      }
       return item.title.toLowerCase().indexOf(keyword) >= 0 ||
-        item.subtitle.toLowerCase().indexOf(keyword) >= 0
+        item.subtitle.toLowerCase().indexOf(keyword) >= 0 ||
+        item.platform.toLowerCase().indexOf(keyword) >= 0
     })
   }
 
   @Builder
-  private SearchAndFilter() {
-    Column({ space: 16 }) {
-      Row({ space: 12 }) {
+  private SearchAndTelemetry() {
+    Column({ space: 20 }) {
+      Row({ space: 14 }) {
         EmuIcon({
           name: 'search',
           tone: 'muted',
-          size: 18,
+          size: 20,
           opacityValue: 0.9
         })
 
-        Text('搜索游戏库')
-          .fontSize(14)
-          .fontColor('#80ABABAB')
-      }
-        .height(48)
-        .backgroundColor(EmuColors.surfaceContainerLow)
-        .borderRadius(8)
-        .padding({ left: 16, right: 16 })
-        .width('100%')
-        .alignItems(VerticalAlign.Center)
+        Stack() {
+          if (this.searchKeyword.trim().length === 0) {
+            Text('搜索游戏库')
+              .fontSize(15)
+              .fontColor('#66484848')
+              .align(Alignment.CenterStart)
+          }
 
-      Row() {
-        Row({ space: 16 }) {
-          this.TelemetryCell('CPU Load', '12.4%')
-          this.TelemetryCell('FPS', '60.0')
-          this.TelemetryCell('Memory', '1.2GB')
+          TextInput({ text: this.searchKeyword, placeholder: '' })
+            .width('100%')
+            .height(28)
+            .fontSize(15)
+            .fontColor(EmuColors.onSurface)
+            .backgroundColor(Color.Transparent)
+            .border({ width: 0 })
+            .padding({ left: 0, right: 0 })
+            .margin({ top: -1 })
+            .onChange((value: string) => {
+              this.searchKeyword = value
+            })
         }
-
-        Row({ space: 2 }) {
-          Column().width(4).height(12).backgroundColor('#3300FF41')
-          Column().width(4).height(18).backgroundColor('#6600FF41')
-          Column().width(4).height(14).backgroundColor('#4D00FF41')
-          Column().width(4).height(24).backgroundColor(EmuColors.primary)
-        }
+        .layoutWeight(1)
+        .height(28)
       }
       .width('100%')
-      .padding(12)
-      .backgroundColor(EmuColors.surfaceContainerLowest)
+      .height(64)
+      .padding({ left: 18, right: 18 })
+      .backgroundColor('#0A0A0A')
+      .borderRadius(8)
+      .border({ width: 0.5, color: '#44757575', style: BorderStyle.Solid })
+      .alignItems(VerticalAlign.Center)
+
+      Row({ space: 0 }) {
+        this.TelemetryCell('CPU LOAD', '12.4%')
+        this.TelemetryDivider()
+        this.TelemetryCell('FPS', '60.0')
+        this.TelemetryDivider()
+        this.TelemetryCell('MEMORY', '1.2GB')
+
+        Column({ space: 3 }) {
+          Row({ space: 2 }) {
+            Row().width(16).height(8).backgroundColor('#3300FF41')
+            Row().width(16).height(12).backgroundColor('#5500FF41')
+            Row().width(16).height(10).backgroundColor('#4A00FF41')
+            Row().width(16).height(24).backgroundColor('#8800FF41')
+          }
+          .alignItems(VerticalAlign.Bottom)
+        }
+        .padding({ left: 18 })
+        .margin({ left: 14 })
+      }
+      .width('100%')
+      .padding({ left: 18, right: 18, top: 16, bottom: 16 })
+      .backgroundColor('#050505')
       .borderRadius(8)
       .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-      .justifyContent(FlexAlign.SpaceBetween)
+      .alignItems(VerticalAlign.Center)
 
       PlatformChipBar({
         items: this.platforms,
@@ -137,56 +158,95 @@ struct LibraryPage {
 
   @Builder
   private TelemetryCell(label: string, value: string) {
-    Column({ space: 4 }) {
+    Column({ space: 6 }) {
       Text(label)
         .fontSize(9)
         .fontColor(EmuColors.onSurfaceVariant)
-        .letterSpacing(1)
+        .fontFamily('monospace')
+        .letterSpacing(1.2)
 
-      Row({ space: 6 }) {
+      Row({ space: 8 }) {
         Row()
-          .width(4)
-          .height(4)
-          .borderRadius(2)
+          .width(6)
+          .height(6)
+          .borderRadius(3)
           .backgroundColor(EmuColors.primary)
 
         Text(value)
           .fontSize(11)
-          .fontColor(EmuColors.onSurface)
           .fontFamily('monospace')
+          .fontColor(EmuColors.onSurface)
       }
+      .alignItems(VerticalAlign.Center)
     }
+    .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
   }
 
   @Builder
+  private TelemetryDivider() {
+    Column()
+      .width(1)
+      .height(44)
+      .backgroundColor('#26484848')
+      .margin({ left: 12, right: 12 })
+  }
+
+  @Builder
   private RecentContent() {
-    Scroll() {
-      Row({ space: 16 }) {
-        ForEach(this.recentGames, (item: LibraryGameItem) => {
+    Row({ space: 16 }) {
+      ForEach(this.recentGames, (item: LibraryGameItem) => {
+        Column() {
           GameCard({
             title: item.title,
             subtitle: item.subtitle,
             platform: item.platform,
             coverColor: item.coverColor,
             coverKey: item.coverKey,
-            isActive: item.id === this.selectedGameId,
             variant: 'recent',
             onCardClick: () => {
-              this.selectedGameId = item.id
+              router.pushUrl({ url: 'pages/LibretroGamePage' })
             }
           })
-        }, (item: LibraryGameItem) => item.id)
-      }
-      .padding({ left: 4, right: 4 })
+        }
+        .layoutWeight(1)
+      }, (item: LibraryGameItem) => item.id)
     }
-    .scrollable(ScrollDirection.Horizontal)
-    .scrollBar(BarState.Off)
+    .width('100%')
+  }
+
+  @Builder
+  private AllGamesHeader() {
+    Row() {
+      Text('全部游戏')
+        .fontSize(18)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(EmuColors.onSurface)
+
+      Row({ space: 12 }) {
+        Text('SORT: NAME')
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(1.2)
+
+        Column({ space: 3 }) {
+          Row().width(16).height(2).backgroundColor(EmuColors.onSurfaceVariant)
+          Row().width(12).height(2).backgroundColor(EmuColors.onSurfaceVariant)
+          Row().width(8).height(2).backgroundColor(EmuColors.onSurfaceVariant)
+        }
+        .alignItems(HorizontalAlign.End)
+      }
+      .alignItems(VerticalAlign.Center)
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.SpaceBetween)
+    .alignItems(VerticalAlign.Bottom)
   }
 
   @Builder
   private AllGamesContent() {
-    Column({ space: 8 }) {
+    Column({ space: 18 }) {
       ForEach(this.filteredGames, (item: LibraryGameItem) => {
         GameCard({
           title: item.title,
@@ -205,29 +265,60 @@ struct LibraryPage {
   }
 
   @Builder
+  private BottomLoader() {
+    Column({ space: 10 }) {
+      Stack() {
+        Row()
+          .width(30)
+          .height(30)
+          .borderRadius(15)
+          .border({ width: 1.5, color: '#2F484848', style: BorderStyle.Solid })
+
+        Row()
+          .width(30)
+          .height(30)
+          .borderRadius(15)
+          .border({
+            width: { top: 2, right: 2 },
+            color: EmuColors.primary,
+            style: BorderStyle.Solid
+          })
+          .rotate({ angle: 16 })
+      }
+
+      Text('LOADING_ASSETS')
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontColor(EmuColors.onSurfaceVariant)
+        .letterSpacing(1.6)
+    }
+    .width('100%')
+    .padding({ top: 26, bottom: 12 })
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
   private MainContent() {
     Scroll() {
-      Column({ space: 28 }) {
-        this.SearchAndFilter()
+      Column({ space: 34 }) {
+        this.SearchAndTelemetry()
 
-        Column({ space: 16 }) {
+        Column({ space: 18 }) {
           LibrarySection({
             title: '最近运行',
-            codeLabel: 'History_Log'
+            codeLabel: 'HISTORY_LOG'
           })
           this.RecentContent()
         }
 
-        Column({ space: 16 }) {
-          LibrarySection({
-            title: '全部游戏',
-            codeLabel: 'Sort: Name'
-          })
+        Column({ space: 18 }) {
+          this.AllGamesHeader()
           this.AllGamesContent()
+          this.BottomLoader()
         }
       }
       .width('100%')
-      .padding({ top: 24, bottom: 32 })
+      .padding({ top: 20, bottom: 40 })
       .alignItems(HorizontalAlign.Start)
     }
     .scrollBar(BarState.Off)
@@ -238,12 +329,13 @@ struct LibraryPage {
       EmuHeaderBar({
         titleText: 'EMU_OS // 0.1',
         titleIcon: 'terminal',
-        rightIcon: 'settings_input_component'
+        rightIcon: 'settings_input_component',
+        activeTextColor: EmuColors.primary,
+        iconSize: 16,
+        rightIconSize: 18
       })
 
-      Stack() {
-        EmuPrecisionGridBackdrop()
-
+      Row() {
         Column() {
           this.MainContent()
         }
@@ -253,9 +345,15 @@ struct LibraryPage {
       .layoutWeight(1)
       .width('100%')
       .padding({ left: 24, right: 24 })
+      .justifyContent(FlexAlign.Center)
 
       EmuBottomNav({
-        items: this.navItems
+        items: this.navItems,
+        activeFontColor: EmuColors.primary,
+        inactiveFontColor: '#FF666666',
+        indicatorStyle: 'dot',
+        overallOpacity: 1,
+        panelBackgroundColor: '#FF000000'
       })
     }
     .width('100%')

@@ -1,4 +1,4 @@
-import { EmuColors, EmuRadius } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
 import { EmuCoverArt } from './EmuCoverArt'
 
 export type GameCardVariant = 'recent' | 'list'
@@ -10,86 +10,79 @@ export struct GameCard {
   @Prop platform: string = ''
   @Prop coverColor: string = '#2C2C2C'
   @Prop coverKey: string = ''
-  @Prop isActive: boolean = false
   @Prop variant: GameCardVariant = 'recent'
   onCardClick?: () => void
 
   build() {
-    Stack() {
-      if (this.variant === 'recent') {
-        this.RecentCard()
-      } else {
-        this.ListCard()
-      }
+    if (this.variant === 'recent') {
+      this.RecentCard()
+    } else {
+      this.ListCard()
     }
-    .width(this.variant === 'recent' ? 176 : '100%')
+  }
+
+  @Builder
+  private CoverBadge() {
+    Row() {
+      Text(this.platform)
+        .fontSize(10)
+        .fontColor(EmuColors.primary)
+        .fontWeight(FontWeight.Bold)
+        .fontFamily('monospace')
+    }
+    .padding({ left: 10, right: 10, top: 8, bottom: 8 })
+    .backgroundColor('#D9000000')
+    .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+    .borderRadius(4)
+    .align(Alignment.TopEnd)
+    .margin({ top: 12, right: 12 })
   }
 
   @Builder
   private RecentCard() {
-    Column({ space: 8 }) {
+    Column({ space: 12 }) {
       Stack() {
         Column()
-          .width(176)
-          .height(234)
+          .width('100%')
+          .aspectRatio(3 / 4)
           .backgroundColor(this.coverColor)
-          .borderRadius(EmuRadius.lg)
-          .border({
-            width: this.isActive ? 2 : 0.5,
-            color: this.isActive ? EmuColors.primary : EmuColors.outlineVariant,
-            style: BorderStyle.Solid
-          })
+          .borderRadius(14)
+          .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
           .clip(true)
 
-        EmuCoverArt({ coverKey: this.coverKey })
-          .width(176)
-          .height(234)
+        EmuCoverArt({
+          coverKey: this.coverKey,
+          variant: 'recent'
+        })
+          .width('100%')
+          .aspectRatio(3 / 4)
           .clip(true)
-          .borderRadius(EmuRadius.lg)
+          .borderRadius(14)
 
-        if (this.isActive) {
-          Row()
-            .width('100%')
-            .height(2)
-            .linearGradient({
-              angle: 90,
-              colors: [[0x00000000, 0], [0x00FF41FF, 0.5], [0x00000000, 1]]
-            })
-            .shadow({ radius: 12, color: '#6600FF41', offsetX: 0, offsetY: 0 })
-            .align(Alignment.Top)
-            .margin({ top: 88 })
-        }
-
-        Row() {
-          Text(this.platform)
-            .fontSize(9)
-            .fontColor(EmuColors.primary)
-            .fontWeight(FontWeight.Bold)
-            .fontFamily('monospace')
-        }
-        .padding({ left: 6, right: 6, top: 4, bottom: 4 })
-        .backgroundColor('#CC000000')
-        .borderRadius(EmuRadius.sm)
-        .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
-        .align(Alignment.TopEnd)
-        .margin({ top: 8, right: 8 })
+        this.CoverBadge()
       }
+      .width('100%')
 
-      Text(this.title)
-        .fontSize(11)
-        .fontWeight(this.isActive ? FontWeight.Bold : FontWeight.Medium)
-        .fontColor(this.isActive ? EmuColors.primary : EmuColors.onSurface)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Column({ space: 4 }) {
+        Text(this.title)
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(EmuColors.onSurface)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-      Text(this.subtitle)
-        .fontSize(9)
-        .fontFamily('monospace')
-        .fontColor(EmuColors.onSurfaceVariant)
-        .maxLines(1)
-        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(this.subtitle)
+          .fontSize(9)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(0.6)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
     }
-    .width(176)
+    .width('100%')
     .onClick(() => {
       this.onCardClick?.()
     })
@@ -97,28 +90,31 @@ export struct GameCard {
 
   @Builder
   private ListCard() {
-    Row({ space: 16 }) {
+    Row({ space: 18 }) {
       Stack() {
         Column()
           .width('100%')
           .height('100%')
           .backgroundColor(this.coverColor)
-          .borderRadius(EmuRadius.md)
-          .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
+          .borderRadius(10)
+          .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
           .clip(true)
 
-        EmuCoverArt({ coverKey: this.coverKey })
+        EmuCoverArt({
+          coverKey: this.coverKey,
+          variant: 'list'
+        })
           .width('100%')
           .height('100%')
           .clip(true)
-          .borderRadius(EmuRadius.md)
+          .borderRadius(10)
       }
-        .width('28%')
-        .aspectRatio(4 / 3)
+      .width(110)
+      .height(82)
 
-      Column({ space: 4 }) {
+      Column({ space: 6 }) {
         Text(this.title)
-          .fontSize(14)
+          .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurface)
           .maxLines(1)
@@ -128,11 +124,13 @@ export struct GameCard {
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(0.3)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
+      .justifyContent(FlexAlign.Center)
 
       Text(this.platform)
         .fontSize(10)
@@ -141,7 +139,8 @@ export struct GameCard {
         .fontFamily('monospace')
     }
     .width('100%')
-    .padding({ top: 8, bottom: 8, left: 8, right: 8 })
+    .height(82)
+    .alignItems(VerticalAlign.Center)
     .onClick(() => {
       this.onCardClick?.()
     })
