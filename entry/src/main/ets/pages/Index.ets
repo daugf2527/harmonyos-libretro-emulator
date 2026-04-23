@@ -75,26 +75,6 @@ struct Index {
         .width('100%')
         .justifyContent(FlexAlign.Center)
 
-        // Stitch 导入任务页（Web，先用同页全屏覆盖避免路由缓存问题）
-        Row() {
-          Button('Stitch 导入任务页（Web）')
-            .fontSize(18)
-            .width('80%')
-            .height(60)
-            .backgroundColor('#0A0A0A')
-            .fontColor('#00FF41')
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({
-                url: 'pages/StitchImportTaskPage'
-              }).catch((err: Error) => {
-                console.error(`[Index] Router error: ${err.message}`);
-              });
-            })
-        }
-        .margin({ top: 10 })
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-
         // Gambatte 测试按钮
         Row() {
           Button('测试 Gambatte 核心')
