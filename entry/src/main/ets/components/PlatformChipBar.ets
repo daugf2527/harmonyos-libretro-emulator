@@ -19,7 +19,6 @@ export struct PlatformChipBar {
             .fontWeight(FontWeight.Bold)
             .fontFamily('monospace')
             .fontColor(this.isSelected(item) ? '#FF000000' : '#FF9D9E9E')
-            .letterSpacing(0.4)
             .width(102)
             .height(42)
             .backgroundColor(this.isSelected(item) ? EmuColors.primary : '#171717')

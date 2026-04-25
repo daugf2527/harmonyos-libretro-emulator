@@ -27,6 +27,13 @@ import {
   GeometryUpdatePayload,
   LibretroEventHub
 } from '../common/LibretroEventHub';
+import { consumePendingLibraryLaunchRequest } from '../common/LibraryLaunchBridge'
+import {
+  LibraryRuntimeSnapshot,
+  markLibraryRecordPlayed,
+  updateLibraryRuntimeSnapshot
+} from '../common/LibraryRepository'
+import { listSandboxRomFiles } from '../common/RomImportService'
 
 // NAPI 接口定义 (遵循 AGENTS.md 规范)
 interface LibretroNapi {
@@ -112,10 +119,21 @@ interface RomConfig {
   coreId: string;
 }
 
+interface LibraryLaunchRouteParams {
+  coreId?: string
+  romFile?: string
+  autoStart?: boolean
+}
+
 interface CoreExtensionRule {
   coreId: string;
   extensions: string[];
   requiresExactName?: string;
+}
+
+interface RomSourceItem {
+  fileName: string;
+  launchPath: string;
 }
 
 interface SoakStats {
@@ -219,6 +237,15 @@ struct LibretroGamePage {
   private pendingSwitch: PendingSwitch | undefined = undefined;
   private romListRefreshToken: number = 0;
   private lastStartOrSwitchAtMs: number = 0;
+  private activeLibraryRomFile: string = '';
+  private activeSessionStartedAtMs: number = 0;
+  private latestSessionFps: number = 0;
+  private latestSessionAudioBufferUsage: number = 0;
+  private latestSessionAudioUnderruns: number = 0;
+  private latestSessionAudioOverruns: number = 0;
+  private latestSessionVideoDrops: number = 0;
+  private latestSessionVideoDupes: number = 0;
+  private latestSessionVideoNulls: number = 0;
   private readonly startOrSwitchDebounceMs: number = 600;
   // 动态输入源列表
   @State inputSourceItems: InputSourceItem[] = [];
@@ -483,6 +510,7 @@ struct LibretroGamePage {
   
   aboutToDisappear() {
     this.romListRefreshToken += 1;
+    void this.finalizeActiveLibrarySession();
     if (this.eventScope) {
       this.eventScope.dispose();
       this.eventScope = undefined;
@@ -703,6 +731,51 @@ struct LibretroGamePage {
     return assignment.sourceType === InputSourceType.Virtual;
   }
 
+  private resetLatestRuntimeSnapshot(): void {
+    this.latestSessionFps = 0;
+    this.latestSessionAudioBufferUsage = 0;
+    this.latestSessionAudioUnderruns = 0;
+    this.latestSessionAudioOverruns = 0;
+    this.latestSessionVideoDrops = 0;
+    this.latestSessionVideoDupes = 0;
+    this.latestSessionVideoNulls = 0;
+  }
+
+  private beginActiveLibrarySession(romFile: string): void {
+    this.activeLibraryRomFile = romFile;
+    this.activeSessionStartedAtMs = Date.now();
+    this.resetLatestRuntimeSnapshot();
+  }
+
+  private async finalizeActiveLibrarySession(): Promise<void> {
+    if (this.activeLibraryRomFile.length === 0 || this.activeSessionStartedAtMs <= 0) {
+      return;
+    }
+    const romFile = this.activeLibraryRomFile;
+    const startedAt = this.activeSessionStartedAtMs;
+    const snapshot: LibraryRuntimeSnapshot = {
+      durationMs: Math.max(0, Date.now() - startedAt),
+      fps: this.latestSessionFps,
+      audioBufferUsage: this.latestSessionAudioBufferUsage,
+      audioUnderruns: this.latestSessionAudioUnderruns,
+      audioOverruns: this.latestSessionAudioOverruns,
+      videoDrops: this.latestSessionVideoDrops,
+      videoDupes: this.latestSessionVideoDupes,
+      videoNulls: this.latestSessionVideoNulls
+    };
+    this.activeLibraryRomFile = '';
+    this.activeSessionStartedAtMs = 0;
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      if (!context) {
+        return;
+      }
+      await updateLibraryRuntimeSnapshot(context, romFile, snapshot);
+    } catch (e) {
+      LogHelper.warn('LibretroGame', 'Library', `写入运行摘要失败: ${(e as Error).message}`);
+    }
+  }
+
   handleCoreCrash(payload: CoreCrashPayload) {
     let message = payload.reason;
     if (payload.step) {
@@ -716,6 +789,7 @@ struct LibretroGamePage {
     this.switching = false;
     this.gameRunning = false;
     this.gamePaused = false;
+    void this.finalizeActiveLibrarySession();
     this.stopSoak();
     LogHelper.error('LibretroGame', 'Event', `core_crash: ${message}`);
   }
@@ -724,6 +798,7 @@ struct LibretroGamePage {
     const fps = Number(payload.fps);
     if (!Number.isNaN(fps)) {
       this.coreFps = Math.round(fps);
+      this.latestSessionFps = fps;
     }
 
     const drops = Number(payload.drops ?? 0);
@@ -732,6 +807,12 @@ struct LibretroGamePage {
     const underruns = Number(payload.underruns ?? 0);
     const overruns = Number(payload.overruns ?? 0);
     const buf = Number(payload.audioBufferUsage ?? 0);
+    this.latestSessionVideoDrops = drops;
+    this.latestSessionVideoDupes = dupes;
+    this.latestSessionVideoNulls = nulls;
+    this.latestSessionAudioUnderruns = underruns;
+    this.latestSessionAudioOverruns = overruns;
+    this.latestSessionAudioBufferUsage = buf;
 
     this.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
   }
@@ -742,6 +823,9 @@ struct LibretroGamePage {
     if (Number.isNaN(occupancy) || Number.isNaN(underruns)) {
       return;
     }
+    this.latestSessionAudioBufferUsage = occupancy;
+    this.latestSessionAudioUnderruns = underruns;
+    this.latestSessionAudioOverruns = Number(payload.overruns) || this.latestSessionAudioOverruns;
     this.audioStatusText = `Buf:${occupancy.toFixed(0)}% U:${underruns}`;
   }
 
@@ -837,7 +921,7 @@ struct LibretroGamePage {
       return;
     }
 
-    let files: string[] = [];
+    const sources: RomSourceItem[] = [];
     try {
       const rawList: string[] = await nativeApi.refactoredGetRawFileListAsync(
         context.resourceManager,
@@ -846,7 +930,22 @@ struct LibretroGamePage {
       if (refreshToken !== this.romListRefreshToken) {
         return;
       }
-      files = rawList.filter(item => typeof item === 'string') as string[];
+      rawList.filter(item => typeof item === 'string').forEach((fileName: string) => {
+        sources.push({
+          fileName: fileName,
+          launchPath: `roms/${fileName}`
+        });
+      });
+      const localFiles: string[] = await listSandboxRomFiles(context.filesDir);
+      if (refreshToken !== this.romListRefreshToken) {
+        return;
+      }
+      localFiles.forEach((fileName: string) => {
+        sources.push({
+          fileName: fileName,
+          launchPath: `${context.filesDir}/roms/${fileName}`
+        });
+      });
     } catch (err) {
       const msg = (err as Error).message || String(err);
       LogHelper.error('LibretroGame', 'ROM', `扫描 ROM 列表失败: ${msg}`);
@@ -856,17 +955,61 @@ struct LibretroGamePage {
       return;
     }
 
-    this.roms = this.buildRomConfigs(files);
+    this.roms = this.buildRomConfigs(sources);
     this.updateRomOptions();
+    this.applyPendingLibraryLaunchRequest()
   }
 
-  private buildRomConfigs(files: string[]): RomConfig[] {
-    const uniqueFiles = Array.from(new Set(files.filter(fileName => fileName)));
+  private applyPendingLibraryLaunchRequest(): void {
+    const request = this.resolveInitialLibraryLaunchRequest()
+    if (!request) {
+      return
+    }
+    const coreIndex = this.cores.findIndex((core: CoreConfig) => core.id === request.coreId)
+    if (coreIndex < 0) {
+      LogHelper.warn('LibretroGame', 'Library', `未找到目标核心: ${request.coreId}`)
+      return
+    }
 
-    uniqueFiles.sort((a, b) => a.localeCompare(b));
+    this.selectedCoreIndex = coreIndex
+    this.updateRomOptions()
+    const availableRoms = this.getAvailableRoms()
+    const romIndex = availableRoms.findIndex((rom: RomConfig) => rom.file === request.romFile)
+    if (romIndex < 0) {
+      LogHelper.warn('LibretroGame', 'Library', `未找到目标 ROM: ${request.romFile}`)
+      return
+    }
+
+    this.selectedRomIndex = romIndex
+    if (request.autoStart) {
+      void this.startOrSwitchGame()
+    }
+  }
+
+  private resolveInitialLibraryLaunchRequest() {
+    const params = this.getUIContext().getRouter().getParams() as LibraryLaunchRouteParams
+    if (typeof params?.coreId === 'string' && params.coreId.length > 0 &&
+      typeof params?.romFile === 'string' && params.romFile.length > 0) {
+      return {
+        coreId: params.coreId,
+        romFile: params.romFile,
+        autoStart: params.autoStart === true
+      }
+    }
+    return consumePendingLibraryLaunchRequest()
+  }
+
+  private buildRomConfigs(sources: RomSourceItem[]): RomConfig[] {
+    const uniqueSources = sources.filter((item: RomSourceItem, index: number) => {
+      return item.fileName.length > 0 &&
+        sources.findIndex((candidate: RomSourceItem) => candidate.launchPath === item.launchPath) === index;
+    });
+
+    uniqueSources.sort((left: RomSourceItem, right: RomSourceItem) => left.fileName.localeCompare(right.fileName));
 
     const roms: RomConfig[] = [];
-    uniqueFiles.forEach((fileName) => {
+    uniqueSources.forEach((source: RomSourceItem) => {
+      const fileName = source.fileName;
       const lowerName = fileName.toLowerCase();
       const ext = this.getFileExtension(lowerName);
       if (!ext) {
@@ -878,9 +1021,9 @@ struct LibretroGamePage {
       }
       coreIds.forEach((coreId) => {
         roms.push({
-          id: `${coreId}:${fileName}`,
+          id: `${coreId}:${source.launchPath}`,
           name: fileName,
-          file: `roms/${fileName}`,
+          file: source.launchPath,
           coreId: coreId
         });
       });
@@ -1848,6 +1991,7 @@ struct LibretroGamePage {
       }
       this.lastStartOrSwitchAtMs = nowMs;
     }
+    await this.finalizeActiveLibrarySession();
     
     LogHelper.info(
       'LibretroGame',
@@ -1914,6 +2058,8 @@ struct LibretroGamePage {
       this.gameRunning = true;
       this.gamePaused = false;
       this.pendingStart = false;
+      await markLibraryRecordPlayed(context, rom.file);
+      this.beginActiveLibrarySession(rom.file);
       LogHelper.info('LibretroGame', 'Engine', '游戏启动成功');
       success = true;
 
@@ -2131,6 +2277,7 @@ struct LibretroGamePage {
   // 停止游戏
   stopGame(asyncStop: boolean = false) {
     if (this.gameRunning || this.gamePaused) {
+      void this.finalizeActiveLibrarySession();
       // 避免 UI 线程同步 Stop 阻塞导致卡死
       nativeApi.refactoredStopEngineAsync();
       this.gameRunning = false;

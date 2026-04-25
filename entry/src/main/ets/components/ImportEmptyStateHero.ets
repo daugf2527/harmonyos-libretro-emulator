@@ -39,7 +39,7 @@ export struct ImportEmptyStateHero {
         EmuIcon({
           name: 'eject',
           tone: 'outline',
-          size: 34
+          iconSize: 34
         })
           .opacity(0.86)
           .align(Alignment.Center)
@@ -135,7 +135,7 @@ export struct ImportEmptyStateHero {
 
           EmuIcon({
             name: 'add_circle',
-            size: 18
+            iconSize: 18
           })
         }
         .justifyContent(FlexAlign.Center)

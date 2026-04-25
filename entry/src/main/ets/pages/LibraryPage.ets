@@ -1,20 +1,39 @@
-import { router } from '@kit.ArkUI'
+import testNapi from 'libentry.so'
+import { common } from '@kit.AbilityKit'
+import { fileIo as fs } from '@kit.CoreFileKit'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { GameCard } from '../components/GameCard'
 import { LibrarySection } from '../components/LibrarySection'
 import { PlatformChipBar } from '../components/PlatformChipBar'
+import { getPreferredCoreIdForFile, listSandboxRomFiles } from '../common/RomImportService'
 import { EmuColors } from '../common/EmuUiTokens'
+import { setPendingLibraryLaunchRequest } from '../common/LibraryLaunchBridge'
+import {
+  buildRecentLibraryRecords,
+  getReadyLibraryRecords,
+  LibraryRecord,
+  LibrarySourceType,
+  removeLibraryRecord,
+  sortAllLibraryRecords,
+  syncLibraryIndex,
+  updateLibraryRecordCover
+} from '../common/LibraryRepository'
+import { setPendingLibraryDetailRequest } from '../common/LibraryDetailBridge'
+import LogHelper from '../common/LogHelper'
 
-interface LibraryGameItem {
-  id: string
-  title: string
-  subtitle: string
-  platform: string
-  coverColor: string
-  coverKey: string
+interface LibretroLibraryNapi {
+  refactoredGetRawFileListAsync(resMgr: object, dir?: string): Promise<string[]>
 }
+
+interface LibraryRomFileSource {
+  fileName: string
+  romFile: string
+  sourceType: LibrarySourceType
+}
+
+const nativeApi = testNapi as LibretroLibraryNapi
 
 interface TouchPoint {
   x: number
@@ -32,47 +51,14 @@ struct LibraryPage {
     { key: 'input', iconName: 'sports_esports', label: 'INPUT', isActive: false },
     { key: 'system', iconName: 'tune', label: 'SYSTEM', isActive: false }
   ]
-  @State private recentGames: LibraryGameItem[] = [
-    {
-      id: 'metroid-fusion',
-      title: '银河战士 融合',
-      subtitle: 'METROID FUSION',
-      platform: 'GBA',
-      coverColor: '#274530',
-      coverKey: 'metroid_fusion'
-    },
-    {
-      id: 'zelda-triforce',
-      title: '塞尔达传说：众神三角',
-      subtitle: 'THE LEGEND OF ZELDA',
-      platform: 'SNES',
-      coverColor: '#27405E',
-      coverKey: 'zelda_triforce'
-    }
-  ]
-  @State private allGames: LibraryGameItem[] = [
-    {
-      id: 'aria-of-sorrow',
-      title: '恶魔城：晓月圆舞曲',
-      subtitle: 'Castlevania: Aria of Sorrow',
-      platform: 'GBA',
-      coverColor: '#4E2A41',
-      coverKey: 'aria_of_sorrow'
-    },
-    {
-      id: 'chrono-trigger',
-      title: '时空之轮',
-      subtitle: 'Chrono Trigger',
-      platform: 'SNES',
-      coverColor: '#5A4331',
-      coverKey: 'chrono_trigger'
-    }
-  ]
+  @State private recentGames: LibraryRecord[] = []
+  @State private allGames: LibraryRecord[] = []
   @State private searchBusy: boolean = false
   @State private showSearchResults: boolean = false
-  @State private searchResults: LibraryGameItem[] = []
+  @State private searchResults: LibraryRecord[] = []
   @State private showContextMenu: boolean = false
-  @State private contextMenuGame: LibraryGameItem | undefined = undefined
+  @State private contextMenuGame: LibraryRecord | undefined = undefined
+  @State private highlightedRecentGameId: string = ''
   @State private showToast: boolean = false
   @State private toastMessage: string = '已刷新库 SYNCED'
   @State private pullRefreshHeight: number = 0
@@ -80,7 +66,7 @@ struct LibraryPage {
   @State private refreshing: boolean = false
   @State private bottomLoaderActive: boolean = false
   @State private spinnerAngle: number = 0
-  private readonly platforms: string[] = ['ALL', 'FC', 'GBA', 'SNES', 'MD']
+  @State private platforms: string[] = ['ALL']
   private scroller: Scroller = new Scroller()
   private searchTimer: number = -1
   private spinnerTimer: number = -1
@@ -88,6 +74,9 @@ struct LibraryPage {
   private refreshTimer: number = -1
   private bottomLoaderTimer: number = -1
   private longPressTimer: number = -1
+  private libraryRefreshToken: number = 0
+  private readonly coverCycleKeys: string[] = ['', 'metroid_fusion', 'zelda_triforce']
+  private readonly coverPalette: string[] = ['#274530', '#27405E', '#4E2A41', '#5A4331']
   private pullTracking: boolean = false
   private pullStartY: number = 0
   private scrollOffsetY: number = 0
@@ -95,15 +84,16 @@ struct LibraryPage {
   private cardTouchStartY: number = 0
   private cardTouchMoved: boolean = false
   private cardLongPressed: boolean = false
-
   aboutToAppear(): void {
     this.navItems = this.navItems.map((item: EmuBottomNavItem): EmuBottomNavItem => {
       return { key: item.key, iconName: item.iconName, label: item.label, isActive: item.key === 'library' }
     })
+    this.refreshLibraryGames()
     this.updateSpinnerLoop()
   }
 
   aboutToDisappear(): void {
+    this.libraryRefreshToken += 1
     this.clearSearchTimer()
     this.clearLongPressTimer()
     this.stopSpinnerLoop()
@@ -121,9 +111,9 @@ struct LibraryPage {
     }
   }
 
-  private get filteredGames(): LibraryGameItem[] {
+  private get filteredGames(): LibraryRecord[] {
     const keyword = this.searchKeyword.trim().toLowerCase()
-    return this.allGames.filter((item: LibraryGameItem) => {
+    return this.allGames.filter((item: LibraryRecord) => {
       if (!this.isPlatformMatched(item)) {
         return false
       }
@@ -131,9 +121,9 @@ struct LibraryPage {
     })
   }
 
-  private get filteredRecentGames(): LibraryGameItem[] {
+  private get filteredRecentGames(): LibraryRecord[] {
     const keyword = this.searchKeyword.trim().toLowerCase()
-    return this.recentGames.filter((item: LibraryGameItem) => {
+    return this.recentGames.filter((item: LibraryRecord) => {
       if (!this.isPlatformMatched(item)) {
         return false
       }
@@ -141,11 +131,11 @@ struct LibraryPage {
     })
   }
 
-  private isPlatformMatched(item: LibraryGameItem): boolean {
+  private isPlatformMatched(item: LibraryRecord): boolean {
     return this.selectedPlatform === 'ALL' || item.platform === this.selectedPlatform
   }
 
-  private matchesKeyword(item: LibraryGameItem, keyword: string): boolean {
+  private matchesKeyword(item: LibraryRecord, keyword: string): boolean {
     if (keyword.length === 0) {
       return true
     }
@@ -207,21 +197,250 @@ struct LibraryPage {
     }
   }
 
-  private getSearchSource(): LibraryGameItem[] {
-    const merged: LibraryGameItem[] = [...this.recentGames, ...this.allGames]
-    return merged.filter((item: LibraryGameItem, index: number) => {
-      return merged.findIndex((candidate: LibraryGameItem) => candidate.id === item.id) === index
+  private getSearchSource(): LibraryRecord[] {
+    const merged: LibraryRecord[] = [...this.recentGames, ...this.allGames]
+    return merged.filter((item: LibraryRecord, index: number) => {
+      return merged.findIndex((candidate: LibraryRecord) => candidate.id === item.id) === index
     })
   }
 
-  private buildSearchResults(query: string): LibraryGameItem[] {
+  private buildSearchResults(query: string): LibraryRecord[] {
     const normalized = query.toLowerCase()
-    return this.getSearchSource().filter((item: LibraryGameItem) => {
+    return this.getSearchSource().filter((item: LibraryRecord) => {
       if (!this.isPlatformMatched(item)) {
         return false
       }
       return this.matchesKeyword(item, normalized)
     })
+  }
+
+  private async refreshLibraryGames(showToast: boolean = false): Promise<void> {
+    const refreshToken = this.libraryRefreshToken + 1
+    this.libraryRefreshToken = refreshToken
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.applyLibraryGames([])
+      if (showToast) {
+        this.showToastMessage('刷新失败 CONTEXT_MISSING')
+      }
+      return
+    }
+
+    const sources: LibraryRomFileSource[] = []
+    try {
+      const rawList: string[] = await nativeApi.refactoredGetRawFileListAsync(context.resourceManager, 'roms')
+      if (refreshToken !== this.libraryRefreshToken) {
+        return
+      }
+      rawList.filter((item: string) => item.length > 0).forEach((fileName: string) => {
+        sources.push({
+          fileName: fileName,
+          romFile: `roms/${fileName}`,
+          sourceType: 'BUNDLED'
+        })
+      })
+      const localFiles = await listSandboxRomFiles(context.filesDir)
+      if (refreshToken !== this.libraryRefreshToken) {
+        return
+      }
+      localFiles.forEach((fileName: string) => {
+        sources.push({
+          fileName: fileName,
+          romFile: `${context.filesDir}/roms/${fileName}`,
+          sourceType: 'IMPORTED'
+        })
+      })
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryPage', 'ROM', `刷新库列表失败: ${message}`)
+      if (refreshToken !== this.libraryRefreshToken) {
+        return
+      }
+      if (showToast) {
+        this.showToastMessage('刷新失败 LIB_SCAN_ERROR')
+      }
+      return
+    }
+
+    if (refreshToken !== this.libraryRefreshToken) {
+      return
+    }
+
+    const syncedRecords = await syncLibraryIndex(context, this.buildLibraryGames(sources))
+    if (refreshToken !== this.libraryRefreshToken) {
+      return
+    }
+    this.applyLibraryGames(getReadyLibraryRecords(syncedRecords))
+    if (showToast) {
+      this.showToastMessage('已刷新库 SYNCED')
+    }
+  }
+
+  private applyLibraryGames(games: LibraryRecord[]): void {
+    this.allGames = sortAllLibraryRecords(games)
+    this.recentGames = buildRecentLibraryRecords(games, 2)
+    if (this.highlightedRecentGameId.length > 0 &&
+      this.recentGames.findIndex((item: LibraryRecord) => item.id === this.highlightedRecentGameId) < 0) {
+      this.highlightedRecentGameId = ''
+    }
+    this.platforms = this.buildPlatforms(this.allGames)
+    if (this.selectedPlatform !== 'ALL' && !this.platforms.includes(this.selectedPlatform)) {
+      this.selectedPlatform = 'ALL'
+    }
+    this.refreshSearchResultsIfNeeded()
+  }
+
+  private buildPlatforms(games: LibraryRecord[]): string[] {
+    const platformSet: Set<string> = new Set()
+    games.forEach((item: LibraryRecord) => {
+      if (item.platform.length > 0) {
+        platformSet.add(item.platform)
+      }
+    })
+    return ['ALL', ...Array.from(platformSet).sort((left: string, right: string) => left.localeCompare(right))]
+  }
+
+  private buildLibraryGames(sources: LibraryRomFileSource[]): LibraryRecord[] {
+    const uniqueSources = sources.filter((item: LibraryRomFileSource, index: number) => {
+      return item.fileName.length > 0 &&
+        sources.findIndex((candidate: LibraryRomFileSource) => candidate.romFile === item.romFile) === index
+    })
+    uniqueSources.sort((left: LibraryRomFileSource, right: LibraryRomFileSource) => left.fileName.localeCompare(right.fileName))
+    const now = Date.now()
+    const games: LibraryRecord[] = []
+    uniqueSources.forEach((source: LibraryRomFileSource, index: number) => {
+      const preferredCoreId = this.resolvePreferredCoreId(source.fileName)
+      if (preferredCoreId.length === 0) {
+        return
+      }
+      games.push({
+        id: source.romFile,
+        title: this.buildGameTitle(source.fileName),
+        subtitle: source.fileName,
+        platform: this.resolvePlatform(source.fileName),
+        coverColor: this.buildCoverColor(index),
+        coverKey: this.resolveCoverKey(source.fileName),
+        romFile: source.romFile,
+        preferredCoreId: preferredCoreId,
+        fileName: source.fileName,
+        sourceType: source.sourceType,
+        status: 'READY',
+        createdAt: now,
+        importedAt: source.sourceType === 'IMPORTED' ? now : 0,
+        updatedAt: now,
+        lastSeenAt: now,
+        lastPlayedAt: 0,
+        playCount: 0,
+        totalPlayTimeMs: 0,
+        lastSessionDurationMs: 0,
+        lastRuntimeUpdatedAt: 0,
+        lastRuntimeFps: 0,
+        lastRuntimeAudioBufferUsage: 0,
+        lastRuntimeAudioUnderruns: 0,
+        lastRuntimeAudioOverruns: 0,
+        lastRuntimeVideoDrops: 0,
+        lastRuntimeVideoDupes: 0,
+        lastRuntimeVideoNulls: 0
+      })
+    })
+    return games
+  }
+
+  private buildGameTitle(fileName: string): string {
+    let nameOnly = fileName
+    const slashIndex = fileName.lastIndexOf('/')
+    if (slashIndex >= 0) {
+      nameOnly = fileName.substring(slashIndex + 1)
+    }
+    const dotIndex = nameOnly.lastIndexOf('.')
+    const baseName = dotIndex > 0 ? nameOnly.substring(0, dotIndex) : nameOnly
+    return baseName.replace(/[_-]+/g, ' ')
+  }
+
+  private resolvePlatform(fileName: string): string {
+    const ext = this.getFileExtension(fileName.toLowerCase())
+    switch (ext) {
+      case 'gb':
+      case 'gbc':
+      case 'dmg':
+        return 'GB'
+      case 'gba':
+      case 'agb':
+        return 'GBA'
+      case 'nes':
+      case 'fds':
+      case 'unf':
+      case 'unif':
+        return 'FC'
+      case 'smc':
+      case 'sfc':
+      case 'swc':
+      case 'fig':
+      case 'bs':
+      case 'st':
+      case 'gd3':
+      case 'gd7':
+      case 'dx2':
+      case 'bsx':
+        return 'SNES'
+      case 'mdx':
+      case 'md':
+      case 'smd':
+      case 'gen':
+      case 'sms':
+      case 'bms':
+      case 'gg':
+      case 'sg':
+      case '68k':
+      case 'sgd':
+        return 'MD'
+      case 'nds':
+      case 'ids':
+      case 'dsi':
+        return 'NDS'
+      case 'cue':
+      case 'toc':
+      case 'ccd':
+      case 'pbp':
+      case 'chd':
+      case 'iso':
+      case 'm3u':
+      case 'cbn':
+        return 'PS'
+      case 'zip':
+      case '7z':
+        return 'ARCADE'
+      default:
+        return ext.length > 0 ? ext.toUpperCase() : 'ROM'
+    }
+  }
+
+  private resolvePreferredCoreId(fileName: string): string {
+    return getPreferredCoreIdForFile(fileName.toLowerCase())
+  }
+
+  private getFileExtension(fileName: string): string {
+    const dotIndex = fileName.lastIndexOf('.')
+    if (dotIndex < 0 || dotIndex === fileName.length - 1) {
+      return ''
+    }
+    return fileName.substring(dotIndex + 1)
+  }
+
+  private buildCoverColor(index: number): string {
+    const palette: string[] = ['#274530', '#27405E', '#4E2A41', '#5A4331', '#2E4A52', '#4F2F2A', '#314B63']
+    return palette[index % palette.length]
+  }
+
+  private resolveCoverKey(fileName: string): string {
+    const normalized = fileName.toLowerCase()
+    if (normalized.indexOf('metroid') >= 0 || normalized.indexOf('castlevania') >= 0 || normalized.indexOf('aria') >= 0) {
+      return 'metroid_fusion'
+    }
+    if (normalized.indexOf('zelda') >= 0 || normalized.indexOf('chrono') >= 0 || normalized.indexOf('final fantasy') >= 0) {
+      return 'zelda_triforce'
+    }
+    return ''
   }
 
   private refreshSearchResultsIfNeeded(): void {
@@ -269,8 +488,25 @@ struct LibraryPage {
     this.hideSearchResults()
   }
 
-  private openGame(_item: LibraryGameItem): void {
-    router.pushUrl({ url: 'pages/LibretroGamePage' }).catch((err: Error) => {
+  private openGame(_item: LibraryRecord): void {
+    if (_item.preferredCoreId.length === 0 || _item.romFile.length === 0) {
+      this.showToastMessage('当前条目暂不支持启动')
+      return
+    }
+    this.highlightedRecentGameId = _item.id
+    setPendingLibraryLaunchRequest({
+      coreId: _item.preferredCoreId,
+      romFile: _item.romFile,
+      autoStart: true
+    })
+    this.getUIContext().getRouter().pushUrl({
+      url: 'pages/LibretroGamePage',
+      params: {
+        coreId: _item.preferredCoreId,
+        romFile: _item.romFile,
+        autoStart: true
+      }
+    }).catch((err: Error) => {
       console.error(`[LibraryPage] 跳转游戏页失败: ${err.message}`)
     })
   }
@@ -300,13 +536,17 @@ struct LibraryPage {
       clearTimeout(this.refreshTimer)
     }
     this.refreshTimer = setTimeout(() => {
-      this.refreshing = false
-      this.pullRefreshHeight = 0
-      this.pullRefreshOpacity = 0
-      this.showToastMessage('已刷新库 SYNCED')
       this.refreshTimer = -1
-      this.updateSpinnerLoop()
-    }, 1200)
+      this.finishPullRefresh()
+    }, 300)
+  }
+
+  private async finishPullRefresh(): Promise<void> {
+    await this.refreshLibraryGames(true)
+    this.refreshing = false
+    this.pullRefreshHeight = 0
+    this.pullRefreshOpacity = 0
+    this.updateSpinnerLoop()
   }
 
   private onMainContentTouch(event: TouchEvent): void {
@@ -386,20 +626,20 @@ struct LibraryPage {
     })
 
     if (key === 'engine' || key === 'input') {
-      router.pushUrl({ url: 'pages/LibretroGamePage' }).catch((err: Error) => {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/LibretroGamePage' }).catch((err: Error) => {
         console.error(`[LibraryPage] 底部导航跳转失败: ${err.message}`)
       })
       return
     }
 
     if (key === 'system') {
-      router.pushUrl({ url: 'pages/OnboardingPage' }).catch((err: Error) => {
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/OnboardingPage' }).catch((err: Error) => {
         console.error(`[LibraryPage] 底部导航跳转失败: ${err.message}`)
       })
     }
   }
 
-  private onCardTouch(event: TouchEvent, item: LibraryGameItem): void {
+  private onCardTouch(event: TouchEvent, item: LibraryRecord): void {
     const point = this.resolveTouchPoint(event)
     const eventType = Number(event.type)
     if (eventType === TouchType.Down) {
@@ -412,6 +652,7 @@ struct LibraryPage {
       this.clearLongPressTimer()
       this.longPressTimer = setTimeout(() => {
         this.cardLongPressed = true
+        this.highlightedRecentGameId = item.id
         this.contextMenuGame = item
         this.showContextMenu = true
       }, 600)
@@ -450,10 +691,23 @@ struct LibraryPage {
     this.contextMenuGame = undefined
   }
 
-  private deleteGame(gameId: string): void {
-    this.recentGames = this.recentGames.filter((item: LibraryGameItem) => item.id !== gameId)
-    this.allGames = this.allGames.filter((item: LibraryGameItem) => item.id !== gameId)
-    this.refreshSearchResultsIfNeeded()
+  private async deleteGame(item: LibraryRecord): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      return
+    }
+    if (item.sourceType !== 'IMPORTED') {
+      this.showToastMessage('内置资源暂不支持删除')
+      return
+    }
+    try {
+      await fs.unlink(item.romFile)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryPage', 'Delete', `删除文件失败: ${message}`)
+    }
+    await removeLibraryRecord(context, item.romFile)
+    await this.refreshLibraryGames()
   }
 
   private launchFromContext(): void {
@@ -471,8 +725,63 @@ struct LibraryPage {
     if (!target) {
       return
     }
-    this.searchKeyword = target.title
-    this.showToastMessage(`已定位 ${target.title} // INFO_META`)
+    this.openDetails(target)
+  }
+
+  private getNextCoverKey(item: LibraryRecord): string {
+    const currentIndex = this.coverCycleKeys.findIndex((value: string) => value === item.coverKey)
+    if (currentIndex < 0) {
+      return this.coverCycleKeys[1]
+    }
+    return this.coverCycleKeys[(currentIndex + 1) % this.coverCycleKeys.length]
+  }
+
+  private resolveCoverColorByKey(key: string): string {
+    if (key === 'metroid_fusion') {
+      return '#274530'
+    }
+    if (key === 'zelda_triforce') {
+      return '#27405E'
+    }
+    return this.coverPalette[0]
+  }
+
+  private async cycleCoverFromContext(): Promise<void> {
+    const target = this.contextMenuGame
+    this.closeContextMenu()
+    if (!target) {
+      return
+    }
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.showToastMessage('封面更新失败 CONTEXT_MISSING')
+      return
+    }
+    const nextCoverKey = this.getNextCoverKey(target)
+    const nextCoverColor = this.resolveCoverColorByKey(nextCoverKey)
+    const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
+    if (!updated) {
+      this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+      return
+    }
+    this.highlightedRecentGameId = updated.id
+    await this.refreshLibraryGames()
+    this.showToastMessage('已切换内置封面 COVER_UPDATED')
+  }
+
+  private openDetails(item: LibraryRecord): void {
+    setPendingLibraryDetailRequest({
+      romFile: item.romFile
+    })
+    this.getUIContext().getRouter().pushUrl({
+      url: 'pages/LibraryDetailPage',
+      params: {
+        romFile: item.romFile
+      }
+    }).catch((err: Error) => {
+      LogHelper.error('LibraryPage', 'Route', `跳转详情页失败: ${err.message}`)
+      this.showToastMessage('详情页打开失败 DETAIL_ROUTE_FAIL')
+    })
   }
 
   private deleteFromContext(): void {
@@ -481,8 +790,42 @@ struct LibraryPage {
     if (!target) {
       return
     }
-    this.deleteGame(target.id)
-    this.showToastMessage(`已删除 ${target.title} // PURGE_DATA`)
+    void this.deleteSaveFilesFromContext(target)
+  }
+
+  private normalizeContentKey(value: string): string {
+    return value.toLowerCase().replace(/[^a-z0-9]+/g, '')
+  }
+
+  private isSaveCandidate(fileName: string, baseName: string): boolean {
+    const normalized = this.normalizeContentKey(fileName)
+    return normalized.indexOf(baseName) === 0
+  }
+
+  private async deleteSaveFilesFromContext(target: LibraryRecord): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.showToastMessage('存档删除失败 CONTEXT_MISSING')
+      return
+    }
+    const saveDir = `${context.filesDir}/saves`
+    const baseName = this.normalizeContentKey(target.fileName)
+    try {
+      const entries = await fs.listFile(saveDir)
+      const candidates = entries.filter((item: string) => this.isSaveCandidate(item, baseName))
+      if (candidates.length === 0) {
+        this.showToastMessage('未找到对应存档 SAVE_EMPTY')
+        return
+      }
+      for (let index = 0; index < candidates.length; index += 1) {
+        await fs.unlink(`${saveDir}/${candidates[index]}`)
+      }
+      this.showToastMessage(`已删除 ${candidates.length} 个存档 SAVE_PURGED`)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryPage', 'Save', `删除存档失败: ${message}`)
+      this.showToastMessage('存档删除失败 SAVE_PURGE_FAIL')
+    }
   }
 
   @Builder
@@ -533,7 +876,7 @@ struct LibraryPage {
         EmuIcon({
           name: 'search',
           tone: 'muted',
-          size: 20,
+          iconSize: 20,
           opacityValue: 0.9
         })
 
@@ -542,7 +885,7 @@ struct LibraryPage {
             Text('搜索游戏库')
               .fontSize(15)
               .fontColor('#66484848')
-              .align(Alignment.CenterStart)
+              .align(Alignment.Start)
           }
 
           TextInput({ text: this.searchKeyword, placeholder: '' })
@@ -576,7 +919,7 @@ struct LibraryPage {
       if (this.showSearchResults) {
         Column({ space: 2 }) {
           if (this.searchResults.length > 0) {
-            ForEach(this.searchResults, (item: LibraryGameItem) => {
+            ForEach(this.searchResults, (item: LibraryRecord) => {
               Row() {
                 Text(item.title)
                   .fontSize(14)
@@ -603,7 +946,7 @@ struct LibraryPage {
                 this.hideSearchResults()
                 this.openGame(item)
               })
-            }, (item: LibraryGameItem) => item.id)
+            }, (item: LibraryRecord) => item.id)
           } else {
             Text('无匹配结果')
               .fontSize(12)
@@ -697,8 +1040,9 @@ struct LibraryPage {
 
   @Builder
   private RecentContent() {
+    const featuredId = this.getHighlightedRecentGameId()
     Row({ space: 16 }) {
-      ForEach(this.filteredRecentGames, (item: LibraryGameItem) => {
+      ForEach(this.filteredRecentGames, (item: LibraryRecord) => {
         Column() {
           GameCard({
             title: item.title,
@@ -706,16 +1050,24 @@ struct LibraryPage {
             platform: item.platform,
             coverColor: item.coverColor,
             coverKey: item.coverKey,
-            variant: 'recent'
+            variant: 'recent',
+            isHighlighted: item.id === featuredId
           })
         }
         .layoutWeight(1)
         .onTouch((event: TouchEvent) => {
           this.onCardTouch(event, item)
         })
-      }, (item: LibraryGameItem) => item.id)
+      }, (item: LibraryRecord) => item.id)
     }
     .width('100%')
+  }
+
+  private getHighlightedRecentGameId(): string {
+    if (this.highlightedRecentGameId.length > 0) {
+      return this.highlightedRecentGameId
+    }
+    return this.filteredRecentGames.length > 0 ? this.filteredRecentGames[0].id : ''
   }
 
   @Builder
@@ -736,7 +1088,7 @@ struct LibraryPage {
         EmuIcon({
           name: 'tune',
           tone: 'muted',
-          size: 14,
+          iconSize: 14,
           opacityValue: 0.85
         })
       }
@@ -750,7 +1102,7 @@ struct LibraryPage {
   @Builder
   private AllGamesContent() {
     Column({ space: 18 }) {
-      ForEach(this.filteredGames, (item: LibraryGameItem) => {
+      ForEach(this.filteredGames, (item: LibraryRecord) => {
         GameCard({
           title: item.title,
           subtitle: item.subtitle,
@@ -762,7 +1114,7 @@ struct LibraryPage {
         .onTouch((event: TouchEvent) => {
           this.onCardTouch(event, item)
         })
-      }, (item: LibraryGameItem) => item.id)
+      }, (item: LibraryRecord) => item.id)
     }
     .width('100%')
   }
@@ -857,109 +1209,129 @@ struct LibraryPage {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#88000000')
-        .backdropBlur(8)
+        .backgroundColor('#B8000000')
+        .backdropBlur(14)
         .onClick(() => {
           this.closeContextMenu()
         })
 
-      Column({ space: 8 }) {
+      Column({ space: 18 }) {
         Column({ space: 0 }) {
-          Row({ space: 12 }) {
+          Row() {
+            Text('启动游戏')
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(EmuColors.onSurface)
+              .fontFamily('monospace')
+              .letterSpacing(1)
+
             EmuIcon({
-              name: 'folder_open',
+              name: 'play_arrow',
               tone: 'primary',
-              size: 20
+              iconSize: 20
             })
-
-            Column({ space: 3 }) {
-              Text('立即启动')
-                .fontSize(14)
-                .fontWeight(FontWeight.Bold)
-                .fontColor(EmuColors.onSurface)
-
-              Text('LAUNCH_EXE')
-                .fontSize(10)
-                .fontFamily('monospace')
-                .fontColor('#8AABABAB')
-            }
           }
           .width('100%')
-          .height(56)
-          .padding({ left: 16, right: 16 })
+          .height(54)
+          .padding({ left: 18, right: 18 })
+          .justifyContent(FlexAlign.SpaceBetween)
           .alignItems(VerticalAlign.Center)
           .onClick(() => {
             this.launchFromContext()
           })
 
-          Row({ space: 12 }) {
+          this.ActionMenuDivider()
+
+          Row() {
+            Text('查看详情')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(EmuColors.onSurface)
+              .fontFamily('monospace')
+              .letterSpacing(0.8)
+
             EmuIcon({
-              name: 'explore',
-              tone: 'muted',
-              size: 20
+              name: 'info',
+              tone: 'on_surface',
+              iconSize: 20
             })
-
-            Column({ space: 3 }) {
-              Text('查看详情')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor(EmuColors.onSurface)
-
-              Text('INFO_META')
-                .fontSize(10)
-                .fontFamily('monospace')
-                .fontColor('#8AABABAB')
-            }
           }
           .width('100%')
-          .height(56)
-          .padding({ left: 16, right: 16 })
+          .height(54)
+          .padding({ left: 18, right: 18 })
+          .justifyContent(FlexAlign.SpaceBetween)
           .alignItems(VerticalAlign.Center)
           .onClick(() => {
             this.showDetailsFromContext()
           })
 
-          Row({ space: 12 }) {
+          this.ActionMenuDivider()
+
+          Row() {
+            Text('修改封面')
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(EmuColors.onSurface)
+              .fontFamily('monospace')
+              .letterSpacing(0.8)
+
             EmuIcon({
-              name: 'warning',
-              tone: 'outline',
-              size: 20
+              name: 'image_edit_auto',
+              tone: 'on_surface',
+              iconSize: 20
             })
-
-            Column({ space: 3 }) {
-              Text('删除项目')
-                .fontSize(14)
-                .fontWeight(FontWeight.Medium)
-                .fontColor('#ED7F64')
-
-              Text('PURGE_DATA')
-                .fontSize(10)
-                .fontFamily('monospace')
-                .fontColor('#9A6D5954')
-            }
           }
           .width('100%')
-          .height(56)
-          .padding({ left: 16, right: 16 })
+          .height(54)
+          .padding({ left: 18, right: 18 })
+          .justifyContent(FlexAlign.SpaceBetween)
+          .alignItems(VerticalAlign.Center)
+          .onClick(() => {
+            void this.cycleCoverFromContext()
+          })
+
+          this.ActionMenuDivider()
+
+          Row() {
+            Text('删除存档')
+              .fontSize(14)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(EmuColors.error)
+              .fontFamily('monospace')
+              .letterSpacing(0.8)
+
+            EmuIcon({
+              name: 'delete_forever',
+              tone: 'outline',
+              iconSize: 20
+            })
+          }
+          .width('100%')
+          .height(54)
+          .padding({ left: 18, right: 18 })
+          .justifyContent(FlexAlign.SpaceBetween)
           .alignItems(VerticalAlign.Center)
           .onClick(() => {
             this.deleteFromContext()
           })
         }
         .width('100%')
-        .backgroundColor('#E6141414')
+        .backgroundColor('#F0141414')
         .backdropBlur(24)
-        .borderRadius(14)
-        .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
+        .borderRadius(16)
+        .border({ width: 0.8, color: '#33FFFFFF', style: BorderStyle.Solid })
+        .shadow({ radius: 30, color: '#99000000', offsetX: 0, offsetY: 10 })
 
         Row() {
-          Text('取消')
-            .fontSize(14)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(EmuColors.onSurface)
+          Text('取消 CANCEL')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#CCABABAB')
+            .fontFamily('monospace')
+            .letterSpacing(1.2)
         }
         .width('100%')
-        .height(50)
+        .height(54)
         .justifyContent(FlexAlign.Center)
         .backgroundColor('#CC1A1A1A')
         .borderRadius(14)
@@ -968,12 +1340,20 @@ struct LibraryPage {
           this.closeContextMenu()
         })
       }
-      .width('85%')
-      .constraintSize({ maxWidth: 360 })
+      .width(240)
       .align(Alignment.Center)
     }
     .width('100%')
     .height('100%')
+  }
+
+  @Builder
+  private ActionMenuDivider() {
+    Row()
+      .width('100%')
+      .height(1)
+      .backgroundColor('#14FFFFFF')
+      .margin({ left: 12, right: 12 })
   }
 
   build() {

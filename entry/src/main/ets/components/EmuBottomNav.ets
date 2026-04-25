@@ -30,7 +30,7 @@ export struct EmuBottomNav {
             EmuIcon({
               name: item.iconName,
               tone: item.isActive ? 'primary' : 'muted',
-              size: item.isActive ? 24 : 23,
+              iconSize: item.isActive ? 24 : 23,
               opacityValue: item.isActive ? 1 : 0.46
             })
 

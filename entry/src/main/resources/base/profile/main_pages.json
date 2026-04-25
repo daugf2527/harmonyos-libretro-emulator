@@ -4,6 +4,7 @@
     "pages/Index",
     "pages/ImportEntryPage",
     "pages/LibraryPage",
+    "pages/LibraryDetailPage",
     "pages/StitchImportTaskPage",
     "pages/ImportTaskOverlayPage",
     "pages/CoreLoaderTest",

@@ -21,7 +21,7 @@ export struct EmuHeaderBar {
       Row({ space: 6 }) {
         EmuIcon({
           name: this.titleIcon,
-          size: this.iconSize
+          iconSize: this.iconSize
         })
 
         Text(this.titleText)
@@ -42,7 +42,7 @@ export struct EmuHeaderBar {
 
         EmuIcon({
           name: this.rightIcon,
-          size: this.rightIconSize
+          iconSize: this.rightIconSize
         })
       }
       .alignItems(VerticalAlign.Center)

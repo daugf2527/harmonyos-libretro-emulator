@@ -1,9 +1,11 @@
-import { router } from '@kit.ArkUI'
+import { common } from '@kit.AbilityKit'
 import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuBottomNav } from '../components/EmuBottomNav'
 import { ImportEmptyStateHero } from '../components/ImportEmptyStateHero'
+import { setPendingImportUris } from '../common/ImportTaskBridge'
 import { EmuColors, EmuMetrics } from '../common/EmuUiTokens'
+import { pickRomUris } from '../common/RomImportService'
 
 interface ImportParticle {
   x: number
@@ -49,7 +51,9 @@ struct ImportEntryPage {
   aboutToAppear(): void {
     this.startParticleMotion()
     if (this.hasGames) {
-      router.replaceUrl({ url: 'pages/LibraryPage' })
+      this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
+        console.error(`[ImportEntryPage] replaceUrl failed: ${err.message}`)
+      })
     }
   }
 
@@ -106,15 +110,42 @@ struct ImportEntryPage {
       const nextValue = Math.min(100, this.scanProgress + Math.random() * 9)
       this.scanProgress = nextValue
       if (nextValue >= 100) {
-        this.scanStatusText = '扫描完成'
+        this.scanStatusText = '等待选择文件...'
         this.stopScan()
         setTimeout(() => {
-          this.isScanning = false
-          this.particleBoosted = false
-          router.pushUrl({ url: 'pages/ImportTaskOverlayPage' })
+          void this.finishImportFlow()
         }, 420)
       }
     }, 80)
+  }
+
+  private async finishImportFlow(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.resetImportState('获取导入上下文失败')
+      return
+    }
+
+    const uris = await pickRomUris(context)
+    this.isScanning = false
+    this.particleBoosted = false
+    if (!uris || uris.length === 0) {
+      this.scanProgress = 0
+      this.scanStatusText = '未选择文件'
+      return
+    }
+
+    setPendingImportUris(uris)
+    this.getUIContext().getRouter().pushUrl({ url: 'pages/ImportTaskOverlayPage' }).catch((err: Error) => {
+      console.error(`[ImportEntryPage] pushUrl failed: ${err.message}`)
+    })
+  }
+
+  private resetImportState(statusText: string): void {
+    this.isScanning = false
+    this.particleBoosted = false
+    this.scanProgress = 0
+    this.scanStatusText = statusText
   }
 
   @Builder

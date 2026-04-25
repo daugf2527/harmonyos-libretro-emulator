@@ -1,5 +1,4 @@
-import { router } from '@kit.ArkUI'
-import { abilityAccessCtrl, bundleManager, Permissions } from '@kit.AbilityKit'
+import { abilityAccessCtrl, bundleManager, common, Permissions } from '@kit.AbilityKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
@@ -49,7 +48,7 @@ struct OnboardingPage {
     this.startButtonPressed = false
     const paramOut: AnimateParam = { duration: 350, curve: Curve.EaseInOut }
     const paramIn: AnimateParam = { duration: 350, curve: Curve.EaseInOut }
-    animateTo(paramOut, () => {
+    this.getUIContext().animateTo(paramOut, () => {
       this.stepOpacity = 0
       this.stepOffsetY = 20
     })
@@ -58,7 +57,7 @@ struct OnboardingPage {
       this.stepOffsetY = 20
       this.scanLineOffsetY = 0
       this.stepOpacity = 0
-      animateTo(paramIn, () => {
+      this.getUIContext().animateTo(paramIn, () => {
         this.stepOpacity = 1
         this.stepOffsetY = 0
       })
@@ -80,11 +79,14 @@ struct OnboardingPage {
     const atManager = abilityAccessCtrl.createAtManager()
     const perms: Permissions[] = ['ohos.permission.READ_MEDIA']
     try {
-      const result = await atManager.requestPermissionsFromUser(getContext(this), perms)
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+      const result = await atManager.requestPermissionsFromUser(context, perms)
       const granted = this.isAllGrantedFromResult(result.authResults)
       this.applyPermissionState(granted ? 'GRANTED' : 'DENIED')
       if (granted) {
-        router.replaceUrl({ url: 'pages/LibretroGamePage' })
+        this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibretroGamePage' }).catch((err: Error) => {
+          console.error(`replaceUrl failed: ${err.message}`)
+        })
       }
     } catch (err) {
       const bizError = err as BusinessError
@@ -282,7 +284,7 @@ struct OnboardingPage {
       Row({ space: 6 }) {
         EmuIcon({
           name: 'memory',
-          size: 14
+          iconSize: 14
         })
         Text('EMU_CORE_v1.0')
           .fontFamily('monospace')
@@ -301,7 +303,7 @@ struct OnboardingPage {
 
         EmuIcon({
           name: 'settings_input_component',
-          size: 12
+          iconSize: 12
         })
       }
       .alignItems(VerticalAlign.Center)
@@ -330,7 +332,7 @@ struct OnboardingPage {
 
         EmuIcon({
           name: 'sports_esports',
-          size: 48
+          iconSize: 48
         })
 
         Row()
@@ -492,7 +494,7 @@ struct OnboardingPage {
           Column({ space: 16 }) {
             EmuIcon({
               name: 'folder_open',
-              size: 72
+              iconSize: 72
             })
 
             Row({ space: 4 }) {
@@ -595,7 +597,7 @@ struct OnboardingPage {
 
             EmuIcon({
               name: 'chevron_right',
-              size: 20
+              iconSize: 20
             })
               .translate({ x: this.authorizeButtonPressed ? 2 : 0 })
           }
