@@ -122,8 +122,8 @@ export async function syncLibraryIndex(
       title: record.title,
       subtitle: record.subtitle,
       platform: record.platform,
-      coverColor: record.coverColor,
-      coverKey: record.coverKey,
+      coverColor: existing?.coverColor ?? record.coverColor,
+      coverKey: existing?.coverKey ?? record.coverKey,
       romFile: record.romFile,
       preferredCoreId: record.preferredCoreId,
       fileName: record.fileName,
@@ -541,8 +541,9 @@ async function ensureRuntimeColumns(store: RdbStoreCompat): Promise<void> {
 }
 
 async function loadRecordsFromRdb(store: RdbStoreCompat): Promise<LibraryRecord[]> {
+  let resultSet: RdbResultSetCompat | undefined = undefined
   try {
-    const resultSet = await store.querySql(`SELECT * FROM ${LIBRARY_TABLE_NAME}`)
+    resultSet = await store.querySql(`SELECT * FROM ${LIBRARY_TABLE_NAME}`)
     const records: LibraryRecord[] = []
     while (resultSet.goToNextRow()) {
       records.push({
@@ -577,12 +578,15 @@ async function loadRecordsFromRdb(store: RdbStoreCompat): Promise<LibraryRecord[
         lastRuntimeVideoNulls: Number(resultSet.getLong(resultSet.getColumnIndex('last_runtime_video_nulls')))
       })
     }
-    resultSet.close()
     return records
   } catch (err) {
     const message = (err as Error).message || String(err)
     LogHelper.error('LibraryRepository', 'Rdb', `读取 RDB 失败，返回空记录: ${message}`)
     return []
+  } finally {
+    if (resultSet) {
+      resultSet.close()
+    }
   }
 }
 
