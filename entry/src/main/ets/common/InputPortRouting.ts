@@ -21,6 +21,12 @@ export interface PortAssignState {
   isActive: boolean;
 }
 
+export interface InputSourceItem {
+  label: string;
+  type: InputSourceType;
+  deviceId: string;
+}
+
 export function createDefaultPortAssignments(): PortAssignState[] {
   return [
     {
@@ -52,4 +58,90 @@ export function createDefaultPortAssignments(): PortAssignState[] {
 
 export function isVirtualSource(sourceType: InputSourceType): boolean {
   return sourceType === InputSourceType.Virtual;
+}
+
+export function buildInputSourceItems(devices: InputDeviceInfo[]): InputSourceItem[] {
+  const items: InputSourceItem[] = [
+    { label: '未分配', type: InputSourceType.None, deviceId: '' },
+    { label: '虚拟手柄', type: InputSourceType.Virtual, deviceId: '' }
+  ];
+
+  devices.forEach((device: InputDeviceInfo) => {
+    items.push({
+      label: buildInputDeviceLabel(device),
+      type: device.sourceType,
+      deviceId: device.deviceId
+    });
+  });
+
+  return items;
+}
+
+export function findPortAssignment(assignments: PortAssignState[], portId: number): PortAssignState {
+  const found = assignments.find((item: PortAssignState) => item.portId === portId);
+  if (found) {
+    return found;
+  }
+  return {
+    portId: portId,
+    sourceType: InputSourceType.None,
+    deviceId: '',
+    isActive: false
+  };
+}
+
+export function getInputSourceItemIndex(
+  items: InputSourceItem[],
+  sourceType: InputSourceType,
+  deviceId: string
+): number {
+  const index = items.findIndex((item: InputSourceItem) => {
+    if (item.type !== sourceType) {
+      return false;
+    }
+    if (sourceType === InputSourceType.None || sourceType === InputSourceType.Virtual) {
+      return true;
+    }
+    return item.deviceId === deviceId;
+  });
+  return index >= 0 ? index : 0;
+}
+
+export function updatePortAssignments(
+  assignments: PortAssignState[],
+  portId: number,
+  sourceType: InputSourceType,
+  deviceId: string
+): PortAssignState[] {
+  return assignments.map((item: PortAssignState) => {
+    if (item.portId !== portId) {
+      return item;
+    }
+    return {
+      portId: portId,
+      sourceType: sourceType,
+      deviceId: deviceId,
+      isActive: sourceType !== InputSourceType.None
+    };
+  });
+}
+
+export function isVirtualPortActive(assignments: PortAssignState[], portId: number): boolean {
+  return findPortAssignment(assignments, portId).sourceType === InputSourceType.Virtual;
+}
+
+function buildInputDeviceLabel(device: InputDeviceInfo): string {
+  if (device.sourceType === InputSourceType.Keyboard) {
+    return `键盘 ${device.name}`;
+  }
+  if (device.sourceType === InputSourceType.Mouse) {
+    return `鼠标 ${device.name}`;
+  }
+  if (device.sourceType === InputSourceType.Gamepad) {
+    return `手柄 ${device.name}`;
+  }
+  if (device.sourceType === InputSourceType.BluetoothGamepad) {
+    return `蓝牙手柄 ${device.name}`;
+  }
+  return device.name;
 }

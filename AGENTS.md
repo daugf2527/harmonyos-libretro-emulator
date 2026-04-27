@@ -5,14 +5,14 @@
 
 ## 强制规则（与仓库规范同级）
 - 官方优先：不确定即查华为鸿蒙官方文档与 libretro 官方标准/`libretro.h`，禁止凭经验猜测 API 行为。
-- 文档抓取：华为开发者文档为 SPA，需抓取渲染结果时使用 `firecrawl_scrape`。
+- 文档抓取：华为开发者文档为 SPA；需抓取渲染结果时，优先使用当前环境可用的联网/渲染抓取工具，不固定工具名。
 - NativeBuffer：访问 NativeWindow buffer 像素内存必须走 `OH_NativeBuffer_FromNativeWindowBuffer` + `OH_NativeBuffer_Map/Unmap` 流程，禁止直接对 BufferHandle 使用 `mmap/munmap`。
 - 线程同步：VSync 回调线程与主线程/ArkTS 共享状态必须用 `std::mutex + std::lock_guard` 保护，且同一状态统一锁边界。
 - 日志规范：日志域使用 `0xD000-0xFFFF`；重定义前先 `#undef LOG_DOMAIN`；数值日志使用 `%{public}d/%{public}u/%{public}X`。
 - ArkTS/NAPI：返回匿名对象必须定义显式 `interface` 类型，避免 `Object/any`；跨语言数值建议 `Number()` 显式转换。
 - NativeWindow：避免强制设置 `SET_TIMEOUT=5`；如需设置，使用默认或 >= 1 帧周期。
-- 交互偏好：不写测试脚本；不编译/不运行（用户自己执行）。
-- 交互要求：若环境提供三术 `mcp4_zhi` 工具，则所有询问/确认通过该工具进行。
+- 交互偏好：不写测试脚本；代理不主动编译/不运行，用户自己执行。代理可做静态检查，并必须明确“未编译/未真机”。
+- 交互要求：若当前环境明确提供专用确认工具，则通过该工具询问；否则正常中文询问。
 - 约定：旧架构（`deprecated/legacy/`）不参与后续检索与代码编辑（除非用户明确要求）。
 
 ## ArkTS 编程规范（华为官方，检查要求）
@@ -92,17 +92,15 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 ## Commit & Pull Request Guidelines
 - Commit history mixes short Chinese summaries and Conventional Commit-style subjects (e.g., `refactor(build): ...`).
 - Use a concise, imperative summary; optionally add a `type(scope):` prefix when it helps clarity.
-- PRs should include: what changed, how it was validated (device + HarmonyOS version), and screenshots for UI changes.
+- PRs should include: what changed, what static checks the agent ran, what device/HarmonyOS validation the user reported, and screenshots for UI changes when available.
 
 ## Configuration Tips
 - Local SDK/NDK paths are machine-specific (see the shell scripts); avoid committing local paths or `entry/build/` artifacts.
 
-## 图形 API 现状（官方文档要点，精简版）
-- Vulkan：SDK 支持 v1.4.309，具体可用版本依赖 GPU 驱动；OHOS 扩展支持 OHNativeWindow/OH_NativeBuffer 互操作。
-- OpenGL（桌面）：API version 20 支持 OpenGL 3.0，API version 22 支持 OpenGL 4.2；仅明确 PC/部分 Tablet，需 OH_Graphics_QueryGL 判断。
-- OpenGL ES：HarmonyOS 支持 OpenGL ES 3.2；扩展需在上下文初始化后通过 glGetString 查询。
-- 手机端：OH_Graphics_QueryGL 返回空，不能假设有桌面 OpenGL 3.x，应默认 GLES/Vulkan 路径。
-**“所有 EGL/GL 操作只在 Engine 线程执行”**原则，这是移动端图形开发的金科玉律。只要守住这条线，90% 的崩溃都能避免
+## 图形 API 口径（精简版）
+- 移动端按 ARM 平台处理，默认优先 GLES / Vulkan 路径；不要假设手机端存在桌面 OpenGL 能力。
+- 具体 API 版本、扩展和设备能力必须以华为官方文档、本机 SDK 声明和运行时查询结果为准，不把旧结论写死进代码。
+- EGL/GL 操作默认只在 Engine 线程执行；跨线程共享状态必须有明确锁边界。
 
 ## 鸿蒙模拟器能力判断（需共识）
 - 平台定位：按“移动端 ARM 平台”处理，默认 Egl + OpenGL ES，Vulkan 视设备支持。
@@ -136,10 +134,26 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 - `code.html` 用于定义“状态切换时如何表现”，重点参考结构、交互形式、动效风格、反馈节奏和显隐关系；不要把其中的 demo 数据、随机数、固定定时器直接搬进正式实现。
 - 业务代码必须绑定真实事件、真实数据和真实流程；禁止为了贴近 demo 演示效果而制造假状态、假 telemetry、假定时触发或与产品逻辑无关的自动流程。
 - 当截图与 HTML 冲突时：
-- 静态最终态以截图为准。
-- 动效与交互表现以 HTML 为参考。
-- 状态进入、退出、数据内容和触发条件以真实业务逻辑为准。
+  - 静态最终态以截图为准。
+  - 动效与交互表现以 HTML 为参考。
+  - 状态进入、退出、数据内容和触发条件以真实业务逻辑为准。
 - 对详情页、启动页、菜单态等页面，允许复用 HTML 的“状态外壳”，但必须把触发机制替换为真实状态机；不要把 demo 模式直接当产品逻辑。
+
+## 最新执行口径（2026-04）
+- 所有产品页风格都必须按 HarmonyOS / ArkUI 容器体系落地；`screen.png` 只验收视觉层级，不再作为固定坐标来源。
+- 禁止为了贴合手机截图把页面主结构写成固定宽高、固定 `top/left`、固定 `marginTop`、固定 `translate/offset`；主内容优先用 `Column` / `Row` / `Stack` / `Scroll` / `List` / `Grid`、`layoutWeight`、`constraintSize`、`aspectRatio`、百分比宽度和父容器 `padding`。
+- 输入布局编辑器、虚拟手柄、摇杆、滑动操作这类“控件热区/逻辑坐标”允许保留内部坐标模型，但必须满足：
+  - 坐标属于业务数据或交互语义，不是截图补偿。
+  - 外层必须是自适应画布，例如 `width('100%') + constraintSize(...) + aspectRatio(...)`。
+  - 持久化坐标或默认坐标应按逻辑画布换算到百分比位置，禁止直接把 750 设计稿或 HTML px 坐标平移到屏幕。
+  - 控件自身可固定最小触控尺寸，但不能决定整页布局。
+- 弹层、抽屉、菜单、Toast、空态、封面、插画不得写死整块宽度或屏外锚点；优先 `width('80%~90%') + constraintSize({ maxWidth }) + align(...)`。
+- 允许固定的值只限图标尺寸、触控最小高度、按钮高度、字号、圆角、分割线、装饰线条等 token 级尺寸；页面起始位置、卡片容器宽度、封面容器、底部留白、安全区避让必须自适应。
+- 视觉语言要在主流程保持一致：底部导航主文案使用中文，业务页中文为主，英文/monospace 只作为状态码、协议名、核心日志或技术副标签。
+- 每次做 UI 页面收口，必须先按“页面结构树 -> 组件拆分 -> token -> 断点/容器 -> ArkTS”顺序思考；禁止先堆固定数值再靠预览图微调。
+- 修改后至少做静态扫描，不编译时也要把剩余风险列清楚：
+  - `rg -n "\.position\(|\.markAnchor\(|\.translate\(|\.offset\(|\.width\('[0-9]+vp'\)|\.height\('[0-9]+vp'\)|\.width\([0-9]{2,}\)|\.height\([0-9]{2,}\)" entry/src/main/ets/pages entry/src/main/ets/components -g "*.ets" -g "!deprecated/**" -g "!legacy/**"`
+  - 扫描命中不等于必错；必须区分“业务热区固定尺寸”和“截图补丁式布局”。前者说明外层自适应依据，后者必须整改。
 
 ## 技术基线与布局原则
 
@@ -300,18 +314,25 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 ### 状态管理与组件通信约束
 - UI 必须由状态驱动，不要依赖命令式“手动刷新某个组件”的补丁式做法
 - 页面私有状态优先使用 `@State`，父传子只读数据使用 `@Prop`，父子双向同步使用 `@Link`，跨层共享状态时才谨慎使用 `@Provide` / `@Consume`
-- 不要给 `@Prop` 传函数值；点击事件优先放在父容器，或改用 ArkUI 兼容的状态同步 / 事件通信方式
+- 不要把函数声明为 `@Prop`；点击事件优先放在父容器，或改用 ArkUI 兼容的状态同步 / 事件通信方式。自定义组件可使用普通可选字段传递回调，但不要用 `@Prop` 装饰函数。
 - 页面组件负责页面级状态、断点和窗口环境；展示组件只负责展示，不持有业务级共享状态
 - 不要让叶子组件自行维护页面级状态、路由状态或窗口断点逻辑
 - 不要把整页状态塞进一个超大对象再跨层传递；优先拆分为语义明确、边界清晰的小状态
 
+### 页面生命周期模板
+- 新增含异步加载、延时、轮询或跨页回写的页面，必须使用 `PageLifecycleGuard` 或等价的 `pageActive + token + timer cleanup` 模板。
+- `aboutToAppear()` 只负责激活生命周期并启动当前代任务；`aboutToDisappear()` 必须让 token 失效、清理 timeout/interval，并阻止后续异步回写。
+- 每个 `await` 后、长耗时 native 调用返回后、定时器回调进入时，都必须校验当前 token；校验失败直接返回，不再写 `@State`、不再发路由、不再写 repository。
+- `setTimeout` / `setInterval` 必须登记到 guard 或页面字段中，离页时统一清理；禁止离页后依靠回调内部偶然判断来兜底。
+- 只有完全同步、无定时器、无异步回写的静态展示页可以不接入 guard；一旦新增异步能力，必须按本模板补齐。
+
 ### 页面、路由与导航约束
 - 新增页面后，必须同步注册到 `entry/src/main/resources/base/profile/main_pages.json`，否则页面跳转可能表面成功但无法正常展示
 - 页面跳转参数必须有明确类型，不要依赖随手拼接的匿名对象透传
-- 旧 `router` / `AppRouter` 过渡层已移除；应用内页面导航统一优先使用 `Navigation + NavPathStack`
-- `Navigation.hideNavBar(true)` 时，不要让页面栈为空；需要首屏走栈时先 `pushPath`
-- 不要把返回 `NavDestination()` 的页面直接当作 `Navigation` 的首屏内容；应通过 `navDestination` builder 渲染
-- 根级 `Navigation` 目的地统一显式包 `NavDestination().hideTitleBar(true)`，避免默认 `TitleBar` 干扰并触发白屏
+- 当前阶段页面导航仍以 ArkUI `router` / `getUIContext().getRouter()` 与 `main_pages.json` 为准；新增页面必须注册 `main_pages.json`。
+- `Navigation + NavPathStack` 只作为后续重构目标；未启动导航架构重构前，不要把局部页面强行改成 Navigation 体系。
+- 如后续正式迁移到 `Navigation`：`Navigation.hideNavBar(true)` 时不要让页面栈为空；需要首屏走栈时先 `pushPath`。
+- 如后续正式迁移到 `Navigation`：不要把返回 `NavDestination()` 的页面直接当作 `Navigation` 的首屏内容，应通过 `navDestination` builder 渲染；根级目的地显式包 `NavDestination().hideTitleBar(true)`。
 - 页面组件负责路由入口、页面生命周期与页面级数据初始化；不要把路由逻辑下沉到纯展示组件
 - 区分“分组标题”和“可点击列表项”，不要默认标题区可点击
 - 如果底部区域承担“导航 + 关键操作”的复合职责，应优先封装为公共 Dock 组件，而不是强行套用 `Tabs`
@@ -335,8 +356,9 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 - 滚动容器中的列表项、卡片项避免做重计算、重复创建重量级对象或层级过深的嵌套结构
 - 不要把几十个同构组件手写展开在页面里
 
-### HarmonyOS 6 / API 20+ 适配要求
-- 每次升级 `compileSdkVersion`、`targetSdkVersion` 或相关 Kit 版本时，先检查官方 Upgrade Guide、API diff 与已知问题清单，再决定是否直接改代码
+### SDK / HarmonyOS 版本适配要求
+- 每次升级 `compileSdkVersion`、`targetSdkVersion` 或相关 Kit 版本时，先检查官方 Upgrade Guide、API diff 与已知问题清单，再决定是否直接改代码。
+- 只有在明确升级到 HarmonyOS 6 / API 20+ 时，才按 HarmonyOS 6 / API 20+ 规则做专项适配；不要默认当前工程已经固定在该版本。
 - 升级后重点回归：页面跳转、输入法避让、列表滚动、弹窗浮层、自定义导航、图片资源、横竖屏切换和多窗口适配
 - 如果应用需要兼容历史版本设备，不能只在最新模拟器或单一设备上验证；必须在目标兼容范围内做关键页面回归
 - 自定义组件、二次封装导航栏、列表容器和复杂布局在 SDK 升级后属于高风险区域，优先检查行为变化和属性废弃情况
@@ -392,8 +414,8 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 - 禁止在键盘弹出、状态栏避让、底部安全区场景中手写补偿值修布局
 - 禁止用频繁重建页面、重复 `push` / `replace` 路由或整树刷新掩盖状态管理问题
 
-## 最终输出要求
-请严格按以下顺序输出：
+## 设计页落地方案输出要求
+当任务是蓝湖 / HTML / 截图到 ArkUI 的页面落地方案时，建议按以下顺序输出；普通修 bug、查代码、改文档不强制套用：
 1. 页面结构树
 2. 组件拆分方案
 3. 样式 token 列表

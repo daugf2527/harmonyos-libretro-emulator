@@ -6,6 +6,7 @@ import { ImportEmptyStateHero } from '../components/ImportEmptyStateHero'
 import { setPendingImportUris } from '../common/ImportTaskBridge'
 import { EmuColors, EmuMetrics } from '../common/EmuUiTokens'
 import { pickRomUris } from '../common/RomImportService'
+import { navigateEmuBottomNav } from '../common/RouteHelper'
 
 interface ImportParticle {
   x: number
@@ -25,6 +26,7 @@ struct ImportEntryPage {
   @State private particleBoosted: boolean = false
   private scanTimer: number = -1
   private particleTimer: number = -1
+  private pageActive: boolean = false
   @State private particlePhase: number = 0
   private readonly particles: ImportParticle[] = [
     { x: 24, y: 88, size: 2, opacity: 0.12 },
@@ -42,13 +44,18 @@ struct ImportEntryPage {
     { x: 286, y: 526, size: 2, opacity: 0.12 }
   ]
   private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: 'LIBRARY', isActive: true },
-    { key: 'engine', iconName: 'terminal', label: 'ENGINE', isActive: false },
-    { key: 'input', iconName: 'sports_esports', label: 'INPUT', isActive: false },
-    { key: 'system', iconName: 'tune', label: 'SYSTEM', isActive: false }
+    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: true },
+    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
+    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
+    { key: 'system', iconName: 'tune', label: '系统', isActive: false }
   ]
 
+  private onBottomNavClick(key: string): void {
+    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'library', 'ImportEntryPage')
+  }
+
   aboutToAppear(): void {
+    this.pageActive = true
     this.startParticleMotion()
     if (this.hasGames) {
       this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
@@ -58,6 +65,7 @@ struct ImportEntryPage {
   }
 
   aboutToDisappear(): void {
+    this.pageActive = false
     this.stopScan()
     this.stopParticleMotion()
   }
@@ -102,24 +110,17 @@ struct ImportEntryPage {
       return
     }
     this.isScanning = true
-    this.scanProgress = 0
-    this.scanStatusText = '正在扫描本地文件...'
+    this.scanProgress = 100
+    this.scanStatusText = '等待选择文件...'
     this.particleBoosted = true
     this.stopScan()
-    this.scanTimer = setInterval(() => {
-      const nextValue = Math.min(100, this.scanProgress + Math.random() * 9)
-      this.scanProgress = nextValue
-      if (nextValue >= 100) {
-        this.scanStatusText = '等待选择文件...'
-        this.stopScan()
-        setTimeout(() => {
-          void this.finishImportFlow()
-        }, 420)
-      }
-    }, 80)
+    void this.finishImportFlow()
   }
 
   private async finishImportFlow(): Promise<void> {
+    if (!this.pageActive) {
+      return
+    }
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
       this.resetImportState('获取导入上下文失败')
@@ -127,6 +128,9 @@ struct ImportEntryPage {
     }
 
     const uris = await pickRomUris(context)
+    if (!this.pageActive) {
+      return
+    }
     this.isScanning = false
     this.particleBoosted = false
     if (!uris || uris.length === 0) {
@@ -170,7 +174,6 @@ struct ImportEntryPage {
     .width('100%')
     .layoutWeight(1)
     .justifyContent(FlexAlign.Center)
-    .translate({ y: 52 })
   }
 
   @Builder
@@ -234,7 +237,10 @@ struct ImportEntryPage {
         inactiveFontColor: '#FF666666',
         indicatorStyle: 'dot',
         overallOpacity: 0.86,
-        panelBackgroundColor: '#E8000000'
+        panelBackgroundColor: '#E8000000',
+        onItemClick: (key: string) => {
+          this.onBottomNavClick(key)
+        }
       })
     }
     .width('100%')

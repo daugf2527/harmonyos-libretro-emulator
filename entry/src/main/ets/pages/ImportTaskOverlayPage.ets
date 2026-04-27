@@ -12,6 +12,7 @@ import {
   RomImportProgress,
   RomImportResult
 } from '../common/RomImportService'
+import { navigateEmuBottomNav } from '../common/RouteHelper'
 
 type FeedbackState = 'CONFLICT' | 'IMPORTING' | 'SUCCESS' | 'ERROR'
 
@@ -50,29 +51,40 @@ struct ImportTaskOverlayPage {
   private latestImportResult: RomImportResult | undefined = undefined
   private cancelRequested: boolean = false
   private importStartedAtMs: number = 0
+  private pageActive: boolean = false
+  private importTaskToken: number = 0
   private pulseTimer: number = -1
-  private importTimer: number = -1
   private readonly horizontalGridIndexes: number[] = createIndexRange(120)
   private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: 'LIBRARY', isActive: false },
+    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
     { key: 'explore', iconName: 'explore', label: 'EXPLORE', isActive: false },
-    { key: 'system', iconName: 'tune', label: 'SYSTEM', isActive: true }
+    { key: 'system', iconName: 'tune', label: '系统', isActive: true }
   ]
 
   aboutToAppear(): void {
+    this.pageActive = true
+    this.cancelRequested = false
+    this.importTaskToken += 1
+    const token = this.importTaskToken
     this.startPulseTimer()
     const pendingUris = consumePendingImportUris()
     if (pendingUris.length > 0) {
-      void this.prepareActualImport(pendingUris)
+      void this.prepareActualImport(pendingUris, token)
       return
     }
-    this.startImportSimulation()
+    this.showMissingImportTask()
   }
 
   aboutToDisappear(): void {
+    this.pageActive = false
+    this.cancelRequested = true
+    this.importTaskToken += 1
     this.stopPulseTimer()
-    this.stopImportSimulation()
+  }
+
+  private isCurrentImportTask(token: number): boolean {
+    return this.pageActive && token === this.importTaskToken
   }
 
   private startPulseTimer(): void {
@@ -93,49 +105,23 @@ struct ImportTaskOverlayPage {
     }
   }
 
-  private applyImportProgress(nextProgress: number): void {
-    this.progressPercent = nextProgress
-    this.transferRateText = `${(18 + Math.random() * 14).toFixed(1)} MB/s`
-    this.processStatusText = 'VERIFYING_CHECKSUM...'
-    this.sourceText = 'Source: EXT_DISK_A'
-
-    const etaSeconds = Math.max(0, Math.ceil((100 - nextProgress) / 8))
-    const minutes = Math.floor(etaSeconds / 60).toString().padStart(2, '0')
-    const seconds = (etaSeconds % 60).toString().padStart(2, '0')
-    this.etaText = `EST: ${minutes}:${seconds}`
-  }
-
-  private startImportSimulation(reset: boolean = true): void {
-    this.stopImportSimulation()
-    if (reset) {
-      this.etaText = 'EST: 02:45'
-      this.sourceText = 'Source: EXT_DISK_A'
-      this.transferRateText = '24.4 MB/s'
-      this.progressPercent = 33
-      this.processStatusText = 'VERIFYING_CHECKSUM...'
-      this.processIdText = 'PROCESS_ID: 0x882A_IMPORT'
-      this.currentProgressText = '正在导入 1/3'
-      this.importedNamesPreviewText = ''
-      this.feedbackState = 'IMPORTING'
-    }
-    this.importTimer = setInterval(() => {
-      const nextProgress = Math.min(33, Number(Math.random() * 6) + 28)
-      this.applyImportProgress(nextProgress)
-
-      if (nextProgress >= 33) {
-        this.stopImportSimulation()
-        setTimeout(() => {
-          this.switchState('SUCCESS')
-        }, 900)
-      }
-    }, 220)
-  }
-
-  private stopImportSimulation(): void {
-    if (this.importTimer !== -1) {
-      clearInterval(this.importTimer)
-      this.importTimer = -1
-    }
+  private showMissingImportTask(): void {
+    this.hasActualImportResult = true
+    this.latestImportResult = undefined
+    this.currentImportUris = []
+    this.resultItems = []
+    this.progressPercent = 0
+    this.feedbackState = 'ERROR'
+    this.resultTitleText = '没有导入任务'
+    this.resultMessageText = '请从导入入口选择真实 ROM 文件后继续'
+    this.resultDetailText = 'IMPORT_TASK_EMPTY'
+    this.importedNamesPreviewText = ''
+    this.processStatusText = 'NO_PENDING_IMPORT_TASK'
+    this.processIdText = 'PROCESS_ID: EMPTY_IMPORT'
+    this.currentProgressText = '等待选择文件'
+    this.sourceText = 'Source: NONE'
+    this.transferRateText = '--'
+    this.etaText = 'EST: --'
   }
 
   private switchState(nextState: FeedbackState): void {
@@ -205,7 +191,6 @@ struct ImportTaskOverlayPage {
     this.hasActualImportResult = true
     this.latestImportResult = result
     this.resultItems = [...result.items]
-    this.stopImportSimulation()
     this.overlayOpacity = 1
     this.overlayScale = 1
     if (!result.canceled) {
@@ -268,7 +253,10 @@ struct ImportTaskOverlayPage {
     return names.slice(0, 3).join('\n')
   }
 
-  private async prepareActualImport(uris: string[]): Promise<void> {
+  private async prepareActualImport(uris: string[], token: number): Promise<void> {
+    if (!this.isCurrentImportTask(token)) {
+      return
+    }
     this.currentImportUris = [...uris]
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
@@ -285,16 +273,21 @@ struct ImportTaskOverlayPage {
         failedNames: [],
         items: []
       }
-      this.applyImportResult(failedResult)
+      if (this.isCurrentImportTask(token)) {
+        this.applyImportResult(failedResult)
+      }
       return
     }
 
     const conflictSummary = await inspectRomImportConflicts(context, uris)
+    if (!this.isCurrentImportTask(token)) {
+      return
+    }
     if (conflictSummary.conflictCount > 0) {
       this.applyConflictSummary(conflictSummary)
       return
     }
-    await this.startActualImport(uris)
+    await this.startActualImport(uris, token)
   }
 
   private applyConflictSummary(summary: RomImportConflictSummary): void {
@@ -315,7 +308,10 @@ struct ImportTaskOverlayPage {
     this.etaText = 'EST: POLICY'
   }
 
-  private async startActualImport(uris: string[]): Promise<void> {
+  private async startActualImport(uris: string[], token: number): Promise<void> {
+    if (!this.isCurrentImportTask(token)) {
+      return
+    }
     this.currentImportUris = [...uris]
     this.cancelRequested = false
     this.importStartedAtMs = Date.now()
@@ -334,7 +330,9 @@ struct ImportTaskOverlayPage {
         failedNames: [],
         items: []
       }
-      this.applyImportResult(failedResult)
+      if (this.isCurrentImportTask(token)) {
+        this.applyImportResult(failedResult)
+      }
       return
     }
 
@@ -345,15 +343,24 @@ struct ImportTaskOverlayPage {
     this.progressPercent = 0
     this.importedNamesPreviewText = ''
     const result = await importRomUris(context, uris, (progress: RomImportProgress) => {
-      this.applyActualImportProgress(progress)
+      if (this.isCurrentImportTask(token)) {
+        this.applyActualImportProgress(progress)
+      }
     }, {
       overwriteExisting: false,
-      shouldCancel: () => this.cancelRequested
+      shouldCancel: () => this.cancelRequested || !this.isCurrentImportTask(token)
     })
+    if (!this.isCurrentImportTask(token)) {
+      return
+    }
     this.applyImportResult(result)
   }
 
   private async restartActualImportWithOverwrite(): Promise<void> {
+    const token = this.importTaskToken
+    if (!this.isCurrentImportTask(token)) {
+      return
+    }
     if (this.currentImportUris.length === 0) {
       return
     }
@@ -370,11 +377,16 @@ struct ImportTaskOverlayPage {
     this.progressPercent = 0
     this.importedNamesPreviewText = ''
     const result = await importRomUris(context, this.currentImportUris, (progress: RomImportProgress) => {
-      this.applyActualImportProgress(progress)
+      if (this.isCurrentImportTask(token)) {
+        this.applyActualImportProgress(progress)
+      }
     }, {
       overwriteExisting: true,
-      shouldCancel: () => this.cancelRequested
+      shouldCancel: () => this.cancelRequested || !this.isCurrentImportTask(token)
     })
+    if (!this.isCurrentImportTask(token)) {
+      return
+    }
     this.applyImportResult(result)
   }
 
@@ -546,7 +558,7 @@ struct ImportTaskOverlayPage {
       this.replaceUrl('pages/ImportEntryPage')
       return
     }
-    this.startImportSimulation()
+    this.showMissingImportTask()
   }
 
   private handleCancelAction(): void {
@@ -555,8 +567,7 @@ struct ImportTaskOverlayPage {
       this.processStatusText = 'CANCEL_REQUESTED...'
       return
     }
-    this.stopImportSimulation()
-    this.switchState('ERROR')
+    this.showMissingImportTask()
   }
 
   private canOverwriteExisting(): boolean {
@@ -569,6 +580,10 @@ struct ImportTaskOverlayPage {
     this.getUIContext().getRouter().replaceUrl({ url: url }).catch((err: Error) => {
       console.error(`[ImportTaskOverlayPage] replaceUrl failed: ${err.message}`)
     })
+  }
+
+  private onBottomNavClick(key: string): void {
+    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'library', 'ImportTaskOverlayPage')
   }
 
   build() {
@@ -591,7 +606,10 @@ struct ImportTaskOverlayPage {
           inactiveFontColor: '#FF666666',
           indicatorStyle: 'line',
           overallOpacity: 1,
-          panelBackgroundColor: '#F2000000'
+          panelBackgroundColor: '#F2000000',
+          onItemClick: (key: string) => {
+            this.onBottomNavClick(key)
+          }
         })
       }
       .width('100%')
@@ -639,12 +657,12 @@ struct ImportTaskOverlayPage {
         Row({ space: 16 }) {
           Column()
             .layoutWeight(1)
-            .height(220)
+            .height('100%')
             .backgroundColor('#33262626')
             .border({ width: 0.5, color: '#26FFFFFF', style: BorderStyle.Solid })
           Column()
             .layoutWeight(1)
-            .height(220)
+            .height('100%')
             .backgroundColor('#33262626')
             .border({ width: 0.5, color: '#26FFFFFF', style: BorderStyle.Solid })
         }
@@ -820,8 +838,8 @@ struct ImportTaskOverlayPage {
           .fontWeight(FontWeight.Bold)
           .fontFamily('monospace')
           .fontColor(Colors.onSurfaceVariant)
-          .width(136)
           .height(40)
+          .padding({ left: 22, right: 22 })
           .border({ width: 0.5, color: '#4D757575', style: BorderStyle.Solid })
           .backgroundColor(this.cancelPressed ? Colors.surfaceContainerHighest : Color.Transparent)
           .scale({ x: this.cancelPressed ? 0.95 : 1, y: this.cancelPressed ? 0.95 : 1 })
@@ -918,7 +936,7 @@ struct ImportTaskOverlayPage {
         .scale({ x: this.confirmPressed ? 0.95 : 1, y: this.confirmPressed ? 0.95 : 1 })
         .onTouch((event: TouchEvent) => this.onConfirmTouch(event))
         .onClick(() => {
-          void this.startActualImport(this.currentImportUris)
+          void this.startActualImport(this.currentImportUris, this.importTaskToken)
         })
         .margin({ bottom: 12 })
 

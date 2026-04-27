@@ -534,7 +534,7 @@ async function ensureRuntimeColumns(store: RdbStoreCompat): Promise<void> {
     } catch (err) {
       const message = (err as Error).message || String(err)
       if (message.toLowerCase().indexOf('duplicate') < 0) {
-        throw err
+        throw new Error(message)
       }
     }
   }

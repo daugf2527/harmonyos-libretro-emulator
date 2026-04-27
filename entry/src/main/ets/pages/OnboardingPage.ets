@@ -1,7 +1,6 @@
-import { abilityAccessCtrl, bundleManager, common, Permissions } from '@kit.AbilityKit'
-import { BusinessError } from '@kit.BasicServicesKit'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
+import { PageLifecycleGuard } from '../common/PageLifecycleGuard'
 
 type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED'
 
@@ -22,22 +21,24 @@ struct OnboardingPage {
   @State private scanLineOffsetY: number = 0
   @State private startButtonPressed: boolean = false
   @State private authorizeButtonPressed: boolean = false
-  @State private permissionRequesting: boolean = false
   @State private permissions: PermissionItem[] = [
-    { key: 'READ_MEDIA_IMAGES', label: 'DIRECTORY_READ', status: 'PENDING' },
-    { key: 'READ_MEDIA_VIDEO', label: 'MEDIA_METADATA', status: 'PENDING' },
+    { key: 'DOCUMENT_PICKER', label: 'DOCUMENT_PICKER', status: 'GRANTED' },
+    { key: 'SANDBOX_IMPORT', label: 'SANDBOX_IMPORT', status: 'GRANTED' },
   ]
-  @State private protocolStatus: string = 'PENDING'
+  @State private protocolStatus: string = 'VERIFIED'
   private readonly horizontalGridIndexes: number[] = createIndexRange(120)
   private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private scanLineTimer: number = -1
+  private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
 
   aboutToAppear() {
-    this.refreshPermissionStatus()
+    this.lifecycle.activate()
+    this.applyPermissionState('GRANTED')
     this.startScanLineAnimation()
   }
 
   aboutToDisappear() {
+    this.lifecycle.deactivate()
     this.stopScanLineAnimation()
   }
 
@@ -46,6 +47,7 @@ struct OnboardingPage {
       return
     }
     this.startButtonPressed = false
+    const token = this.lifecycle.beginTask()
     const paramOut: AnimateParam = { duration: 350, curve: Curve.EaseInOut }
     const paramIn: AnimateParam = { duration: 350, curve: Curve.EaseInOut }
     this.getUIContext().animateTo(paramOut, () => {
@@ -53,6 +55,9 @@ struct OnboardingPage {
       this.stepOffsetY = 20
     })
     setTimeout(() => {
+      if (!this.lifecycle.isCurrentTask(token)) {
+        return
+      }
       this.currentStep = 2
       this.stepOffsetY = 20
       this.scanLineOffsetY = 0
@@ -62,6 +67,9 @@ struct OnboardingPage {
         this.stepOffsetY = 0
       })
       setTimeout(() => {
+        if (!this.lifecycle.isCurrentTask(token)) {
+          return
+        }
         if (this.currentStep === 2 && this.stepOpacity < 1) {
           this.stepOpacity = 1
           this.stepOffsetY = 0
@@ -70,69 +78,17 @@ struct OnboardingPage {
     }, 350)
   }
 
-  private async requestPermission(): Promise<void> {
-    if (this.permissionRequesting) {
-      return
-    }
+  private openImportEntry(): void {
     this.authorizeButtonPressed = false
-    this.permissionRequesting = true
-    const atManager = abilityAccessCtrl.createAtManager()
-    const perms: Permissions[] = ['ohos.permission.READ_MEDIA']
-    try {
-      const context = this.getUIContext().getHostContext() as common.UIAbilityContext
-      const result = await atManager.requestPermissionsFromUser(context, perms)
-      const granted = this.isAllGrantedFromResult(result.authResults)
-      this.applyPermissionState(granted ? 'GRANTED' : 'DENIED')
-      if (granted) {
-        this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibretroGamePage' }).catch((err: Error) => {
-          console.error(`replaceUrl failed: ${err.message}`)
-        })
-      }
-    } catch (err) {
-      const bizError = err as BusinessError
-      console.error(`requestPermissionsFromUser failed: ${bizError.code}, ${bizError.message}`)
-      this.applyPermissionState('DENIED')
-    } finally {
-      this.permissionRequesting = false
-    }
+    this.getUIContext().getRouter().replaceUrl({ url: 'pages/ImportEntryPage' }).catch((err: Error) => {
+      console.error(`replaceUrl failed: ${err.message}`)
+    })
   }
 
-  private skipPermission(): void {
-    this.applyPermissionState('DENIED')
-  }
-
-  private async refreshPermissionStatus(): Promise<void> {
-    const granted = await this.checkPermissionGranted('ohos.permission.READ_MEDIA')
-    this.applyPermissionState(granted ? 'GRANTED' : 'PENDING')
-  }
-
-  private async checkPermissionGranted(permission: Permissions): Promise<boolean> {
-    try {
-      const atManager = abilityAccessCtrl.createAtManager()
-      const bundleInfo = await bundleManager.getBundleInfoForSelf(bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION)
-      const tokenId = Number(bundleInfo.appInfo.accessTokenId)
-      const grantStatus = await atManager.checkAccessToken(tokenId, permission)
-      return grantStatus === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED
-    } catch (err) {
-      const bizError = err as BusinessError
-      console.error(`checkAccessToken failed: ${bizError.code}, ${bizError.message}`)
-      return false
-    }
-  }
-
-  private extractAuthResults(authResults: number[] | undefined): number[] {
-    if (!Array.isArray(authResults)) {
-      return []
-    }
-    return authResults.map((item: number): number => Number(item))
-  }
-
-  private isAllGrantedFromResult(authResults: number[] | undefined): boolean {
-    const normalizedResults = this.extractAuthResults(authResults)
-    if (normalizedResults.length === 0) {
-      return false
-    }
-    return normalizedResults.every((status: number) => status === abilityAccessCtrl.GrantStatus.PERMISSION_GRANTED)
+  private openLibraryPage(): void {
+    this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
+      console.error(`replaceUrl failed: ${err.message}`)
+    })
   }
 
   private applyPermissionState(status: PermissionStatus): void {
@@ -176,19 +132,22 @@ struct OnboardingPage {
       this.scanLineTimer = -1
     }
     this.scanLineOffsetY = 0
-    this.scanLineTimer = setInterval(() => {
+    this.scanLineTimer = this.lifecycle.trackInterval(setInterval(() => {
+      if (!this.lifecycle.isActive()) {
+        return
+      }
       if (this.currentStep !== 2) {
         this.scanLineOffsetY = 0
         return
       }
       const nextOffset = this.scanLineOffsetY + 1
       this.scanLineOffsetY = nextOffset > 191 ? 0 : nextOffset
-    }, 16)
+    }, 16))
   }
 
   private stopScanLineAnimation(): void {
     if (this.scanLineTimer !== -1) {
-      clearInterval(this.scanLineTimer)
+      this.lifecycle.clearIntervalId(this.scanLineTimer)
       this.scanLineTimer = -1
     }
   }
@@ -324,8 +283,8 @@ struct OnboardingPage {
       // Icon
       Stack() {
         Column()
-          .width(96)
-          .height(96)
+          .width('100%')
+          .height('100%')
           .backgroundColor(Colors.surfaceContainer)
           .borderRadius(8)
           .border({ width: 0.5, color: '#66484848', style: BorderStyle.Solid })
@@ -340,10 +299,11 @@ struct OnboardingPage {
           .height(6)
           .borderRadius(3)
           .backgroundColor(Colors.primary)
-          .position({ x: 88, y: -4 })
+          .align(Alignment.TopEnd)
       }
-      .width(96)
-      .height(96)
+      .width('26%')
+      .constraintSize({ minWidth: 80, maxWidth: 96 })
+      .aspectRatio(1)
       .margin({ bottom: 48 })
 
       // Title + subtitle
@@ -401,7 +361,7 @@ struct OnboardingPage {
         .width('100%')
         .height('100%')
       }
-      .width(164)
+      .padding({ left: 30, right: 30 })
       .height(48)
       .backgroundColor(this.startButtonPressed ? Colors.surfaceContainerHighest : Color.Transparent)
       .border({ width: 1, color: Colors.outline, style: BorderStyle.Solid })
@@ -450,7 +410,7 @@ struct OnboardingPage {
             .height(16)
             .backgroundColor(Colors.primary)
 
-          Text('Authorization Required')
+          Text('Import Source Ready')
             .fontSize(12)
             .fontFamily('monospace')
             .fontColor(Colors.primary)
@@ -458,14 +418,14 @@ struct OnboardingPage {
         }
         .alignItems(VerticalAlign.Center)
 
-        Text('允许访问文件，才能导入你手机里的游戏')
+        Text('通过系统文件选择器导入游戏')
           .fontSize(24)
           .fontWeight(FontWeight.Medium)
           .fontColor(Colors.onSurface)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-        Text('EMU_CORE 需要读取存储权限以检索 ROM 镜像并管理着色器缓存数据。')
+        Text('EMU_CORE 使用系统文件选择器获取一次性文件 URI，并把 ROM 复制到应用沙箱。')
           .fontSize(14)
           .fontColor(Colors.onSurfaceVariant)
           .lineHeight(22)
@@ -481,8 +441,8 @@ struct OnboardingPage {
       // Folder icon panel
       Stack() {
         Column()
-          .width(216)
-          .height(216)
+          .width('90%')
+          .aspectRatio(1)
           .borderRadius(108)
           .backgroundColor('#0D00FF41')
           .blur(24)
@@ -515,8 +475,8 @@ struct OnboardingPage {
             .align(Alignment.Top)
             .translate({ y: this.scanLineOffsetY })
         }
-        .width(192)
-        .height(192)
+        .width('80%')
+        .aspectRatio(1)
           .backgroundColor(Colors.surfaceContainerLow)
           .borderRadius(8)
           .border({ width: 0.5, color: '#66484848', style: BorderStyle.Solid })
@@ -536,8 +496,9 @@ struct OnboardingPage {
           .align(Alignment.BottomEnd)
           .margin({ right: 16, bottom: 16 })
       }
-      .width(240)
-      .height(240)
+      .width('58%')
+      .constraintSize({ minWidth: 200, maxWidth: 240 })
+      .aspectRatio(1)
       .margin({ bottom: 48 })
 
       // Permission list
@@ -589,7 +550,7 @@ struct OnboardingPage {
       Column({ space: 24 }) {
         Button({ type: ButtonType.Normal }) {
           Row({ space: 8 }) {
-            Text('授权')
+            Text('打开导入器')
               .fontSize(14)
               .fontWeight(FontWeight.Medium)
               .fontColor(Colors.onSurface)
@@ -609,15 +570,14 @@ struct OnboardingPage {
         .backgroundColor(this.authorizeButtonPressed ? Colors.surfaceContainerHighest : Color.Transparent)
         .border({ width: 1, color: Colors.outline, style: BorderStyle.Solid })
         .borderRadius(0)
-        .enabled(!this.permissionRequesting)
         .onTouch((event: TouchEvent) => this.onAuthorizeButtonTouch(event))
-        .onClick(() => this.requestPermission())
+        .onClick(() => this.openImportEntry())
 
-        Text('暂不授权，稍后在设置中手动开启')
+        Text('稍后导入，先进入游戏库')
           .fontSize(10)
-          .fontColor(this.protocolStatus === 'DENIED' ? '#FFABABAB' : '#FF666666')
+          .fontColor('#FF666666')
           .letterSpacing(2)
-          .onClick(() => this.skipPermission())
+          .onClick(() => this.openLibraryPage())
       }
       .width('100%')
       .constraintSize({ maxWidth: 460 })

@@ -5,11 +5,14 @@
     "pages/ImportEntryPage",
     "pages/LibraryPage",
     "pages/LibraryDetailPage",
-    "pages/StitchImportTaskPage",
+    "pages/SettingsPage",
+    "pages/SaveStatePage",
+    "pages/InputLayoutPage",
+    "pages/CoreManagerPage",
+    "pages/ShaderPreviewPage",
+    "pages/AboutHelpPage",
+    "pages/MetadataEditPage",
     "pages/ImportTaskOverlayPage",
-    "pages/CoreLoaderTest",
-    "pages/TestGambatte",
-    "pages/LibretroGamePage",
-    "pages/LibretroNewArchTestPage"
+    "pages/LibretroGamePage"
   ]
 }

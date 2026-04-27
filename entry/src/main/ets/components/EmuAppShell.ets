@@ -15,6 +15,7 @@ export struct EmuHeaderBar {
   @Prop mutedTextColor: string = '#888888'
   @Prop iconSize: number = 18
   @Prop rightIconSize: number = 20
+  onRightClick?: () => void
 
   build() {
     Row() {
@@ -46,6 +47,9 @@ export struct EmuHeaderBar {
         })
       }
       .alignItems(VerticalAlign.Center)
+      .onClick(() => {
+        this.onRightClick?.()
+      })
     }
     .width('100%')
     .height(EmuMetrics.headerHeight)

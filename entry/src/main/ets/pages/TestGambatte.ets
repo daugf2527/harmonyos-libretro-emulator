@@ -1,6 +1,7 @@
 /*
  * Libretro 核心测试工具
  * 按照鸿蒙官方文档标准编写
+ * DEV DIAGNOSTIC ONLY: 不注册到产品 main_pages.json，不作为默认产品路由入口。
  */
 
 import testNapi from 'libentry.so';
@@ -729,7 +730,7 @@ struct TestGambatte {
       }
 
       const bundleCodeDir = context.bundleCodeDir;
-      const corePath = `${bundleCodeDir}/libs/arm64/${core.soFile}`;
+      const corePath = `${bundleCodeDir}/libs/${this.resolveAbiPath()}/${core.soFile}`;
       const resMgr = context.resourceManager;
       const filesDir = context.filesDir;
       const cacheDir = context.cacheDir;
@@ -907,7 +908,7 @@ struct TestGambatte {
     const bundleCodeDir = context.bundleCodeDir;
     const filesDir = context.filesDir;
     const resMgr = context.resourceManager;
-    const corePath = `${bundleCodeDir}/libs/arm64/${core.soFile}`; // 假设 arm64，自动化测试通常在真机
+    const corePath = `${bundleCodeDir}/libs/${this.resolveAbiPath()}/${core.soFile}`;
 
     try {
       // Start Engine
@@ -1023,7 +1024,8 @@ struct TestGambatte {
       return this.makePassResult(core.name, romName, maxFps);
 
     } catch (e) {
-      throw e as Error;
+      const message = (e as Error).message || String(e);
+      throw new Error(message);
     } finally {
       // 再次确保清理
       nativeApi.refactoredStopEngineAsync();
@@ -1231,6 +1233,11 @@ struct TestGambatte {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  private resolveAbiPath(): string {
+    const rawAbiList = String(deviceInfo.abiList ?? '').toLowerCase();
+    return rawAbiList.indexOf('x86_64') >= 0 ? 'x86_64' : 'arm64';
+  }
+
   // 验证核心符号
   runCoreCheck() {
     if (this.coreCheckRunning) {
@@ -1257,7 +1264,7 @@ struct TestGambatte {
       }
 
       const bundleCodeDir = context.bundleCodeDir;
-      const abiPath = deviceInfo.abiList === 'x86_64' ? 'x86_64' : 'arm64';
+      const abiPath = this.resolveAbiPath();
       const corePath = `${bundleCodeDir}/libs/${abiPath}/${core.soFile}`;
 
       LogHelper.info('TestGambatte', 'Core', `验证核心: ${corePath}`);

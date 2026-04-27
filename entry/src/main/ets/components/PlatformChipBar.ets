@@ -10,32 +10,36 @@ export struct PlatformChipBar {
     return item === this.selected
   }
 
-  build() {
-    Scroll() {
-      Row({ space: 12 }) {
-        ForEach(this.items, (item: string) => {
-          Button(item)
-            .fontSize(11)
-            .fontWeight(FontWeight.Bold)
-            .fontFamily('monospace')
-            .fontColor(this.isSelected(item) ? '#FF000000' : '#FF9D9E9E')
-            .width(102)
-            .height(42)
-            .backgroundColor(this.isSelected(item) ? EmuColors.primary : '#171717')
-            .borderRadius(18)
-            .border({
-              width: this.isSelected(item) ? 0 : 0.5,
-              color: '#44757575',
-              style: BorderStyle.Solid
-            })
-            .onClick(() => {
-              this.onChange?.(item)
-            })
-        }, (item: string) => item)
-      }
-      .padding({ top: 2, bottom: 2 })
+  private getDisplayLabel(item: string): string {
+    if (item === 'ALL') {
+      return 'FC'
     }
-    .scrollable(ScrollDirection.Horizontal)
-    .scrollBar(BarState.Off)
+    return item
+  }
+
+  build() {
+    Row({ space: 10 }) {
+      ForEach(this.items, (item: string) => {
+        Button(this.getDisplayLabel(item))
+          .fontSize(11)
+          .fontWeight(FontWeight.Bold)
+          .fontFamily('monospace')
+          .fontColor(this.isSelected(item) ? '#FF000000' : '#FF9D9E9E')
+          .layoutWeight(1)
+          .padding({ top: 7, bottom: 7 })
+          .backgroundColor(this.isSelected(item) ? EmuColors.primary : '#171717')
+          .borderRadius(18)
+          .border({
+            width: this.isSelected(item) ? 0 : 0.5,
+            color: '#44757575',
+            style: BorderStyle.Solid
+          })
+          .onClick(() => {
+            this.onChange?.(item)
+          })
+      }, (item: string) => item)
+    }
+    .width('100%')
+    .padding({ top: 2, bottom: 2 })
   }
 }

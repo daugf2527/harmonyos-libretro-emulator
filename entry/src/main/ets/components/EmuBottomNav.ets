@@ -8,6 +8,17 @@ export interface EmuBottomNavItem {
   isActive: boolean
 }
 
+export type EmuBottomNavKey = 'library' | 'engine' | 'input' | 'system'
+
+export function createEmuBottomNavItems(activeKey: EmuBottomNavKey): EmuBottomNavItem[] {
+  return [
+    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: activeKey === 'library' },
+    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: activeKey === 'engine' },
+    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: activeKey === 'input' },
+    { key: 'system', iconName: 'tune', label: '系统', isActive: activeKey === 'system' }
+  ]
+}
+
 @Component
 export struct EmuBottomNav {
   @Prop items: EmuBottomNavItem[] = []
@@ -22,6 +33,22 @@ export struct EmuBottomNav {
     return this.indicatorStyle === 'dot'
   }
 
+  private getPrimaryLabel(item: EmuBottomNavItem): string {
+    if (item.key === 'library') {
+      return 'LIBRARY'
+    }
+    if (item.key === 'engine') {
+      return 'ENGINE'
+    }
+    if (item.key === 'input') {
+      return 'INPUT'
+    }
+    if (item.key === 'system') {
+      return 'SYSTEM'
+    }
+    return item.label
+  }
+
   build() {
     Row() {
       ForEach(this.items, (item: EmuBottomNavItem) => {
@@ -34,12 +61,13 @@ export struct EmuBottomNav {
               opacityValue: item.isActive ? 1 : 0.46
             })
 
-            Text(item.label)
+            Text(this.getPrimaryLabel(item))
               .fontSize(10)
               .fontWeight(item.isActive ? FontWeight.Bold : FontWeight.Medium)
               .fontFamily('monospace')
               .fontColor(item.isActive ? this.activeFontColor : this.inactiveFontColor)
               .letterSpacing(1.4)
+              .maxLines(1)
               .opacity(item.isActive ? 1 : 0.88)
           }
           .height(EmuMetrics.bottomNavHeight)

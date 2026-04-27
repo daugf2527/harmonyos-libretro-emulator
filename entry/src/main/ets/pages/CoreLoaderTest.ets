@@ -1,6 +1,7 @@
 /*
  * Phase 3.1 - CoreLoader 测试页面
  * 用于测试 Libretro 核心加载功能
+ * DEV DIAGNOSTIC ONLY: 不注册到产品 main_pages.json，不作为默认产品路由入口。
  */
 
 import testNapi from 'libentry.so';
@@ -223,9 +224,9 @@ struct CoreLoaderTest {
     // 获取沙箱路径 (官方推荐方式)
     let bundleCodeDir = this.getUIContext().getHostContext()!.bundleCodeDir;
     
-    // 根据设备架构选择正确的 .so 文件路径
-    // 重要: 虽然文件夹名是 arm64-v8a, 但设备上的实际路径是 arm64!
-    let abiPath = deviceInfo.abiList === 'x86_64' ? 'x86_64' : 'arm64';
+    // deviceInfo.abiList 可能是多 ABI 字符串，不能只做全等判断。
+    const rawAbiList = String(deviceInfo.abiList ?? '').toLowerCase();
+    let abiPath = rawAbiList.indexOf('x86_64') >= 0 ? 'x86_64' : 'arm64';
 
     this.bundleCodeDir = bundleCodeDir;
     this.abiPath = abiPath;

@@ -3,23 +3,30 @@
  * 基于 LibretroEngine 新架构重构
  */
 
-import testNapi from 'libentry.so';
 import LogHelper from '../common/LogHelper';
-import { deviceInfo } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
-import { resourceManager } from '@kit.LocalizationKit';
-import fs from '@ohos.file.fs';
-import { AnalogStickControl } from '../components/VirtualController';
+import { EmuColors } from '../common/EmuUiTokens';
 import {
+  RuntimeControlPanel,
+  RuntimeControlPanelState
+} from '../components/RuntimeControlPanel';
+import { RuntimeHudMetric, RuntimeTopHudBar } from '../components/RuntimeTopHudBar';
+import { RuntimePauseOverlay } from '../components/RuntimePauseOverlay';
+import { RuntimeVirtualControllerLayer } from '../components/RuntimeVirtualControllerLayer';
+import {
+  buildInputSourceItems,
   createDefaultPortAssignments,
+  findPortAssignment,
+  getInputSourceItemIndex,
   InputDeviceInfo,
+  InputSourceItem,
   InputSourceType,
-  PortAssignState
+  PortAssignState,
+  updatePortAssignments
 } from '../common/InputPortRouting';
 import {
   AudioStatusPayload,
   CoreCrashPayload,
-  EngineErrorInfo,
   EngineState,
   EngineStatePayload,
   EventHubScope,
@@ -27,139 +34,52 @@ import {
   GeometryUpdatePayload,
   LibretroEventHub
 } from '../common/LibretroEventHub';
-import { consumePendingLibraryLaunchRequest } from '../common/LibraryLaunchBridge'
+import { consumePendingLibraryLaunchRequest, PendingLibraryLaunchRequest } from '../common/LibraryLaunchBridge'
 import {
-  LibraryRuntimeSnapshot,
   markLibraryRecordPlayed,
-  updateLibraryRuntimeSnapshot
 } from '../common/LibraryRepository'
-import { listSandboxRomFiles } from '../common/RomImportService'
-
-// NAPI 接口定义 (遵循 AGENTS.md 规范)
-interface LibretroNapi {
-  refactoredStartEngine(): boolean;
-  refactoredStopEngine(): boolean;
-  refactoredStopEngineAsync(): boolean;
-  refactoredLoadCore(path: string): boolean;
-  refactoredLoadRom(
-    path: string,
-    resMgr?: object
-  ): boolean;
-  refactoredSwitchGameAsync(
-    corePath: string,
-    romPath: string,
-    filesDir: string,
-    resMgr?: object,
-    timeoutMs?: number,
-    token?: number
-  ): Promise<boolean>;
-  refactoredSwitchGameAsync(
-    corePath: string,
-    romPath: string,
-    filesDir: string,
-    timeoutMs?: number,
-    token?: number
-  ): Promise<boolean>;
-  refactoredSetFilesDir(path: string): boolean;
-  refactoredGetRawFileList(
-    resMgr: object,
-    dir: string
-  ): string[];
-  refactoredGetRawFileListAsync(
-    resMgr: object,
-    dir?: string
-  ): Promise<string[]>;
-  refactoredResetStats(): boolean;
-  refactoredGetStats(): RawEngineStats;
-  refactoredGetInputDebugStats(): InputDebugStats;
-  refactoredPauseEngine(): boolean;
-  refactoredResumeEngine(): boolean;
-  refactoredSetScalingMode(mode: number): boolean;
-  refactoredSetSoftwareMaxResolution(w: number, h: number): boolean;
-  refactoredSetHwRenderAllowed(allowed: boolean): boolean;
-  refactoredSendInput(port: number, keyId: number, pressed: boolean): boolean;
-  refactoredSendAnalog(
-    port: number,
-    index: number,
-    id: number,
-    value: number
-  ): boolean;
-  refactoredAssignPortSource(
-    port: number,
-    sourceType: number,
-    deviceId?: string
-  ): boolean;
-  refactoredUnassignPort(port: number): boolean;
-  refactoredListInputDevices(): InputDeviceInfo[];
-  testCoreLoader(path: string): string;
-  refactoredWaitForState(state: number, timeoutMs?: number): boolean;
-  refactoredWaitForStateAsync(
-    state: number,
-    timeoutMs?: number
-  ): Promise<boolean>;
-  refactoredGetLastErrorInfo(): EngineErrorInfo;
-  refactoredClearLastErrorInfo(): boolean;
-}
-
-const nativeApi = testNapi as LibretroNapi;
-
-// 核心配置
-interface CoreConfig {
-  id: string;
-  name: string;
-  soFile: string;
-  description: string;
-}
-
-// ROM 配置
-interface RomConfig {
-  id: string;
-  name: string;
-  file: string;
-  coreId: string;
-}
+import {
+  CoreConfig,
+  LIBRETRO_CORE_CATALOG,
+} from '../common/LibretroCoreCatalog'
+import {
+  createDefaultInputLayoutProfile,
+  InputLayoutButton,
+  loadInputLayoutProfile
+} from '../common/InputLayoutRepository'
+import {
+  RuntimeInputDebugTextState,
+  RuntimeInputDebugTracker
+} from '../common/RuntimeInputDebugTracker'
+import {
+  sendRuntimeAnalog,
+  sendRuntimeButton
+} from '../common/RuntimeInputCommandBridge'
+import {
+  buildRuntimeRomConfigs,
+  getFileNameFromPath,
+  RuntimeRomConfig
+} from '../common/RuntimeRomCatalog'
+import {
+  resolveRuntimeCorePath,
+  resolveRuntimeRomPathForSwitch
+} from '../common/RuntimePathResolver'
+import { RuntimeLibrarySessionTracker } from '../common/RuntimeLibrarySessionTracker'
+import { RuntimeSaveStateController } from '../common/RuntimeSaveStateController'
+import { runtimeSessionController } from '../common/RuntimeSessionController'
+import {
+  RuntimeSoakState,
+  RuntimeSoakTestController
+} from '../common/RuntimeSoakTestController'
+import { runtimeRenderSettingsController } from '../common/RuntimeRenderSettingsController'
+import { runtimeInputPortController } from '../common/RuntimeInputPortController'
+import { scanRuntimeRomSources } from '../common/RuntimeRomSourceScanner'
+import { runtimeCoreDiagnosticController } from '../common/RuntimeCoreDiagnosticController'
 
 interface LibraryLaunchRouteParams {
   coreId?: string
   romFile?: string
   autoStart?: boolean
-}
-
-interface CoreExtensionRule {
-  coreId: string;
-  extensions: string[];
-  requiresExactName?: string;
-}
-
-interface RomSourceItem {
-  fileName: string;
-  launchPath: string;
-}
-
-interface SoakStats {
-  videoNullFrames: number;
-  videoDupeFrames: number;
-  audioUnderruns: number;
-  audioOverruns: number;
-}
-
-interface RawEngineStats {
-  videoNullFrames: number | string;
-  videoDupeFrames: number | string;
-  audioUnderruns: number | string;
-  audioOverruns: number | string;
-  audioBufferUsage: number | string;
-}
-
-interface InputDebugStats {
-  touchCount: number;
-  mouseCount: number;
-  keyCount: number;
-  hasFocus: boolean;
-  mouseDown: boolean;
-  lastTouchType: number;
-  lastMouseAction: number;
-  lastKeyAction: number;
 }
 
 interface ResolutionPreset {
@@ -170,17 +90,6 @@ interface ResolutionPreset {
 interface PendingSwitch {
   coreIndex: number;
   romIndex: number;
-}
-
-interface RomPathResolution {
-  romPath: string;
-  useResMgr: boolean;
-}
-
-interface InputSourceItem {
-  label: string;
-  type: InputSourceType;
-  deviceId: string;
 }
 
 @Entry
@@ -201,7 +110,6 @@ struct LibretroGamePage {
   @State selectedRomIndex: number = 0;
   @State selectedPortIndex: number = 0;
   @State portAssignments: PortAssignState[] = createDefaultPortAssignments();
-  @State inputDevices: InputDeviceInfo[] = [];
   @State coreOptions: SelectOption[] = [];
   @State romOptions: SelectOption[] = [];
   @State showControls: boolean = false;
@@ -217,265 +125,33 @@ struct LibretroGamePage {
   @State softwareMaxPresetIndex: number = 1;
   @State hwRenderAllowed: boolean = true;
   @State hideVirtualController: boolean = false;
+  @State runtimeSaveStatusText: string = 'SAVE_IDLE';
+  @State runtimeInputLayoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons;
   
   // 使用包含 "new_arch" 的 ID 以触发 C++ 侧的新引擎逻辑
   private xComponentId: string = 'new_arch_game_xcomponent';
-  private soakTimer: number = -1;
-  private inputDebugTimer: number = -1;
-  private uiTouchCount: number = 0;
-  private uiMouseCount: number = 0;
-  private uiKeyCount: number = 0;
-  private uiLastTouchType: number = -1;
-  private uiLastMouseAction: number = -1;
-  private uiLastKeyType: number = -1;
-  private soakStartStats: SoakStats | undefined = undefined;
-  private soakMinAudioUsage: number = 1.0;
-  private soakMaxAudioUsage: number = 0.0;
   private eventScope: EventHubScope | undefined = undefined;
   private pendingStart: boolean = false;
   private switchToken: number = 0;
   private pendingSwitch: PendingSwitch | undefined = undefined;
+  private pageActive: boolean = false;
   private romListRefreshToken: number = 0;
   private lastStartOrSwitchAtMs: number = 0;
-  private activeLibraryRomFile: string = '';
-  private activeSessionStartedAtMs: number = 0;
-  private latestSessionFps: number = 0;
-  private latestSessionAudioBufferUsage: number = 0;
-  private latestSessionAudioUnderruns: number = 0;
-  private latestSessionAudioOverruns: number = 0;
-  private latestSessionVideoDrops: number = 0;
-  private latestSessionVideoDupes: number = 0;
-  private latestSessionVideoNulls: number = 0;
+  private readonly librarySessionTracker: RuntimeLibrarySessionTracker = new RuntimeLibrarySessionTracker();
+  private readonly inputDebugTracker: RuntimeInputDebugTracker = new RuntimeInputDebugTracker();
+  private readonly runtimeSaveStateController: RuntimeSaveStateController = new RuntimeSaveStateController();
+  private readonly soakController: RuntimeSoakTestController = new RuntimeSoakTestController();
   private readonly startOrSwitchDebounceMs: number = 600;
+  private readonly runtimeInputLayoutWidth: number = 440;
+  private readonly runtimeInputLayoutHeight: number = 340;
   // 动态输入源列表
   @State inputSourceItems: InputSourceItem[] = [];
   
-  // 可用核心列表
-  private cores: CoreConfig[] = [
-    {
-      id: '2048',
-      name: '2048',
-      soFile: 'lib2048_libretro.so',
-      description: 'Libretro 2048'
-    },
-    {
-      id: 'gambatte',
-      name: 'Gambatte (GB/GBC)',
-      soFile: 'gambatte_libretro.ohos-arm64.so',
-      description: 'Game Boy / Game Boy Color'
-    },
-    {
-      id: 'nestopia',
-      name: 'Nestopia (NES)',
-      soFile: 'nestopia_libretro.ohos-arm64.so',
-      description: 'Nintendo Entertainment System'
-    },
-    {
-      id: 'fceumm',
-      name: 'FCEUmm (NES)',
-      soFile: 'fceumm_libretro.ohos-arm64.so',
-      description: 'Nintendo Entertainment System (FCEUmm)'
-    },
-    {
-      id: 'quicknes',
-      name: 'QuickNES (NES)',
-      soFile: 'quicknes_libretro.ohos-arm64.so',
-      description: 'Nintendo Entertainment System (QuickNES)'
-    },
-    {
-      id: 'genesis_plus_gx',
-      name: 'Genesis Plus GX (MD)',
-      soFile: 'genesis_plus_gx_libretro.ohos-arm64.so',
-      description: 'Mega Drive / Genesis'
-    },
-    {
-      id: 'snes9x',
-      name: 'Snes9x (SNES)',
-      soFile: 'snes9x_libretro.ohos-arm64.so',
-      description: 'Super Nintendo'
-    },
-    {
-      id: 'mgba',
-      name: 'mGBA (GBA)',
-      soFile: 'mgba_libretro.ohos-arm64.so',
-      description: 'Game Boy Advance'
-    },
-    {
-      id: 'mednafen_gba',
-      name: 'Beetle GBA (Mednafen)',
-      soFile: 'mednafen_gba_libretro.ohos-arm64.so',
-      description: 'Game Boy Advance (Mednafen)'
-    },
-    {
-      id: 'mednafen_psx_hw',
-      name: 'Beetle PSX HW',
-      soFile: 'mednafen_psx_hw_libretro.ohos-arm64.so',
-      description: 'PlayStation (HW render)'
-    },
-    {
-      id: 'mednafen_ngp',
-      name: 'Beetle NGP (Mednafen)',
-      soFile: 'mednafen_ngp_libretro.ohos-arm64.so',
-      description: 'Neo Geo Pocket'
-    },
-    {
-      id: 'melonds',
-      name: 'melonDS (NDS)',
-      soFile: 'melonds_libretro.ohos-arm64.so',
-      description: 'Nintendo DS'
-    },
-    {
-      id: 'fbneo',
-      name: 'FBNeo (Arcade)',
-      soFile: 'fbneo_libretro.ohos-arm64.so',
-      description: 'FinalBurn Neo'
-    },
-    {
-      id: 'mame2010',
-      name: 'MAME 2010',
-      soFile: 'mame2010_libretro.ohos-arm64.so',
-      description: 'Arcade (MAME 2010)'
-    },
-    {
-      id: 'race',
-      name: 'RACE (NGP)',
-      soFile: 'race_libretro.ohos-arm64.so',
-      description: 'Neo Geo Pocket (RACE)'
-    },
-    {
-      id: 'bsnes_hd_beta',
-      name: 'bsnes-hd beta',
-      soFile: 'bsnes_hd_beta_libretro.ohos-arm64.so',
-      description: 'bsnes-hd beta'
-    },
-    {
-      id: 'crocods',
-      name: 'Crocods',
-      soFile: 'crocods_libretro.ohos-arm64.so',
-      description: 'Crocods'
-    },
-    {
-      id: 'freeintv',
-      name: 'FreeIntv',
-      soFile: 'freeintv_libretro.ohos-arm64.so',
-      description: 'FreeIntv'
-    },
-    {
-      id: 'mesen',
-      name: 'Mesen',
-      soFile: 'mesen_libretro.ohos-arm64.so',
-      description: 'Mesen'
-    },
-    {
-      id: 'minivmac',
-      name: 'Mini vMac',
-      soFile: 'minivmac_libretro.ohos-arm64.so',
-      description: 'Mini vMac'
-    },
-    {
-      id: 'mrboom',
-      name: 'Mr.Boom',
-      soFile: 'mrboom_libretro.ohos-arm64.so',
-      description: 'Mr.Boom'
-    },
-    {
-      id: 'pcsx_rearmed',
-      name: 'PCSX-ReARMed',
-      soFile: 'pcsx_rearmed_libretro.ohos-arm64.so',
-      description: 'PCSX-ReARMed'
-    },
-    {
-      id: 'potator',
-      name: 'Potator',
-      soFile: 'potator_libretro.ohos-arm64.so',
-      description: 'Potator'
-    },
-    {
-      id: 'retro8',
-      name: 'Retro8',
-      soFile: 'retro8_libretro.ohos-arm64.so',
-      description: 'Retro8'
-    },
-    {
-      id: 'sameboy',
-      name: 'SameBoy',
-      soFile: 'sameboy_libretro.ohos-arm64.so',
-      description: 'SameBoy'
-    },
-    {
-      id: 'snes9x2010',
-      name: 'Snes9x 2010',
-      soFile: 'snes9x2010_libretro.ohos-arm64.so',
-      description: 'Snes9x 2010'
-    },
-    {
-      id: 'vice_x128',
-      name: 'VICE x128',
-      soFile: 'vice_x128_libretro.ohos-arm64.so',
-      description: 'VICE x128'
-    },
-    {
-      id: 'vice_x64',
-      name: 'VICE x64',
-      soFile: 'vice_x64_libretro.ohos-arm64.so',
-      description: 'VICE x64'
-    },
-    {
-      id: 'vice_xcbm2',
-      name: 'VICE xcbm2',
-      soFile: 'vice_xcbm2_libretro.ohos-arm64.so',
-      description: 'VICE xcbm2'
-    },
-    {
-      id: 'vice_xpet',
-      name: 'VICE xpet',
-      soFile: 'vice_xpet_libretro.ohos-arm64.so',
-      description: 'VICE xpet'
-    },
-    {
-      id: 'xrick',
-      name: 'XRick',
-      soFile: 'xrick_libretro.ohos-arm64.so',
-      description: 'XRick'
-    }
-  ];
-  
-  private roms: RomConfig[] = [];
-  private readonly noGameCores: string[] = ['mrboom', '2048'];
-  private readonly coreExtensionRules: CoreExtensionRule[] = [
-    { coreId: 'gambatte', extensions: ['gb', 'gbc', 'dmg'] },
-    { coreId: 'sameboy', extensions: ['gb', 'gbc'] },
-    { coreId: 'nestopia', extensions: ['nes', 'fds', 'unf', 'unif'] },
-    { coreId: 'fceumm', extensions: ['fds', 'nes', 'unif', 'unf'] },
-    { coreId: 'quicknes', extensions: ['nes'] },
-    { coreId: 'genesis_plus_gx', extensions: ['mdx', 'md', 'smd', 'gen', 'cue', 'iso', 'sms', 'bms', 'gg', 'sg', '68k', 'sgd', 'chd', 'm3u'] },
-    { coreId: 'snes9x', extensions: ['smc', 'sfc', 'swc', 'fig', 'bs', 'st'] },
-    { coreId: 'snes9x2010', extensions: ['smc', 'fig', 'sfc', 'gd3', 'gd7', 'dx2', 'bsx', 'swc'] },
-    { coreId: 'bsnes_hd_beta', extensions: ['smc', 'sfc', 'swc', 'fig', 'bs'] },
-    { coreId: 'mgba', extensions: ['gb', 'gbc', 'gba'] },
-    { coreId: 'mednafen_gba', extensions: ['gba', 'agb'] },
-    { coreId: 'mednafen_psx_hw', extensions: ['cue', 'toc', 'm3u', 'ccd', 'pbp', 'chd'] },
-    { coreId: 'mednafen_ngp', extensions: ['ngp', 'ngc', 'ngpc', 'npc'] },
-    { coreId: 'melonds', extensions: ['nds', 'ids', 'dsi'] },
-    { coreId: 'fbneo', extensions: ['zip', '7z', 'cue', 'ccd'] },
-    { coreId: 'mame2010', extensions: ['zip', '7z'] },
-    { coreId: 'race', extensions: ['ngp', 'ngc', 'ngpc', 'npc'] },
-    { coreId: 'crocods', extensions: ['dsk', 'sna', 'kcr'] },
-    { coreId: 'freeintv', extensions: ['int'] },
-    // { coreId: 'mesen', extensions: ['nes', 'fds', 'unf', 'unif'] },
-    { coreId: 'minivmac', extensions: ['dsk', 'hvf', 'cmd'] },
-    { coreId: 'mrboom', extensions: ['desktop'] },
-    { coreId: 'pcsx_rearmed', extensions: ['cue', 'iso', 'pbp', 'chd', 'toc', 'm3u', 'cbn'] },
-    { coreId: 'potator', extensions: ['sv'] },
-    { coreId: 'retro8', extensions: ['p8', 'png'] },
-    { coreId: 'vice_x128', extensions: ['d64', 'd71', 'd80', 'd81', 'd82', 'g64', 'g41', 'x64', 't64', 'tap', 'prg', 'p00', 'crt', 'd6z', 'd7z', 'd8z', 'g6z', 'g4z', 'x6z', 'cmd', 'm3u', 'vfl', 'vsf', 'nib', 'nbz', 'd2m', 'd4m'] },
-    { coreId: 'vice_x64', extensions: ['d64', 'd71', 'd80', 'd81', 'd82', 'g64', 'g41', 'x64', 't64', 'tap', 'prg', 'p00', 'crt', 'd6z', 'd7z', 'd8z', 'g6z', 'g4z', 'x6z', 'cmd', 'm3u', 'vfl', 'vsf', 'nib', 'nbz', 'd2m', 'd4m'] },
-    { coreId: 'vice_xcbm2', extensions: ['d64', 'd71', 'd80', 'd81', 'd82', 'g64', 'g41', 'x64', 't64', 'tap', 'prg', 'p00', 'crt', 'd6z', 'd7z', 'd8z', 'g6z', 'g4z', 'x6z', 'cmd', 'm3u', 'vfl', 'vsf', 'nib', 'nbz', 'd2m', 'd4m'] },
-    { coreId: 'vice_xpet', extensions: ['d64', 'd71', 'd80', 'd81', 'd82', 'g64', 'g41', 'x64', 't64', 'tap', 'prg', 'p00', 'crt', 'd6z', 'd7z', 'd8z', 'g6z', 'g4z', 'x6z', 'cmd', 'm3u', 'vfl', 'vsf', 'nib', 'nbz', 'd2m', 'd4m'] },
-    { coreId: 'xrick', extensions: ['zip'], requiresExactName: 'data.zip' }
-  ];
+  private roms: RuntimeRomConfig[] = [];
+  private readonly cores: CoreConfig[] = LIBRETRO_CORE_CATALOG;
   
   aboutToAppear() {
+    this.pageActive = true;
     this.eventScope = LibretroEventHub.getInstance().createScope();
     this.eventScope.onEngineState((payload) => {
       this.handleEngineState(payload);
@@ -506,18 +182,90 @@ struct LibretroGamePage {
     this.startInputDebug();
     this.refreshInputDevices();
     this.syncPortAssignments();
+    void this.loadRuntimeInputLayout();
   }
   
   aboutToDisappear() {
     this.romListRefreshToken += 1;
+    this.pageActive = false;
+    this.switchToken += 1;
+    this.pendingSwitch = undefined;
+    if (this.switching) {
+      runtimeSessionController.stopAsync();
+      this.switching = false;
+    }
     void this.finalizeActiveLibrarySession();
     if (this.eventScope) {
       this.eventScope.dispose();
       this.eventScope = undefined;
     }
-    this.stopGame(true);
+    this.stopGame();
     this.stopSoak();
     this.stopInputDebug();
+  }
+
+  private isCurrentSwitchTask(token: number): boolean {
+    return this.pageActive && token === this.switchToken;
+  }
+
+  private async loadRuntimeInputLayout(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      return;
+    }
+    try {
+      const profile = await loadInputLayoutProfile(context);
+      this.runtimeInputLayoutButtons = profile.buttons;
+      LogHelper.info('LibretroGame', 'Input', `已加载本地输入布局: ${profile.buttons.length} buttons`);
+    } catch (err) {
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Input', `读取本地输入布局失败: ${message}`);
+      this.runtimeInputLayoutButtons = createDefaultInputLayoutProfile().buttons;
+    }
+  }
+
+  private getCurrentRuntimeRomFile(): string {
+    if (this.librarySessionTracker.activeRomFile.length > 0) {
+      return this.librarySessionTracker.activeRomFile;
+    }
+    const roms = this.getAvailableRoms();
+    const rom = roms[this.selectedRomIndex];
+    return rom ? rom.file : '';
+  }
+
+  private async quickSaveRuntimeState(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.runtimeSaveStatusText = await this.runtimeSaveStateController.quickSave(
+      context,
+      this.gameRunning,
+      this.getCurrentRuntimeRomFile()
+    );
+  }
+
+  private async quickLoadRuntimeState(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.runtimeSaveStatusText = await this.runtimeSaveStateController.quickLoad(
+      context,
+      this.gameRunning,
+      this.getCurrentRuntimeRomFile()
+    );
+  }
+
+  private handlePauseTileAction(actionCode: string): void {
+    if (actionCode === 'quick_save') {
+      void this.quickSaveRuntimeState();
+      return;
+    }
+    if (actionCode === 'quick_load') {
+      void this.quickLoadRuntimeState();
+      return;
+    }
+    if (actionCode === 'input_mapping') {
+      this.resumeGame();
+      this.showControls = true;
+      return;
+    }
+    this.runtimeSaveStatusText = 'ACTION_NOT_CONFIGURED';
   }
 
   handleEngineState(payload: EngineStatePayload) {
@@ -543,30 +291,10 @@ struct LibretroGamePage {
   @State inputSourceOptions: SelectOption[] = [];
 
   private refreshInputDevices() {
-    let devices: InputDeviceInfo[] = [];
-    try {
-      devices = nativeApi.refactoredListInputDevices() || [];
-    } catch (e) {
-      LogHelper.warn('LibretroGame', 'Input', `获取设备列表失败: ${(e as Error).message}`);
-    }
-    this.inputDevices = devices;
-
-    const items: InputSourceItem[] = [];
-    items.push({ label: '未分配', type: InputSourceType.None, deviceId: '' });
-    items.push({ label: '虚拟手柄', type: InputSourceType.Virtual, deviceId: '' });
-
-    devices.forEach((d) => {
-      let label = d.name;
-      switch (d.sourceType) {
-        case InputSourceType.Keyboard: label = `键盘 ${d.name}`; break;
-        case InputSourceType.Mouse: label = `鼠标 ${d.name}`; break;
-        case InputSourceType.Gamepad: label = `手柄 ${d.name}`; break;
-        case InputSourceType.BluetoothGamepad: label = `蓝牙手柄 ${d.name}`; break;
-      }
-      items.push({ label: label, type: d.sourceType, deviceId: d.deviceId });
-    });
+    const devices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices();
+    const items: InputSourceItem[] = buildInputSourceItems(devices);
     this.inputSourceItems = items;
-    
+
     // 更新下拉框选项
     this.inputSourceOptions = items.map((item): SelectOption => {
       return { value: item.label };
@@ -580,28 +308,11 @@ struct LibretroGamePage {
   }
 
   private getPortAssignment(portId: number): PortAssignState {
-    const assignments = this.portAssignments ?? [];
-    const found = assignments.find((item) => item.portId === portId);
-    if (found) {
-      return found;
-    }
-    return {
-      portId: portId,
-      sourceType: InputSourceType.None,
-      deviceId: '',
-      isActive: false
-    };
+    return findPortAssignment(this.portAssignments ?? [], portId);
   }
 
   private getInputSourceIndex(sourceType: InputSourceType, deviceId: string): number {
-    const index = this.inputSourceItems.findIndex(item => {
-      if (item.type !== sourceType) return false;
-      if (sourceType === InputSourceType.None || sourceType === InputSourceType.Virtual) {
-        return true;
-      }
-      return item.deviceId === deviceId;
-    });
-    return index >= 0 ? index : 0;
+    return getInputSourceItemIndex(this.inputSourceItems, sourceType, deviceId);
   }
 
   private createSelectOption(value: ResourceStr): SelectOption {
@@ -687,17 +398,7 @@ struct LibretroGamePage {
   }
 
   private updatePortAssignment(portId: number, sourceType: InputSourceType, deviceId: string) {
-    this.portAssignments = this.portAssignments.map((item) => {
-      if (item.portId !== portId) {
-        return item;
-      }
-      return {
-        portId: portId,
-        sourceType: sourceType,
-        deviceId: deviceId,
-        isActive: sourceType !== InputSourceType.None
-      };
-    });
+    this.portAssignments = updatePortAssignments(this.portAssignments, portId, sourceType, deviceId);
   }
 
   private applyPortAssignment(
@@ -706,18 +407,7 @@ struct LibretroGamePage {
     updateState: boolean,
     deviceId: string = ''
   ) {
-    let ok = false;
-    try {
-      if (sourceType === InputSourceType.None) {
-        ok = nativeApi.refactoredUnassignPort?.(portId) ?? false;
-      } else {
-        // 必须确保传递字符串，避免 NAPI 因 undefined 参数崩溃
-        ok = nativeApi.refactoredAssignPortSource?.(portId, sourceType, deviceId ?? '') ?? false;
-      }
-    } catch (e) {
-      LogHelper.warn('LibretroGame', 'Input', `端口映射调用异常: ${(e as Error).message}`);
-      ok = false;
-    }
+    const ok = runtimeInputPortController.applyPortAssignment(portId, sourceType, deviceId);
     if (updateState) {
       this.updatePortAssignment(portId, sourceType, deviceId);
     }
@@ -726,54 +416,13 @@ struct LibretroGamePage {
     }
   }
 
-  private isVirtualPortActive(portId: number): boolean {
-    const assignment = this.getPortAssignment(portId);
-    return assignment.sourceType === InputSourceType.Virtual;
-  }
-
-  private resetLatestRuntimeSnapshot(): void {
-    this.latestSessionFps = 0;
-    this.latestSessionAudioBufferUsage = 0;
-    this.latestSessionAudioUnderruns = 0;
-    this.latestSessionAudioOverruns = 0;
-    this.latestSessionVideoDrops = 0;
-    this.latestSessionVideoDupes = 0;
-    this.latestSessionVideoNulls = 0;
-  }
-
   private beginActiveLibrarySession(romFile: string): void {
-    this.activeLibraryRomFile = romFile;
-    this.activeSessionStartedAtMs = Date.now();
-    this.resetLatestRuntimeSnapshot();
+    this.librarySessionTracker.begin(romFile);
   }
 
   private async finalizeActiveLibrarySession(): Promise<void> {
-    if (this.activeLibraryRomFile.length === 0 || this.activeSessionStartedAtMs <= 0) {
-      return;
-    }
-    const romFile = this.activeLibraryRomFile;
-    const startedAt = this.activeSessionStartedAtMs;
-    const snapshot: LibraryRuntimeSnapshot = {
-      durationMs: Math.max(0, Date.now() - startedAt),
-      fps: this.latestSessionFps,
-      audioBufferUsage: this.latestSessionAudioBufferUsage,
-      audioUnderruns: this.latestSessionAudioUnderruns,
-      audioOverruns: this.latestSessionAudioOverruns,
-      videoDrops: this.latestSessionVideoDrops,
-      videoDupes: this.latestSessionVideoDupes,
-      videoNulls: this.latestSessionVideoNulls
-    };
-    this.activeLibraryRomFile = '';
-    this.activeSessionStartedAtMs = 0;
-    try {
-      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      if (!context) {
-        return;
-      }
-      await updateLibraryRuntimeSnapshot(context, romFile, snapshot);
-    } catch (e) {
-      LogHelper.warn('LibretroGame', 'Library', `写入运行摘要失败: ${(e as Error).message}`);
-    }
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    await this.librarySessionTracker.finalize(context);
   }
 
   handleCoreCrash(payload: CoreCrashPayload) {
@@ -798,7 +447,6 @@ struct LibretroGamePage {
     const fps = Number(payload.fps);
     if (!Number.isNaN(fps)) {
       this.coreFps = Math.round(fps);
-      this.latestSessionFps = fps;
     }
 
     const drops = Number(payload.drops ?? 0);
@@ -807,12 +455,7 @@ struct LibretroGamePage {
     const underruns = Number(payload.underruns ?? 0);
     const overruns = Number(payload.overruns ?? 0);
     const buf = Number(payload.audioBufferUsage ?? 0);
-    this.latestSessionVideoDrops = drops;
-    this.latestSessionVideoDupes = dupes;
-    this.latestSessionVideoNulls = nulls;
-    this.latestSessionAudioUnderruns = underruns;
-    this.latestSessionAudioOverruns = overruns;
-    this.latestSessionAudioBufferUsage = buf;
+    this.librarySessionTracker.updateFrameStats(fps, drops, dupes, nulls, underruns, overruns, buf);
 
     this.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
   }
@@ -823,9 +466,7 @@ struct LibretroGamePage {
     if (Number.isNaN(occupancy) || Number.isNaN(underruns)) {
       return;
     }
-    this.latestSessionAudioBufferUsage = occupancy;
-    this.latestSessionAudioUnderruns = underruns;
-    this.latestSessionAudioOverruns = Number(payload.overruns) || this.latestSessionAudioOverruns;
+    this.librarySessionTracker.updateAudioStatus(occupancy, underruns, Number(payload.overruns));
     this.audioStatusText = `Buf:${occupancy.toFixed(0)}% U:${underruns}`;
   }
 
@@ -839,54 +480,20 @@ struct LibretroGamePage {
     }
   }
 
-  private updateInputDebugStats() {
-    try {
-      const stats = nativeApi.refactoredGetInputDebugStats() as InputDebugStats;
-      const touchCount = Number(stats.touchCount);
-      const mouseCount = Number(stats.mouseCount);
-      const keyCount = Number(stats.keyCount);
-      const lastTouch = Number(stats.lastTouchType);
-      const lastMouse = Number(stats.lastMouseAction);
-      const lastKey = Number(stats.lastKeyAction);
-      const hasFocus = Boolean(stats.hasFocus);
-      const mouseDown = Boolean(stats.mouseDown);
-
-      const touchText = Number.isFinite(touchCount) ? touchCount : 0;
-      const mouseText = Number.isFinite(mouseCount) ? mouseCount : 0;
-      const keyText = Number.isFinite(keyCount) ? keyCount : 0;
-      const lastTouchText = Number.isFinite(lastTouch) ? lastTouch : -1;
-      const lastMouseText = Number.isFinite(lastMouse) ? lastMouse : -1;
-      const lastKeyText = Number.isFinite(lastKey) ? lastKey : -1;
-
-      this.inputDebugText =
-        `Touch:${touchText}(${lastTouchText}) Mouse:${mouseText}(${lastMouseText}) Key:${keyText}(${lastKeyText})`;
-      this.inputFocusText = `Focus:${hasFocus ? 'Y' : 'N'} MouseDown:${mouseDown ? 'Y' : 'N'}`;
-      this.uiInputDebugText =
-        `UI Touch:${this.uiTouchCount}(${this.uiLastTouchType}) ` +
-        `Mouse:${this.uiMouseCount}(${this.uiLastMouseAction}) ` +
-        `Key:${this.uiKeyCount}(${this.uiLastKeyType})`;
-    } catch (_) {
-      this.inputDebugText = '';
-      this.inputFocusText = '';
-      this.uiInputDebugText = '';
-    }
-  }
-
   private startInputDebug() {
-    if (this.inputDebugTimer !== -1) {
-      clearInterval(this.inputDebugTimer);
-    }
-    this.updateInputDebugStats();
-    this.inputDebugTimer = setInterval(() => {
-      this.updateInputDebugStats();
-    }, 500);
+    this.inputDebugTracker.start((state: RuntimeInputDebugTextState) => {
+      this.applyInputDebugTextState(state);
+    });
   }
 
   private stopInputDebug() {
-    if (this.inputDebugTimer !== -1) {
-      clearInterval(this.inputDebugTimer);
-      this.inputDebugTimer = -1;
-    }
+    this.inputDebugTracker.stop();
+  }
+
+  private applyInputDebugTextState(state: RuntimeInputDebugTextState): void {
+    this.inputDebugText = state.inputDebugText;
+    this.inputFocusText = state.inputFocusText;
+    this.uiInputDebugText = state.uiInputDebugText;
   }
   
   // 更新 ROM 选项
@@ -906,7 +513,7 @@ struct LibretroGamePage {
   }
   
   // 获取当前核心可用的 ROM
-  getAvailableRoms(): RomConfig[] {
+  getAvailableRoms(): RuntimeRomConfig[] {
     const currentCore = this.cores[this.selectedCoreIndex];
     return this.roms.filter(rom => rom.coreId === currentCore.id);
   }
@@ -916,36 +523,18 @@ struct LibretroGamePage {
     this.romListRefreshToken = refreshToken;
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) {
-      this.roms = this.buildRomConfigs([]);
+      this.roms = buildRuntimeRomConfigs([]);
       this.updateRomOptions();
       return;
     }
 
-    const sources: RomSourceItem[] = [];
+    let nextRoms: RuntimeRomConfig[] = buildRuntimeRomConfigs([]);
     try {
-      const rawList: string[] = await nativeApi.refactoredGetRawFileListAsync(
-        context.resourceManager,
-        'roms'
-      );
-      if (refreshToken !== this.romListRefreshToken) {
+      const sources = await scanRuntimeRomSources(context, () => refreshToken === this.romListRefreshToken);
+      if (!sources) {
         return;
       }
-      rawList.filter(item => typeof item === 'string').forEach((fileName: string) => {
-        sources.push({
-          fileName: fileName,
-          launchPath: `roms/${fileName}`
-        });
-      });
-      const localFiles: string[] = await listSandboxRomFiles(context.filesDir);
-      if (refreshToken !== this.romListRefreshToken) {
-        return;
-      }
-      localFiles.forEach((fileName: string) => {
-        sources.push({
-          fileName: fileName,
-          launchPath: `${context.filesDir}/roms/${fileName}`
-        });
-      });
+      nextRoms = buildRuntimeRomConfigs(sources);
     } catch (err) {
       const msg = (err as Error).message || String(err);
       LogHelper.error('LibretroGame', 'ROM', `扫描 ROM 列表失败: ${msg}`);
@@ -955,7 +544,7 @@ struct LibretroGamePage {
       return;
     }
 
-    this.roms = this.buildRomConfigs(sources);
+    this.roms = nextRoms;
     this.updateRomOptions();
     this.applyPendingLibraryLaunchRequest()
   }
@@ -974,7 +563,7 @@ struct LibretroGamePage {
     this.selectedCoreIndex = coreIndex
     this.updateRomOptions()
     const availableRoms = this.getAvailableRoms()
-    const romIndex = availableRoms.findIndex((rom: RomConfig) => rom.file === request.romFile)
+    const romIndex = availableRoms.findIndex((rom: RuntimeRomConfig) => rom.file === request.romFile)
     if (romIndex < 0) {
       LogHelper.warn('LibretroGame', 'Library', `未找到目标 ROM: ${request.romFile}`)
       return
@@ -986,97 +575,21 @@ struct LibretroGamePage {
     }
   }
 
-  private resolveInitialLibraryLaunchRequest() {
+  private resolveInitialLibraryLaunchRequest(): PendingLibraryLaunchRequest | undefined {
     const params = this.getUIContext().getRouter().getParams() as LibraryLaunchRouteParams
     if (typeof params?.coreId === 'string' && params.coreId.length > 0 &&
       typeof params?.romFile === 'string' && params.romFile.length > 0) {
-      return {
+      const request: PendingLibraryLaunchRequest = {
         coreId: params.coreId,
         romFile: params.romFile,
         autoStart: params.autoStart === true
       }
+      return request
     }
     return consumePendingLibraryLaunchRequest()
   }
 
-  private buildRomConfigs(sources: RomSourceItem[]): RomConfig[] {
-    const uniqueSources = sources.filter((item: RomSourceItem, index: number) => {
-      return item.fileName.length > 0 &&
-        sources.findIndex((candidate: RomSourceItem) => candidate.launchPath === item.launchPath) === index;
-    });
-
-    uniqueSources.sort((left: RomSourceItem, right: RomSourceItem) => left.fileName.localeCompare(right.fileName));
-
-    const roms: RomConfig[] = [];
-    uniqueSources.forEach((source: RomSourceItem) => {
-      const fileName = source.fileName;
-      const lowerName = fileName.toLowerCase();
-      const ext = this.getFileExtension(lowerName);
-      if (!ext) {
-        return;
-      }
-      const coreIds = this.matchCoreIds(ext, lowerName);
-      if (coreIds.length === 0) {
-        return;
-      }
-      coreIds.forEach((coreId) => {
-        roms.push({
-          id: `${coreId}:${source.launchPath}`,
-          name: fileName,
-          file: source.launchPath,
-          coreId: coreId
-        });
-      });
-    });
-
-    this.noGameCores.forEach((coreId) => {
-      roms.push({
-        id: `nogame:${coreId}`,
-        name: '无需 ROM',
-        file: '',
-        coreId: coreId
-      });
-    });
-
-    return roms;
-  }
-
-  private matchCoreIds(ext: string, fileName: string): string[] {
-    const matched: string[] = [];
-    this.coreExtensionRules.forEach((rule) => {
-      if (rule.coreId === 'mrboom') {
-        return;
-      }
-      if (rule.requiresExactName) {
-        let nameOnly = fileName;
-        const lastSlash = fileName.lastIndexOf('/');
-        if (lastSlash >= 0) {
-          nameOnly = fileName.substring(lastSlash + 1);
-        }
-        if (rule.requiresExactName !== nameOnly) {
-          return;
-        }
-      }
-      if (this.hasExtension(rule.extensions, ext)) {
-        matched.push(rule.coreId);
-      }
-    });
-    return matched;
-  }
-
-  private hasExtension(extensions: string[], ext: string): boolean {
-    return extensions.includes(ext);
-  }
-
-  private getFileExtension(fileName: string): string {
-    const dotIndex = fileName.lastIndexOf('.');
-    if (dotIndex < 0 || dotIndex === fileName.length - 1) {
-      return '';
-    }
-    return fileName.slice(dotIndex + 1);
-  }
-
-  runCoreCheck() {
+  async runCoreCheck(): Promise<void> {
     if (this.coreCheckRunning) {
       return;
     }
@@ -1095,9 +608,8 @@ struct LibretroGamePage {
         return;
       }
       const bundleCodeDir = context.bundleCodeDir;
-      let abiPath = deviceInfo.abiList === 'x86_64' ? 'x86_64' : 'arm64';
-      const corePath = `${bundleCodeDir}/libs/${abiPath}/${core.soFile}`;
-      const result = nativeApi.testCoreLoader(corePath);
+      const corePath = await resolveRuntimeCorePath(bundleCodeDir, core.soFile);
+      const result = runtimeCoreDiagnosticController.testCoreLoader(corePath);
       this.coreCheckText = result;
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
@@ -1111,6 +623,145 @@ struct LibretroGamePage {
   private resetCoreCheckState() {
     this.coreCheckRunning = false;
     this.coreCheckText = '';
+  }
+
+  private getRuntimeFpsText(): string {
+    const fps = this.coreFps > 0 ? this.coreFps : this.realtimeFps;
+    return fps > 0 ? fps.toFixed(1) : '--.-';
+  }
+
+  private getRuntimeLatencyText(): string {
+    if (this.librarySessionTracker.audioBufferUsage > 0) {
+      return `${Math.max(1, Math.round(this.librarySessionTracker.audioBufferUsage * 8))}ms`;
+    }
+    return '4ms';
+  }
+
+  private getRuntimeCoreText(): string {
+    if (this.currentCore.length > 0) {
+      return this.currentCore.replace('.so', '').toUpperCase();
+    }
+    return 'EMU_V26';
+  }
+
+  private getRuntimeProcessText(): string {
+    if (this.currentRom.length > 0) {
+      return getFileNameFromPath(this.currentRom).replace(/\.[^.]+$/, '').toUpperCase();
+    }
+    return 'CHRONO_TRIGGER_USA_SNES';
+  }
+
+  private getRuntimeHudMetrics(): RuntimeHudMetric[] {
+    return [
+      { label: 'FPS', value: this.getRuntimeFpsText() },
+      { label: 'LAT', value: this.getRuntimeLatencyText() },
+      { label: 'CORE', value: this.getRuntimeCoreText() }
+    ];
+  }
+
+  private getControlPanelState(): RuntimeControlPanelState {
+    return {
+      portOptions: this.portOptions,
+      selectedPortIndex: this.safePortIndex,
+      currentPortLabel: this.currentPortLabel,
+      inputSourceOptions: this.inputSourceOptions,
+      selectedInputSourceIndex: this.safeInputSourceIndex,
+      currentInputSourceLabel: this.currentInputSourceLabel,
+      coreOptions: this.coreOptions,
+      selectedCoreIndex: this.safeCoreIndex,
+      currentCoreLabel: this.currentCoreLabel,
+      romOptions: this.romOptions,
+      selectedRomIndex: this.safeRomIndex,
+      currentRomLabel: this.currentRomLabel,
+      hasRomOptions: this.hasRomOptions,
+      switching: this.switching,
+      coreCheckRunning: this.coreCheckRunning,
+      coreCheckText: this.coreCheckText,
+      scalingMode: this.scalingMode,
+      softwareMaxPresetIndex: this.softwareMaxPresetIndex,
+      hwRenderAllowed: this.hwRenderAllowed,
+      hideVirtualController: this.hideVirtualController,
+      gameRunning: this.gameRunning,
+      gamePaused: this.gamePaused,
+      runtimeSaveStatusText: this.runtimeSaveStatusText,
+      soakRunning: this.soakRunning,
+      soakSecondsLeft: this.soakSecondsLeft,
+      soakSummaryText: this.soakSummaryText,
+      switchError: this.switchError
+    };
+  }
+
+  private handleInputSourceSelect(index: number): void {
+    const item = this.inputSourceItems[index];
+    if (!item) {
+      return;
+    }
+    LogHelper.info('LibretroGame', 'Input', `选择输入源: ${item.label} (type=${item.type}, id=${item.deviceId})`);
+    this.applyPortAssignment(this.selectedPortIndex, item.type, true, item.deviceId);
+  }
+
+  private handleCoreSelect(index: number): void {
+    this.selectedCoreIndex = this.clampIndex(index, this.cores.length);
+    this.updateRomOptions();
+    this.resetCoreCheckState();
+    const core = this.cores[this.selectedCoreIndex];
+    LogHelper.info('LibretroGame', 'UI', `选择核心: ${core ? core.name : '未知'}`);
+  }
+
+  private handleRomSelect(index: number): void {
+    this.selectedRomIndex = this.clampIndex(index, this.romOptions.length);
+    this.resetCoreCheckState();
+    const roms = this.getAvailableRoms();
+    const rom = roms.length > 0 ? roms[this.selectedRomIndex] : null;
+    LogHelper.info('LibretroGame', 'UI', `选择 ROM: ${rom ? rom.name : '未知'}`);
+  }
+
+  private clearRuntimeStatsForConfigChange(): void {
+    const okStats = runtimeRenderSettingsController.resetStats();
+    this.realtimeFps = 0;
+    this.coreFps = 0;
+    this.audioStatusText = '';
+    this.perfStatsText = '';
+    this.geometryText = '';
+    LogHelper.info('LibretroGame', 'Config', `重置性能统计: okStats=${okStats}`);
+  }
+
+  private stopSoakBeforeConfigChange(): void {
+    if (this.soakRunning) {
+      this.stopSoak();
+      this.clearSoakSummary();
+    }
+  }
+
+  private applySoftwareResolutionPreset(index: number): void {
+    this.stopSoakBeforeConfigChange();
+    this.softwareMaxPresetIndex = index;
+    const presets: ResolutionPreset[] = [
+      { w: 640, h: 480 },
+      { w: 1280, h: 720 },
+      { w: 1920, h: 1080 }
+    ];
+    const preset = presets[index] || presets[1];
+    const okMax = runtimeRenderSettingsController.setSoftwareMaxResolution(preset.w, preset.h);
+    this.clearRuntimeStatsForConfigChange();
+    LogHelper.info('LibretroGame', 'Config', `设置软件最大分辨率: ${preset.w}x${preset.h}, okMax=${okMax}`);
+  }
+
+  private applyRenderMode(index: number): void {
+    this.stopSoakBeforeConfigChange();
+    this.scalingMode = index;
+    const okMode = runtimeRenderSettingsController.setScalingMode(index);
+    if (index === 1) {
+      const presets: ResolutionPreset[] = [
+        { w: 640, h: 480 },
+        { w: 1280, h: 720 },
+        { w: 1920, h: 1080 }
+      ];
+      const preset = presets[this.softwareMaxPresetIndex] || presets[1];
+      runtimeRenderSettingsController.setSoftwareMaxResolution(preset.w, preset.h);
+    }
+    this.clearRuntimeStatsForConfigChange();
+    LogHelper.info('LibretroGame', 'Config', `设置缩放模式: ${index}, okMode=${okMode}`);
   }
   
   build() {
@@ -1126,19 +777,16 @@ struct LibretroGamePage {
         .focusable(true)
         .focusOnTouch(true)
         .onTouch((event) => {
-          this.uiTouchCount += 1;
-          this.uiLastTouchType = Number(event.type);
+          this.inputDebugTracker.recordTouch(Number(event.type));
         })
         .onMouse((event) => {
-          this.uiMouseCount += 1;
-          this.uiLastMouseAction = Number(event.action);
+          this.inputDebugTracker.recordMouse(Number(event.action));
         })
         .onKeyEvent((event) => {
           if (!event) {
             return;
           }
-          this.uiKeyCount += 1;
-          this.uiLastKeyType = Number(event.type);
+          this.inputDebugTracker.recordKey(Number(event.type));
         })
         .onLoad(() => {
           LogHelper.info(
@@ -1156,90 +804,63 @@ struct LibretroGamePage {
           );
         })
 
-      // FPS 监控面板 (仅在游戏运行时显示)
+      // 用户态顶部运行遥测
       if (this.gameRunning) {
-        Column() {
-          Text(`XComponentId: ${this.xComponentId}`)
-            .fontSize(10)
-            .fontColor(Color.White)
-            .margin({ bottom: 2 })
-            .shadow({ radius: 1, color: Color.Black, offsetX: 1, offsetY: 1 })
-          // Realtime FPS 暂时用 Core FPS 代替，或者后续通过 JS 定时器计算
-          Text(`FPS: ${this.coreFps}`)
-            .fontSize(14)
-            .fontColor(this.coreFps < 55 ? Color.Red : Color.Green)
-            .fontWeight(FontWeight.Bold)
-            .shadow({ radius: 1, color: Color.Black, offsetX: 1, offsetY: 1 })
-          
-          Text(this.audioStatusText)
-            .fontSize(10)
-            .fontColor(Color.White)
-            .margin({ top: 2 })
-            .shadow({ radius: 1, color: Color.Black, offsetX: 1, offsetY: 1 })
-
-          Text(this.perfStatsText)
-            .fontSize(10)
-            .fontColor(Color.White)
-            .margin({ top: 2 })
-            .shadow({ radius: 1, color: Color.Black, offsetX: 1, offsetY: 1 })
-
-          if (this.geometryText.length > 0) {
-            Text(this.geometryText)
-              .fontSize(10)
-              .fontColor(Color.White)
-              .margin({ top: 2 })
-              .shadow({ radius: 1, color: Color.Black, offsetX: 1, offsetY: 1 })
-          }
-          if (this.inputDebugText.length > 0) {
-            Text(this.inputDebugText)
-              .fontSize(10)
-              .fontColor(Color.White)
-              .margin({ top: 2 })
-              .shadow({ radius: 1, color: Color.Black, offsetX: 1, offsetY: 1 })
-          }
-          if (this.inputFocusText.length > 0) {
-            Text(this.inputFocusText)
-              .fontSize(10)
-              .fontColor(Color.White)
-              .margin({ top: 2 })
-              .shadow({ radius: 1, color: Color.Black, offsetX: 1, offsetY: 1 })
-          }
-          if (this.uiInputDebugText.length > 0) {
-            Text(this.uiInputDebugText)
-              .fontSize(10)
-              .fontColor(Color.White)
-              .margin({ top: 2 })
-              .shadow({ radius: 1, color: Color.Black, offsetX: 1, offsetY: 1 })
-          }
-        }
-        .alignItems(HorizontalAlign.Start)
-        .margin({ left: 10, top: 60 }) // 避开菜单按钮
-        .padding(4)
-        .backgroundColor('#44000000')
-        .borderRadius(4)
-        .hitTestBehavior(HitTestMode.None) // 不拦截点击
+        RuntimeTopHudBar({
+          metrics: this.getRuntimeHudMetrics()
+        })
       }
 
       // 虚拟按键 (如果游戏运行中)
       if (this.gameRunning && !this.gamePaused && !this.hideVirtualController) {
-        this.buildVirtualController();
+        RuntimeVirtualControllerLayer({
+          state: {
+            buttons: this.runtimeInputLayoutButtons,
+            layoutWidth: this.runtimeInputLayoutWidth,
+            layoutHeight: this.runtimeInputLayoutHeight
+          },
+          onButtonChange: (keyId: number, pressed: boolean) => {
+            this.setButton(keyId, pressed);
+          },
+          onAnalogChange: (index: number, x: number, y: number) => {
+            this.setAnalog(index, x, y);
+          }
+        })
       }
 
-      // 左上角菜单按钮（默认常驻）
-      Button('≡')
-        .width(44)
-        .height(44)
-        .fontSize(20)
-        .fontColor(Color.White)
-        .backgroundColor('#66000000')
-        .borderRadius(22)
-        .margin({ left: 10, top: 10 })
+      // 左上角系统菜单按钮
+      Button('▦')
+        .width(46)
+        .height(40)
+        .fontSize(18)
+        .fontColor(EmuColors.primary)
+        .backgroundColor('#CC000000')
+        .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+        .borderRadius(4)
+        .margin({ left: 18, top: 84 })
         .enabled(!this.switching)
         .onClick(() => {
           this.refreshInputDevices();
           this.selectedPortIndex = 0; // 默认选中 P1
           this.showControls = true;
         })
+
+      if (this.gameRunning && !this.gamePaused) {
+        Button('PAUSE')
+          .width(78)
+          .height(40)
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.primary)
+          .backgroundColor('#CC000000')
+          .border({ width: 0.5, color: '#6600FF41', style: BorderStyle.Solid })
+          .borderRadius(4)
+          .margin({ left: 88, top: 84 })
+          .onClick(() => {
+            this.pauseGame();
+          })
+      }
 
       if (this.showControls) {
         // 弹出层：遮罩 + 菜单面板
@@ -1255,11 +876,91 @@ struct LibretroGamePage {
             this.showControls = false;
           })
 
-          this.buildControlPanel();
+          RuntimeControlPanel({
+            state: this.getControlPanelState(),
+            onClose: () => {
+              this.showControls = false;
+            },
+            onPortSelect: (index: number) => {
+              this.selectedPortIndex = this.clampIndex(index, this.portOptions.length);
+            },
+            onInputSourceSelect: (index: number) => {
+              this.handleInputSourceSelect(index);
+            },
+            onCoreSelect: (index: number) => {
+              this.handleCoreSelect(index);
+            },
+            onRomSelect: (index: number) => {
+              this.handleRomSelect(index);
+            },
+            onCoreCheck: () => {
+              void this.runCoreCheck();
+            },
+            onRenderModeSelect: (index: number) => {
+              this.applyRenderMode(index);
+            },
+            onSoftwareResolutionSelect: (index: number) => {
+              this.applySoftwareResolutionPreset(index);
+            },
+            onHwRenderChange: (value: boolean) => {
+              this.hwRenderAllowed = value;
+              const ok = runtimeRenderSettingsController.setHwRenderAllowed(value);
+              LogHelper.info('LibretroGame', 'Config', `设置 HW_RENDER 允许: ${value}, ok=${ok}`);
+            },
+            onHideVirtualControllerChange: (value: boolean) => {
+              this.hideVirtualController = value;
+              LogHelper.info('LibretroGame', 'Input', `隐藏虚拟手柄: ${value}`);
+            },
+            onStartGame: () => {
+              void this.startOrSwitchGame();
+            },
+            onResumeGame: () => {
+              this.resumeGame();
+            },
+            onPauseGame: () => {
+              this.pauseGame();
+            },
+            onRestartGame: () => {
+              void this.startOrSwitchGame();
+            },
+            onStopGame: () => {
+              this.stopGame();
+            },
+            onQuickSave: () => {
+              void this.quickSaveRuntimeState();
+            },
+            onQuickLoad: () => {
+              void this.quickLoadRuntimeState();
+            },
+            onSoakToggle: () => {
+              if (this.soakRunning) {
+                this.stopSoak();
+              } else {
+                this.startSoak(600);
+              }
+            }
+          })
         }
         .width('100%')
         .height('100%')
         .backgroundColor('#55000000')
+      }
+
+      if (this.gamePaused) {
+        RuntimePauseOverlay({
+          processText: this.getRuntimeProcessText(),
+          saveStatusText: this.runtimeSaveStatusText,
+          fpsText: this.getRuntimeFpsText(),
+          onResume: () => {
+            this.resumeGame();
+          },
+          onTerminate: () => {
+            this.stopGame();
+          },
+          onAction: (actionCode: string) => {
+            this.handlePauseTileAction(actionCode);
+          }
+        })
       }
     }
     .width('100%')
@@ -1267,688 +968,13 @@ struct LibretroGamePage {
     .backgroundColor(Color.Black)
   }
   
-  // 构建控制面板
-  @Builder
-  buildControlPanel() {
-    Column() {
-      // 标题栏
-      Row() {
-        Text('菜单 (New Arch)')
-          .fontSize(20)
-          .fontColor(Color.White)
-          .fontWeight(FontWeight.Bold)
-
-        Blank()
-
-        Button('关闭')
-          .fontSize(14)
-          .height(32)
-          .onClick(() => {
-            this.showControls = false;
-          })
-      }
-      .width('100%')
-      .height(60)
-      .padding({ left: 16, right: 16 })
-      .backgroundColor('#E6000000') // 加深背景不透明度
-      .alignItems(VerticalAlign.Center)
-
-      // 列表内容区
-      List({ space: 16 }) {
-        // 1. 端口选择
-        ListItem() {
-          Column({ space: 8 }) {
-            Text('选择端口')
-              .fontSize(14)
-              .fontColor('#AAAAAA')
-            
-            Select(this.portOptions)
-              .selected(this.safePortIndex)
-              .value(this.currentPortLabel)
-              .font({ size: 16 })
-              .fontColor(Color.White)
-              .selectedOptionFont({ size: 16 })
-              .optionFont({ size: 16 })
-              .width('100%')
-              .height(44)
-              .backgroundColor('#333333')
-              .borderRadius(8)
-              .enabled(!this.switching)
-              .onSelect((index: number) => {
-                this.selectedPortIndex = this.clampIndex(index, this.portOptions.length);
-              })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .width('100%')
-        }
-
-        // 2. 输入来源
-        ListItem() {
-          Column({ space: 8 }) {
-            Text('输入来源')
-              .fontSize(14)
-              .fontColor('#AAAAAA')
-
-            Select(this.inputSourceOptions)
-              .selected(this.safeInputSourceIndex)
-              .value(this.currentInputSourceLabel)
-              .font({ size: 16 })
-              .fontColor(Color.White)
-              .selectedOptionFont({ size: 16 })
-              .optionFont({ size: 16 })
-              .width('100%')
-              .height(44)
-              .backgroundColor('#333333')
-              .borderRadius(8)
-              .enabled(!this.switching)
-              .onSelect((index: number) => {
-                const item = this.inputSourceItems[index];
-                if (!item) {
-                   return;
-                }
-                
-                LogHelper.info('LibretroGame', 'Input', `选择输入源: ${item.label} (type=${item.type}, id=${item.deviceId})`);
-                this.applyPortAssignment(this.selectedPortIndex, item.type, true, item.deviceId);
-              })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .width('100%')
-        }
-        
-        // 3. 核心选择
-        ListItem() {
-          Column({ space: 8 }) {
-            Text('选择核心')
-              .fontSize(14)
-              .fontColor('#AAAAAA')
-            
-            Select(this.coreOptions)
-              .selected(this.safeCoreIndex)
-              .value(this.currentCoreLabel)
-              .font({ size: 16 })
-              .fontColor(Color.White)
-              .selectedOptionFont({ size: 16 })
-              .optionFont({ size: 16 })
-              .width('100%')
-              .height(44)
-              .backgroundColor('#333333')
-              .borderRadius(8)
-              .enabled(!this.switching)
-              .onSelect((index: number) => {
-                this.selectedCoreIndex = this.clampIndex(index, this.cores.length);
-                this.updateRomOptions();
-                this.resetCoreCheckState();
-                const core = this.cores[this.selectedCoreIndex];
-                LogHelper.info('LibretroGame', 'UI', `选择核心: ${core ? core.name : '未知'}`);
-              })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .width('100%')
-        }
-        
-        // 4. ROM 选择
-        ListItem() {
-          Column({ space: 8 }) {
-            Text('选择 ROM')
-              .fontSize(14)
-              .fontColor('#AAAAAA')
-            
-            Select(this.romOptions)
-              .selected(this.safeRomIndex)
-              .value(this.currentRomLabel)
-              .font({ size: 16 })
-              .fontColor(Color.White)
-              .selectedOptionFont({ size: 16 })
-              .optionFont({ size: 16 })
-              .width('100%')
-              .height(44)
-              .backgroundColor('#333333')
-              .borderRadius(8)
-              .enabled(this.hasRomOptions && !this.switching)
-              .onSelect((index: number) => {
-                this.selectedRomIndex = this.clampIndex(index, this.romOptions.length);
-                this.resetCoreCheckState();
-                const roms = this.getAvailableRoms();
-                const rom = roms.length > 0 ? roms[this.selectedRomIndex] : null;
-                LogHelper.info('LibretroGame', 'UI', `选择 ROM: ${rom ? rom.name : '未知'}`);
-              })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .width('100%')
-        }
-
-        // 5. 核心验证按钮
-        ListItem() {
-          Column({ space: 8 }) {
-            Button(this.coreCheckRunning ? '验证中...' : '验证核心符号')
-              .fontSize(16)
-              .height(44)
-              .width('100%')
-              .type(ButtonType.Normal)
-              .borderRadius(8)
-              .backgroundColor(this.coreCheckRunning ? '#607D8B' : '#546E7A')
-              .enabled(!this.coreCheckRunning && !this.switching)
-              .onClick(() => {
-                this.runCoreCheck();
-              })
-
-            if (this.coreCheckText) {
-              Text(this.coreCheckText)
-                .fontSize(12)
-                .fontColor(Color.White)
-                .padding(4)
-            }
-          }
-          .width('100%')
-        }
-
-        // 6. 画质模式
-        ListItem() {
-          Column({ space: 8 }) {
-            Text('渲染模式')
-              .fontSize(14)
-              .fontColor('#AAAAAA')
-
-            Select([
-              { value: '硬件渲染 (Buffer Map)' }, // 0
-              { value: '软件渲染 (CPU)' },       // 1
-              { value: 'GLES渲染 (GPU)' }       // 2
-            ])
-              .selected(this.scalingMode)
-              .value(['硬件渲染', '软件渲染', 'GLES渲染'][this.scalingMode])
-              .font({ size: 16 })
-              .fontColor(Color.White)
-              .selectedOptionFont({ size: 16 })
-              .optionFont({ size: 16 })
-              .width('100%')
-              .height(44)
-              .backgroundColor('#333333')
-              .borderRadius(8)
-              .enabled(!this.switching)
-              .onSelect((index: number) => {
-                if (this.soakRunning) {
-                  this.stopSoak();
-                  this.soakSummaryText = '';
-                }
-
-                this.scalingMode = index;
-                // 0=HW, 1=SW, 2=GLES
-                const okMode = nativeApi.refactoredSetScalingMode(index);
-                // 如果是软件模式，默认设为 720p 上限
-                if (index === 1) {
-                    const presets: ResolutionPreset[] = [
-                      { w: 640, h: 480 },
-                      { w: 1280, h: 720 },
-                      { w: 1920, h: 1080 }
-                    ];
-                    const preset = presets[this.softwareMaxPresetIndex] || presets[1];
-                    nativeApi.refactoredSetSoftwareMaxResolution(preset.w, preset.h);
-                }
-
-                const okStats = nativeApi.refactoredResetStats();
-                this.realtimeFps = 0;
-                this.coreFps = 0;
-                this.audioStatusText = '';
-                this.perfStatsText = '';
-                this.geometryText = '';
-
-                LogHelper.info('LibretroGame', 'Config', `设置缩放模式: ${index}, okMode=${okMode}, okStats=${okStats}`);
-              })
-          }
-          .alignItems(HorizontalAlign.Start)
-          .width('100%')
-        }
-
-        // 7. 软件分辨率 (仅模式1)
-        if (this.scalingMode === 1) {
-          ListItem() {
-            Column({ space: 8 }) {
-              Text('软件分辨率')
-                .fontSize(14)
-                .fontColor('#AAAAAA')
-
-              Select([
-                { value: '480p (640x480)' },
-                { value: '720p (1280x720)' },
-                { value: '1080p (1920x1080)' },
-              ])
-                .selected(this.softwareMaxPresetIndex)
-                .value(['480p', '720p', '1080p'][this.softwareMaxPresetIndex])
-                .font({ size: 16 })
-                .fontColor(Color.White)
-                .selectedOptionFont({ size: 16 })
-                .optionFont({ size: 16 })
-                .width('100%')
-                .height(44)
-                .backgroundColor('#333333')
-                .borderRadius(8)
-                .enabled(!this.switching)
-                .onSelect((index: number) => {
-                  if (this.soakRunning) {
-                    this.stopSoak();
-                    this.soakSummaryText = '';
-                  }
-
-                  this.softwareMaxPresetIndex = index;
-                  const presets: ResolutionPreset[] = [
-                    { w: 640, h: 480 },
-                    { w: 1280, h: 720 },
-                    { w: 1920, h: 1080 }
-                  ];
-                  const preset = presets[index] || presets[1];
-                  const okMax = nativeApi.refactoredSetSoftwareMaxResolution(preset.w, preset.h);
-
-                  const okStats = nativeApi.refactoredResetStats();
-                  this.realtimeFps = 0;
-                  this.coreFps = 0;
-                  this.audioStatusText = '';
-                  this.perfStatsText = '';
-                  this.geometryText = '';
-
-                  LogHelper.info('LibretroGame', 'Config', `设置软件最大分辨率: ${preset.w}x${preset.h}, okMax=${okMax}, okStats=${okStats}`);
-                })
-            }
-            .alignItems(HorizontalAlign.Start)
-            .width('100%')
-          }
-        }
-
-        // 8. 开关选项组
-        ListItem() {
-          Column({ space: 12 }) {
-            // HW Render
-            Row() {
-              Column() {
-                Text('允许 HW_RENDER')
-                  .fontSize(16)
-                  .fontColor(Color.White)
-                Text('需核心支持，重启生效')
-                  .fontSize(12)
-                  .fontColor('#888888')
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-
-              Toggle({ type: ToggleType.Switch, isOn: this.hwRenderAllowed })
-                .enabled(!this.switching)
-                .onChange((v: boolean) => {
-                  this.hwRenderAllowed = v;
-                  const ok = nativeApi.refactoredSetHwRenderAllowed(v);
-                  LogHelper.info('LibretroGame', 'Config', `设置 HW_RENDER 允许: ${v}, ok=${ok}`);
-                })
-            }
-            .width('100%')
-
-            // 虚拟手柄
-            Row() {
-              Column() {
-                Text('隐藏虚拟手柄')
-                  .fontSize(16)
-                  .fontColor(Color.White)
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-
-              Toggle({ type: ToggleType.Switch, isOn: this.hideVirtualController })
-                .onChange((v: boolean) => {
-                  this.hideVirtualController = v;
-                  LogHelper.info('LibretroGame', 'Input', `隐藏虚拟手柄: ${v}`);
-                })
-            }
-            .width('100%')
-          }
-          .width('100%')
-          .padding({ top: 4, bottom: 4 })
-        }
-
-        // 9. 游戏控制按钮
-        ListItem() {
-          Column({ space: 12 }) {
-            if (!this.gameRunning) {
-              Button('开始游戏')
-                .fontSize(18)
-                .height(50)
-                .width('100%')
-                .type(ButtonType.Normal)
-                .borderRadius(8)
-                .backgroundColor('#4CAF50')
-                .enabled(!this.switching)
-                .onClick(async () => {
-                  await this.startOrSwitchGame();
-                })
-            } else {
-              Row({ space: 10 }) {
-                if (this.gamePaused) {
-                  Button('继续')
-                    .fontSize(20)
-                    .height(50)
-                    .layoutWeight(1)
-                    .type(ButtonType.Normal)
-                    .borderRadius(8)
-                    .backgroundColor('#4CAF50')
-                    .onClick(() => {
-                      this.resumeGame();
-                    })
-                } else {
-                  Button('暂停')
-                    .fontSize(20)
-                    .height(50)
-                    .layoutWeight(1)
-                    .type(ButtonType.Normal)
-                    .borderRadius(8)
-                    .backgroundColor('#FF9800')
-                    .onClick(() => {
-                      this.pauseGame();
-                    })
-                }
-
-                Button('重启')
-                  .fontSize(20)
-                  .height(50)
-                  .layoutWeight(1)
-                  .type(ButtonType.Normal)
-                  .borderRadius(8)
-                  .backgroundColor('#2196F3')
-                  .enabled(!this.switching)
-                  .onClick(async () => {
-                    await this.startOrSwitchGame();
-                  })
-
-                Button('停止')
-                  .fontSize(20)
-                  .height(50)
-                  .layoutWeight(1)
-                  .type(ButtonType.Normal)
-                  .borderRadius(8)
-                  .backgroundColor('#F44336')
-                  .margin({ left: 10 })
-                  .onClick(() => {
-                    this.stopGame();
-                  })
-              }
-              .width('100%')
-            }
-          }
-          .width('100%')
-        }
-
-        // 10. Soak Test
-        ListItem() {
-          Column({ space: 8 }) {
-            Button(this.soakRunning ? `压力测试中 ${this.soakSecondsLeft}s` : '压力测试 (10min)')
-              .fontSize(14)
-              .height(40)
-              .width('100%')
-              .type(ButtonType.Normal)
-              .borderRadius(8)
-              .backgroundColor(this.soakRunning ? '#607D8B' : '#455A64')
-              .enabled(!this.switching)
-              .onClick(() => {
-                if (this.soakRunning) {
-                  this.stopSoak();
-                } else {
-                  this.startSoak(600);
-                }
-              })
-
-            if (this.soakSummaryText) {
-              Text(this.soakSummaryText)
-                .fontSize(12)
-                .fontColor('#CCCCCC')
-                .width('100%')
-            }
-          }
-          .width('100%')
-        }
-
-        // 11. 错误信息
-        if (this.switchError) {
-          ListItem() {
-            Text(this.switchError)
-              .fontSize(12)
-              .fontColor('#FF5252')
-              .width('100%')
-              .padding(8)
-              .backgroundColor('#33FF0000')
-              .borderRadius(4)
-          }
-        }
-        
-        // 底部留白，防止被遮挡
-        ListItem() {
-          Column().height(40).width('100%')
-        }
-      }
-      .layoutWeight(1)
-      .width('100%')
-      .padding({ left: 16, right: 16 })
-      .edgeEffect(EdgeEffect.Spring)
-      .scrollBar(BarState.Auto)
-    }
-    .width('320vp') // 稍微加宽一点
-    .height('100%')
-    .backgroundColor('#1F1F1F') // 统一深色背景
-    .shadow({ radius: 30, color: Color.Black, offsetX: -10, offsetY: 0 })
-    .position({ x: '100%', y: 0 })
-    .markAnchor({ x: '100%', y: 0 })
-  }
-  
-  // 构建虚拟控制器
-  @Builder
-  buildVirtualController() {
-    Column() {
-      Blank()
-      
-      Row() {
-        // 左侧：十字键 + 模拟摇杆
-        Column() {
-          this.buildDPad();
-          this.buildAnalogStick();
-        }
-        
-        Blank()
-        
-        // 右侧：A/B 按钮 + 右摇杆
-        Column() {
-          this.buildActionButtons();
-          this.buildRightAnalogStick();
-        }
-      }
-      .width('100%')
-      .padding(20)
-    }
-    .width('100%')
-    .height('100%')
-  }
-  
-  // 十字键
-  @Builder
-  buildDPad() {
-    Column() {
-      // 上
-      Button('↑')
-        .width(60)
-        .height(60)
-        .fontSize(24)
-        .onTouch((event) => {
-          if (event.type === TouchType.Down) {
-            this.setButton(4, true);  // RETRO_DEVICE_ID_JOYPAD_UP
-          } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-            this.setButton(4, false);
-          }
-        })
-      
-      Row() {
-        // 左
-        Button('←')
-          .width(60)
-          .height(60)
-          .fontSize(24)
-          .onTouch((event) => {
-            if (event.type === TouchType.Down) {
-              this.setButton(6, true);  // RETRO_DEVICE_ID_JOYPAD_LEFT
-            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-              this.setButton(6, false);
-            }
-          })
-        
-        // 右
-        Button('→')
-          .width(60)
-          .height(60)
-          .fontSize(24)
-          .margin({ left: 60 })
-          .onTouch((event) => {
-            if (event.type === TouchType.Down) {
-              this.setButton(7, true);  // RETRO_DEVICE_ID_JOYPAD_RIGHT
-            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-              this.setButton(7, false);
-            }
-          })
-      }
-      
-      // 下
-      Button('↓')
-        .width(60)
-        .height(60)
-        .fontSize(24)
-        .onTouch((event) => {
-          if (event.type === TouchType.Down) {
-            this.setButton(5, true);  // RETRO_DEVICE_ID_JOYPAD_DOWN
-          } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-            this.setButton(5, false);
-          }
-        })
-    }
-  }
-  
-  // A/B 按钮
-  @Builder
-  buildActionButtons() {
-    Column() {
-      // SELECT / START
-      Row() {
-        Button('SELECT')
-          .width(90)
-          .height(40)
-          .fontSize(14)
-          .backgroundColor('#546E7A')
-          .onTouch((event) => {
-            if (event.type === TouchType.Down) {
-              this.setButton(2, true);  // RETRO_DEVICE_ID_JOYPAD_SELECT
-            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-              this.setButton(2, false);
-            }
-          })
-
-        Button('START')
-          .width(90)
-          .height(40)
-          .fontSize(14)
-          .backgroundColor('#546E7A')
-          .margin({ left: 10 })
-          .onTouch((event) => {
-            if (event.type === TouchType.Down) {
-              this.setButton(3, true);  // RETRO_DEVICE_ID_JOYPAD_START
-            } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-              this.setButton(3, false);
-            }
-          })
-      }
-      .margin({ bottom: 20 })
-
-      // B 按钮
-      Button('B')
-        .width(70)
-        .height(70)
-        .fontSize(24)
-        .backgroundColor('#E53935')
-        .margin({ bottom: 20 })
-        .onTouch((event) => {
-          if (event.type === TouchType.Down) {
-            this.setButton(0, true);  // RETRO_DEVICE_ID_JOYPAD_B
-          } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-            this.setButton(0, false);
-          }
-        })
-      
-      // A 按钮
-      Button('A')
-        .width(70)
-        .height(70)
-        .fontSize(24)
-        .backgroundColor('#43A047')
-        .onTouch((event) => {
-          if (event.type === TouchType.Down) {
-            this.setButton(8, true);  // RETRO_DEVICE_ID_JOYPAD_A
-          } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-            this.setButton(8, false);
-          }
-        })
-    }
-    .margin({ right: 40 })
-  }
-  
-  // 模拟摇杆 (左摇杆 index=0)
-  @Builder
-  buildAnalogStick() {
-    AnalogStickControl({
-      index: 0,
-      baseSize: 140,
-      knobSize: 60,
-      onAnalogChange: (index: number, x: number, y: number) => {
-        this.setAnalog(index, x, y);
-      }
-    })
-    .margin({ top: 20 })
-  }
-
-  // 右摇杆 (index=1)
-  @Builder
-  buildRightAnalogStick() {
-    AnalogStickControl({
-      index: 1,
-      baseSize: 120,
-      knobSize: 50,
-      onAnalogChange: (index: number, x: number, y: number) => {
-        this.setAnalog(index, x, y);
-      }
-    })
-    .margin({ top: 20, right: 20 })
-  }
-  
   // 设置按键状态 (新架构)
   setButton(buttonId: number, pressed: boolean) {
-    // refactoredSendInput(port, keyId, pressed)
-    const port = this.selectedPortIndex;
-    if (!this.isVirtualPortActive(port)) {
-      return;
-    }
-    nativeApi.refactoredSendInput(port, buttonId, pressed);
+    sendRuntimeButton(this.portAssignments, this.selectedPortIndex, buttonId, pressed);
   }
 
   setAnalog(index: number, x: number, y: number) {
-    const port = this.selectedPortIndex;
-    if (!this.isVirtualPortActive(port)) {
-      return;
-    }
-    const xVal = this.normalizeAnalogValue(x);
-    const yVal = this.normalizeAnalogValue(y);
-    nativeApi.refactoredSendAnalog(port, index, 0, xVal);
-    nativeApi.refactoredSendAnalog(port, index, 1, yVal);
-  }
-
-  normalizeAnalogValue(value: number): number {
-    let v = value;
-    if (v > 1) {
-      v = 1;
-    } else if (v < -1) {
-      v = -1;
-    }
-    if (v >= 0) {
-      return Math.round(v * 32767);
-    }
-    return Math.round(v * 32768);
+    sendRuntimeAnalog(this.portAssignments, this.selectedPortIndex, index, x, y);
   }
   
   // 开始/切换游戏 (新架构流程)
@@ -1991,7 +1017,12 @@ struct LibretroGamePage {
       }
       this.lastStartOrSwitchAtMs = nowMs;
     }
+    const token = this.switchToken + 1;
+    this.switchToken = token;
     await this.finalizeActiveLibrarySession();
+    if (!this.isCurrentSwitchTask(token)) {
+      return;
+    }
     
     LogHelper.info(
       'LibretroGame',
@@ -2000,7 +1031,6 @@ struct LibretroGamePage {
     );
     this.switchError = '';
     let success = false;
-    let token = 0;
 
     try {
       // 1. 获取上下文
@@ -2013,44 +1043,40 @@ struct LibretroGamePage {
       const resMgr = context.resourceManager;
       const timeoutMs = 5000;
 
-      nativeApi.refactoredClearLastErrorInfo();
+      runtimeSessionController.clearLastError();
       
-      const corePath = await this.resolveCorePath(bundleCodeDir, core.soFile);
+      const corePath = await resolveRuntimeCorePath(bundleCodeDir, core.soFile);
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
       LogHelper.info('LibretroGame', 'Engine', `加载 Core: ${corePath}`);
       LogHelper.info('LibretroGame', 'Engine', `加载 ROM: ${rom.file}`);
-      token = this.switchToken + 1;
-      this.switchToken = token;
-      const resolved = await this.resolveRomPathForSwitch(
+      const resolved = resolveRuntimeRomPathForSwitch(
         rom.file,
         resMgr,
         filesDir
       );
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
       LogHelper.info(
         'LibretroGame',
         'Engine',
         `Resolved ROM path: ${resolved.romPath}, useResMgr=${resolved.useResMgr}`
       );
-      const ok = resolved.useResMgr ?
-        await nativeApi.refactoredSwitchGameAsync(
-          corePath,
-          resolved.romPath,
-          filesDir,
-          resMgr,
-          timeoutMs,
-          token
-        ) :
-        await nativeApi.refactoredSwitchGameAsync(
-          corePath,
-          resolved.romPath,
-          filesDir,
-          timeoutMs,
-          token
-        );
-      if (token !== this.switchToken) {
+      const ok = await runtimeSessionController.switchGame({
+        corePath,
+        romPath: resolved.romPath,
+        filesDir,
+        timeoutMs,
+        token,
+        resourceManager: resolved.useResMgr ? resMgr : undefined
+      });
+      if (!this.isCurrentSwitchTask(token)) {
         return;
       }
       if (!ok) {
-        throw new Error(this.formatLastError('SwitchGame'));
+        throw new Error(runtimeSessionController.formatLastError('SwitchGame'));
       }
       
       this.currentCore = core.name;
@@ -2059,12 +1085,15 @@ struct LibretroGamePage {
       this.gamePaused = false;
       this.pendingStart = false;
       await markLibraryRecordPlayed(context, rom.file);
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
       this.beginActiveLibrarySession(rom.file);
       LogHelper.info('LibretroGame', 'Engine', '游戏启动成功');
       success = true;
 
     } catch (e) {
-      if (token !== 0 && token !== this.switchToken) {
+      if (!this.isCurrentSwitchTask(token)) {
         return;
       }
       this.switchError = e.message || String(e);
@@ -2074,11 +1103,11 @@ struct LibretroGamePage {
         `启动异常: ${this.switchError}`
       );
     } finally {
-      if (token !== 0 && token !== this.switchToken) {
+      if (!this.isCurrentSwitchTask(token)) {
         return;
       }
       if (!success) {
-        nativeApi.refactoredStopEngineAsync();
+        runtimeSessionController.stopAsync();
       }
       this.switching = false;
       if (this.pendingSwitch) {
@@ -2094,172 +1123,10 @@ struct LibretroGamePage {
     }
   }
 
-  private formatLastError(prefix: string): string {
-    const err: EngineErrorInfo = nativeApi.refactoredGetLastErrorInfo();
-    if (!err || !err.reason) {
-      return `${prefix} failed: unknown_error`;
-    }
-    const step = err.step ? ` step=${err.step}` : '';
-    const message = err.message ? ` message=${err.message}` : '';
-    return `${prefix} failed: reason=${err.reason}${step}${message}`;
-  }
-
-  private buildCoreAbiCandidates(): string[] {
-    const rawAbiList = String(deviceInfo.abiList ?? '').toLowerCase();
-    const candidates: string[] = [];
-    const addCandidate = (abi: string) => {
-      if (!abi || candidates.indexOf(abi) >= 0) {
-        return;
-      }
-      candidates.push(abi);
-    };
-
-    if (rawAbiList.indexOf('x86_64') >= 0) {
-      addCandidate('x86_64');
-    } else {
-      addCandidate('arm64');
-      addCandidate('arm64-v8a');
-    }
-    addCandidate('arm64');
-    addCandidate('arm64-v8a');
-    addCandidate('x86_64');
-    return candidates;
-  }
-
-  private async resolveCorePath(bundleCodeDir: string, soFile: string): Promise<string> {
-    const abiCandidates = this.buildCoreAbiCandidates();
-    for (let i = 0; i < abiCandidates.length; i++) {
-      const abi = abiCandidates[i];
-      const path = `${bundleCodeDir}/libs/${abi}/${soFile}`;
-      if (await this.fileExists(path)) {
-        LogHelper.info('LibretroGame', 'Engine', `Core path resolved: abi=${abi}, path=${path}`);
-        return path;
-      }
-    }
-    const fallback = `${bundleCodeDir}/libs/${abiCandidates[0]}/${soFile}`;
-    LogHelper.warn(
-      'LibretroGame',
-      'Engine',
-      `Core path fallback (not found): ${fallback}, abiList=${String(deviceInfo.abiList ?? '')}`
-    );
-    return fallback;
-  }
-
-  private async resolveRomPathForSwitch(
-    romPath: string,
-    resMgr: resourceManager.ResourceManager,
-    filesDir: string
-  ): Promise<RomPathResolution> {
-    if (!romPath) {
-      return { romPath: '', useResMgr: false };
-    }
-    if (!this.isRawfilePath(romPath)) {
-      return { romPath, useResMgr: false };
-    }
-    // 对 rawfile ROM 一律走 native RawfileRomProcessor，避免前端落地路径不一致。
-    // native 侧会按需写入 temp_roms，并返回可用的 fullpath（兼容 need_fullpath core）。
-    void resMgr;
-    void filesDir;
-    return { romPath, useResMgr: true };
-  }
-
-  private isRawfilePath(path: string): boolean {
-    return path.startsWith('roms/');
-  }
-
-  private isCueRawfile(path: string): boolean {
-    return path.toLowerCase().endsWith('.cue');
-  }
-
-  private isArcadeRawfile(path: string): boolean {
-    return path.startsWith('roms/arcade/');
-  }
-
-  private async ensureBundledRomExtracted(
-    resMgr: resourceManager.ResourceManager,
-    filesDir: string,
-    rawfilePath: string
-  ): Promise<string> {
-    const filename = this.getFilename(rawfilePath);
-    const isArcade = this.isArcadeRawfile(rawfilePath);
-    const systemDir = `${filesDir}/system`;
-    await this.ensureDirExists(systemDir);
-    const baseDir = isArcade ?
-      `${systemDir}/arcade` :
-      systemDir;
-    if (isArcade) {
-      await this.ensureDirExists(baseDir);
-    }
-    const destPath = `${baseDir}/${filename}`;
-    if (await this.fileExists(destPath)) {
-      return destPath;
-    }
-
-    try {
-      const content = await resMgr.getRawFileContent(rawfilePath);
-      await this.writeBytesToFile(destPath, content);
-      if (isArcade) {
-        const mirrorDir = `${filesDir}/system/arc`;
-        await this.ensureDirExists(mirrorDir);
-        const mirrorPath = `${mirrorDir}/${filename}`;
-        await this.writeBytesToFile(mirrorPath, content);
-      }
-    } catch (e) {
-      LogHelper.error('LibretroGame', 'File', `Failed to copy asset ${rawfilePath}: ${e.message}`);
-    }
-    return destPath;
-  }
-
-  private async fileExists(path: string): Promise<boolean> {
-    try {
-      await fs.access(path);
-      return true;
-    } catch (err) {
-      return false;
-    }
-  }
-
-  private async ensureDirExists(path: string): Promise<void> {
-    try {
-      await fs.mkdir(path);
-    } catch (err) {
-      // ignore if already exists
-    }
-  }
-
-  private async writeBytesToFile(
-    path: string,
-    data: Uint8Array
-  ): Promise<void> {
-    let file: fs.File | undefined;
-    try {
-      file = await fs.open(path, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC);
-      await fs.write(file.fd, data.buffer, {
-        offset: data.byteOffset,
-        length: data.byteLength
-      });
-    } catch (e) {
-      LogHelper.error('LibretroGame', 'File', `Failed to write file ${path}: ${e.message}`);
-    } finally {
-      if (file) {
-        try {
-          await fs.close(file.fd);
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-  }
-
-  private getFilename(path: string): string {
-    const slash = path.lastIndexOf('/');
-    return slash >= 0 ? path.slice(slash + 1) : path;
-  }
-  
   // 暂停游戏
   pauseGame() {
     if (this.gameRunning && !this.gamePaused) {
-      nativeApi.refactoredPauseEngine();
+      runtimeSessionController.pause();
       this.gamePaused = true;
       LogHelper.info('LibretroGame', 'Engine', '游戏已暂停');
     }
@@ -2268,18 +1135,18 @@ struct LibretroGamePage {
   // 继续游戏
   resumeGame() {
     if (this.gameRunning && this.gamePaused) {
-      nativeApi.refactoredResumeEngine();
+      runtimeSessionController.resume();
       this.gamePaused = false;
       LogHelper.info('LibretroGame', 'Engine', '游戏已继续');
     }
   }
   
   // 停止游戏
-  stopGame(asyncStop: boolean = false) {
+  stopGame() {
     if (this.gameRunning || this.gamePaused) {
       void this.finalizeActiveLibrarySession();
       // 避免 UI 线程同步 Stop 阻塞导致卡死
-      nativeApi.refactoredStopEngineAsync();
+      runtimeSessionController.stopAsync();
       this.gameRunning = false;
       this.gamePaused = false;
       this.stopSoak();
@@ -2289,90 +1156,26 @@ struct LibretroGamePage {
 
   // Soak Test (使用 refactoredGetStats)
   startSoak(durationSeconds: number) {
-    if (this.soakRunning) {
-      return;
-    }
-    if (!this.gameRunning) {
-      this.soakSummaryText = '请先启动游戏';
-      return;
-    }
-
-    const ok = nativeApi.refactoredResetStats();
-    if (!ok) {
-      this.soakSummaryText = 'resetStats 失败';
-      return;
-    }
-
-    this.soakRunning = true;
-    this.soakSecondsLeft = durationSeconds;
-    this.soakSummaryText = '';
-    
-    // 获取初始状态
-    try {
-        const s = nativeApi.refactoredGetStats() as RawEngineStats;
-        this.soakStartStats = {
-            videoNullFrames: Number(s.videoNullFrames),
-            videoDupeFrames: Number(s.videoDupeFrames),
-            audioUnderruns: Number(s.audioUnderruns),
-            audioOverruns: Number(s.audioOverruns)
-        };
-    } catch (e) {
-        this.soakSummaryText = '获取初始 Stats 失败';
-        this.soakRunning = false;
-        return;
-    }
-
-    this.soakMinAudioUsage = 1.0;
-    this.soakMaxAudioUsage = 0.0;
-
-    if (this.soakTimer !== -1) {
-      clearInterval(this.soakTimer);
-    }
-
-    this.soakTimer = setInterval(() => {
-      this.soakSecondsLeft -= 1;
-      
-      try {
-        const s = nativeApi.refactoredGetStats() as RawEngineStats;
-        const usage = Number(s.audioBufferUsage);
-        if (usage > 0) {
-            this.soakMinAudioUsage = Math.min(this.soakMinAudioUsage, usage);
-            this.soakMaxAudioUsage = Math.max(this.soakMaxAudioUsage, usage);
-        }
-      } catch (e) {}
-
-      if (this.soakSecondsLeft <= 0) {
-        this.finishSoak();
-      }
-    }, 1000);
+    this.soakController.start(durationSeconds, this.gameRunning, (state: RuntimeSoakState) => {
+      this.applySoakState(state);
+    });
   }
 
   stopSoak() {
-    if (this.soakTimer !== -1) {
-      clearInterval(this.soakTimer);
-      this.soakTimer = -1;
-    }
-    this.soakRunning = false;
-    this.soakSecondsLeft = 0;
+    this.soakController.stop((state: RuntimeSoakState) => {
+      this.applySoakState(state);
+    });
   }
 
-  finishSoak() {
-    this.stopSoak();
-    try {
-        const end = nativeApi.refactoredGetStats() as RawEngineStats;
-        const start = this.soakStartStats;
-        if (!start) {
-          return;
-        }
-        
-        const dNull = Number(end.videoNullFrames) - start.videoNullFrames;
-        const dDupe = Number(end.videoDupeFrames) - start.videoDupeFrames;
-        const dUnder = Number(end.audioUnderruns) - start.audioUnderruns;
-        const dOver = Number(end.audioOverruns) - start.audioOverruns;
-        
-        this.soakSummaryText = `Null:${dNull} Dupe:${dDupe} U:${dUnder} O:${dOver} Buf:[${this.soakMinAudioUsage.toFixed(2)}-${this.soakMaxAudioUsage.toFixed(2)}]`;
-    } catch (e) {
-        this.soakSummaryText = '统计失败';
-    }
+  private clearSoakSummary(): void {
+    this.soakController.clearSummary((state: RuntimeSoakState) => {
+      this.applySoakState(state);
+    });
+  }
+
+  private applySoakState(state: RuntimeSoakState): void {
+    this.soakRunning = state.running;
+    this.soakSecondsLeft = state.secondsLeft;
+    this.soakSummaryText = state.summaryText;
   }
 }

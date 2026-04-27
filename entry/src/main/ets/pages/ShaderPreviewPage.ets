@@ -1,0 +1,284 @@
+import testNapi from 'libentry.so'
+import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuHeaderBar } from '../components/EmuAppShell'
+import { EmuColors } from '../common/EmuUiTokens'
+import { navigateEmuBottomNav } from '../common/RouteHelper'
+import LogHelper from '../common/LogHelper'
+
+interface ShaderPreviewNapi {
+  refactoredSetScalingMode(mode: number): boolean
+  refactoredSetAIUpscale(enabled: boolean): boolean
+}
+
+const nativeApi = testNapi as ShaderPreviewNapi
+
+@Entry
+@Component
+struct ShaderPreviewPage {
+  @State private scanlineIntensity: number = 65
+  @State private curvature: number = 12
+  @State private saturation: number = 115
+  @State private selectedMode: string = 'GLES_PREVIEW'
+  @State private statusText: string = 'ENGINE_BRIDGE_IDLE'
+  private readonly scanlineRows: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  private readonly navItems: EmuBottomNavItem[] = [
+    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
+    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: true },
+    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
+    { key: 'system', iconName: 'tune', label: '系统', isActive: false }
+  ]
+
+  private resetPreset(): void {
+    this.scanlineIntensity = 65
+    this.curvature = 12
+    this.saturation = 115
+    this.statusText = 'LOCAL_PRESET_RESET'
+  }
+
+  private applyPreviewBridge(): void {
+    try {
+      const scalingApplied = nativeApi.refactoredSetScalingMode(2)
+      const upscaleApplied = nativeApi.refactoredSetAIUpscale(this.saturation > 120)
+      if (scalingApplied || upscaleApplied) {
+        this.statusText = 'VIDEO_BRIDGE_APPLIED'
+      } else {
+        this.statusText = 'ENGINE_BRIDGE_REJECTED'
+      }
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('ShaderPreviewPage', 'Bridge', `应用视频预览失败: ${message}`)
+      this.statusText = 'ENGINE_BRIDGE_FAILED'
+    }
+  }
+
+  private onBottomNavClick(key: string): void {
+    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'engine', 'ShaderPreviewPage')
+  }
+
+  @Builder
+  private PreviewPane(title: string, mode: string, processed: boolean) {
+    Stack() {
+      Column()
+        .width('100%')
+        .height('100%')
+        .linearGradient({
+          angle: processed ? 135 : 45,
+          colors: processed ?
+            [[0xFF133323, 0.0], [0xFF1B2856, 0.52], [0xFF2E1528, 1.0]] :
+            [[0xFF101010, 0.0], [0xFF243044, 0.52], [0xFF171717, 1.0]]
+        })
+
+      if (processed) {
+        Column({ space: 3 }) {
+          ForEach(this.scanlineRows, (item: number) => {
+            Row()
+              .width('100%')
+              .height(1)
+              .backgroundColor('#55000000')
+              .opacity(0.5)
+          }, (item: number) => `scan-${item}`)
+        }
+        .width('100%')
+        .height('100%')
+      }
+
+      Column({ space: 10 }) {
+        Text(title)
+          .fontSize(11)
+          .fontFamily('monospace')
+          .fontColor(processed ? '#00131313' : EmuColors.onSurfaceVariant)
+          .fontWeight(FontWeight.Bold)
+          .letterSpacing(1.8)
+          .padding({ left: 10, right: 10, top: 5, bottom: 5 })
+          .backgroundColor(processed ? EmuColors.primary : '#CC000000')
+        Text(mode)
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor(processed ? EmuColors.primary : EmuColors.onSurface)
+      }
+      .align(processed ? Alignment.TopEnd : Alignment.TopStart)
+      .margin({ left: 18, right: 18, top: 18 })
+
+      Row({ space: 10 }) {
+        Row()
+          .width(32)
+          .height(32)
+          .backgroundColor(processed ? EmuColors.primary : '#88E5E5E5')
+        Row()
+          .width(32)
+          .height(32)
+          .backgroundColor(processed ? '#FFED7F64' : '#88757575')
+        Row()
+          .width(32)
+          .height(32)
+          .backgroundColor(processed ? '#FF72FF70' : '#88484848')
+      }
+      .align(Alignment.Center)
+    }
+    .layoutWeight(1)
+    .height('100%')
+    .backgroundColor(EmuColors.surfaceContainerLow)
+    .clip(true)
+  }
+
+  @Builder
+  private SplitPreview() {
+    Stack() {
+      Row({ space: 1 }) {
+        this.PreviewPane('SOURCE_RAW', 'NEAREST / NO_SHADER', false)
+        this.PreviewPane('LIVE_SHADER', this.selectedMode, true)
+      }
+      .width('100%')
+      .height('100%')
+
+      Row() {
+        Text('↕')
+          .fontSize(18)
+          .fontColor('#00131313')
+          .width(28)
+          .height(28)
+          .textAlign(TextAlign.Center)
+          .backgroundColor(EmuColors.primary)
+          .borderRadius(3)
+      }
+      .width(2)
+      .height('100%')
+      .backgroundColor(EmuColors.primary)
+      .justifyContent(FlexAlign.Center)
+      .align(Alignment.Center)
+    }
+    .width('100%')
+    .layoutWeight(1)
+  }
+
+  @Builder
+  private ParameterPanel() {
+    Column({ space: 18 }) {
+      Row() {
+        Text('实时视觉滤镜预览')
+          .fontSize(12)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurface)
+          .letterSpacing(1.4)
+        Text(this.statusText)
+          .fontSize(9)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.primary)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      this.SliderRow('SCANLINE INTENSITY', this.scanlineIntensity, '%')
+      this.SliderRow('CRT CURVATURE', this.curvature, '%')
+      this.SliderRow('COLOR SATURATION', this.saturation, '%')
+
+      Row({ space: 12 }) {
+        Button('RESET')
+          .layoutWeight(1)
+          .height(36)
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .backgroundColor(Color.Transparent)
+          .border({ width: 0.5, color: EmuColors.outline, style: BorderStyle.Solid })
+          .onClick(() => {
+            this.resetPreset()
+          })
+        Button('APPLY')
+          .layoutWeight(1)
+          .height(36)
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#00131313')
+          .backgroundColor(EmuColors.primary)
+          .onClick(() => {
+            this.applyPreviewBridge()
+          })
+      }
+      .width('100%')
+    }
+    .width('86%')
+    .constraintSize({ maxWidth: 320 })
+    .padding(20)
+    .backgroundColor('#F21F1F1F')
+    .border({ width: 0.5, color: '#55484848', style: BorderStyle.Solid })
+  }
+
+  @Builder
+  private SliderRow(label: string, value: number, suffix: string) {
+    Column({ space: 8 }) {
+      Row() {
+        Text(label)
+          .fontSize(9)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(1.2)
+        Text(`${value}${suffix}`)
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurface)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Stack() {
+        Row()
+          .width('100%')
+          .height(1)
+          .backgroundColor(EmuColors.outlineVariant)
+        Row()
+          .width(`${Math.min(100, value)}%`)
+          .height(1)
+          .backgroundColor(EmuColors.primary)
+          .align(Alignment.Start)
+      }
+      .width('100%')
+      .height(14)
+    }
+    .width('100%')
+  }
+
+  build() {
+    Column() {
+      EmuHeaderBar({
+        titleText: 'OS_EMU_v2.4.1',
+        titleIcon: 'terminal',
+        rightLabel: 'ENGINE_PREVIEW_MODE',
+        rightIcon: 'settings_input_component',
+        activeTextColor: EmuColors.primary,
+        iconSize: 16,
+        rightIconSize: 18
+      })
+
+      Stack() {
+        this.SplitPreview()
+        Row() {
+          Blank()
+          this.ParameterPanel()
+        }
+        .width('100%')
+        .height('100%')
+        .padding({ right: 18 })
+        .alignItems(VerticalAlign.Center)
+      }
+      .width('100%')
+      .layoutWeight(1)
+
+      EmuBottomNav({
+        items: this.navItems,
+        activeFontColor: EmuColors.primary,
+        inactiveFontColor: '#FF666666',
+        indicatorStyle: 'dot',
+        panelBackgroundColor: '#FF000000',
+        onItemClick: (key: string) => {
+          this.onBottomNavClick(key)
+        }
+      })
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(EmuColors.background)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+  }
+}

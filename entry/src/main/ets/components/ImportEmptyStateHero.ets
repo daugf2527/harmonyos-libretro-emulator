@@ -15,8 +15,8 @@ export struct ImportEmptyStateHero {
     Column() {
       Stack() {
         Column()
-          .width(120)
-          .height(140)
+          .width('100%')
+          .height('100%')
           .backgroundColor(EmuColors.background)
           .borderRadius(EmuRadius.sm)
           .border({
@@ -26,15 +26,14 @@ export struct ImportEmptyStateHero {
           })
 
         Column()
-          .width(90)
-          .height(82)
+          .width('75%')
+          .aspectRatio(90 / 82)
           .border({
             width: 1,
             color: '#66484848',
             style: BorderStyle.Dashed
           })
           .align(Alignment.Center)
-          .margin({ bottom: 18 })
 
         EmuIcon({
           name: 'eject',
@@ -49,17 +48,18 @@ export struct ImportEmptyStateHero {
           .height(5)
           .borderRadius(2.5)
           .backgroundColor(EmuColors.primary)
-          .position({ x: 117, y: -3 })
+          .align(Alignment.TopEnd)
 
         Row()
           .width(3)
           .height(3)
           .borderRadius(1.5)
           .backgroundColor('#66484848')
-          .position({ x: -1, y: 138 })
+          .align(Alignment.BottomStart)
       }
-      .width(120)
-      .height(140)
+      .width('34%')
+      .constraintSize({ minWidth: 96, maxWidth: 120 })
+      .aspectRatio(120 / 140)
       .margin({ bottom: 52 })
       .shadow({
         radius: this.particleBoosted ? 12 : 4,

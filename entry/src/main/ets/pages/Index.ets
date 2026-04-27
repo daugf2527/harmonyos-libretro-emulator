@@ -75,25 +75,6 @@ struct Index {
         .width('100%')
         .justifyContent(FlexAlign.Center)
 
-        // Gambatte 测试按钮
-        Row() {
-          Button('测试 Gambatte 核心')
-            .fontSize(18)
-            .width('80%')
-            .height(60)
-            .backgroundColor('#FF6B35')
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({
-                url: 'pages/TestGambatte'
-              }).catch((err: Error) => {
-                console.error(`[Index] Router error: ${err.message}`);
-              });
-            })
-        }
-        .margin({ top: 10 })
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-
         // 通用 Libretro 游戏页面按钮
         Row() {
           Button('通用 Libretro 游戏')
@@ -104,25 +85,6 @@ struct Index {
             .onClick(() => {
               this.getUIContext().getRouter().pushUrl({
                 url: 'pages/LibretroGamePage'
-              }).catch((err: Error) => {
-                console.error(`[Index] Router error: ${err.message}`);
-              });
-            })
-        }
-        .margin({ top: 10 })
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-
-        // 新架构测试页面按钮
-        Row() {
-          Button('新架构测试')
-            .fontSize(18)
-            .width('80%')
-            .height(60)
-            .backgroundColor('#9C27B0')
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({
-                url: 'pages/LibretroNewArchTestPage'
               }).catch((err: Error) => {
                 console.error(`[Index] Router error: ${err.message}`);
               });

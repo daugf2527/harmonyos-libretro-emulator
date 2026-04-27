@@ -166,7 +166,7 @@ export struct GameCard {
       Stack() {
         Column()
           .width('100%')
-          .height('100%')
+          .aspectRatio(4 / 3)
           .backgroundColor(this.coverColor)
           .borderRadius(10)
           .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
@@ -177,12 +177,12 @@ export struct GameCard {
           variant: 'list'
         })
           .width('100%')
-          .height('100%')
+          .aspectRatio(4 / 3)
           .clip(true)
           .borderRadius(10)
       }
-      .width(110)
-      .height(82)
+      .width('28%')
+      .aspectRatio(4 / 3)
 
       Column({ space: 6 }) {
         Text(this.title)
@@ -211,7 +211,6 @@ export struct GameCard {
         .fontFamily('monospace')
     }
     .width('100%')
-    .height(82)
     .alignItems(VerticalAlign.Center)
     .onClick(() => {
       this.onCardClick?.()
