@@ -453,6 +453,30 @@ static void RecoverAfterSwitchFailure(uint32_t timeoutMs, uint64_t token) {
   }
 }
 
+static void RecoverAfterStopRequestFailure(uint32_t timeoutMs, uint64_t token) {
+  auto preservedError = GetEngine()->GetLastErrorInfo();
+  if (!IsLatestSwitchToken(token)) {
+    return;
+  }
+  if (WaitForStateWithToken(EngineState::STOPPED, timeoutMs, token)) {
+    GetEngine()->Reset();
+    if (!preservedError.reason.empty()) {
+      GetEngine()->SetLastErrorInfo(preservedError.reason, preservedError.step,
+                                    preservedError.message);
+    }
+    return;
+  }
+  if (GetEngine()->WaitForState(EngineState::INIT, 0)) {
+    if (!preservedError.reason.empty()) {
+      GetEngine()->SetLastErrorInfo(preservedError.reason, preservedError.step,
+                                    preservedError.message);
+    }
+    return;
+  }
+  EnsureLastErrorIfEmpty("switch_stop_unrecovered", "Stop",
+                         "Stop() failed and engine did not reach STOPPED/INIT");
+}
+
 static void ExecuteSwitchGame(napi_env env, void *data) {
   auto *ctx = static_cast<SwitchGameAsyncContext *>(data);
   if (!ctx) {
@@ -485,6 +509,7 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
     if (!GetEngine()->Stop()) {
       EnsureLastErrorIfEmpty("switch_stop_failed", "Stop",
                              "Stop() returned false before switch");
+      RecoverAfterStopRequestFailure(ctx->timeoutMs, ctx->token);
       ctx->result = false;
       return;
     }
@@ -574,6 +599,13 @@ static void CompleteSwitchGame(napi_env env, napi_status status, void *data) {
   auto *ctx = static_cast<SwitchGameAsyncContext *>(data);
   if (!ctx) {
     return;
+  }
+
+  if (status != napi_ok) {
+    GetEngine()->SetLastErrorInfo("switch_async_work_failed",
+                                  "SwitchGameAsync",
+                                  "SwitchGameAsync complete callback status was not napi_ok");
+    ctx->result = false;
   }
 
   napi_value result;
@@ -697,6 +729,9 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
       CompleteSwitchGame, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] SwitchGameAsync create work failed");
+    GetEngine()->SetLastErrorInfo("switch_async_create_failed",
+                                  "SwitchGameAsync",
+                                  "napi_create_async_work failed");
     napi_value falseVal;
     napi_get_boolean(env, false, &falseVal);
     napi_resolve_deferred(env, ctx->deferred, falseVal);
@@ -707,6 +742,9 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   napi_status queueStatus = napi_queue_async_work(env, ctx->work);
   if (queueStatus != napi_ok) {
     LOGF(LOG_ERROR, "[NEW] SwitchGameAsync queue work failed");
+    GetEngine()->SetLastErrorInfo("switch_async_queue_failed",
+                                  "SwitchGameAsync",
+                                  "napi_queue_async_work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
     napi_value falseVal;
@@ -775,6 +813,9 @@ static void CompleteStopEngineAsync(napi_env env, napi_status status,
   if (status != napi_ok) {
     LOGF(LOG_ERROR, "[NEW] StopEngineAsync work failed: status=%{public}d",
          static_cast<int>(status));
+    GetEngine()->SetLastErrorInfo("stop_async_work_failed",
+                                  "StopEngineAsync",
+                                  "StopEngineAsync complete callback status was not napi_ok");
   } else if (!ctx->stopped) {
     LOGF(LOG_WARN,
          "[NEW] StopEngineAsync completed with stop timeout/failure");
@@ -808,6 +849,9 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
                              CompleteStopEngineAsync, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] StopEngineAsync create work failed");
+    GetEngine()->SetLastErrorInfo("stop_async_create_failed",
+                                  "StopEngineAsync",
+                                  "napi_create_async_work failed");
     stop_in_progress.store(false);
     delete ctx;
     return MakeBool(env, false);
@@ -816,6 +860,9 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
   napi_status queueStatus = napi_queue_async_work(env, ctx->work);
   if (queueStatus != napi_ok) {
     LOGF(LOG_ERROR, "[NEW] StopEngineAsync queue work failed");
+    GetEngine()->SetLastErrorInfo("stop_async_queue_failed",
+                                  "StopEngineAsync",
+                                  "napi_queue_async_work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
     stop_in_progress.store(false);

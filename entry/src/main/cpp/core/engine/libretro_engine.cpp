@@ -536,8 +536,10 @@ void LibretroEngine::Reset() {
     LOGF(LOG_INFO, "%{public}s AudioBridge stopped", kAudioChainPrefix);
   }
 
-  // 5. 重置引擎状态
+  // 5. 重置引擎状态。Reset 是强制收敛入口，不能受普通状态迁移表限制。
   state_.store(EngineState::INIT);
+  stateCond_.notify_all();
+  eventBridge_.Emit("engine_state", "{\"state\": 0}", false);
   ClearLastErrorInfo();
   frameCount_ = 0;
   currentFps_ = 0.0f;

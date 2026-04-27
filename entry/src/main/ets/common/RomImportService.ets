@@ -67,6 +67,8 @@ interface ImportFilePlan {
   fileName: string
   fileBytes: number
   progressBytes: number
+  dependencyNames: string[]
+  isDependencyFile: boolean
 }
 
 interface FileStatCompat {
@@ -113,6 +115,7 @@ const VICE_X64_EXTENSIONS: string[] = [
 ]
 const MINIVMAC_EXTENSIONS: string[] = ['dsk', 'hvf']
 const CROCODS_EXTENSIONS: string[] = ['kcr', 'sna']
+const MULTIFILE_ENTRY_EXTENSIONS: string[] = ['cue', 'm3u']
 
 export function getRomFileExtension(fileName: string): string {
   const dotIndex = fileName.lastIndexOf('.')
@@ -226,12 +229,15 @@ export async function importRomUris(
   const totalBytes = importPlans.reduce((sum: number, item: ImportFilePlan) => sum + item.progressBytes, 0)
   const hasAccurateByteProgress = importPlans.every((item: ImportFilePlan) => item.fileBytes > 0)
   let completedBytes = 0
+  const completedNameSet: Set<string> = new Set()
 
   for (let index = 0; index < uris.length; index += 1) {
     const currentPlan = importPlans[index]
     const fileName = currentPlan?.fileName ?? getFileNameFromUri(uris[index], index)
     const currentFileTotalBytes = currentPlan?.fileBytes ?? 0
     const currentProgressBytes = currentPlan?.progressBytes ?? 1
+    const isDependencyFile = currentPlan?.isDependencyFile ?? false
+    const dependencyNames = currentPlan?.dependencyNames ?? []
     if (options?.shouldCancel?.()) {
         result.canceled = true
         appendImportItemResult(result, fileName, 'CANCELED', '任务在复制开始前取消')
@@ -263,7 +269,33 @@ export async function importRomUris(
       currentFileCompletedBytes: 0,
       hasAccurateByteProgress: hasAccurateByteProgress
     })
-    if (getPreferredCoreIdForFile(fileName).length === 0) {
+    const missingDependencyNames = await findMissingDependencyNames(romDir, completedNameSet, dependencyNames)
+    if (missingDependencyNames.length > 0) {
+      result.failedCount += 1
+      result.failedNames.push(fileName)
+      appendImportItemResult(
+        result,
+        fileName,
+        'FAILED',
+        `MISSING_DEPENDENCY: ${missingDependencyNames.join(', ')}`
+      )
+      completedBytes += currentProgressBytes
+      onProgress?.({
+        totalCount: uris.length,
+        completedCount: index + 1,
+        currentFileIndex: index + 1,
+        currentFileName: fileName,
+        stage: 'MISSING_DEPENDENCY',
+        totalBytes: totalBytes,
+        completedBytes: completedBytes,
+        currentFileTotalBytes: currentFileTotalBytes,
+        currentFileCompletedBytes: 0,
+        hasAccurateByteProgress: hasAccurateByteProgress
+      })
+      continue
+    }
+
+    if (getPreferredCoreIdForFile(fileName).length === 0 && !isDependencyFile) {
       result.skippedCount += 1
       result.skippedNames.push(fileName)
       appendImportItemResult(result, fileName, 'SKIPPED', '不支持的文件格式')
@@ -302,7 +334,7 @@ export async function importRomUris(
         })
         let copiedBytesForFile = 0
         try {
-          copyFileFromUri(uri, tempOverwritePath, (nextCopiedBytes: number) => {
+          await copyFileFromUri(uri, tempOverwritePath, (nextCopiedBytes: number) => {
             copiedBytesForFile = nextCopiedBytes
             onProgress?.({
               totalCount: uris.length,
@@ -317,10 +349,11 @@ export async function importRomUris(
               hasAccurateByteProgress: hasAccurateByteProgress
             })
           }, options?.shouldCancel)
-          copyFileFromUri(tempOverwritePath, destPath)
+          await copyFileFromUri(tempOverwritePath, destPath)
           await deletePathIfExists(tempOverwritePath)
           result.overwrittenCount += 1
           result.overwrittenNames.push(fileName)
+          completedNameSet.add(normalizeFileNameKey(fileName))
           appendImportItemResult(result, fileName, 'OVERWRITTEN', '已覆盖写入目标文件')
           completedBytes += currentProgressBytes
           onProgress?.({
@@ -378,7 +411,8 @@ export async function importRomUris(
       }
       result.skippedCount += 1
       result.skippedNames.push(fileName)
-      appendImportItemResult(result, fileName, 'SKIPPED', '目标文件已存在')
+      completedNameSet.add(normalizeFileNameKey(fileName))
+      appendImportItemResult(result, fileName, 'SKIPPED', isDependencyFile ? '依赖文件已存在' : '目标文件已存在')
       completedBytes += currentProgressBytes
       onProgress?.({
         totalCount: uris.length,
@@ -396,8 +430,10 @@ export async function importRomUris(
     }
 
     let copiedBytesForFile = 0
+    const tempImportPath = `${destPath}.importing`
     try {
-      copyFileFromUri(uri, destPath, (nextCopiedBytes: number) => {
+      await deletePathIfExists(tempImportPath)
+      await copyFileFromUri(uri, tempImportPath, (nextCopiedBytes: number) => {
         copiedBytesForFile = nextCopiedBytes
         onProgress?.({
           totalCount: uris.length,
@@ -412,9 +448,17 @@ export async function importRomUris(
           hasAccurateByteProgress: hasAccurateByteProgress
         })
       }, options?.shouldCancel)
+      await copyFileFromUri(tempImportPath, destPath)
+      await deletePathIfExists(tempImportPath)
       result.importedCount += 1
       result.importedNames.push(fileName)
-      appendImportItemResult(result, fileName, 'IMPORTED', '已成功写入游戏库目录')
+      completedNameSet.add(normalizeFileNameKey(fileName))
+      appendImportItemResult(
+        result,
+        fileName,
+        'IMPORTED',
+        isDependencyFile ? '已作为多文件依赖写入游戏库目录' : '已成功写入游戏库目录'
+      )
       completedBytes += currentProgressBytes
       onProgress?.({
         totalCount: uris.length,
@@ -431,7 +475,7 @@ export async function importRomUris(
     } catch (err) {
       if (err instanceof ImportCanceledError) {
         result.canceled = true
-        await deletePathIfExists(destPath)
+        await deletePathIfExists(tempImportPath)
         appendImportItemResult(result, fileName, 'CANCELED', '复制过程中取消，已清理未完成文件')
         onProgress?.({
           totalCount: uris.length,
@@ -448,6 +492,7 @@ export async function importRomUris(
         break
       }
       const message = (err as Error).message || String(err)
+      await deletePathIfExists(tempImportPath)
       LogHelper.error('RomImport', 'Copy', `复制文件失败 ${fileName}: ${message}`)
       result.failedCount += 1
       result.failedNames.push(fileName)
@@ -481,7 +526,7 @@ export async function inspectRomImportConflicts(
   const conflictNames: string[] = []
   for (let index = 0; index < plans.length; index += 1) {
     const plan = plans[index]
-    if (getPreferredCoreIdForFile(plan.fileName).length === 0) {
+    if (getPreferredCoreIdForFile(plan.fileName).length === 0 && !plan.isDependencyFile) {
       continue
     }
     const destPath = `${romDir}/${plan.fileName}`
@@ -544,14 +589,124 @@ async function buildImportFilePlans(uris: string[]): Promise<ImportFilePlan[]> {
     const uri = uris[index]
     const fileName = getFileNameFromUri(uri, index)
     const fileBytes = await resolveFileSize(uri)
+    const dependencyNames = await resolveMultiFileDependencyNames(uri, fileName)
     plans.push({
       uri: uri,
       fileName: fileName,
       fileBytes: fileBytes,
-      progressBytes: fileBytes > 0 ? fileBytes : 1
+      progressBytes: fileBytes > 0 ? fileBytes : 1,
+      dependencyNames: dependencyNames,
+      isDependencyFile: false
     })
   }
+  markSelectedDependencyFiles(plans)
+  plans.sort((left: ImportFilePlan, right: ImportFilePlan) => {
+    if (left.isDependencyFile !== right.isDependencyFile) {
+      return left.isDependencyFile ? -1 : 1
+    }
+    return left.fileName.localeCompare(right.fileName)
+  })
   return plans
+}
+
+function markSelectedDependencyFiles(plans: ImportFilePlan[]): void {
+  const dependencyNameSet: Set<string> = new Set()
+  plans.forEach((plan: ImportFilePlan) => {
+    plan.dependencyNames.forEach((name: string) => dependencyNameSet.add(normalizeFileNameKey(name)))
+  })
+  plans.forEach((plan: ImportFilePlan) => {
+    plan.isDependencyFile = dependencyNameSet.has(normalizeFileNameKey(plan.fileName))
+  })
+}
+
+async function findMissingDependencyNames(
+  romDir: string,
+  completedNameSet: Set<string>,
+  dependencyNames: string[]
+): Promise<string[]> {
+  if (dependencyNames.length === 0) {
+    return []
+  }
+  const missingNames: string[] = []
+  for (let index = 0; index < dependencyNames.length; index += 1) {
+    const dependencyName = dependencyNames[index]
+    if (completedNameSet.has(normalizeFileNameKey(dependencyName))) {
+      continue
+    }
+    if (await pathExists(`${romDir}/${dependencyName}`)) {
+      continue
+    }
+    missingNames.push(dependencyName)
+  }
+  return missingNames
+}
+
+async function resolveMultiFileDependencyNames(uri: string, fileName: string): Promise<string[]> {
+  const ext = getRomFileExtension(fileName)
+  if (!MULTIFILE_ENTRY_EXTENSIONS.includes(ext)) {
+    return []
+  }
+  let text = ''
+  try {
+    text = await fs.readText(uri)
+  } catch (err) {
+    LogHelper.warn('RomImport', 'Dependency', `读取多文件入口失败 ${fileName}: ${(err as Error).message || String(err)}`)
+    return []
+  }
+  if (ext === 'cue') {
+    return parseCueDependencyNames(text)
+  }
+  if (ext === 'm3u') {
+    return parseM3uDependencyNames(text)
+  }
+  return []
+}
+
+function parseCueDependencyNames(text: string): string[] {
+  const names: string[] = []
+  const lines = text.split(/\r?\n/)
+  lines.forEach((line: string) => {
+    const match = /^\s*FILE\s+"?([^"]+?)"?\s+/i.exec(line)
+    if (!match || match.length < 2) {
+      return
+    }
+    appendDependencyName(names, extractBaseName(match[1]))
+  })
+  return names
+}
+
+function parseM3uDependencyNames(text: string): string[] {
+  const names: string[] = []
+  const lines = text.split(/\r?\n/)
+  lines.forEach((line: string) => {
+    const trimmed = line.trim()
+    if (trimmed.length === 0 || trimmed.startsWith('#')) {
+      return
+    }
+    appendDependencyName(names, extractBaseName(trimmed))
+  })
+  return names
+}
+
+function appendDependencyName(names: string[], name: string): void {
+  if (name.length === 0) {
+    return
+  }
+  const key = normalizeFileNameKey(name)
+  const exists = names.findIndex((item: string) => normalizeFileNameKey(item) === key) >= 0
+  if (!exists) {
+    names.push(name)
+  }
+}
+
+function extractBaseName(path: string): string {
+  const normalized = path.replace(/\\/g, '/')
+  const slashIndex = normalized.lastIndexOf('/')
+  return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized
+}
+
+function normalizeFileNameKey(fileName: string): string {
+  return fileName.toLowerCase()
 }
 
 async function resolveFileSize(path: string): Promise<number> {
@@ -578,12 +733,12 @@ function normalizeFileSize(size: number): number {
   return Math.floor(size)
 }
 
-function copyFileFromUri(
+async function copyFileFromUri(
   sourceUri: string,
   destPath: string,
   onChunkCopied?: (copiedBytes: number) => void,
   shouldCancel?: () => boolean
-): void {
+): Promise<void> {
   let srcFile: fs.File | undefined = undefined
   let destFile: fs.File | undefined = undefined
   try {
@@ -607,6 +762,9 @@ function copyFileFromUri(
       }
       fs.writeSync(destFile.fd, buf, writeOptions)
       onChunkCopied?.(readSize)
+      if (readSize % (1024 * 1024) === 0) {
+        await Promise.resolve()
+      }
       if (shouldCancel?.()) {
         throw new ImportCanceledError(readSize)
       }
