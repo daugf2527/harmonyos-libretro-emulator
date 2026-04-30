@@ -44,11 +44,6 @@ struct AboutHelpPage {
     })
   }
 
-  private getSelectedHelpText(): string {
-    const item = this.helpItems.find((entry: HelpItem) => entry.id === this.selectedHelpId)
-    return item ? item.value : 'Unknown'
-  }
-
   @Builder
   private StatusHeader() {
     Column({ space: 14 }) {
@@ -57,7 +52,7 @@ struct AboutHelpPage {
           .width(5)
           .height(5)
           .backgroundColor(EmuColors.primary)
-        Text('Status: Operational')
+        Text('Status: LOCAL_ABOUT_READY')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
@@ -137,7 +132,7 @@ struct AboutHelpPage {
   @Builder
   private HelpRow(item: HelpItem) {
     Row() {
-      Column({ space: 4 }) {
+      Column({ space: 5 }) {
         Text(item.title)
           .fontSize(17)
           .fontWeight(FontWeight.Medium)
@@ -149,6 +144,16 @@ struct AboutHelpPage {
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1)
+
+        if (this.selectedHelpId === item.id) {
+          Text(item.value)
+            .fontSize(12)
+            .lineHeight(18)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .maxLines(3)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+            .margin({ top: 6 })
+        }
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
@@ -185,31 +190,44 @@ struct AboutHelpPage {
   }
 
   @Builder
-  private DetailPanel() {
-    Column({ space: 10 }) {
-      Row({ space: 8 }) {
-        EmuIcon({
-          name: 'info',
-          iconSize: 16
-        })
-        Text('HELP_DETAIL')
-          .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.primary)
-          .letterSpacing(2)
-      }
-      .alignItems(VerticalAlign.Center)
+  private FooterBrand() {
+    Row() {
+      Column({ space: 14 }) {
+        Row()
+          .width(64)
+          .height(2)
+          .backgroundColor(EmuColors.primary)
 
-      Text(this.getSelectedHelpText())
-        .fontSize(13)
-        .lineHeight(20)
-        .fontColor(EmuColors.onSurfaceVariant)
+        Text('DESIGNED FOR LOCAL\nLIBRETRO SHELL.\nHARMONYOS // ARKUI //\nLIBRETRO')
+          .fontSize(13)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(1.6)
+          .lineHeight(22)
+      }
+      .alignItems(HorizontalAlign.Start)
+
+      Stack() {
+        Row()
+          .width(40)
+          .height(40)
+          .backgroundColor('#2200FF41')
+        EmuIcon({
+          name: 'memory',
+          tone: 'muted',
+          iconSize: 22
+        })
+      }
+      .width(64)
+      .height(64)
+      .backgroundColor(EmuColors.surfaceContainerLow)
+      .border({ width: 0.5, color: '#22484848', style: BorderStyle.Solid })
     }
     .width('100%')
-    .padding(16)
-    .backgroundColor(EmuColors.surfaceContainerLow)
-    .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-    .alignItems(HorizontalAlign.Start)
+    .padding({ top: 38, bottom: 18 })
+    .border({ width: { top: 0.5 }, color: '#22333333', style: BorderStyle.Solid })
+    .justifyContent(FlexAlign.SpaceBetween)
+    .alignItems(VerticalAlign.Center)
   }
 
   build() {
@@ -229,7 +247,7 @@ struct AboutHelpPage {
           this.StatusHeader()
           this.VersionPanel()
           this.HelpList()
-          this.DetailPanel()
+          this.FooterBrand()
         }
         .width('100%')
         .constraintSize({ maxWidth: 680 })
