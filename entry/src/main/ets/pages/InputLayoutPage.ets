@@ -2,7 +2,7 @@ import { common } from '@kit.AbilityKit'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuMetrics } from '../common/EmuUiTokens'
 import {
   createDefaultInputLayoutProfile,
   InputLayoutButton,
@@ -479,17 +479,18 @@ struct InputLayoutPage {
   @Builder
   private EditorTelemetry() {
     Column({ space: 8 }) {
-      this.EditorMetric('Profile', this.layoutStatusText)
-      this.EditorMetric('Saved At', this.layoutUpdatedAtText)
+      this.EditorMetric('Resolution', `${this.editorLayoutWidth} X ${this.editorLayoutHeight}`)
+      this.EditorMetric('Latency', 'INPUT_QUEUE')
+      this.EditorMetric('Input Poll', this.layoutStatusText)
       this.EditorMetric('Selected', this.selectedButtonId.toUpperCase())
     }
-    .padding(12)
-    .backgroundColor('#66000000')
+    .padding({ left: 20, right: 20, top: 14, bottom: 14 })
+    .backgroundColor('#82000000')
     .backdropBlur(12)
     .border({ width: { left: 2 }, color: EmuColors.primary, style: BorderStyle.Solid })
     .align(Alignment.TopStart)
-    .margin({ left: 24, top: 24 })
-    .constraintSize({ maxWidth: 260 })
+    .margin({ left: 24, top: 44 })
+    .constraintSize({ maxWidth: 330 })
   }
 
   @Builder
@@ -502,7 +503,7 @@ struct InputLayoutPage {
       Text(value)
         .fontSize(10)
         .fontFamily('monospace')
-        .fontColor(value === 'INPUT_QUEUE' ? EmuColors.primary : EmuColors.onSurface)
+        .fontColor(value === 'INPUT_QUEUE' || value === this.selectedButtonId.toUpperCase() ? EmuColors.primary : EmuColors.onSurface)
     }
     .width('100%')
     .constraintSize({ maxWidth: 220 })
@@ -671,17 +672,119 @@ struct InputLayoutPage {
   }
 
   @Builder
+  private EditorHeaderBar() {
+    Row() {
+      Row({ space: 12 }) {
+        EmuIcon({
+          name: 'memory',
+          iconSize: 28
+        })
+
+        Text('EMU_CORE_v1.0')
+          .fontFamily('monospace')
+          .fontSize(18)
+          .fontColor(EmuColors.primary)
+          .letterSpacing(4)
+      }
+      .alignItems(VerticalAlign.Center)
+
+      Column({ space: 3 }) {
+        Text('正在编辑布局...')
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurface)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text('CALIBRATION MODE')
+          .fontSize(9)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.primary)
+          .letterSpacing(2.4)
+      }
+      .alignItems(HorizontalAlign.Center)
+
+      Row({ space: 4 }) {
+        EmuIcon({
+          name: 'settings_input_component',
+          tone: 'muted',
+          iconSize: 30
+        })
+      }
+      .width(56)
+      .justifyContent(FlexAlign.End)
+      .onClick(() => {
+        this.toggleEditorMode()
+      })
+    }
+    .width('100%')
+    .height(72)
+    .padding({ left: 24, right: 24 })
+    .justifyContent(FlexAlign.SpaceBetween)
+    .alignItems(VerticalAlign.Center)
+    .backdropBlur(24)
+    .backgroundColor('#F0000000')
+    .border({
+      width: { bottom: 1 },
+      color: EmuMetrics.panelBorderColor,
+      style: BorderStyle.Solid
+    })
+  }
+
+  @Builder
+  private CalibrationMarkers() {
+    Column({ space: 6 }) {
+      Column()
+        .width(4)
+        .height(34)
+        .backgroundColor('#33484848')
+      Row()
+        .width(22)
+        .height(1)
+        .backgroundColor(EmuColors.primary)
+      Column()
+        .width(4)
+        .height(18)
+        .backgroundColor('#33484848')
+      Column()
+        .width(4)
+        .height(18)
+        .backgroundColor('#33484848')
+      Row()
+        .width(22)
+        .height(1)
+        .backgroundColor(EmuColors.primary)
+      Column()
+        .width(4)
+        .height(34)
+        .backgroundColor('#33484848')
+    }
+    .alignItems(HorizontalAlign.End)
+    .opacity(0.55)
+    .align(Alignment.End)
+    .margin({ right: 14 })
+  }
+
+  @Builder
   private EditorContent() {
     Stack() {
       EmuPrecisionGridBackdrop()
-        .opacity(0.18)
+        .opacity(0.08)
+
+      Column()
+        .width('100%')
+        .height('100%')
+        .linearGradient({
+          angle: 135,
+          colors: [[0x332D6C5A, 0.0], [0x11131313, 0.48], [0xDD000000, 1.0]]
+        })
 
       Column()
         .width('100%')
         .height('100%')
         .linearGradient({
           angle: 180,
-          colors: [[0x22131313, 0.0], [0x99000000, 1.0]]
+          colors: [[0x2200FF41, 0.0], [0x00131313, 0.36], [0xD9000000, 1.0]]
         })
 
       Column() {
@@ -697,6 +800,8 @@ struct InputLayoutPage {
       }
       .width('100%')
       .height('100%')
+
+      this.CalibrationMarkers()
 
       if (this.savedToastVisible) {
         Text('INPUT_LAYOUT_SAVED')
@@ -737,18 +842,22 @@ struct InputLayoutPage {
 
   build() {
     Column() {
-      EmuHeaderBar({
-        titleText: this.isEditorMode() ? 'EMU_CORE_v1.0' : 'OS_EMU_v2.4.1',
-      rightLabel: this.isEditorMode() ? '正在编辑布局... CALIBRATION MODE' : '输入映射与联机中心',
-      titleIcon: this.isEditorMode() ? 'memory' : 'terminal',
-      rightIcon: 'settings_input_component',
-      activeTextColor: EmuColors.primary,
-      iconSize: 16,
-      rightIconSize: 18,
-      onRightClick: () => {
-        this.toggleEditorMode()
+      if (this.isEditorMode()) {
+        this.EditorHeaderBar()
+      } else {
+        EmuHeaderBar({
+          titleText: 'OS_EMU_v2.4.1',
+          rightLabel: '输入映射与联机中心',
+          titleIcon: 'terminal',
+          rightIcon: 'settings_input_component',
+          activeTextColor: EmuColors.primary,
+          iconSize: 16,
+          rightIconSize: 18,
+          onRightClick: () => {
+            this.toggleEditorMode()
+          }
+        })
       }
-    })
 
       if (this.isEditorMode()) {
         this.EditorContent()

@@ -145,19 +145,19 @@
 - 路由：`pages/InputLayoutPage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前 ETS 已有 layout profile、选中按钮、nudge、reset/save 与保存 toast；仍需确认外层逻辑画布、虚线选框、按键尺寸、底部 dock 和 telemetry 浮层与截图一致。
-- 截图中控件贴近横屏/游戏画布语义，ETS 需要避免把 750 设计稿坐标直接变成固定页面布局。
+- 已按 `_6` 编辑器主态收口：编辑态独立 calibration header、暗化游戏画布感、左上 telemetry panel、肩键/方向键/动作键虚线选框、底部 floating editor dock 和右侧 calibration markers 已对齐首批视觉目标。
+- `position({ x: percent, y: percent })` 继续只用于输入热区的逻辑画布百分比坐标，不作为截图绝对坐标补丁；外层画布仍由 `width('100%')`、`constraintSize` 与 `aspectRatio` 控制。
 
 ### 交互 gap
-- 拖拽/选择/微调/保存应全部基于百分比逻辑画布；重置需明确恢复默认 profile。
-- 若页面中混有输入中心/Netplay 入口，需保证 `_6` 的编辑模式不是被 `_2` 信息结构污染。
+- 选择、微调、重置和保存继续绑定 `InputLayoutRepository` 本地 profile；本轮未新增拖拽能力，避免把设计 demo 的 cursor-move 误写成已完成触控拖拽。
+- `_6` 保持布局校准编辑器语义，非编辑态入口仍可回到输入中心；多人/外设/Netplay 信息结构留给 `_2` 收口。
 
 ### 运行态 gap
 - `LOCAL_ONLY`：布局 profile 可写入本地 repository。
 - `需真机验证`：真实触控热区、横竖屏、底部 dock 遮挡和保存后 runtime 使用需设备验证。
 
 ### 结论
-部分完成。
+视觉完成；未编译、未预览、未真机。
 
 ## _7 Runtime Controller
 
