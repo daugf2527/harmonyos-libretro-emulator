@@ -70,7 +70,7 @@ export struct LibraryDetailInfoPanel {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .layoutWeight(1)
-    .height(isLarge ? 78 : 72)
+    .height(isLarge ? 76 : 60)
     .padding({ left: 12, right: 12, top: 12, bottom: 12 })
     .alignItems(HorizontalAlign.Start)
     .justifyContent(FlexAlign.Start)
@@ -168,7 +168,7 @@ export struct LibraryDetailInfoPanel {
             .borderRadius(2)
             .backgroundColor(EmuColors.primary)
 
-          Text(`${this.state.telemetryFpsText} FPS // ${this.state.hasRuntimeSnapshot ? 'LAST SESSION' : 'NO SESSION DATA'}`)
+          Text(this.buildTelemetryStatusText())
             .fontSize(10)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.primary)
@@ -181,6 +181,17 @@ export struct LibraryDetailInfoPanel {
       .justifyContent(FlexAlign.SpaceBetween)
 
       Stack() {
+        Row({ space: 23 }) {
+          ForEach(createIndexRange(13), (_: number) => {
+            Column()
+              .width(1)
+              .height('100%')
+              .backgroundColor('#112C2C2C')
+          }, (index: number) => `v-${index}`)
+        }
+        .width('100%')
+        .height('100%')
+
         Column({ space: 16 }) {
           ForEach(createIndexRange(4), (_: number) => {
             Row()
@@ -250,12 +261,17 @@ export struct LibraryDetailInfoPanel {
         .margin({ left: 12, top: 10 })
       }
       .width('100%')
-      .height(96)
+      .height(92)
       .backgroundColor('#060606')
       .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
       .clip(true)
     }
     .width('100%')
+  }
+
+  private buildTelemetryStatusText(): string {
+    const sessionText = this.state.hasRuntimeSnapshot ? 'LAST SESSION' : 'NO SESSION DATA'
+    return `${this.state.telemetryFpsText} FPS // ${sessionText}`
   }
 
   @Builder
@@ -275,15 +291,17 @@ export struct LibraryDetailInfoPanel {
             .lineHeight(26)
             .fontColor('#E6E5E5E5')
 
-          Text(this.state.runtimeSummaryText)
-            .fontSize(10)
-            .fontFamily('monospace')
-            .lineHeight(18)
-            .fontColor(EmuColors.onSurfaceVariant)
-            .margin({ top: 12 })
+          if (this.state.showExtendedDetails) {
+            Text(this.state.runtimeSummaryText)
+              .fontSize(10)
+              .fontFamily('monospace')
+              .lineHeight(18)
+              .fontColor(EmuColors.onSurfaceVariant)
+              .margin({ top: 12 })
+          }
         }
         .width('100%')
-        .padding({ left: 18, right: 18, top: 18, bottom: 18 })
+        .padding({ left: 22, right: 20, top: 20, bottom: 20 })
         .backgroundColor(EmuColors.surfaceContainer)
         .border({
           width: { left: 1.5 },

@@ -23,7 +23,7 @@ export struct LibraryDetailHeroPanel {
   onQuickAction?: (message: string) => void
 
   build() {
-    Column({ space: 30 }) {
+    Column({ space: 28 }) {
       this.HeroSection()
       this.PrimaryActions()
     }
@@ -37,9 +37,9 @@ export struct LibraryDetailHeroPanel {
         Column()
           .width('100%')
           .aspectRatio(3 / 4)
-          .backgroundColor(EmuColors.surfaceContainerLow)
-          .borderRadius(8)
-          .border({ width: 1, color: '#33484848', style: BorderStyle.Solid })
+          .backgroundColor('#080808')
+          .borderRadius(4)
+          .border({ width: 1, color: '#44484848', style: BorderStyle.Solid })
           .clip(true)
 
         EmuCoverArt({
@@ -49,7 +49,7 @@ export struct LibraryDetailHeroPanel {
           .width('100%')
           .aspectRatio(3 / 4)
           .scale({ x: this.state.heroScale, y: this.state.heroScale })
-          .borderRadius(8)
+          .borderRadius(4)
           .clip(true)
 
         Column()
@@ -65,7 +65,7 @@ export struct LibraryDetailHeroPanel {
           })
       }
       .width('100%')
-      .shadow({ radius: 28, color: '#4400FF41', offsetX: 0, offsetY: 0 })
+      .shadow({ radius: 22, color: '#33000000', offsetX: 0, offsetY: 10 })
 
       Column({ space: 4 }) {
         Text(this.state.displayTitle)
@@ -92,10 +92,10 @@ export struct LibraryDetailHeroPanel {
     Column({ space: 12 }) {
       Column({ space: 2 }) {
         Text('启动游戏')
-          .fontSize(22)
+          .fontSize(23)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
-          .letterSpacing(0.8)
+          .letterSpacing(1.2)
 
         Text('LAUNCH GAME')
           .fontSize(10)
@@ -105,12 +105,12 @@ export struct LibraryDetailHeroPanel {
           .letterSpacing(2.4)
       }
       .width('100%')
-      .height(98)
+      .height(92)
       .justifyContent(FlexAlign.Center)
       .alignItems(HorizontalAlign.Center)
-      .backgroundColor('#1900FF41')
-      .border({ width: 1.5, color: '#6600FF41', style: BorderStyle.Solid })
-      .shadow({ radius: 18, color: '#5500FF41', offsetX: 0, offsetY: 0 })
+      .backgroundColor('#1F00FF41')
+      .border({ width: 2, color: '#AA00FF41', style: BorderStyle.Solid })
+      .shadow({ radius: 24, color: '#6600FF41', offsetX: 0, offsetY: 0 })
       .onClick(() => {
         this.onLaunch?.()
       })
@@ -142,9 +142,9 @@ export struct LibraryDetailHeroPanel {
     .layoutWeight(1)
     .height(48)
     .justifyContent(FlexAlign.Center)
-    .backgroundColor(EmuColors.surfaceContainerHigh)
+    .backgroundColor('#1F1F1F')
     .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-    .borderRadius(4)
+    .borderRadius(2)
     .onClick(() => {
       this.onQuickAction?.(toastMessage)
     })

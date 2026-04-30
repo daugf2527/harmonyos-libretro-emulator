@@ -246,8 +246,8 @@
 - 路由：`pages/LibraryDetailPage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前已有详情页、hero、metadata、launch overlay 和 runtime snapshot；仍需对齐截图中的超窄宽度布局、封面比例、绿色 glow CTA、metadata 三列、telemetry 网格和 overview 灰底文本块。
-- 云存档 toast 如果无后端，应从视觉上改为本地状态或未配置，不应强化成同步成功。
+- 已按 `_10` 主体详情页收口：顶部状态胶囊改为本地资料/运行记录语义，hero 封面边框、Launch Game 绿色 glow CTA、quick action、metadata 三列、telemetry 网格和 overview 灰底文本块已对齐首批视觉目标。
+- 剩余视觉风险只在真机侧确认：封面资源裁切、窄屏长标题、telemetry 折线密度、底部导航遮挡和 loading overlay 动效节奏。
 
 ### 交互 gap
 - Launch -> Runtime 参数、启动 overlay 进度、编辑元数据、返回库页和 quick action toast 需要按真实 route/repository 复核。
@@ -259,7 +259,7 @@
 - `需真机验证`：游戏启动、runtime 写回、封面资源和 launch overlay 结束条件需设备验证。
 
 ### 结论
-部分完成。
+视觉完成。
 
 ## _11 Library Context Menu
 

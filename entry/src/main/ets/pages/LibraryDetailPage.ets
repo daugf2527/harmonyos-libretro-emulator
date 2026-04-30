@@ -409,6 +409,11 @@ struct LibraryDetailPage {
       Blank()
         .layoutWeight(1)
 
+      this.LocalStatusPill()
+
+      Blank()
+        .layoutWeight(1)
+
       Row() {
         EmuIcon({
           name: 'settings_input_component',
@@ -438,6 +443,32 @@ struct LibraryDetailPage {
     })
   }
 
+  @Builder
+  private LocalStatusPill() {
+    Row({ space: 7 }) {
+      Row()
+        .width(14)
+        .height(14)
+        .borderRadius(7)
+        .backgroundColor('#FF0E0E0E')
+
+      Text(this.getLocalStatusText())
+        .fontSize(10)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#FF0E0E0E')
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .height(34)
+    .constraintSize({ maxWidth: 142 })
+    .padding({ left: 12, right: 12 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(VerticalAlign.Center)
+    .backgroundColor(EmuColors.primary)
+    .borderRadius(18)
+    .shadow({ radius: 18, color: '#6600FF41', offsetX: 0, offsetY: 0 })
+  }
+
   private getCoreSpecItems(record: LibraryRecord): KeyValueSpecItem[] {
     return [
       { label: 'ROM Version', value: getLibraryDetailRomVersionLabel(record, this.metadataRecord) },
@@ -454,6 +485,23 @@ struct LibraryDetailPage {
       localizedTitle: getLibraryDetailLocalizedTitle(record),
       coreLabel: record.preferredCoreId.toUpperCase()
     }
+  }
+
+  private getLocalStatusText(): string {
+    if (!this.libraryRecord) {
+      return '本地资料加载中'
+    }
+    if (hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord)) {
+      return '本地运行记录'
+    }
+    return '本地资料已加载'
+  }
+
+  private getLaunchRuntimeStatusText(): string {
+    if (!this.libraryRecord) {
+      return 'NO DATA'
+    }
+    return hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord) ? 'RECORDED' : 'NO DATA'
   }
 
   private getInfoPanelState(record: LibraryRecord): LibraryDetailInfoPanelState {
@@ -547,7 +595,7 @@ struct LibraryDetailPage {
         Row() {
           if (this.libraryRecord) {
             Scroll() {
-              Column({ space: 30 }) {
+              Column({ space: 32 }) {
                 LibraryDetailHeroPanel({
                   state: this.getHeroPanelState(this.libraryRecord as LibraryRecord),
                   onLaunch: () => {
@@ -569,7 +617,7 @@ struct LibraryDetailPage {
                 })
               }
               .width('100%')
-              .padding({ left: 24, right: 24, top: 24, bottom: 40 })
+              .padding({ left: 24, right: 24, top: 26, bottom: 42 })
             }
             .width('100%')
             .constraintSize({ maxWidth: 390 })
@@ -624,7 +672,7 @@ struct LibraryDetailPage {
             progress: this.launchProgress,
             statusText: this.launchStatusText,
             cpuText: this.launchCpuText,
-            runtimeStatusText: hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord) ? 'RECORDED' : 'NO DATA',
+            runtimeStatusText: this.getLaunchRuntimeStatusText(),
             fileLabel: getLibraryLaunchFileLabel(this.libraryRecord as LibraryRecord)
           }
         })
