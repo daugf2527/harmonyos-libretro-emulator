@@ -1,5 +1,8 @@
 # Stitch Visual Parity Closure Implementation Plan
 
+> 状态：已被 2026-04-30 两份验收文档取代，仅作历史计划参考。
+> 后续不要再按该旧计划继续执行 `_12 menu`、随机扫描进度、旧 import simulation 等条目；以 `docs/2026-04-30-design-page-acceptance-matrix.md` 和 `docs/2026-04-30-design-page-artifact-gap-audit.md` 为准。
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Close the largest visual gaps between the Stitch emulator screens and native ArkTS pages without weakening the real runtime/data-state boundaries.

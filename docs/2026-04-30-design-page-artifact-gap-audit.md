@@ -3,7 +3,7 @@
 > 日期：2026-04-30
 > 范围：`stitch_game_emulator_design_plan/_1` 到 `_15`。
 > 方法：逐项打开 `screen.png`，读取 `code.html` 的 body 结构/可见文案/主要 class，并对照当前矩阵映射的 ETS 页面/组件与 `main_pages.json` 注册状态。
-> 边界：本轮只做静态验收与文档更新；未编译、未预览、未真机运行；旧架构 `deprecated/legacy/` 不参与。
+> 边界：本轮包含静态验收、文档更新与第一批 ArkTS 视觉收口；未编译、未预览、未真机运行；旧架构 `deprecated/legacy/` 不参与。
 
 ## _1 Core Manager
 
