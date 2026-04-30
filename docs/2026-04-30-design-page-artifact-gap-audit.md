@@ -42,12 +42,12 @@
 - 路由：`pages/MultiplayerInputPage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前页面已有 controller slot、Netplay lobby、telemetry、input log 与刷新/编辑按钮；仍需对齐截图中的卡片高度、三列 stats 小块、房间列表缩略图、jitter 图表网格、input log 右侧状态列。
-- 设计是输入中心页，底部 Input 高亮；需确认 ETS 的底部导航与主流程一致。
+- 已按 `_2` 输入中心主态收口：controller slot、三列 stats 小块、Netplay lobby 标题区、房间/入口列表、jitter telemetry 网格、input log 右侧状态列和底部 Input 高亮已对齐首批视觉目标。
+- 远端 lobby 不沿用 `code.html` 的在线房间演示数据；ETS 保留本地输入会话、离线 Netplay Adapter 和 Layout Editor 入口，视觉结构贴近截图但状态保持诚实。
 
 ### 交互 gap
-- 外设刷新、端口映射、进入按键布局页应走真实 device route；房间创建/加入若无后端必须禁用或展示未配置态。
-- `code.html` 的 hover/active 反馈和房间 chevron 动效尚未逐项落到 ArkUI。
+- 外设刷新继续走 `RuntimeInputPortController`，进入按键布局页继续走真实 `InputLayoutPage` route。
+- Netplay 创建/加入未接后端，`CREATE ROOM` 已显示为禁用态，Netplay Adapter 明确标 `NOT_CONFIGURED/OFFLINE`，不伪造可用房间服务。
 
 ### 运行态 gap
 - `LOCAL_ONLY`：本地 input port/controller 列表可静态接入。
@@ -55,7 +55,7 @@
 - `需真机验证`：蓝牙/USB 外设、轮询率、输入延迟和端口映射需设备验证。
 
 ### 结论
-部分完成。
+视觉完成；未编译、未预览、未真机。
 
 ## _3 Shader Preview
 

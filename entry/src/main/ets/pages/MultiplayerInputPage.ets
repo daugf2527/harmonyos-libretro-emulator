@@ -53,7 +53,6 @@ struct MultiplayerInputPage {
   @State private deviceCountText: string = '0'
   @State private selectedRoomId: string = 'local'
   @State private localLatencyText: string = 'FRAME_SYNC'
-  @State private adapterStatusText: string = 'LOCAL_ONLY'
 
   private readonly telemetryBars: TelemetryBarItem[] = [
     { id: 'j-01', height: 24, isPrimary: false },
@@ -100,7 +99,6 @@ struct MultiplayerInputPage {
     this.deviceCountText = `${devices.length}`
     this.deviceNamesText = this.buildDeviceNamesText(devices)
     this.localLatencyText = devices.length > 0 ? 'INPUT_QUEUE' : 'FRAME_SYNC'
-    this.adapterStatusText = devices.length > 0 ? 'DEVICE_ROUTE_READY' : 'LOCAL_ONLY'
   }
 
   private buildDeviceNamesText(devices: InputDeviceInfo[]): string {
@@ -176,7 +174,7 @@ struct MultiplayerInputPage {
         game: 'Remote lobby service not configured',
         latency: '--',
         players: 'OFFLINE',
-        status: this.adapterStatusText,
+        status: 'NOT_CONFIGURED',
         color: EmuColors.error
       },
       {
@@ -319,27 +317,32 @@ struct MultiplayerInputPage {
       Row() {
         Row({ space: 8 }) {
           EmuIcon({ name: 'explore', tone: 'muted', iconSize: 18 })
-          Text('Netplay Lobby')
-            .fontSize(13)
+          Text('NETPLAY\nLOBBY')
+            .fontSize(12)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
             .letterSpacing(2)
+            .lineHeight(20)
         }
         .alignItems(VerticalAlign.Center)
 
         Row({ space: 12 }) {
-          Text(`Devices: ${this.deviceCountText}`)
+          Text('Servers: NOT_CONFIGURED')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor('#777777')
 
-          Button('Create Room')
-            .height(30)
+          Button('CREATE\nROOM')
+            .height(44)
             .fontSize(10)
+            .fontFamily('monospace')
+            .lineHeight(16)
             .fontColor(EmuColors.onSurface)
             .backgroundColor(Color.Transparent)
-            .border({ width: 0.5, color: EmuColors.outline, style: BorderStyle.Solid })
+            .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
             .borderRadius(0)
+            .opacity(0.45)
+            .enabled(false)
             .onClick(() => {
               this.selectedRoomId = 'adapter'
             })
@@ -384,6 +387,8 @@ struct MultiplayerInputPage {
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor(EmuColors.onSurface)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(`Game: ${room.game}`)
           .fontSize(10)
           .fontFamily('monospace')
@@ -415,6 +420,15 @@ struct MultiplayerInputPage {
           .fontColor(EmuColors.onSurface)
       }
       .alignItems(HorizontalAlign.End)
+
+      Text(room.status)
+        .fontSize(9)
+        .fontFamily('monospace')
+        .fontColor(room.status === 'NOT_CONFIGURED' ? EmuColors.error : room.color)
+        .padding({ left: 6, right: 6, top: 3, bottom: 3 })
+        .backgroundColor(room.status === 'NOT_CONFIGURED' ? '#227E2B17' : '#1800FF41')
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
 
       Text(this.selectedRoomId === room.id ? '●' : '›')
         .fontSize(this.selectedRoomId === room.id ? 12 : 24)
