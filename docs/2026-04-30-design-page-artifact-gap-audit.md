@@ -195,8 +195,8 @@
 - 路由：`pages/SaveStatePage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前 ETS 已有 save slot、delete confirm、toast 和 empty archive；仍需对齐首项 swipe action 的露出宽度、slot 缩略图比例、右侧时间/drag handle、顶部摘要三列和底部虚线 archive block。
-- 截图里部分图片资源带有占位/错误图状态，正式页需要使用真实缩略图或明确 fallback，而不是沿用设计导出资源名。
+- 已按 `_8` 主体存档页收口：顶部 header、三列本地归档摘要、首项 swipe action 露出宽度、slot 缩略图比例、右侧时间/drag handle 和底部虚线 archive block 已对齐首批视觉目标。
+- 截图里部分图片资源带有占位/错误图状态；ETS 继续使用本地 fallback 缩略块，不沿用设计导出远程图片资源。
 
 ### 交互 gap
 - quick save、load、delete、refresh 需要与当前 ROM 参数和 repository 绑定；滑动删除不能破坏列表稳定 key。
@@ -208,7 +208,7 @@
 - `需真机验证`：读档/写档、缩略图、文件权限、删除结果需设备验证。
 
 ### 结论
-部分完成。
+视觉完成。
 
 ## _9 Pause Overlay
 

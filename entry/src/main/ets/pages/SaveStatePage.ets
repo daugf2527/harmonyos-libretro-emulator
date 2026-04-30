@@ -1,7 +1,6 @@
 import testNapi from 'libentry.so'
 import { common } from '@kit.AbilityKit'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
-import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors } from '../common/EmuUiTokens'
 import {
@@ -302,71 +301,125 @@ struct SaveStatePage {
   }
 
   @Builder
-  private TelemetryStrip() {
+  private SaveHeader() {
     Row() {
-      Row({ space: 18 }) {
-        this.StatusChip('Storage', 'APP_FILES')
-        this.StatusChip('Slots', `${this.saveItems.length}/99`)
-      }
-      .alignItems(VerticalAlign.Center)
+      Row({ space: 10 }) {
+        EmuIcon({
+          name: 'memory',
+          iconSize: 21
+        })
 
-      Row({ space: 8 }) {
-        Row()
-          .width(6)
-          .height(6)
-          .borderRadius(3)
-          .backgroundColor(EmuColors.primary)
-
-        Text(this.loading ? '正在读取本地存档...' : this.syncStatusText)
-          .fontSize(10)
+        Text('EMU_CORE_v1.0')
+          .fontSize(16)
           .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
-          .letterSpacing(0.8)
+          .letterSpacing(3)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
+      .layoutWeight(1)
       .alignItems(VerticalAlign.Center)
 
-      Button('QUICK SAVE')
-        .height(30)
-        .fontSize(10)
-        .fontFamily('monospace')
+      Text('存档管理')
+        .fontSize(14)
         .fontWeight(FontWeight.Bold)
-        .fontColor('#004C0C')
+        .fontColor(EmuColors.onSurface)
+        .letterSpacing(0.8)
+
+      Row({ space: 16 }) {
+        Row() {
+          Text('+')
+            .fontSize(28)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#004C0C')
+        }
+        .width(34)
+        .height(34)
+        .borderRadius(3)
+        .justifyContent(FlexAlign.Center)
+        .alignItems(VerticalAlign.Center)
         .backgroundColor(EmuColors.primary)
         .onClick(() => {
           void this.quickSave()
         })
+
+        Row() {
+          EmuIcon({
+            name: 'settings_input_component',
+            iconSize: 28
+          })
+        }
+        .onClick(() => {
+          void this.refreshSaveItems()
+        })
+      }
+      .layoutWeight(1)
+      .justifyContent(FlexAlign.End)
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(48)
+    .height(64)
     .padding({ left: 24, right: 24 })
-    .backgroundColor('#0E0E0E')
+    .backgroundColor('#E6000000')
     .border({ width: { bottom: 0.5 }, color: '#262626', style: BorderStyle.Solid })
     .justifyContent(FlexAlign.SpaceBetween)
+    .alignItems(VerticalAlign.Center)
+    .backdropBlur(24)
   }
 
   @Builder
-  private StatusChip(label: string, value: string) {
-    Row({ space: 8 }) {
+  private TelemetryStrip() {
+    Row() {
+      this.StatusColumn('Storage', this.currentRomFile.length > 0 ? 'Current ROM' : 'Local Files')
+      this.StatusColumn('Slots', `${this.saveItems.length}/99`)
+      this.StatusColumn('Archive', this.loading ? 'Reading local...' : this.syncStatusText)
+    }
+    .width('100%')
+    .height(100)
+    .padding({ left: 30, right: 30 })
+    .backgroundColor('#0E0E0E')
+    .border({ width: { bottom: 0.5 }, color: '#262626', style: BorderStyle.Solid })
+    .justifyContent(FlexAlign.SpaceBetween)
+    .alignItems(VerticalAlign.Center)
+  }
+
+  @Builder
+  private StatusColumn(label: string, value: string) {
+    Row({ space: 12 }) {
       Row()
-        .width(4)
-        .height(4)
-        .borderRadius(2)
+        .width(6)
+        .height(6)
+        .borderRadius(3)
         .backgroundColor(EmuColors.primary)
 
-      Text(`${label}: ${value}`)
-        .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor(EmuColors.onSurfaceVariant)
-        .letterSpacing(1.2)
+      Column({ space: 6 }) {
+        Text(label.toUpperCase())
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(2.4)
+
+        Text(value)
+          .fontSize(14)
+          .fontFamily('monospace')
+          .fontColor(label === 'Archive' ? EmuColors.primary : EmuColors.onSurfaceVariant)
+          .letterSpacing(1.6)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .alignItems(HorizontalAlign.Start)
     }
     .alignItems(VerticalAlign.Center)
+    .layoutWeight(1)
   }
 
   @Builder
   private SaveSlotRow(item: SaveSlotItem) {
     Stack() {
       Row() {
-        Row({ space: 8 }) {
+        Row({ space: 0 }) {
           this.SwipeAction('读档', EmuColors.primary, item.fileName)
           this.SwipeAction('删除', EmuColors.error, item.fileName)
         }
@@ -429,7 +482,7 @@ struct SaveStatePage {
       .padding({ left: item.isActive ? 18 : 24, right: 24 })
       .backgroundColor(EmuColors.surfaceContainerLowest)
       .border({ width: { bottom: 0.5 }, color: '#262626', style: BorderStyle.Solid })
-      .translate({ x: item.isActive ? -112 : 0 })
+      .translate({ x: item.isActive ? -184 : 0 })
       .onClick(() => {
         void this.loadSave(item.fileName)
       })
@@ -465,7 +518,7 @@ struct SaveStatePage {
         .fontColor(label === '读档' ? '#004C0C' : '#450900')
         .letterSpacing(1)
     }
-    .width(72)
+    .width(92)
     .height('100%')
     .justifyContent(FlexAlign.Center)
     .backgroundColor(color)
@@ -493,23 +546,24 @@ struct SaveStatePage {
     } else {
       Column({ space: 16 }) {
         Text('▣')
-          .fontSize(42)
+          .fontSize(46)
           .fontColor(EmuColors.onSurfaceVariant)
           .opacity(0.48)
 
-        Text('End of Archive Stream')
+        Text('END OF ARCHIVE STREAM')
           .fontSize(12)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
-          .letterSpacing(2.4)
+          .letterSpacing(4)
           .opacity(0.48)
       }
       .width('100%')
-      .layoutWeight(1)
+      .height(252)
       .justifyContent(FlexAlign.Center)
       .alignItems(HorizontalAlign.Center)
       .border({ width: 0.5, color: '#4D484848', style: BorderStyle.Dashed })
-      .margin({ left: 24, right: 24, top: 42, bottom: 42 })
+      .borderRadius(8)
+      .margin({ left: 44, right: 44, top: 88, bottom: 88 })
     }
   }
 
@@ -607,16 +661,7 @@ struct SaveStatePage {
   build() {
     Stack() {
       Column() {
-        EmuHeaderBar({
-          titleText: 'EMU_CORE_v1.0',
-          rightLabel: '存档管理',
-          titleIcon: 'memory',
-          rightIcon: 'settings_input_component',
-          activeTextColor: EmuColors.primary,
-          iconSize: 16,
-          rightIconSize: 18
-        })
-
+        this.SaveHeader()
         this.TelemetryStrip()
         this.ArchiveList()
 
