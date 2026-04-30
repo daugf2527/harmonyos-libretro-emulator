@@ -12,50 +12,63 @@ export struct RuntimeTopHudBar {
 
   @Builder
   private MetricCell(item: RuntimeHudMetric) {
-    Column({ space: 2 }) {
+    Column({ space: 1 }) {
       Text(item.label)
-        .fontSize(9)
+        .fontSize(7)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor('#88757575')
+        .maxLines(1)
 
       Text(item.value)
-        .fontSize(14)
+        .fontSize(11)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.primary)
+        .maxLines(1)
     }
     .alignItems(HorizontalAlign.Start)
   }
 
   build() {
     Row() {
-      Row({ space: 8 }) {
-        Text('◉')
-          .fontSize(12)
+      Row({ space: 10 }) {
+        Text('⚙')
+          .fontSize(15)
           .fontColor(EmuColors.primary)
 
         Text(this.titleText)
-          .fontSize(14)
+          .fontSize(13)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
-          .letterSpacing(1.8)
+          .letterSpacing(2.6)
+          .maxLines(1)
       }
       .alignItems(VerticalAlign.Center)
 
-      Row({ space: 16 }) {
+      Row({ space: 18 }) {
         ForEach(this.metrics, (item: RuntimeHudMetric) => {
           this.MetricCell(item)
         }, (item: RuntimeHudMetric) => item.label)
+
+        Row()
+          .width(1)
+          .height(20)
+          .backgroundColor('#33484848')
+
+        Text('◥')
+          .fontSize(16)
+          .fontColor(EmuColors.primary)
       }
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height(70)
-    .padding({ left: 30, right: 30 })
+    .height(40)
+    .padding({ left: 28, right: 28 })
     .justifyContent(FlexAlign.SpaceBetween)
-    .backgroundColor('#E6000000')
+    .backgroundColor('#F0000000')
+    .backdropBlur(18)
     .border({ width: { bottom: 0.5 }, color: '#33484848', style: BorderStyle.Solid })
     .hitTestBehavior(HitTestMode.None)
     .align(Alignment.Top)

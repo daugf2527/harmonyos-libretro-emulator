@@ -170,19 +170,19 @@
 - 路由：`pages/LibretroGamePage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前已有 runtime HUD、虚拟手柄和控制面板；仍需对齐截图中的大面积 playfield、CRT/scanline 质感、movement 卡片、动作键 cluster、Quick Save 竖向按钮和 Select/Start 位置。
-- ETS 的 debug/control panel 信息需要确认默认不遮挡运行画面。
+- 顶部 compact telemetry、运行画面暗场/scanline、movement 玻璃卡片、动作键 cluster、Quick Save 竖向按钮、Select/Start 和底部 System 高亮已按截图主结构收口。
+- 控制面板默认不再作为运行画面主体；仍需真机确认 Quick Save 右侧驻留按钮与不同窗口宽度下的手柄间距。
 
 ### 交互 gap
-- 虚拟按钮必须继续调用真实 input binding；暂停、隐藏手柄、即时存档/读档不能只停留在 UI 状态。
-- `code.html` 的按键 active/scale 反馈和 telemetry 展开/隐藏需要逐项核对。
+- 虚拟方向键、A/B/X/Y、Select/Start 继续调用真实 runtime input binding；Quick Save 继续绑定 `RuntimeSaveStateController`，不是假 UI 状态。
+- `code.html` 的 telemetry 展开/隐藏和拖拽 Quick Save 未作为本轮运行逻辑引入，避免伪造未接入交互。
 
 ### 运行态 gap
 - `需真机验证`：XComponent 画面、帧率、音频、输入、暂停、存档和实际 core 运行只能设备验证。
 - `NOT_CONFIGURED`：震动、部分 overlay 工具若未接 native 能力，不应显示为可用。
 
 ### 结论
-部分完成。
+视觉完成。
 
 ## _8 Save State
 

@@ -10,9 +10,11 @@ import {
   RuntimeControlPanel,
   RuntimeControlPanelState
 } from '../components/RuntimeControlPanel';
+import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav';
 import { RuntimeHudMetric, RuntimeTopHudBar } from '../components/RuntimeTopHudBar';
 import { RuntimePauseOverlay } from '../components/RuntimePauseOverlay';
 import { RuntimeVirtualControllerLayer } from '../components/RuntimeVirtualControllerLayer';
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper';
 import {
   buildInputSourceItems,
   createDefaultPortAssignments,
@@ -763,6 +765,32 @@ struct LibretroGamePage {
     this.clearRuntimeStatsForConfigChange();
     LogHelper.info('LibretroGame', 'Config', `设置缩放模式: ${index}, okMode=${okMode}`);
   }
+
+  private openRuntimeControlPanel(): void {
+    this.refreshInputDevices();
+    this.selectedPortIndex = 0;
+    this.showControls = true;
+  }
+
+  private onRuntimeBottomNavClick(key: string): void {
+    if (key === 'system') {
+      this.openRuntimeControlPanel();
+      return;
+    }
+    const route = getEmuBottomNavTargetRoute(key, 'engine');
+    if (route.length === 0) {
+      return;
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[LibretroGamePage] replaceUrl ${route} failed: ${err.message}`);
+      });
+      return;
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[LibretroGamePage] pushUrl ${route} failed: ${err.message}`);
+    });
+  }
   
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
@@ -824,26 +852,41 @@ struct LibretroGamePage {
           },
           onAnalogChange: (index: number, x: number, y: number) => {
             this.setAnalog(index, x, y);
+          },
+          onQuickSave: () => {
+            void this.quickSaveRuntimeState();
           }
         })
       }
 
-      // 左上角系统菜单按钮
-      Button('▦')
-        .width(46)
-        .height(40)
-        .fontSize(18)
-        .fontColor(EmuColors.primary)
-        .backgroundColor('#CC000000')
-        .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-        .borderRadius(4)
-        .margin({ left: 18, top: 84 })
-        .enabled(!this.switching)
-        .onClick(() => {
-          this.refreshInputDevices();
-          this.selectedPortIndex = 0; // 默认选中 P1
-          this.showControls = true;
+      if (this.gameRunning) {
+        EmuBottomNav({
+          items: createEmuBottomNavItems('system'),
+          indicatorStyle: 'dot',
+          panelBackgroundColor: '#F8000000',
+          onItemClick: (key: string) => {
+            this.onRuntimeBottomNavClick(key);
+          }
         })
+          .align(Alignment.Bottom)
+      }
+
+      // 左上角系统菜单按钮
+      if (!this.gameRunning) {
+        Button('▦')
+          .width(46)
+          .height(40)
+          .fontSize(18)
+          .fontColor(EmuColors.primary)
+          .backgroundColor('#CC000000')
+          .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+          .borderRadius(4)
+          .margin({ left: 18, top: 48 })
+          .enabled(!this.switching)
+          .onClick(() => {
+            this.openRuntimeControlPanel();
+          })
+      }
 
       if (this.gameRunning && !this.gamePaused) {
         Button('PAUSE')
@@ -856,7 +899,7 @@ struct LibretroGamePage {
           .backgroundColor('#CC000000')
           .border({ width: 0.5, color: '#6600FF41', style: BorderStyle.Solid })
           .borderRadius(4)
-          .margin({ left: 88, top: 84 })
+          .margin({ left: 88, top: 48 })
           .onClick(() => {
             this.pauseGame();
           })
