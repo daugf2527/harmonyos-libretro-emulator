@@ -68,19 +68,19 @@
 - 路由：`pages/ShaderPreviewPage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前 ETS 有 split preview 和调参面板承载；仍需对齐截图的全屏背景图裁切、中央荧光分割线、scanline/CRT 点阵、面板透明度、slider 轨道与 GPU stat 浮层。
-- `SAVE_CFG` 在 ETS 中表现为 `APPLY`，需要确认产品文案是否统一。
+- 已按 `_3` Shader Preview 主态收口：双栏 split preview、中央荧光分割线/handle、右侧 scanline/CRT 处理层、浮动参数面板、slider 轨道/handle、`SAVE_CFG` 和 GPU/latency stats 浮层已对齐首批视觉目标。
+- 预览画面仍是静态视觉外壳；GPU load、latency 和 shader runtime 明确标 `NOT_CONFIGURED` / `PREVIEW_ONLY`，不沿用设计 demo 的真实数值。
 
 ### 交互 gap
-- slider 变化、reset、apply/save 行为需要区分仅保存设置与真实 runtime shader 应用。
-- `code.html` 的 split divider 状态和 live shader 标记未通过运行态确认。
+- RESET 只恢复本地预览 preset，`SAVE_CFG` 只更新本地状态为 `LOCAL_PREVIEW_CFG_SAVED`；本轮移除“已应用到 native shader runtime”的暗示。
+- split divider、CRT/scanline 和 live shader 标记仅完成静态视觉收口，真实 GLES shader 链路需后续运行态验证/接线。
 
 ### 运行态 gap
 - `NOT_CONFIGURED`：真实 shader 列表、GPU load、shader runtime 应用链路未静态证明完整。
 - `需真机验证`：GLES 渲染、shader 参数应用、延迟指标和预览帧真实性必须设备验证。
 
 ### 结论
-部分完成。
+视觉完成；未编译、未预览、未真机。
 
 ## _4 Settings
 

@@ -1,16 +1,7 @@
-import testNapi from 'libentry.so'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuColors } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
-import LogHelper from '../common/LogHelper'
-
-interface ShaderPreviewNapi {
-  refactoredSetScalingMode(mode: number): boolean
-  refactoredSetAIUpscale(enabled: boolean): boolean
-}
-
-const nativeApi = testNapi as ShaderPreviewNapi
 
 @Entry
 @Component
@@ -18,9 +9,10 @@ struct ShaderPreviewPage {
   @State private scanlineIntensity: number = 65
   @State private curvature: number = 12
   @State private saturation: number = 115
-  @State private selectedMode: string = 'GLES_PREVIEW'
-  @State private statusText: string = 'ENGINE_BRIDGE_IDLE'
+  @State private selectedMode: string = 'STATIC_PREVIEW'
+  @State private statusText: string = 'SHADER_RUNTIME_NOT_CONFIGURED'
   private readonly scanlineRows: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  private readonly previewStatBars: number[] = [12, 22, 34, 18, 42, 28]
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
     { key: 'engine', iconName: 'terminal', label: '引擎', isActive: true },
@@ -35,20 +27,12 @@ struct ShaderPreviewPage {
     this.statusText = 'LOCAL_PRESET_RESET'
   }
 
-  private applyPreviewBridge(): void {
-    try {
-      const scalingApplied = nativeApi.refactoredSetScalingMode(2)
-      const upscaleApplied = nativeApi.refactoredSetAIUpscale(this.saturation > 120)
-      if (scalingApplied || upscaleApplied) {
-        this.statusText = 'VIDEO_BRIDGE_APPLIED'
-      } else {
-        this.statusText = 'ENGINE_BRIDGE_REJECTED'
-      }
-    } catch (err) {
-      const message = (err as Error).message || String(err)
-      LogHelper.warn('ShaderPreviewPage', 'Bridge', `应用视频预览失败: ${message}`)
-      this.statusText = 'ENGINE_BRIDGE_FAILED'
-    }
+  private savePreviewConfig(): void {
+    this.statusText = 'LOCAL_PREVIEW_CFG_SAVED'
+  }
+
+  private getSliderTrackValue(value: number): number {
+    return Math.max(0, Math.min(100, value))
   }
 
   private onBottomNavClick(key: string): void {
@@ -103,7 +87,7 @@ struct ShaderPreviewPage {
           .letterSpacing(1.8)
           .padding({ left: 10, right: 10, top: 5, bottom: 5 })
           .backgroundColor(processed ? EmuColors.primary : '#CC000000')
-        Text(mode)
+        Text(processed ? `${mode} / NOT_CONFIGURED` : mode)
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(processed ? EmuColors.primary : EmuColors.onSurface)
@@ -196,16 +180,17 @@ struct ShaderPreviewPage {
           .onClick(() => {
             this.resetPreset()
           })
-        Button('APPLY')
+        Button('SAVE_CFG')
           .layoutWeight(1)
           .height(36)
           .fontSize(10)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
-          .fontColor('#00131313')
-          .backgroundColor(EmuColors.primary)
+          .fontColor(EmuColors.primary)
+          .backgroundColor(Color.Transparent)
+          .border({ width: 0.5, color: EmuColors.primary, style: BorderStyle.Solid })
           .onClick(() => {
-            this.applyPreviewBridge()
+            this.savePreviewConfig()
           })
       }
       .width('100%')
@@ -240,15 +225,82 @@ struct ShaderPreviewPage {
           .height(1)
           .backgroundColor(EmuColors.outlineVariant)
         Row()
-          .width(`${Math.min(100, value)}%`)
+          .width(`${this.getSliderTrackValue(value)}%`)
           .height(1)
           .backgroundColor(EmuColors.primary)
           .align(Alignment.Start)
+
+        Row() {
+          Row()
+            .width(2)
+            .height(12)
+            .backgroundColor(EmuColors.onSurface)
+        }
+        .width(`${this.getSliderTrackValue(value)}%`)
+        .height(1)
+        .justifyContent(FlexAlign.End)
+        .align(Alignment.Start)
       }
       .width('100%')
       .height(14)
     }
     .width('100%')
+  }
+
+  @Builder
+  private PreviewStatsOverlay() {
+    Column({ space: 12 }) {
+      Row() {
+        Text('GPU LOAD')
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(1.4)
+        Text('NOT_CONFIGURED')
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.primary)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Row()
+        .width('100%')
+        .height(2)
+        .backgroundColor('#3300FF41')
+
+      Row() {
+        Text('LATENCY')
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(1.4)
+        Text('PREVIEW_ONLY')
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.primary)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Row({ space: 3 }) {
+        ForEach(this.previewStatBars, (heightValue: number) => {
+          Row()
+            .width(6)
+            .height(heightValue)
+            .backgroundColor(heightValue > 24 ? EmuColors.primary : EmuColors.surfaceContainerHighest)
+        }, (heightValue: number) => `${heightValue}`)
+      }
+      .height(46)
+      .alignItems(VerticalAlign.Bottom)
+    }
+    .width(250)
+    .padding(18)
+    .backgroundColor('#B3000000')
+    .backdropBlur(12)
+    .border({ width: 0.5, color: '#55484848', style: BorderStyle.Solid })
+    .align(Alignment.BottomStart)
+    .margin({ left: 24, bottom: 24 })
   }
 
   build() {
@@ -265,6 +317,7 @@ struct ShaderPreviewPage {
 
       Stack() {
         this.SplitPreview()
+        this.PreviewStatsOverlay()
         Row() {
           Blank()
           this.ParameterPanel()
