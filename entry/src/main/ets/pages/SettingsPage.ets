@@ -1,7 +1,7 @@
 import { EmuColors } from '../common/EmuUiTokens'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
 interface SettingOptionItem {
   key: string
@@ -56,7 +56,19 @@ struct SettingsPage {
   ]
 
   private onBottomNavClick(key: string): void {
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'system', 'SettingsPage')
+    const route = getEmuBottomNavTargetRoute(key, 'system')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[SettingsPage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[SettingsPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   private openPage(url: string, label: string): void {
@@ -416,6 +428,8 @@ struct SettingsPage {
       this.ValueRow('Audio Buffer', 'Adaptive')
       this.ValueRow('Shader Mode', 'CRT_ROYALE_V4.2')
       this.ValueRow('Telemetry Scope', 'Runtime Only')
+      this.NavigationRow('Input / Netplay Center', 'LOCAL_INPUT_ROUTING', 'pages/MultiplayerInputPage')
+      this.NavigationRow('Input Layout Editor', 'LOCAL_TOUCH_LAYOUT', 'pages/InputLayoutPage')
       this.NavigationRow('Core / Firmware Manager', 'LOCAL_CORE_SCAN', 'pages/CoreManagerPage')
       this.NavigationRow('Shader Preview', 'VIDEO_BRIDGE_PREVIEW', 'pages/ShaderPreviewPage')
       this.NavigationRow('About / Help', 'LOCAL_DOCUMENTATION', 'pages/AboutHelpPage')

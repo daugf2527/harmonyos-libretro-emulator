@@ -4,9 +4,9 @@ import { EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuBottomNav } from '../components/EmuBottomNav'
 import { ImportEmptyStateHero } from '../components/ImportEmptyStateHero'
 import { setPendingImportUris } from '../common/ImportTaskBridge'
-import { EmuColors, EmuMetrics } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
 import { pickRomUris } from '../common/RomImportService'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
 interface ImportParticle {
   x: number
@@ -51,7 +51,19 @@ struct ImportEntryPage {
   ]
 
   private onBottomNavClick(key: string): void {
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'library', 'ImportEntryPage')
+    const route = getEmuBottomNavTargetRoute(key, 'library')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[ImportEntryPage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[ImportEntryPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   aboutToAppear(): void {
@@ -195,7 +207,7 @@ struct ImportEntryPage {
     Column() {
       EmuHeaderBar({
         titleText: 'EMU_CORE_v1.0',
-        rightLabel: 'NETWORK: ONLINE',
+        rightLabel: 'LOCAL_ONLY',
         titleIcon: 'memory',
         rightIcon: 'settings_input_component',
         activeTextColor: EmuColors.primary,

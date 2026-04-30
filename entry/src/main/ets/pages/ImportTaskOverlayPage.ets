@@ -12,7 +12,7 @@ import {
   RomImportProgress,
   RomImportResult
 } from '../common/RomImportService'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
 type FeedbackState = 'CONFLICT' | 'IMPORTING' | 'SUCCESS' | 'ERROR'
 
@@ -30,11 +30,11 @@ struct ImportTaskOverlayPage {
   @State private overwritePressed: boolean = false
   @State private pulseDotVisible: boolean = true
   @State private etaText: string = 'EST: 02:45'
-  @State private sourceText: string = 'Source: EXT_DISK_A'
-  @State private transferRateText: string = '24.4 MB/s'
-  @State private progressPercent: number = 33
-  @State private processStatusText: string = 'VERIFYING_CHECKSUM...'
-  @State private processIdText: string = 'PROCESS_ID: 0x882A_IMPORT'
+  @State private sourceText: string = 'Source: LOCAL_PICKER'
+  @State private transferRateText: '--'
+  @State private progressPercent: number = 0
+  @State private processStatusText: string = 'AWAITING_TASK...'
+  @State private processIdText: string = 'PROCESS_ID: LOCAL_IMPORT'
   @State private conflictTitleText: string = '检测到同名文件'
   @State private conflictMessageText: string = '请选择本次导入任务的冲突处理策略'
   @State private conflictDetailText: string = ''
@@ -407,7 +407,7 @@ struct ImportTaskOverlayPage {
     }
     const currentIndex = progress.currentFileIndex > 0 ? progress.currentFileIndex : Math.min(completed + 1, total)
     this.currentProgressText = `正在导入 ${Math.min(currentIndex, total)}/${total}`
-    this.sourceText = progress.currentFileName.length > 0 ? `Source: ${progress.currentFileName}` : 'Source: EXT_DISK_A'
+    this.sourceText = progress.currentFileName.length > 0 ? `Source: ${progress.currentFileName}` : 'Source: LOCAL_PICKER'
     this.transferRateText = this.buildTransferRateText(progress, completedBytes)
     this.processStatusText = `${progress.stage}...`
     this.processIdText = `PROCESS_ID: ${completed}/${total}`
@@ -583,7 +583,19 @@ struct ImportTaskOverlayPage {
   }
 
   private onBottomNavClick(key: string): void {
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'library', 'ImportTaskOverlayPage')
+    const route = getEmuBottomNavTargetRoute(key, 'library')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[ImportTaskOverlayPage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[ImportTaskOverlayPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   build() {
@@ -714,8 +726,8 @@ struct ImportTaskOverlayPage {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#99000000')
-        .backdropBlur(20)
+        .backgroundColor('#C9000000')
+        .backdropBlur(28)
 
       Column() {
         Row()
@@ -737,14 +749,14 @@ struct ImportTaskOverlayPage {
         }
       }
       .width('100%')
-      .constraintSize({ maxWidth: 400, minHeight: 220 })
-      .backgroundColor('#FF080808')
+      .constraintSize({ maxWidth: 760, minHeight: 300 })
+      .backgroundColor('#FF0A0A0A')
       .border({ width: 0.5, color: '#1AFFFFFF', style: BorderStyle.Solid })
-      .shadow({ radius: 28, color: '#52000000', offsetX: 0, offsetY: 6 })
+      .shadow({ radius: 36, color: '#99000000', offsetX: 0, offsetY: 10 })
       .clip(true)
       .opacity(this.overlayOpacity)
       .scale({ x: this.overlayScale, y: this.overlayScale })
-      .margin({ left: 20, right: 20 })
+      .margin({ left: 0, right: 0 })
       .align(Alignment.Center)
     }
     .width('100%')
@@ -763,9 +775,11 @@ struct ImportTaskOverlayPage {
             .letterSpacing(1.4)
 
           Text(this.currentProgressText)
-            .fontSize(18)
+            .fontSize(22)
             .fontWeight(FontWeight.Medium)
             .fontColor(Colors.onSurface)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .alignItems(HorizontalAlign.Start)
 
@@ -805,10 +819,13 @@ struct ImportTaskOverlayPage {
             .opacity(this.pulseDotVisible ? 1 : 0.3)
 
           Text(this.sourceText)
+            .layoutWeight(1)
             .fontSize(11)
             .fontFamily('monospace')
             .fontColor(Colors.onSurfaceVariant)
             .letterSpacing(0.3)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .alignItems(VerticalAlign.Center)
 
@@ -816,6 +833,7 @@ struct ImportTaskOverlayPage {
           .fontSize(11)
           .fontFamily('monospace')
           .fontColor(Colors.onSurfaceVariant)
+          .maxLines(1)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
@@ -838,8 +856,8 @@ struct ImportTaskOverlayPage {
           .fontWeight(FontWeight.Bold)
           .fontFamily('monospace')
           .fontColor(Colors.onSurfaceVariant)
-          .height(40)
-          .padding({ left: 22, right: 22 })
+          .height(48)
+          .padding({ left: 28, right: 28 })
           .border({ width: 0.5, color: '#4D757575', style: BorderStyle.Solid })
           .backgroundColor(this.cancelPressed ? Colors.surfaceContainerHighest : Color.Transparent)
           .scale({ x: this.cancelPressed ? 0.95 : 1, y: this.cancelPressed ? 0.95 : 1 })
@@ -874,7 +892,7 @@ struct ImportTaskOverlayPage {
       .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .padding({ left: 32, right: 32, top: 32 })
+    .padding({ left: 60, right: 60, top: 58 })
   }
 
   @Builder

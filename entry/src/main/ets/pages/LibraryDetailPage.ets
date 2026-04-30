@@ -51,7 +51,7 @@ import {
   LibraryDetailTelemetrySnapshot
 } from '../common/LibraryDetailPresenter'
 import LogHelper from '../common/LogHelper'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
 interface LibraryDetailRouteParams {
   romFile?: string
@@ -335,7 +335,13 @@ struct LibraryDetailPage {
       this.launchGame()
       return
     }
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'library', 'LibraryDetailPage')
+    const route = getEmuBottomNavTargetRoute(key, 'library')
+    if (route.length === 0) {
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[LibraryDetailPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   private handleActionMenuClick(actionKey: LibraryDetailActionKey): void {

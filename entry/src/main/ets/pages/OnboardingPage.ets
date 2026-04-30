@@ -189,7 +189,7 @@ struct OnboardingPage {
           }
         }
         .width('100%')
-        .constraintSize({ maxWidth: 520 })
+        .constraintSize({ maxWidth: 560 })
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .opacity(this.stepOpacity)
@@ -291,7 +291,7 @@ struct OnboardingPage {
 
         EmuIcon({
           name: 'sports_esports',
-          iconSize: 48
+          iconSize: 52
         })
 
         Row()
@@ -300,28 +300,38 @@ struct OnboardingPage {
           .borderRadius(3)
           .backgroundColor(Colors.primary)
           .align(Alignment.TopEnd)
+
+        Row()
+          .width(4)
+          .height(4)
+          .borderRadius(2)
+          .backgroundColor('#66484848')
+          .align(Alignment.TopEnd)
+          .margin({ top: 10, right: 1 })
       }
       .width('26%')
-      .constraintSize({ minWidth: 80, maxWidth: 96 })
+      .constraintSize({ minWidth: 88, maxWidth: 112 })
       .aspectRatio(1)
       .margin({ bottom: 48 })
 
       // Title + subtitle
       Column({ space: 16 }) {
         Text('一键找回你的童年游戏')
-          .fontSize(30)
+          .fontSize(34)
           .fontWeight(FontWeight.Medium)
           .fontColor(Colors.onSurface)
           .textAlign(TextAlign.Center)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Text('系统已准备就绪。自动扫描本地存储、云端库及映射驱动器。')
-          .fontSize(14)
-          .fontColor(Colors.onSurfaceVariant)
-          .lineHeight(22)
+          .fontSize(16)
+          .fontColor('#CCABABAB')
+          .lineHeight(28)
           .textAlign(TextAlign.Center)
           .maxLines(3)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .constraintSize({ maxWidth: 320 })
+          .constraintSize({ maxWidth: 420 })
       }
       .width('100%')
       .margin({ bottom: 64 })
@@ -361,8 +371,9 @@ struct OnboardingPage {
         .width('100%')
         .height('100%')
       }
-      .padding({ left: 30, right: 30 })
-      .height(48)
+      .width('56%')
+      .constraintSize({ minWidth: 292, maxWidth: 340 })
+      .height(58)
       .backgroundColor(this.startButtonPressed ? Colors.surfaceContainerHighest : Color.Transparent)
       .border({ width: 1, color: Colors.outline, style: BorderStyle.Solid })
       .borderRadius(6)
@@ -392,7 +403,7 @@ struct OnboardingPage {
       }
       .width('100%')
       .constraintSize({ maxWidth: 460 })
-      .padding({ left: 32, right: 32 })
+      .padding({ left: 8, right: 8 })
       .justifyContent(FlexAlign.SpaceBetween)
     }
     .width('100%')
@@ -410,7 +421,7 @@ struct OnboardingPage {
             .height(16)
             .backgroundColor(Colors.primary)
 
-          Text('Import Source Ready')
+          Text('Authorization Required')
             .fontSize(12)
             .fontFamily('monospace')
             .fontColor(Colors.primary)
@@ -418,8 +429,8 @@ struct OnboardingPage {
         }
         .alignItems(VerticalAlign.Center)
 
-        Text('通过系统文件选择器导入游戏')
-          .fontSize(24)
+        Text('允许访问文件，才能导入你手机里的游戏')
+          .fontSize(25)
           .fontWeight(FontWeight.Medium)
           .fontColor(Colors.onSurface)
           .maxLines(2)

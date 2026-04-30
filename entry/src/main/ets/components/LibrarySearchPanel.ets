@@ -73,7 +73,7 @@ export struct LibrarySearchPanel {
         }
       }
       .width('100%')
-      .padding({ left: 18, right: 18, top: 12, bottom: 12 })
+      .padding({ left: 18, right: 18, top: 15, bottom: 15 })
       .backgroundColor('#0A0A0A')
       .borderRadius(8)
       .border({ width: 0.5, color: '#44757575', style: BorderStyle.Solid })

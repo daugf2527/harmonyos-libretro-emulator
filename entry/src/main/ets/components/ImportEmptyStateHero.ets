@@ -17,7 +17,7 @@ export struct ImportEmptyStateHero {
         Column()
           .width('100%')
           .height('100%')
-          .backgroundColor(EmuColors.background)
+          .backgroundColor('#101010')
           .borderRadius(EmuRadius.sm)
           .border({
             width: 1,
@@ -38,9 +38,9 @@ export struct ImportEmptyStateHero {
         EmuIcon({
           name: 'eject',
           tone: 'outline',
-          iconSize: 34
+          iconSize: 38
         })
-          .opacity(0.86)
+          .opacity(0.72)
           .align(Alignment.Center)
 
         Row()
@@ -57,10 +57,10 @@ export struct ImportEmptyStateHero {
           .backgroundColor('#66484848')
           .align(Alignment.BottomStart)
       }
-      .width('34%')
-      .constraintSize({ minWidth: 96, maxWidth: 120 })
-      .aspectRatio(120 / 140)
-      .margin({ bottom: 52 })
+      .width('48%')
+      .constraintSize({ minWidth: 156, maxWidth: 196 })
+      .aspectRatio(170 / 202)
+      .margin({ bottom: 56 })
       .shadow({
         radius: this.particleBoosted ? 12 : 4,
         color: this.particleBoosted ? '#1800FF41' : '#0800FF41',
@@ -69,19 +69,21 @@ export struct ImportEmptyStateHero {
       })
 
       Text('一键导入游戏，重温经典')
-        .fontSize(24)
+        .fontSize(31)
         .fontWeight(FontWeight.Medium)
         .fontColor(EmuColors.onSurface)
         .textAlign(TextAlign.Center)
-        .margin({ bottom: 12 })
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .margin({ bottom: 18 })
 
       Text('系统未检测到可用镜像。请选择本地 ROM 或 ISO 文件开始模拟。')
-        .fontSize(14)
-        .lineHeight(22)
-        .fontColor(EmuColors.onSurfaceVariant)
+        .fontSize(16)
+        .lineHeight(28)
+        .fontColor('#CCABABAB')
         .textAlign(TextAlign.Center)
-        .constraintSize({ maxWidth: 304 })
-        .margin({ bottom: 36 })
+        .constraintSize({ maxWidth: 440 })
+        .margin({ bottom: 48 })
 
       if (this.isScanning) {
         Column({ space: 8 }) {
@@ -141,6 +143,8 @@ export struct ImportEmptyStateHero {
         .justifyContent(FlexAlign.Center)
         .alignItems(VerticalAlign.Center)
       }
+      .width('74%')
+      .constraintSize({ minWidth: 260, maxWidth: 430 })
       .height(48)
       .padding({ left: 28, right: 28 })
       .backgroundColor(this.buttonPressed ? EmuColors.surfaceContainerHighest : Color.Transparent)
@@ -163,7 +167,7 @@ export struct ImportEmptyStateHero {
 
       Text('仅支持你合法拥有的游戏')
         .fontSize(10)
-        .fontColor('#454545')
+        .fontColor('#555555')
         .letterSpacing(1.2)
         .margin({ top: 48 })
     }

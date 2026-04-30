@@ -4,7 +4,7 @@ import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors } from '../common/EmuUiTokens'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
 interface ManagedCoreItem {
   id: string
@@ -110,7 +110,19 @@ struct CoreManagerPage {
   }
 
   private onBottomNavClick(key: string): void {
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'engine', 'CoreManagerPage')
+    const route = getEmuBottomNavTargetRoute(key, 'engine')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[CoreManagerPage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[CoreManagerPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   @Builder

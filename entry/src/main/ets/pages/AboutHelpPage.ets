@@ -2,7 +2,7 @@ import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors } from '../common/EmuUiTokens'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
 interface HelpItem {
   id: string
@@ -29,7 +29,19 @@ struct AboutHelpPage {
   ]
 
   private onBottomNavClick(key: string): void {
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'system', 'AboutHelpPage')
+    const route = getEmuBottomNavTargetRoute(key, 'system')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[AboutHelpPage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[AboutHelpPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   private getSelectedHelpText(): string {

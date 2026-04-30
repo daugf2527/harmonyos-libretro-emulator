@@ -7,7 +7,7 @@ import { LibraryGameSections } from '../components/LibraryGameSections'
 import { LibrarySearchPanel } from '../components/LibrarySearchPanel'
 import { EmuColors } from '../common/EmuUiTokens'
 import { setPendingLibraryLaunchRequest } from '../common/LibraryLaunchBridge'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import {
   buildRecentLibraryRecords,
   getReadyLibraryRecords,
@@ -427,7 +427,19 @@ struct LibraryPage {
   }
 
   private onBottomNavClick(key: string): void {
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'library', 'LibraryPage')
+    const route = getEmuBottomNavTargetRoute(key, 'library')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[LibraryPage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[LibraryPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   private onCardTouch(event: TouchEvent, item: LibraryRecord): void {

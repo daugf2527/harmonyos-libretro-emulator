@@ -134,9 +134,9 @@ export struct GameCard {
 
       Column({ space: 4 }) {
         Text(this.title)
-          .fontSize(12)
+          .fontSize(13)
           .fontWeight(this.isHighlighted ? FontWeight.Bold : FontWeight.Medium)
-          .fontColor(this.isHighlighted ? EmuColors.primary : EmuColors.onSurface)
+          .fontColor(EmuColors.onSurface)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .opacity(this.isHighlighted ? 1 : 0.78)
@@ -154,7 +154,7 @@ export struct GameCard {
       .alignItems(HorizontalAlign.Start)
     }
     .width('100%')
-    .opacity(this.isHighlighted ? 1 : 0.42)
+    .opacity(1)
     .onClick(() => {
       this.onCardClick?.()
     })

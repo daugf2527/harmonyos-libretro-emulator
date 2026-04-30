@@ -11,7 +11,7 @@ import {
   resetInputLayoutProfile,
   saveInputLayoutProfile
 } from '../common/InputLayoutRepository'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
 
 interface InputMetricItem {
@@ -260,10 +260,24 @@ struct InputLayoutPage {
 
   private onBottomNavClick(key: string): void {
     if (key === 'input') {
-      this.activeMode = 'center'
+      this.getUIContext().getRouter().replaceUrl({ url: 'pages/MultiplayerInputPage' }).catch((err: Error) => {
+        console.error(`[InputLayoutPage] replaceUrl MultiplayerInputPage failed: ${err.message}`)
+      })
       return
     }
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'input', 'InputLayoutPage')
+    const route = getEmuBottomNavTargetRoute(key, 'input')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[InputLayoutPage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[InputLayoutPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   @Builder

@@ -14,13 +14,13 @@ export struct LibraryContextMenuOverlay {
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor('#B8000000')
-        .backdropBlur(14)
+        .backgroundColor('#D9000000')
+        .backdropBlur(26)
         .onClick(() => {
           this.onClose?.()
         })
 
-      Column({ space: 18 }) {
+      Column({ space: 26 }) {
         Column({ space: 0 }) {
           this.ActionMenuItem('启动游戏', 'play_arrow', 'primary', true, () => {
             this.onLaunch?.()
@@ -47,9 +47,9 @@ export struct LibraryContextMenuOverlay {
         .width('100%')
         .backgroundColor('#F0141414')
         .backdropBlur(24)
-        .borderRadius(16)
+        .borderRadius(12)
         .border({ width: 0.8, color: '#33FFFFFF', style: BorderStyle.Solid })
-        .shadow({ radius: 30, color: '#99000000', offsetX: 0, offsetY: 10 })
+        .shadow({ radius: 34, color: '#AA000000', offsetX: 0, offsetY: 12 })
 
         Row() {
           Text('取消 CANCEL')
@@ -60,17 +60,17 @@ export struct LibraryContextMenuOverlay {
             .letterSpacing(1.2)
         }
         .width('100%')
-        .height(54)
+        .height(76)
         .justifyContent(FlexAlign.Center)
         .backgroundColor('#CC1A1A1A')
-        .borderRadius(14)
+        .borderRadius(12)
         .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
         .onClick(() => {
           this.onClose?.()
         })
       }
-      .width('86%')
-      .constraintSize({ maxWidth: 320 })
+      .width('78%')
+      .constraintSize({ minWidth: 300, maxWidth: 430 })
       .align(Alignment.Center)
     }
     .width('100%')
@@ -88,7 +88,7 @@ export struct LibraryContextMenuOverlay {
   ) {
     Row() {
       Text(label)
-        .fontSize(14)
+        .fontSize(18)
         .fontWeight(bold ? FontWeight.Bold : FontWeight.Medium)
         .fontColor(danger ? EmuColors.error : EmuColors.onSurface)
         .fontFamily('monospace')
@@ -97,12 +97,12 @@ export struct LibraryContextMenuOverlay {
       EmuIcon({
         name: iconName,
         tone: iconTone,
-        iconSize: 20
+        iconSize: danger ? 22 : 24
       })
     }
     .width('100%')
-    .height(54)
-    .padding({ left: 18, right: 18 })
+    .height(76)
+    .padding({ left: 42, right: 42 })
     .justifyContent(FlexAlign.SpaceBetween)
     .alignItems(VerticalAlign.Center)
     .onClick(() => {

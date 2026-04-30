@@ -45,8 +45,10 @@ export struct RuntimeVirtualControllerLayer {
       Row() {
         this.buildAnalogStick(0, 140, 60)
         Blank()
-        this.buildAnalogStick(1, 120, 50)
-          .margin({ right: 20 })
+        Row() {
+          this.buildAnalogStick(1, 120, 50)
+        }
+        .margin({ right: 20 })
       }
       .width('100%')
       .height('100%')
@@ -95,16 +97,18 @@ export struct RuntimeVirtualControllerLayer {
 
   @Builder
   private buildAnalogStick(index: number, baseSize: number, knobSize: number) {
-    AnalogStickControl({
-      index,
-      baseSize,
-      knobSize,
-      onAnalogChange: (stickIndex: number, x: number, y: number) => {
-        if (this.onAnalogChange) {
-          this.onAnalogChange(stickIndex, x, y)
+    Row() {
+      AnalogStickControl({
+        index,
+        baseSize,
+        knobSize,
+        onAnalogChange: (stickIndex: number, x: number, y: number) => {
+          if (this.onAnalogChange) {
+            this.onAnalogChange(stickIndex, x, y)
+          }
         }
-      }
-    })
+      })
+    }
     .margin({ top: 20 })
   }
 

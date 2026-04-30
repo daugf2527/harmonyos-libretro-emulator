@@ -11,7 +11,7 @@ import {
   SaveStateManifestItem,
   saveStateData
 } from '../common/SaveStateRepository'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
 
 interface SaveStateNapi {
@@ -286,7 +286,19 @@ struct SaveStatePage {
   }
 
   private onBottomNavClick(key: string): void {
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'system', 'SaveStatePage')
+    const route = getEmuBottomNavTargetRoute(key, 'system')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[SaveStatePage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[SaveStatePage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   @Builder

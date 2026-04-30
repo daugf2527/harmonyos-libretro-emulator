@@ -2,7 +2,7 @@ import testNapi from 'libentry.so'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuColors } from '../common/EmuUiTokens'
-import { navigateEmuBottomNav } from '../common/RouteHelper'
+import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
 
 interface ShaderPreviewNapi {
@@ -52,7 +52,19 @@ struct ShaderPreviewPage {
   }
 
   private onBottomNavClick(key: string): void {
-    navigateEmuBottomNav(this.getUIContext().getRouter(), key, 'engine', 'ShaderPreviewPage')
+    const route = getEmuBottomNavTargetRoute(key, 'engine')
+    if (route.length === 0) {
+      return
+    }
+    if (key === 'library') {
+      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+        console.error(`[ShaderPreviewPage] replaceUrl ${route} failed: ${err.message}`)
+      })
+      return
+    }
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      console.error(`[ShaderPreviewPage] pushUrl ${route} failed: ${err.message}`)
+    })
   }
 
   @Builder
