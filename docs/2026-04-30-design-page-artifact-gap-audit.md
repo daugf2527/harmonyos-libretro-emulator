@@ -221,8 +221,8 @@
 - 路由：`pages/LibretroGamePage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前 pause overlay 有 resume、action cards、terminate、telemetry；仍需对齐截图中的左侧绿线标题、卡片尺寸、红色 terminate 区域、telemetry 折线和暗化背景。
-- 设计存在侧栏菜单结构，但移动截图不显示；ETS 应按窗口断点选择，而不是同时堆叠。
+- 已按 `_9` 移动主菜单态收口：顶部 telemetry bar、左侧绿线标题、Resume 大 CTA、四宫格 action cards、红色 terminate 区域、右侧绿色暗光和 subsystem telemetry 波形/网格已对齐首批视觉目标。
+- 设计存在侧栏菜单结构，但截图实际展示移动主菜单；本轮未引入桌面侧栏，避免同时堆叠两套导航。
 
 ### 交互 gap
 - Resume/stop 可走真实 runtime；quick save/load/input/filter 的可用性必须按能力状态显示。
@@ -233,7 +233,7 @@
 - `需真机验证`：暂停/恢复/停止对 engine 状态的影响需设备运行验证。
 
 ### 结论
-部分完成。
+视觉完成。
 
 ## _10 Library Detail
 
