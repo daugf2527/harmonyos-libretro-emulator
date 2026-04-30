@@ -16,12 +16,12 @@
 - 路由：`pages/CoreManagerPage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前页面已有 `MEMORY_FOOTPRINT`、`ACTIVE_CORES` 与 `KERNEL_LOG` 静态骨架，但仍需逐项对齐截图中的三段资源条密度、核心卡图标块、状态 badge、按钮边框、log 行间距和底部导航 System 高亮。
-- 设计强调窄长终端屏的单列密度，ETS 需要确认在不同窗口宽度下不会把 active core 行压成松散卡片。
+- 已按 `_1` 核心管理主态收口：`MEMORY_FOOTPRINT` 三段资源条、`ACTIVE_CORES` 核心行、图标块、状态 badge、远端禁用标识、`KERNEL_LOG` 密度和底部 System 高亮已对齐首批视觉目标。
+- 核心列表改为从 `LibretroCoreCatalog` 取本地 catalog 可见项，不再维护页面内独立演示 catalog；视觉上保留截图的 core/log 结构，数据边界仍是本地扫描。
 
 ### 交互 gap
-- `UPDATE` / `INSTALL` / 核心选择 / 诊断入口需要与真实 catalog 能力绑定；不可用的固件源和远端更新应保持禁用或说明态。
-- 底部导航已通过 router 跳转承载，但当前静态检查未验证点击反馈、active 状态和返回路径。
+- 核心选择仅更新页面选中态；远端 `UPDATE/INSTALL`、固件库和在线诊断未接入，已显示 `REMOTE_DISABLED` / `LOCAL_ONLY`，不伪造成可用能力。
+- 底部导航继续通过 router 跳转承载；当前仅做静态检查，点击反馈和返回路径需设备验证。
 
 ### 运行态 gap
 - `LOCAL_ONLY`：当前核心目录与固件状态只能从本地 catalog / packaged libs 范围证明。
@@ -29,7 +29,7 @@
 - `需真机验证`：实际 core 扫描、权限、动态内存指标和按钮可用性需设备验证。
 
 ### 结论
-部分完成。
+视觉完成；未编译、未预览、未真机。
 
 ## _2 Multiplayer Input
 

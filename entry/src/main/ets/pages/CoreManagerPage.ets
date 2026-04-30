@@ -4,6 +4,7 @@ import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors } from '../common/EmuUiTokens'
+import { CoreConfig, LIBRETRO_CORE_CATALOG } from '../common/LibretroCoreCatalog'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
 interface ManagedCoreItem {
@@ -25,17 +26,9 @@ struct CoreManagerPage {
   private coreRefreshToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: true },
+    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
     { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: false }
-  ]
-  private readonly catalog: ManagedCoreItem[] = [
-    { id: 'gambatte', name: 'Gambatte', platform: 'GB / GBC', soFile: 'gambatte_libretro.ohos-arm64.so', status: 'LOCAL', installed: false },
-    { id: 'mgba', name: 'mGBA', platform: 'GBA', soFile: 'mgba_libretro.ohos-arm64.so', status: 'LOCAL', installed: false },
-    { id: 'snes9x', name: 'Snes9x', platform: 'SNES', soFile: 'snes9x_libretro.ohos-arm64.so', status: 'LOCAL', installed: false },
-    { id: 'fceumm', name: 'FCEUmm', platform: 'NES', soFile: 'fceumm_libretro.ohos-arm64.so', status: 'LOCAL', installed: false },
-    { id: 'pcsx_rearmed', name: 'PCSX-ReARMed', platform: 'PS1', soFile: 'pcsx_rearmed_libretro.ohos-arm64.so', status: 'LOCAL', installed: false },
-    { id: 'fbneo', name: 'FBNeo', platform: 'ARCADE', soFile: 'fbneo_libretro.ohos-arm64.so', status: 'LOCAL', installed: false }
+    { key: 'system', iconName: 'tune', label: '系统', isActive: true }
   ]
 
   aboutToAppear(): void {
@@ -62,12 +55,13 @@ struct CoreManagerPage {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
       this.statusText = 'CONTEXT_MISSING'
-      this.coreItems = this.catalog
+      this.coreItems = this.buildCatalogItems()
       return
     }
     const nextItems: ManagedCoreItem[] = []
-    for (let index = 0; index < this.catalog.length; index += 1) {
-      const item = this.catalog[index]
+    const catalogItems = this.buildCatalogItems()
+    for (let index = 0; index < catalogItems.length; index += 1) {
+      const item = catalogItems[index]
       const installed = await this.hasCoreFile(context, item.soFile)
       if (!this.isCurrentCoreRefresh(token)) {
         return
@@ -109,8 +103,25 @@ struct CoreManagerPage {
     return `${installedCount}/${items.length}_LOCAL_CORES_READY`
   }
 
+  private buildCatalogItems(): ManagedCoreItem[] {
+    const items: ManagedCoreItem[] = []
+    const maxVisibleItems = Math.min(6, LIBRETRO_CORE_CATALOG.length)
+    for (let index = 0; index < maxVisibleItems; index += 1) {
+      const config: CoreConfig = LIBRETRO_CORE_CATALOG[index]
+      items.push({
+        id: config.id,
+        name: config.name,
+        platform: config.description,
+        soFile: config.soFile,
+        status: 'LOCAL',
+        installed: false
+      })
+    }
+    return items
+  }
+
   private onBottomNavClick(key: string): void {
-    const route = getEmuBottomNavTargetRoute(key, 'engine')
+    const route = getEmuBottomNavTargetRoute(key, 'system')
     if (route.length === 0) {
       return
     }
@@ -197,13 +208,23 @@ struct CoreManagerPage {
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
 
-      Text(item.status)
-        .fontSize(10)
-        .fontFamily('monospace')
-        .fontWeight(FontWeight.Bold)
-        .fontColor(item.installed ? EmuColors.primary : EmuColors.error)
-        .padding({ left: 8, right: 8, top: 5, bottom: 5 })
-        .border({ width: 0.5, color: item.installed ? EmuColors.primary : EmuColors.error, style: BorderStyle.Solid })
+      Column({ space: 6 }) {
+        Text(item.status)
+          .fontSize(10)
+          .fontFamily('monospace')
+          .fontWeight(FontWeight.Bold)
+          .fontColor(item.installed ? EmuColors.primary : EmuColors.error)
+          .padding({ left: 8, right: 8, top: 5, bottom: 5 })
+          .border({ width: 0.5, color: item.installed ? EmuColors.primary : EmuColors.error, style: BorderStyle.Solid })
+
+        Text('REMOTE_DISABLED')
+          .fontSize(9)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .padding({ left: 8, right: 8, top: 6, bottom: 6 })
+          .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
+      }
+      .alignItems(HorizontalAlign.End)
     }
     .width('100%')
     .padding(16)
