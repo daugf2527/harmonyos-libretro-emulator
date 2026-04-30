@@ -93,12 +93,12 @@
 - 路由：`pages/SettingsPage` 已在 `main_pages.json` 注册。
 
 ### 视觉 gap
-- 当前 ETS 已有 tab、segment、slider、输入设备卡、telemetry；仍需校准截图中的顶部栏高度、tab 下划线、section 左侧绿条、controller 图片/预览区域、柱状图网格和底部导航间距。
-- 设计的高级设置文案在 `code.html` 中存在，需确认 Advanced tab 内容不是只显示占位。
+- 已按 `_4` 设置页主态收口：顶部栏、Basic/Advanced tab、section 左侧绿条、画面比例 segment、scanline/volume slider、输入设备预览卡、系统 telemetry 柱状图和底部 System 高亮已对齐首批视觉目标。
+- 输入设备卡不再沿用设计 demo 的 `DualSense ACTIVE` 运行态表述，改成本地 `RETRO_PAD_TOUCH / LOCAL_PRESET`，避免把未验证外设能力写成已连接。
 
 ### 交互 gap
-- 画面比例、scanline、音量、输入设备入口如未真正写入 controller，应展示 pending/只读状态。
-- 输入布局预览点击应跳到真实 `InputLayoutPage`，并保持路由参数与当前设备一致。
+- 画面比例、scanline、音量仍是页面本地状态；高级项以 `LOCAL_PRESET` / `PREVIEW_ONLY` 表示，未写成已应用到 runtime。
+- 输入布局、多人输入、核心管理、Shader Preview、关于帮助继续通过真实页面 route 进入；设置实际写入 controller/repository 仍需后续运行态接线。
 
 ### 运行态 gap
 - `LOCAL_ONLY`：静态设置状态和本地页面状态可承载。
@@ -106,7 +106,7 @@
 - `需真机验证`：渲染、音频、输入设置实际生效需运行验证。
 
 ### 结论
-部分完成。
+视觉完成；未编译、未预览、未真机。
 
 ## _5 About Help
 

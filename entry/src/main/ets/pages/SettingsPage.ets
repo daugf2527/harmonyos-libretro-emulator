@@ -22,7 +22,7 @@ struct SettingsPage {
   @State private aspectMode: string = '4:3'
   @State private scanlineIntensity: number = 64
   @State private masterVolume: number = 80
-  @State private inputDeviceStatus: string = 'ACTIVE'
+  @State private inputDeviceStatus: string = 'LOCAL_PRESET'
 
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
@@ -210,18 +210,23 @@ struct SettingsPage {
           .height(1)
           .backgroundColor('#66757575')
 
+        Row() {
+          Row()
+            .width(2)
+            .height(16)
+            .backgroundColor(EmuColors.onSurface)
+        }
+          .width(`${value}%`)
+          .height(1)
+          .backgroundColor(Color.Transparent)
+          .justifyContent(FlexAlign.End)
+          .align(Alignment.Start)
+
         Row()
           .width(`${value}%`)
           .height(1)
           .backgroundColor(EmuColors.primary)
           .align(Alignment.Start)
-
-        Row()
-          .width(2)
-          .height(16)
-          .backgroundColor(EmuColors.onSurface)
-          .align(Alignment.Start)
-          .translate({ x: value * 3.2 })
       }
       .width('100%')
     }
@@ -233,12 +238,12 @@ struct SettingsPage {
     Column({ space: 16 }) {
       Row() {
         Column({ space: 6 }) {
-          Text('DUALSENSE WIRELESS')
+          Text('LOCAL TOUCH INPUT')
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.onSurface)
 
-          Text('ID: BT_CONTROLLER_09X')
+          Text('ID: RETRO_PAD_TOUCH')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor('#B3ABABAB')
@@ -267,12 +272,12 @@ struct SettingsPage {
             .borderRadius(3.5)
             .backgroundColor(EmuColors.primary)
 
-          Text('L2: BRAKE')
+          Text('L: SHOULDER_LEFT')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor('#B3ABABAB')
 
-          Text('L1: SHIFT_DOWN')
+          Text('R: SHOULDER_RIGHT')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor('#B3ABABAB')
@@ -423,10 +428,10 @@ struct SettingsPage {
   private AdvancedSettings() {
     Column({ space: 18 }) {
       this.SectionTitle('高级设置', 'ADVANCED_RUNTIME')
-      this.ValueRow('GPU Backend', 'OpenGL ES')
-      this.ValueRow('Frame Pacing', 'VSync Locked')
-      this.ValueRow('Audio Buffer', 'Adaptive')
-      this.ValueRow('Shader Mode', 'CRT_ROYALE_V4.2')
+      this.ValueRow('GPU Backend', 'LOCAL_PRESET')
+      this.ValueRow('Frame Pacing', 'LOCAL_PRESET')
+      this.ValueRow('Audio Buffer', 'LOCAL_PRESET')
+      this.ValueRow('Shader Mode', 'PREVIEW_ONLY')
       this.ValueRow('Telemetry Scope', 'Runtime Only')
       this.NavigationRow('Input / Netplay Center', 'LOCAL_INPUT_ROUTING', 'pages/MultiplayerInputPage')
       this.NavigationRow('Input Layout Editor', 'LOCAL_TOUCH_LAYOUT', 'pages/InputLayoutPage')
