@@ -22,7 +22,7 @@ struct SettingsPage {
   @State private aspectMode: string = '4:3'
   @State private scanlineIntensity: number = 64
   @State private masterVolume: number = 80
-  @State private inputDeviceStatus: string = 'LOCAL_PRESET'
+  @State private inputDeviceStatus: string = '本地预设'
 
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
@@ -238,7 +238,7 @@ struct SettingsPage {
     Column({ space: 16 }) {
       Row() {
         Column({ space: 6 }) {
-          Text('LOCAL TOUCH INPUT')
+          Text('本地触控手柄')
             .fontSize(16)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.onSurface)
@@ -272,12 +272,12 @@ struct SettingsPage {
             .borderRadius(3.5)
             .backgroundColor(EmuColors.primary)
 
-          Text('L: SHOULDER_LEFT')
+          Text('L: 左肩键')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor('#B3ABABAB')
 
-          Text('R: SHOULDER_RIGHT')
+          Text('R: 右肩键')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor('#B3ABABAB')
@@ -297,7 +297,7 @@ struct SettingsPage {
       .backgroundColor('#0B0B0B')
       .clip(true)
 
-      Text('按键布局映射预览 BUTTON_LAYOUT_PREVIEW')
+      Text('按键布局预览 BUTTON_LAYOUT_PREVIEW')
         .fontSize(10)
         .fontFamily('monospace')
         .fontColor('#88757575')
@@ -428,16 +428,16 @@ struct SettingsPage {
   private AdvancedSettings() {
     Column({ space: 18 }) {
       this.SectionTitle('高级设置', 'ADVANCED_RUNTIME')
-      this.ValueRow('GPU Backend', 'LOCAL_PRESET')
-      this.ValueRow('Frame Pacing', 'LOCAL_PRESET')
-      this.ValueRow('Audio Buffer', 'LOCAL_PRESET')
-      this.ValueRow('Shader Mode', 'PREVIEW_ONLY')
-      this.ValueRow('Telemetry Scope', 'Runtime Only')
-      this.NavigationRow('Input / Netplay Center', 'LOCAL_INPUT_ROUTING', 'pages/MultiplayerInputPage')
-      this.NavigationRow('Input Layout Editor', 'LOCAL_TOUCH_LAYOUT', 'pages/InputLayoutPage')
-      this.NavigationRow('Core / Firmware Manager', 'LOCAL_CORE_SCAN', 'pages/CoreManagerPage')
-      this.NavigationRow('Shader Preview', 'VIDEO_BRIDGE_PREVIEW', 'pages/ShaderPreviewPage')
-      this.NavigationRow('About / Help', 'LOCAL_DOCUMENTATION', 'pages/AboutHelpPage')
+      this.ValueRow('GPU Backend', '本地预设')
+      this.ValueRow('Frame Pacing', '本地预设')
+      this.ValueRow('Audio Buffer', '本地预设')
+      this.ValueRow('Shader Mode', '仅预览')
+      this.ValueRow('运行状态范围', 'Runtime Only')
+      this.NavigationRow('Input / Netplay Center', '手柄与联机', 'pages/MultiplayerInputPage')
+      this.NavigationRow('Input Layout Editor', '触控布局', 'pages/InputLayoutPage')
+      this.NavigationRow('Core / Firmware Manager', 'Core 与固件', 'pages/CoreManagerPage')
+      this.NavigationRow('Shader Preview', '画面滤镜预览', 'pages/ShaderPreviewPage')
+      this.NavigationRow('About / Help', '关于与帮助', 'pages/AboutHelpPage')
     }
     .width('100%')
   }

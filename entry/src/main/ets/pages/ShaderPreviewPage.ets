@@ -10,7 +10,7 @@ struct ShaderPreviewPage {
   @State private curvature: number = 12
   @State private saturation: number = 115
   @State private selectedMode: string = 'STATIC_PREVIEW'
-  @State private statusText: string = 'SHADER_RUNTIME_NOT_CONFIGURED'
+  @State private statusText: string = '滤镜运行时未接入'
   private readonly scanlineRows: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
   private readonly previewStatBars: number[] = [12, 22, 34, 18, 42, 28]
   private readonly navItems: EmuBottomNavItem[] = [
@@ -24,11 +24,11 @@ struct ShaderPreviewPage {
     this.scanlineIntensity = 65
     this.curvature = 12
     this.saturation = 115
-    this.statusText = 'LOCAL_PRESET_RESET'
+    this.statusText = '已重置本地预设'
   }
 
   private savePreviewConfig(): void {
-    this.statusText = 'LOCAL_PREVIEW_CFG_SAVED'
+    this.statusText = '已保存预览预设'
   }
 
   private getSliderTrackValue(value: number): number {
@@ -87,7 +87,7 @@ struct ShaderPreviewPage {
           .letterSpacing(1.8)
           .padding({ left: 10, right: 10, top: 5, bottom: 5 })
           .backgroundColor(processed ? EmuColors.primary : '#CC000000')
-        Text(processed ? `${mode} / NOT_CONFIGURED` : mode)
+        Text(processed ? `${mode} / 未应用到游戏` : mode)
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(processed ? EmuColors.primary : EmuColors.onSurface)
@@ -164,12 +164,12 @@ struct ShaderPreviewPage {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      this.SliderRow('SCANLINE INTENSITY', this.scanlineIntensity, '%')
-      this.SliderRow('CRT CURVATURE', this.curvature, '%')
-      this.SliderRow('COLOR SATURATION', this.saturation, '%')
+      this.SliderRow('扫描线强度', this.scanlineIntensity, '%')
+      this.SliderRow('CRT 曲率', this.curvature, '%')
+      this.SliderRow('色彩饱和度', this.saturation, '%')
 
       Row({ space: 12 }) {
-        Button('RESET')
+        Button('重置')
           .layoutWeight(1)
           .height(36)
           .fontSize(10)
@@ -180,7 +180,7 @@ struct ShaderPreviewPage {
           .onClick(() => {
             this.resetPreset()
           })
-        Button('SAVE_CFG')
+        Button('保存预设')
           .layoutWeight(1)
           .height(36)
           .fontSize(10)
@@ -251,12 +251,12 @@ struct ShaderPreviewPage {
   private PreviewStatsOverlay() {
     Column({ space: 12 }) {
       Row() {
-        Text('GPU LOAD')
+        Text('GPU 负载')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.4)
-        Text('NOT_CONFIGURED')
+        Text('未接入')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(EmuColors.primary)
@@ -270,12 +270,12 @@ struct ShaderPreviewPage {
         .backgroundColor('#3300FF41')
 
       Row() {
-        Text('LATENCY')
+        Text('延迟')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.4)
-        Text('PREVIEW_ONLY')
+        Text('仅预览')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(EmuColors.primary)
@@ -294,7 +294,8 @@ struct ShaderPreviewPage {
       .height(46)
       .alignItems(VerticalAlign.Bottom)
     }
-    .width(250)
+    .width('72%')
+    .constraintSize({ maxWidth: 250 })
     .padding(18)
     .backgroundColor('#B3000000')
     .backdropBlur(12)
@@ -308,7 +309,7 @@ struct ShaderPreviewPage {
       EmuHeaderBar({
         titleText: 'OS_EMU_v2.4.1',
         titleIcon: 'terminal',
-        rightLabel: 'ENGINE_PREVIEW_MODE',
+        rightLabel: '滤镜预览',
         rightIcon: 'settings_input_component',
         activeTextColor: EmuColors.primary,
         iconSize: 16,

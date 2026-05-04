@@ -29,12 +29,12 @@ struct ImportTaskOverlayPage {
   @State private retryPressed: boolean = false
   @State private overwritePressed: boolean = false
   @State private pulseDotVisible: boolean = true
-  @State private etaText: string = 'EST: 02:45'
-  @State private sourceText: string = 'Source: LOCAL_PICKER'
-  @State private transferRateText: '--'
+  @State private etaText: string = '剩余约 02:45'
+  @State private sourceText: string = '来源：本地文件选择器'
+  @State private transferRateText: string = '--'
   @State private progressPercent: number = 0
-  @State private processStatusText: string = 'AWAITING_TASK...'
-  @State private processIdText: string = 'PROCESS_ID: LOCAL_IMPORT'
+  @State private processStatusText: string = '等待导入任务...'
+  @State private processIdText: string = '本地导入'
   @State private conflictTitleText: string = '检测到同名文件'
   @State private conflictMessageText: string = '请选择本次导入任务的冲突处理策略'
   @State private conflictDetailText: string = ''
@@ -58,7 +58,7 @@ struct ImportTaskOverlayPage {
   private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'explore', iconName: 'explore', label: 'EXPLORE', isActive: false },
+    { key: 'explore', iconName: 'explore', label: '探索', isActive: false },
     { key: 'system', iconName: 'tune', label: '系统', isActive: true }
   ]
 
@@ -114,14 +114,14 @@ struct ImportTaskOverlayPage {
     this.feedbackState = 'ERROR'
     this.resultTitleText = '没有导入任务'
     this.resultMessageText = '请从导入入口选择真实 ROM 文件后继续'
-    this.resultDetailText = 'IMPORT_TASK_EMPTY'
+    this.resultDetailText = '没有待处理的导入任务'
     this.importedNamesPreviewText = ''
-    this.processStatusText = 'NO_PENDING_IMPORT_TASK'
-    this.processIdText = 'PROCESS_ID: EMPTY_IMPORT'
+    this.processStatusText = '没有待导入文件'
+    this.processIdText = '导入队列为空'
     this.currentProgressText = '等待选择文件'
-    this.sourceText = 'Source: NONE'
+    this.sourceText = '来源：未选择文件'
     this.transferRateText = '--'
-    this.etaText = 'EST: --'
+    this.etaText = '剩余约 --'
   }
 
   private switchState(nextState: FeedbackState): void {
@@ -300,12 +300,12 @@ struct ImportTaskOverlayPage {
     this.conflictDetailText = '可选：全部跳过 / 全部覆盖 / 取消本次任务'
     this.conflictNamesPreviewText = this.buildNamesPreview(summary.conflictNames)
     this.conflictNames = [...summary.conflictNames]
-    this.processStatusText = 'AWAITING_CONFLICT_POLICY...'
-    this.processIdText = `PROCESS_ID: CONFLICT_${summary.conflictCount}`
+    this.processStatusText = '等待处理同名文件'
+    this.processIdText = `同名文件：${summary.conflictCount}`
     this.currentProgressText = '等待冲突处理策略'
-    this.sourceText = 'Source: LOCAL_IMPORT_BATCH'
-    this.transferRateText = `${summary.conflictCount} CONFLICTS`
-    this.etaText = 'EST: POLICY'
+    this.sourceText = '来源：本地导入队列'
+    this.transferRateText = `${summary.conflictCount} 个冲突`
+    this.etaText = '等待选择'
   }
 
   private async startActualImport(uris: string[], token: number): Promise<void> {
@@ -399,18 +399,18 @@ struct ImportTaskOverlayPage {
     this.progressPercent = percent
     if (progress.stage === 'CANCELED') {
       this.currentProgressText = `取消中 ${completed}/${total}`
-      this.processStatusText = 'CANCELED...'
+      this.processStatusText = '正在取消...'
       this.transferRateText = this.buildTransferRateText(progress, completedBytes)
-      this.processIdText = `PROCESS_ID: ${completed}/${total}`
+      this.processIdText = `进度：${completed}/${total}`
       this.etaText = this.buildEtaText(progress, completedBytes, totalBytes)
       return
     }
     const currentIndex = progress.currentFileIndex > 0 ? progress.currentFileIndex : Math.min(completed + 1, total)
     this.currentProgressText = `正在导入 ${Math.min(currentIndex, total)}/${total}`
-    this.sourceText = progress.currentFileName.length > 0 ? `Source: ${progress.currentFileName}` : 'Source: LOCAL_PICKER'
+    this.sourceText = progress.currentFileName.length > 0 ? `来源：${progress.currentFileName}` : '来源：本地文件选择器'
     this.transferRateText = this.buildTransferRateText(progress, completedBytes)
-    this.processStatusText = `${progress.stage}...`
-    this.processIdText = `PROCESS_ID: ${completed}/${total}`
+    this.processStatusText = this.getImportStageText(progress.stage)
+    this.processIdText = `进度：${completed}/${total}`
     this.etaText = this.buildEtaText(progress, completedBytes, totalBytes)
     this.importedNamesPreviewText = progress.currentFileName
   }
@@ -424,19 +424,50 @@ struct ImportTaskOverlayPage {
     return `${this.formatBytes(bytesPerSecond)}/s`
   }
 
+  private getImportStageText(stage: string): string {
+    if (stage === 'COPYING') {
+      return '正在复制 ROM...'
+    }
+    if (stage === 'OVERWRITING') {
+      return '正在覆盖同名文件...'
+    }
+    if (stage === 'OVERWRITTEN') {
+      return '已覆盖同名文件'
+    }
+    if (stage === 'SKIPPED') {
+      return '已跳过同名文件'
+    }
+    if (stage === 'EXISTS') {
+      return '文件已存在'
+    }
+    if (stage === 'DONE') {
+      return '导入完成'
+    }
+    if (stage === 'FAILED') {
+      return '导入失败'
+    }
+    if (stage === 'MISSING_DEPENDENCY') {
+      return '缺少导入依赖'
+    }
+    if (stage === 'CANCELED') {
+      return '已取消'
+    }
+    return stage
+  }
+
   private buildEtaText(progress: RomImportProgress, completedBytes: number, totalBytes: number): string {
     if (!progress.hasAccurateByteProgress || completedBytes <= 0 || completedBytes >= totalBytes || this.importStartedAtMs <= 0) {
-      return `EST: ${this.progressPercent}%`
+      return `进度 ${this.progressPercent}%`
     }
     const elapsedSeconds = Math.max(1, (Date.now() - this.importStartedAtMs) / 1000)
     const bytesPerSecond = completedBytes / elapsedSeconds
     if (bytesPerSecond <= 0) {
-      return `EST: ${this.progressPercent}%`
+      return `进度 ${this.progressPercent}%`
     }
     const etaSeconds = Math.max(0, Math.ceil((totalBytes - completedBytes) / bytesPerSecond))
     const minutes = Math.floor(etaSeconds / 60).toString().padStart(2, '0')
     const seconds = (etaSeconds % 60).toString().padStart(2, '0')
-    return `EST: ${minutes}:${seconds}`
+    return `剩余约 ${minutes}:${seconds}`
   }
 
   private formatBytes(bytes: number): string {
@@ -455,18 +486,18 @@ struct ImportTaskOverlayPage {
 
   private getResultStatusText(item: RomImportItemResult): string {
     if (item.status === 'IMPORTED') {
-      return 'IMPORTED'
+      return '已导入'
     }
     if (item.status === 'OVERWRITTEN') {
-      return 'OVERWRITTEN'
+      return '已覆盖'
     }
     if (item.status === 'SKIPPED') {
-      return 'SKIPPED'
+      return '已跳过'
     }
     if (item.status === 'FAILED') {
-      return 'FAILED'
+      return '失败'
     }
-    return 'CANCELED'
+    return '已取消'
   }
 
   private getResultStatusColor(item: RomImportItemResult): string {
@@ -604,7 +635,7 @@ struct ImportTaskOverlayPage {
         EmuHeaderBar({
           titleText: 'EMU_OS // 0.1',
           titleIcon: 'terminal',
-          rightLabel: 'SYS_MONITOR',
+          rightLabel: '导入监控',
           rightIcon: 'settings_input_component',
           activeTextColor: EmuColors.primary,
           mutedTextColor: '#7A7A7A',
@@ -768,7 +799,7 @@ struct ImportTaskOverlayPage {
     Column({ space: 0 }) {
       Row() {
         Column({ space: 2 }) {
-          Text('Executing Task')
+          Text('正在导入')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor(Colors.primary)
@@ -851,7 +882,7 @@ struct ImportTaskOverlayPage {
       }
 
       Row() {
-        Button('Cancel Task')
+        Button('取消导入')
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
           .fontFamily('monospace')

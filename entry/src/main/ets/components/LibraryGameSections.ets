@@ -81,7 +81,7 @@ export struct LibraryGameSections {
         .fontColor(EmuColors.onSurface)
 
       Row({ space: 12 }) {
-        Text('SORT: NAME')
+        Text('排序：名称')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
@@ -126,7 +126,7 @@ export struct LibraryGameSections {
     Column({ space: 10 }) {
       this.Spinner(30, 2, EmuColors.primary, '#2F484848')
 
-      Text(this.state.bottomLoaderActive ? 'RETRIEVING_MORE...' : 'LOADING_ASSETS')
+      Text(this.state.bottomLoaderActive ? '继续加载游戏...' : '正在读取游戏库')
         .fontSize(9)
         .fontFamily('monospace')
         .fontColor(this.state.bottomLoaderActive ? EmuColors.primary : EmuColors.onSurfaceVariant)

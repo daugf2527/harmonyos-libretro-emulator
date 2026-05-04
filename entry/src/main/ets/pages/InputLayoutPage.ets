@@ -61,32 +61,32 @@ struct InputLayoutPage {
   private readonly controllerCards: ControllerCardItem[] = [
     {
       id: 'p1',
-      label: 'Controller 01',
-      name: 'Virtual Pad P1',
-      status: 'READY',
-      power: 'LOCAL',
+      label: '玩家 1',
+      name: '虚拟手柄 P1',
+      status: '就绪',
+      power: '本地',
       metrics: [
-        { label: 'Polling Rate', value: 'FRAME_SYNC', highlight: false },
-        { label: 'Latency', value: 'INPUT_QUEUE', highlight: true },
-        { label: 'Protocol', value: 'RETRO_PAD', highlight: false }
+        { label: '轮询', value: 'FRAME_SYNC', highlight: false },
+        { label: '延迟', value: 'INPUT_QUEUE', highlight: true },
+        { label: '协议', value: 'RETRO_PAD', highlight: false }
       ]
     },
     {
       id: 'p2',
-      label: 'Controller 02',
-      name: 'External Device',
-      status: 'UNBOUND',
-      power: 'NO DEVICE',
+      label: '外接手柄',
+      name: '等待连接手柄',
+      status: '未绑定',
+      power: '无设备',
       metrics: [
-        { label: 'Polling Rate', value: '--', highlight: false },
-        { label: 'Latency', value: '--', highlight: false },
-        { label: 'Protocol', value: 'HID_WAIT', highlight: false }
+        { label: '轮询', value: '--', highlight: false },
+        { label: '延迟', value: '--', highlight: false },
+        { label: '协议', value: 'HID_WAIT', highlight: false }
       ]
     }
   ]
   private readonly rooms: NetplayRoomItem[] = [
-    { id: 'local', name: 'Local Session', game: 'Current Runtime Input Bridge', latency: '0ms', players: '1 / 1', color: EmuColors.primary },
-    { id: 'netplay', name: 'Netplay Adapter', game: 'External service not configured', latency: '--', players: 'OFFLINE', color: EmuColors.error }
+    { id: 'local', name: '本地游玩', game: '当前运行输入桥', latency: '0ms', players: '1 / 1', color: EmuColors.primary },
+    { id: 'netplay', name: 'Netplay 联机', game: '外部服务未配置', latency: '--', players: '离线', color: EmuColors.error }
   ]
 
   aboutToAppear(): void {
@@ -194,7 +194,7 @@ struct InputLayoutPage {
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      this.applyLayoutProfile(profile, 'LOCAL_LAYOUT_RESET')
+      this.applyLayoutProfile(profile, '已重置本地布局')
       this.showSavedToast()
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
@@ -202,7 +202,7 @@ struct InputLayoutPage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('InputLayoutPage', 'Layout', `重置输入布局失败: ${message}`)
-      this.layoutStatusText = 'LOCAL_LAYOUT_RESET_FAILED'
+      this.layoutStatusText = '本地布局重置失败'
     }
   }
 
@@ -373,7 +373,7 @@ struct InputLayoutPage {
           Text('◎')
             .fontSize(16)
             .fontColor(EmuColors.onSurfaceVariant)
-          Text('Netplay Lobby')
+          Text('Netplay 联机')
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
@@ -381,7 +381,7 @@ struct InputLayoutPage {
         }
         .alignItems(VerticalAlign.Center)
 
-        Text('Servers: NOT CONFIGURED')
+        Text('中继：未配置')
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor('#666666')

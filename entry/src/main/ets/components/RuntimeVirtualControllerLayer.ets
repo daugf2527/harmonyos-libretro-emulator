@@ -116,7 +116,7 @@ export struct RuntimeVirtualControllerLayer {
       }
       .width('100%')
 
-      Text('M O V E M E N T')
+      Text('方向键')
         .fontSize(9)
         .fontFamily('monospace')
         .fontColor('#88757575')
@@ -159,7 +159,7 @@ export struct RuntimeVirtualControllerLayer {
         Row() {
           Blank()
             .layoutWeight(1)
-          this.RuntimeInputButtonById('a', 'A', '确认 (Confirm)', 112, 34, 8)
+          this.RuntimeInputButtonById('a', 'A', '确认', 112, 34, 8)
           Blank()
             .layoutWeight(1)
         }
@@ -211,8 +211,8 @@ export struct RuntimeVirtualControllerLayer {
     .border({ width: 1, color: EmuColors.primary, style: BorderStyle.Solid })
     .borderRadius(16)
     .shadow({ radius: 14, color: '#5500FF41', offsetX: 0, offsetY: 0 })
-    .align(Alignment.TopEnd)
-    .margin({ right: 22, top: 164 })
+    .align(Alignment.End)
+    .margin({ right: 22 })
     .onClick(() => {
       this.onQuickSave?.()
     })

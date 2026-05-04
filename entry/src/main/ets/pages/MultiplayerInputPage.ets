@@ -132,11 +132,11 @@ struct MultiplayerInputPage {
     return [
       {
         id: 'p1',
-        label: 'Controller 01',
-        name: 'Virtual Pad P1',
+        label: '玩家 1',
+        name: '虚拟手柄 P1',
         deviceId: 'RETRO_PAD_TOUCH',
-        status: 'CONNECTED',
-        powerText: 'LOCAL',
+        status: '已连接',
+        powerText: '本地',
         pollingRate: 'FRAME',
         latency: this.localLatencyText,
         protocol: 'RETRO_PAD',
@@ -144,11 +144,11 @@ struct MultiplayerInputPage {
       },
       {
         id: 'p2',
-        label: 'Controller 02',
-        name: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? 'External Device' : this.deviceNamesText,
-        deviceId: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? 'WAITING_FOR_HID' : `${this.deviceCountText}_DEVICE(S)`,
-        status: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? 'UNBOUND' : 'CONNECTED',
-        powerText: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? 'NO DEVICE' : 'INPUT BUS',
+        label: '外接手柄',
+        name: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '等待连接手柄' : this.deviceNamesText,
+        deviceId: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '等待 HID / 蓝牙手柄' : `${this.deviceCountText} 个输入设备`,
+        status: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '未绑定' : '已连接',
+        powerText: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '无设备' : '输入总线',
         pollingRate: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '--' : 'DEVICE',
         latency: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '--' : 'NATIVE',
         protocol: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? 'HID_WAIT' : 'HID',
@@ -161,8 +161,8 @@ struct MultiplayerInputPage {
     return [
       {
         id: 'local',
-        title: 'Local Session',
-        game: 'Current Runtime Input Bridge',
+        title: '本地游玩',
+        game: '当前运行输入桥',
         latency: '0ms',
         players: '1 / 1',
         status: 'READY',
@@ -170,20 +170,20 @@ struct MultiplayerInputPage {
       },
       {
         id: 'adapter',
-        title: 'Netplay Adapter',
-        game: 'Remote lobby service not configured',
+        title: 'Netplay 联机',
+        game: '中继 / 房间服务未配置',
         latency: '--',
         players: 'OFFLINE',
-        status: 'NOT_CONFIGURED',
+        status: '未配置',
         color: EmuColors.error
       },
       {
         id: 'layout',
-        title: 'Layout Editor',
-        game: 'Touch buttons and hot zone calibration',
-        latency: 'LOCAL',
+        title: '按键布局编辑',
+        game: '触控按键与热区校准',
+        latency: '本地',
         players: 'P1',
-        status: 'EDITABLE',
+        status: '可编辑',
         color: EmuColors.secondary
       }
     ]
@@ -276,9 +276,9 @@ struct MultiplayerInputPage {
       .alignItems(VerticalAlign.Bottom)
 
       Row({ space: 8 }) {
-        this.MetricBox('Polling Rate', item.pollingRate, false)
-        this.MetricBox('Latency', item.latency, item.isActive)
-        this.MetricBox('Protocol', item.protocol, false)
+        this.MetricBox('轮询', item.pollingRate, false)
+        this.MetricBox('延迟', item.latency, item.isActive)
+        this.MetricBox('协议', item.protocol, false)
       }
       .width('100%')
     }
@@ -317,7 +317,7 @@ struct MultiplayerInputPage {
       Row() {
         Row({ space: 8 }) {
           EmuIcon({ name: 'explore', tone: 'muted', iconSize: 18 })
-          Text('NETPLAY\nLOBBY')
+          Text('NETPLAY\n联机')
             .fontSize(12)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
@@ -327,16 +327,15 @@ struct MultiplayerInputPage {
         .alignItems(VerticalAlign.Center)
 
         Row({ space: 12 }) {
-          Text('Servers: NOT_CONFIGURED')
+          Text('中继：未配置')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor('#777777')
 
-          Button('CREATE\nROOM')
+          Button('创建\n房间')
             .height(44)
             .fontSize(10)
             .fontFamily('monospace')
-            .lineHeight(16)
             .fontColor(EmuColors.onSurface)
             .backgroundColor(Color.Transparent)
             .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
@@ -389,7 +388,7 @@ struct MultiplayerInputPage {
           .fontColor(EmuColors.onSurface)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(`Game: ${room.game}`)
+        Text(room.game)
           .fontSize(10)
           .fontFamily('monospace')
           .fontColor('#666666')
@@ -400,7 +399,7 @@ struct MultiplayerInputPage {
       .alignItems(HorizontalAlign.Start)
 
       Column({ space: 4 }) {
-        Text('Latency')
+        Text('延迟')
           .fontSize(9)
           .fontColor('#666666')
         Text(room.latency)
@@ -411,7 +410,7 @@ struct MultiplayerInputPage {
       .alignItems(HorizontalAlign.End)
 
       Column({ space: 4 }) {
-        Text('Players')
+        Text('人数')
           .fontSize(9)
           .fontColor('#666666')
         Text(room.players)
@@ -424,9 +423,9 @@ struct MultiplayerInputPage {
       Text(room.status)
         .fontSize(9)
         .fontFamily('monospace')
-        .fontColor(room.status === 'NOT_CONFIGURED' ? EmuColors.error : room.color)
+        .fontColor(room.status === '未配置' ? EmuColors.error : room.color)
         .padding({ left: 6, right: 6, top: 3, bottom: 3 })
-        .backgroundColor(room.status === 'NOT_CONFIGURED' ? '#227E2B17' : '#1800FF41')
+        .backgroundColor(room.status === '未配置' ? '#227E2B17' : '#1800FF41')
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
 
@@ -451,7 +450,7 @@ struct MultiplayerInputPage {
       Row() {
         Row({ space: 8 }) {
           EmuIcon({ name: 'equalizer', iconSize: 16 })
-          Text('Buffer Jitter Telemetry')
+          Text('输入延迟抖动')
             .fontSize(11)
             .fontFamily('monospace')
             .fontColor(EmuColors.onSurface)
@@ -460,7 +459,7 @@ struct MultiplayerInputPage {
         .alignItems(VerticalAlign.Center)
 
         Row({ space: 8 }) {
-          Text('REAL-TIME')
+          Text('实时')
             .fontSize(8)
             .fontFamily('monospace')
             .fontColor(EmuColors.primary)
@@ -468,7 +467,7 @@ struct MultiplayerInputPage {
             .backgroundColor('#1800FF41')
             .border({ width: 0.5, color: '#3300FF41', style: BorderStyle.Solid })
 
-          Text('INTERVAL: 16.6ms')
+          Text('采样：16.6ms')
             .fontSize(8)
             .fontFamily('monospace')
             .fontColor('#777777')
@@ -502,7 +501,7 @@ struct MultiplayerInputPage {
           .backgroundColor('#3300FF41')
           .align(Alignment.Center)
 
-        Text('Jitter Variance: LOCAL_SAMPLE')
+        Text('抖动样本：本地输入')
           .fontSize(8)
           .fontFamily('monospace')
           .fontColor('#777777')
@@ -526,7 +525,7 @@ struct MultiplayerInputPage {
     Column({ space: 12 }) {
       Row({ space: 8 }) {
         EmuIcon({ name: 'info', tone: 'muted', iconSize: 16 })
-        Text('Input Log')
+        Text('输入检测')
           .fontSize(11)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurface)

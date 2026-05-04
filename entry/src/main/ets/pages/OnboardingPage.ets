@@ -253,7 +253,7 @@ struct OnboardingPage {
       }
 
       Row({ space: 16 }) {
-        Text(this.currentStep === 1 ? 'BOOT_SEQUENCE: 01' : 'STEP 02')
+        Text(this.currentStep === 1 ? '初始设置 01' : '文件授权 02')
           .fontFamily('Inter')
           .fontSize(12)
           .fontColor(Colors.secondary)
@@ -324,7 +324,7 @@ struct OnboardingPage {
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-        Text('系统已准备就绪。自动扫描本地存储、云端库及映射驱动器。')
+        Text('为本地 ROM / ISO 建立游戏库，保留 Core、Shader、存档等模拟器工作流。')
           .fontSize(16)
           .fontColor('#CCABABAB')
           .lineHeight(28)
@@ -384,19 +384,19 @@ struct OnboardingPage {
       // Status bar
       Row() {
         Column({ space: 4 }) {
-          Text('Status').fontSize(10).fontColor('#FF666666').letterSpacing(2)
-          Text('READY_STABLE').fontSize(10).fontFamily('monospace').fontColor('#FF9D9E9E')
+          Text('状态').fontSize(10).fontColor('#FF666666').letterSpacing(2)
+          Text('本地就绪').fontSize(10).fontColor('#FF9D9E9E')
         }
         .alignItems(HorizontalAlign.Start)
 
         Column({ space: 4 }) {
-          Text('Module').fontSize(10).fontColor('#FF666666').letterSpacing(2)
-          Text('CORE_INT_V1').fontSize(10).fontFamily('monospace').fontColor('#FF9D9E9E')
+          Text('核心').fontSize(10).fontColor('#FF666666').letterSpacing(2)
+          Text('Core 已启用').fontSize(10).fontColor('#FF9D9E9E')
         }
         .alignItems(HorizontalAlign.Center)
 
         Column({ space: 4 }) {
-          Text('Latency').fontSize(10).fontColor('#FF666666').letterSpacing(2)
+          Text('延迟').fontSize(10).fontColor('#FF666666').letterSpacing(2)
           Text('0.02ms').fontSize(10).fontFamily('monospace').fontColor(Colors.primary)
         }
         .alignItems(HorizontalAlign.End)
@@ -421,7 +421,7 @@ struct OnboardingPage {
             .height(16)
             .backgroundColor(Colors.primary)
 
-          Text('Authorization Required')
+          Text('需要文件访问权限')
             .fontSize(12)
             .fontFamily('monospace')
             .fontColor(Colors.primary)
@@ -515,7 +515,7 @@ struct OnboardingPage {
       // Permission list
       Column({ space: 0 }) {
         Row() {
-          Text('System Access Protocol')
+          Text('文件访问状态')
             .fontSize(10)
             .fontFamily('monospace')
             .fontColor('#FF666666')

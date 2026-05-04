@@ -106,7 +106,7 @@ struct AboutHelpPage {
             .fontFamily('monospace')
             .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
-          Text('LOCAL_ONLY')
+          Text('本地模式')
             .fontSize(13)
             .fontFamily('monospace')
             .fontColor(EmuColors.onSurfaceVariant)

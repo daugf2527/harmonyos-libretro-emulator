@@ -671,7 +671,7 @@ struct LibraryPage {
     Column({ space: 6 }) {
       this.Spinner(26, 2, EmuColors.primary, '#3300FF41')
 
-      Text(this.refreshing ? 'SYNCING_LIBRARY' : 'SYNC_INDEX')
+      Text(this.refreshing ? '正在扫描游戏库' : '扫描游戏库')
         .fontSize(9)
         .fontColor(EmuColors.primary)
         .fontFamily('monospace')

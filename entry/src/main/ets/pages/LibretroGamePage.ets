@@ -267,7 +267,7 @@ struct LibretroGamePage {
       this.showControls = true;
       return;
     }
-    this.runtimeSaveStatusText = 'ACTION_NOT_CONFIGURED';
+    this.runtimeSaveStatusText = '该操作暂未配置';
   }
 
   handleEngineState(payload: EngineStatePayload) {

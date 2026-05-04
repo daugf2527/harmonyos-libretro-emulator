@@ -207,7 +207,7 @@ struct ImportEntryPage {
     Column() {
       EmuHeaderBar({
         titleText: 'EMU_CORE_v1.0',
-        rightLabel: 'LOCAL_ONLY',
+        rightLabel: '本地导入',
         titleIcon: 'memory',
         rightIcon: 'settings_input_component',
         activeTextColor: EmuColors.primary,

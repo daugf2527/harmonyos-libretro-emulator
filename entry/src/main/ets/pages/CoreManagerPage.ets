@@ -140,8 +140,8 @@ struct CoreManagerPage {
   private MemoryFootprint() {
     Row({ space: 1 }) {
       this.FootprintCell('CORE CATALOG', `${this.coreItems.length}`, 72)
-      this.FootprintCell('FIRMWARE SOURCE', 'LOCAL_ONLY', 44)
-      this.FootprintCell('NETWORK UPDATE', 'DISABLED', 18)
+      this.FootprintCell('FIRMWARE SOURCE', '本地', 44)
+      this.FootprintCell('NETWORK UPDATE', '已关闭', 18)
     }
     .width('100%')
     .backgroundColor('#33484848')
