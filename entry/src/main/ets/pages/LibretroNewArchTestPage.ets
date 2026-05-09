@@ -1186,7 +1186,7 @@ struct LibretroNewArchTestPage {
                 }
                 .width('100%')
                 .padding(4)
-              })
+              }, (opt: CoreOptionItem) => opt.key)
             }
             .width('100%')
             .padding(10)
@@ -1337,7 +1337,7 @@ struct LibretroNewArchTestPage {
                   .fontColor('#CCC')
                   .width('100%')
                   .textAlign(TextAlign.Start)
-                })
+                }, (log: string, index: number) => 'log-' + index)
               }
               .width('100%')
               .height('30%')
@@ -1378,7 +1378,7 @@ struct LibretroNewArchTestPage {
                     .fontColor('#CCC')
                     .width('100%')
                     .textAlign(TextAlign.Start)
-                })
+                }, (log: string, index: number) => 'log-' + index)
               }
               .width('100%')
             }
@@ -1683,7 +1683,7 @@ struct LibretroNewArchTestPage {
                 }
                 .width('100%')
                 .padding(4)
-              })
+              }, (opt: CoreOptionItem) => opt.key)
             }
             .width('100%')
             .padding(10)

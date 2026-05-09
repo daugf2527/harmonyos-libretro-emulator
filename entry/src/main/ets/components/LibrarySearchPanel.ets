@@ -8,31 +8,17 @@ import {
 } from './EmuTelemetryPanel'
 import { PlatformChipBar } from './PlatformChipBar'
 
-export interface LibrarySearchPanelState {
-  keyword: string
-  searchBusy: boolean
-  showSearchResults: boolean
-  searchResults: LibraryRecord[]
-  telemetryCells: EmuTelemetryCellItem[]
-  telemetryBars: EmuTelemetryBarItem[]
-  platforms: string[]
-  selectedPlatform: string
-  spinnerAngle: number
-}
-
 @Component
 export struct LibrarySearchPanel {
-  @Prop state: LibrarySearchPanelState = {
-    keyword: '',
-    searchBusy: false,
-    showSearchResults: false,
-    searchResults: [],
-    telemetryCells: [],
-    telemetryBars: [],
-    platforms: ['ALL'],
-    selectedPlatform: 'ALL',
-    spinnerAngle: 0
-  }
+  @Prop keyword: string = ''
+  @Prop searchBusy: boolean = false
+  @Prop showSearchResults: boolean = false
+  @Prop selectedPlatform: string = 'ALL'
+  @Prop spinnerAngle: number = 0
+  private searchResults: LibraryRecord[] = []
+  private telemetryCells: EmuTelemetryCellItem[] = []
+  private telemetryBars: EmuTelemetryBarItem[] = []
+  private platforms: string[] = ['ALL']
   onKeywordChange?: (value: string) => void
   onSearchResultLaunch?: (item: LibraryRecord) => void
   onPlatformChange?: (value: string) => void
@@ -48,14 +34,14 @@ export struct LibrarySearchPanel {
         })
 
         Stack() {
-          if (this.state.keyword.trim().length === 0) {
+          if (this.keyword.trim().length === 0) {
             Text('搜索游戏库')
               .fontSize(15)
               .fontColor('#66484848')
               .align(Alignment.Start)
           }
 
-          TextInput({ text: this.state.keyword, placeholder: '' })
+          TextInput({ text: this.keyword, placeholder: '' })
             .width('100%')
             .fontSize(15)
             .fontColor(EmuColors.onSurface)
@@ -68,7 +54,7 @@ export struct LibrarySearchPanel {
         }
         .layoutWeight(1)
 
-        if (this.state.searchBusy) {
+        if (this.searchBusy) {
           this.Spinner(16, 1.5, EmuColors.primary, '#2200FF41')
         }
       }
@@ -79,18 +65,18 @@ export struct LibrarySearchPanel {
       .border({ width: 0.5, color: '#44757575', style: BorderStyle.Solid })
       .alignItems(VerticalAlign.Center)
 
-      if (this.state.showSearchResults) {
+      if (this.showSearchResults) {
         this.SearchResults()
       }
 
       EmuTelemetryPanel({
-        cells: this.state.telemetryCells,
-        bars: this.state.telemetryBars
+        cells: this.telemetryCells,
+        bars: this.telemetryBars
       })
 
       PlatformChipBar({
-        items: this.state.platforms,
-        selected: this.state.selectedPlatform,
+        items: this.platforms,
+        selected: this.selectedPlatform,
         onChange: (value: string) => {
           this.onPlatformChange?.(value)
         }
@@ -101,8 +87,8 @@ export struct LibrarySearchPanel {
   @Builder
   private SearchResults() {
     Column({ space: 2 }) {
-      if (this.state.searchResults.length > 0) {
-        ForEach(this.state.searchResults, (item: LibraryRecord) => {
+      if (this.searchResults.length > 0) {
+        ForEach(this.searchResults, (item: LibraryRecord) => {
           Row() {
             Text(item.title)
               .fontSize(14)
@@ -164,7 +150,7 @@ export struct LibrarySearchPanel {
           color: activeColor,
           style: BorderStyle.Solid
         })
-        .rotate({ angle: this.state.spinnerAngle })
+        .rotate({ angle: this.spinnerAngle })
     }
   }
 }

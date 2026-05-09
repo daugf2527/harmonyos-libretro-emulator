@@ -14,13 +14,11 @@ export interface LibraryGameSectionsState {
 
 @Component
 export struct LibraryGameSections {
-  @Prop state: LibraryGameSectionsState = {
-    recentGames: [],
-    games: [],
-    highlightedRecentGameId: '',
-    bottomLoaderActive: false,
-    spinnerAngle: 0
-  }
+  @Prop recentGames: LibraryRecord[] = []
+  @Prop games: LibraryRecord[] = []
+  @Prop highlightedRecentGameId: string = ''
+  @Prop bottomLoaderActive: boolean = false
+  @Prop spinnerAngle: number = 0
   onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
   onHideSearchResults?: () => void
 

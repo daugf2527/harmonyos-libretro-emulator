@@ -2,25 +2,14 @@ import { createIndexRange, EmuColors } from '../common/EmuUiTokens'
 import { EmuCoverArt } from './EmuCoverArt'
 import { EmuIcon } from './EmuIcon'
 
-export interface LibraryLaunchOverlayState {
-  coverKey: string
-  progress: number
-  statusText: string
-  cpuText: string
-  runtimeStatusText: string
-  fileLabel: string
-}
-
 @Component
 export struct LibraryLaunchOverlay {
-  @Prop state: LibraryLaunchOverlayState = {
-    coverKey: '',
-    progress: 0,
-    statusText: 'READY_TO_HANDOFF',
-    cpuText: 'FPS: --',
-    runtimeStatusText: 'NO DATA',
-    fileLabel: ''
-  }
+  @Prop coverKey: string = ''
+  @Prop progress: number = 0
+  @Prop statusText: string = 'READY_TO_HANDOFF'
+  @Prop cpuText: string = 'FPS: --'
+  @Prop runtimeStatusText: string = 'NO DATA'
+  @Prop fileLabel: string = ''
 
   build() {
     Stack() {
@@ -75,8 +64,8 @@ export struct LibraryLaunchOverlay {
       }
 
       Row({ space: 10 }) {
-        this.StatusPill(this.state.cpuText)
-        this.StatusPill(this.state.runtimeStatusText)
+        this.StatusPill(this.cpuText)
+        this.StatusPill(this.runtimeStatusText)
       }
     }
     .width('100%')
@@ -126,7 +115,7 @@ export struct LibraryLaunchOverlay {
             .height(12)
             .backgroundColor('#3300FF41')
 
-          Text(this.state.statusText)
+          Text(this.statusText)
             .fontSize(9)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.primary)
@@ -165,7 +154,7 @@ export struct LibraryLaunchOverlay {
         .clip(true)
 
       EmuCoverArt({
-        coverKey: this.state.coverKey,
+        coverKey: this.coverKey,
         variant: 'recent'
       })
         .width('100%')
@@ -198,7 +187,7 @@ export struct LibraryLaunchOverlay {
             color: EmuColors.primary,
             style: BorderStyle.Solid
           })
-          .rotate({ angle: this.state.progress * 3.6 })
+          .rotate({ angle: this.progress * 3.6 })
 
         Row()
           .width(6)
@@ -225,7 +214,7 @@ export struct LibraryLaunchOverlay {
           .backgroundColor('#222222')
 
         Row()
-          .width(`${this.state.progress}%`)
+          .width(`${this.progress}%`)
           .height(2)
           .backgroundColor(EmuColors.primary)
           .shadow({ radius: 10, color: '#5500FF41', offsetX: 0, offsetY: 0 })
@@ -234,7 +223,7 @@ export struct LibraryLaunchOverlay {
       .width('100%')
 
       Row() {
-        Text(this.state.fileLabel)
+        Text(this.fileLabel)
           .fontSize(9)
           .fontColor('#666666')
           .fontFamily('monospace')
@@ -242,7 +231,7 @@ export struct LibraryLaunchOverlay {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
 
-        Text(`${this.state.progress}%`)
+        Text(`${this.progress}%`)
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)

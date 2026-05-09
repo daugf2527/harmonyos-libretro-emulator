@@ -83,7 +83,7 @@ struct LibraryPage {
   private cardLongPressed: boolean = false
   aboutToAppear(): void {
     this.pageActive = true
-    this.refreshLibraryGames()
+    void this.refreshLibraryGames()
     this.updateSpinnerLoop()
   }
 
@@ -688,17 +688,15 @@ struct LibraryPage {
   @Builder
   private SearchAndTelemetry() {
     LibrarySearchPanel({
-      state: {
-        keyword: this.searchKeyword,
-        searchBusy: this.searchBusy,
-        showSearchResults: this.showSearchResults,
-        searchResults: this.searchResults,
-        telemetryCells: getLibraryTelemetryCells(this.allGames),
-        telemetryBars: getLibraryTelemetryBars(this.allGames),
-        platforms: this.getDisplayPlatformFilters(),
-        selectedPlatform: this.selectedPlatform,
-        spinnerAngle: this.spinnerAngle
-      },
+      keyword: this.searchKeyword,
+      searchBusy: this.searchBusy,
+      showSearchResults: this.showSearchResults,
+      searchResults: this.searchResults,
+      telemetryCells: getLibraryTelemetryCells(this.allGames),
+      telemetryBars: getLibraryTelemetryBars(this.allGames),
+      platforms: this.getDisplayPlatformFilters(),
+      selectedPlatform: this.selectedPlatform,
+      spinnerAngle: this.spinnerAngle,
       onKeywordChange: (value: string) => {
         this.onSearchKeywordChange(value)
       },

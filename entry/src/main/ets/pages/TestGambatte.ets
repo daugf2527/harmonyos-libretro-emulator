@@ -622,7 +622,7 @@ struct TestGambatte {
             .padding({ top: 5, bottom: 5 })
             .border({ width: { bottom: 1 }, color: '#EEEEEE' })
           }
-        })
+        }, (item: AutoTestResult) => item.id)
       }
       .width('100%')
       .height(200) // 限制高度，可滚动

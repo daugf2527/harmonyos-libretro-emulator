@@ -1,64 +1,33 @@
-export interface RuntimeControlPanelState {
-  portOptions: SelectOption[]
-  selectedPortIndex: number
-  currentPortLabel: ResourceStr
-  inputSourceOptions: SelectOption[]
-  selectedInputSourceIndex: number
-  currentInputSourceLabel: ResourceStr
-  coreOptions: SelectOption[]
-  selectedCoreIndex: number
-  currentCoreLabel: ResourceStr
-  romOptions: SelectOption[]
-  selectedRomIndex: number
-  currentRomLabel: ResourceStr
-  hasRomOptions: boolean
-  switching: boolean
-  coreCheckRunning: boolean
-  coreCheckText: string
-  scalingMode: number
-  softwareMaxPresetIndex: number
-  hwRenderAllowed: boolean
-  hideVirtualController: boolean
-  gameRunning: boolean
-  gamePaused: boolean
-  runtimeSaveStatusText: string
-  soakRunning: boolean
-  soakSecondsLeft: number
-  soakSummaryText: string
-  switchError: string
-}
-
 @Component
 export struct RuntimeControlPanel {
-  @Prop state: RuntimeControlPanelState = {
-    portOptions: [],
-    selectedPortIndex: 0,
-    currentPortLabel: 'P1',
-    inputSourceOptions: [],
-    selectedInputSourceIndex: 0,
-    currentInputSourceLabel: '未分配',
-    coreOptions: [],
-    selectedCoreIndex: 0,
-    currentCoreLabel: '无',
-    romOptions: [],
-    selectedRomIndex: 0,
-    currentRomLabel: '无',
-    hasRomOptions: false,
-    switching: false,
-    coreCheckRunning: false,
-    coreCheckText: '',
-    scalingMode: 2,
-    softwareMaxPresetIndex: 1,
-    hwRenderAllowed: true,
-    hideVirtualController: false,
-    gameRunning: false,
-    gamePaused: false,
-    runtimeSaveStatusText: 'SAVE_IDLE',
-    soakRunning: false,
-    soakSecondsLeft: 0,
-    soakSummaryText: '',
-    switchError: ''
-  }
+  @Prop selectedPortIndex: number = 0
+  @Prop currentPortLabel: ResourceStr = 'P1'
+  @Prop selectedInputSourceIndex: number = 0
+  @Prop currentInputSourceLabel: ResourceStr = '未分配'
+  @Prop selectedCoreIndex: number = 0
+  @Prop currentCoreLabel: ResourceStr = '无'
+  @Prop selectedRomIndex: number = 0
+  @Prop currentRomLabel: ResourceStr = '无'
+  @Prop hasRomOptions: boolean = false
+  @Prop switching: boolean = false
+  @Prop coreCheckRunning: boolean = false
+  @Prop coreCheckText: string = ''
+  @Prop scalingMode: number = 2
+  @Prop softwareMaxPresetIndex: number = 1
+  @Prop hwRenderAllowed: boolean = true
+  @Prop hideVirtualController: boolean = false
+  @Prop gameRunning: boolean = false
+  @Prop gamePaused: boolean = false
+  @Prop runtimeSaveStatusText: string = 'SAVE_IDLE'
+  @Prop soakRunning: boolean = false
+  @Prop soakSecondsLeft: number = 0
+  @Prop soakSummaryText: string = ''
+  @Prop switchError: string = ''
+
+  private portOptions: SelectOption[] = []
+  private inputSourceOptions: SelectOption[] = []
+  private coreOptions: SelectOption[] = []
+  private romOptions: SelectOption[] = []
   onClose?: () => void
   onPortSelect?: (index: number) => void
   onInputSourceSelect?: (index: number) => void
@@ -118,20 +87,20 @@ export struct RuntimeControlPanel {
   private CoreCheckBlock() {
     ListItem() {
       Column({ space: 8 }) {
-        Button(this.state.coreCheckRunning ? '验证中...' : '验证核心符号')
+        Button(this.coreCheckRunning ? '验证中...' : '验证核心符号')
           .fontSize(16)
           .height(44)
           .width('100%')
           .type(ButtonType.Normal)
           .borderRadius(8)
-          .backgroundColor(this.state.coreCheckRunning ? '#607D8B' : '#546E7A')
-          .enabled(!this.state.coreCheckRunning && !this.state.switching)
+          .backgroundColor(this.coreCheckRunning ? '#607D8B' : '#546E7A')
+          .enabled(!this.coreCheckRunning && !this.switching)
           .onClick(() => {
             this.onCoreCheck?.()
           })
 
-        if (this.state.coreCheckText) {
-          Text(this.state.coreCheckText)
+        if (this.coreCheckText) {
+          Text(this.coreCheckText)
             .fontSize(12)
             .fontColor(Color.White)
             .padding(4)
@@ -150,9 +119,9 @@ export struct RuntimeControlPanel {
         { value: '软件渲染 (CPU)' },
         { value: 'GLES渲染 (GPU)' }
       ],
-      this.state.scalingMode,
-      ['硬件渲染', '软件渲染', 'GLES渲染'][this.state.scalingMode],
-      !this.state.switching,
+      this.scalingMode,
+      ['硬件渲染', '软件渲染', 'GLES渲染'][this.scalingMode],
+      !this.switching,
       (index: number) => {
         this.onRenderModeSelect?.(index)
       }
@@ -161,7 +130,7 @@ export struct RuntimeControlPanel {
 
   @Builder
   private SoftwareResolutionBlock() {
-    if (this.state.scalingMode === 1) {
+    if (this.scalingMode === 1) {
       this.SelectBlock(
         '软件分辨率',
         [
@@ -169,9 +138,9 @@ export struct RuntimeControlPanel {
           { value: '720p (1280x720)' },
           { value: '1080p (1920x1080)' }
         ],
-        this.state.softwareMaxPresetIndex,
-        ['480p', '720p', '1080p'][this.state.softwareMaxPresetIndex],
-        !this.state.switching,
+        this.softwareMaxPresetIndex,
+        ['480p', '720p', '1080p'][this.softwareMaxPresetIndex],
+        !this.switching,
         (index: number) => {
           this.onSoftwareResolutionSelect?.(index)
         }
@@ -195,8 +164,8 @@ export struct RuntimeControlPanel {
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
 
-          Toggle({ type: ToggleType.Switch, isOn: this.state.hwRenderAllowed })
-            .enabled(!this.state.switching)
+          Toggle({ type: ToggleType.Switch, isOn: this.hwRenderAllowed })
+            .enabled(!this.switching)
             .onChange((value: boolean) => {
               this.onHwRenderChange?.(value)
             })
@@ -212,7 +181,7 @@ export struct RuntimeControlPanel {
           .layoutWeight(1)
           .alignItems(HorizontalAlign.Start)
 
-          Toggle({ type: ToggleType.Switch, isOn: this.state.hideVirtualController })
+          Toggle({ type: ToggleType.Switch, isOn: this.hideVirtualController })
             .onChange((value: boolean) => {
               this.onHideVirtualControllerChange?.(value)
             })
@@ -228,7 +197,7 @@ export struct RuntimeControlPanel {
   private GameActionsBlock() {
     ListItem() {
       Column({ space: 12 }) {
-        if (!this.state.gameRunning) {
+        if (!this.gameRunning) {
           Button('开始游戏')
             .fontSize(18)
             .height(50)
@@ -236,13 +205,13 @@ export struct RuntimeControlPanel {
             .type(ButtonType.Normal)
             .borderRadius(8)
             .backgroundColor('#4CAF50')
-            .enabled(!this.state.switching)
+            .enabled(!this.switching)
             .onClick(() => {
               this.onStartGame?.()
             })
         } else {
           Row({ space: 10 }) {
-            if (this.state.gamePaused) {
+            if (this.gamePaused) {
               Button('继续')
                 .fontSize(20)
                 .height(50)
@@ -273,7 +242,7 @@ export struct RuntimeControlPanel {
               .type(ButtonType.Normal)
               .borderRadius(8)
               .backgroundColor('#2196F3')
-              .enabled(!this.state.switching)
+              .enabled(!this.switching)
               .onClick(() => {
                 this.onRestartGame?.()
               })
@@ -300,7 +269,7 @@ export struct RuntimeControlPanel {
               .type(ButtonType.Normal)
               .borderRadius(8)
               .backgroundColor('#2E7D32')
-              .enabled(!this.state.switching)
+              .enabled(!this.switching)
               .onClick(() => {
                 this.onQuickSave?.()
               })
@@ -312,7 +281,7 @@ export struct RuntimeControlPanel {
               .type(ButtonType.Normal)
               .borderRadius(8)
               .backgroundColor('#1565C0')
-              .enabled(!this.state.switching)
+              .enabled(!this.switching)
               .onClick(() => {
                 this.onQuickLoad?.()
               })
@@ -320,7 +289,7 @@ export struct RuntimeControlPanel {
           .width('100%')
         }
 
-        Text(this.state.runtimeSaveStatusText)
+        Text(this.runtimeSaveStatusText)
           .fontSize(12)
           .fontColor('#AAAAAA')
           .fontFamily('monospace')
@@ -336,20 +305,20 @@ export struct RuntimeControlPanel {
   private SoakBlock() {
     ListItem() {
       Column({ space: 8 }) {
-        Button(this.state.soakRunning ? `压力测试中 ${this.state.soakSecondsLeft}s` : '压力测试 (10min)')
+        Button(this.soakRunning ? `压力测试中 ${this.soakSecondsLeft}s` : '压力测试 (10min)')
           .fontSize(14)
           .height(40)
           .width('100%')
           .type(ButtonType.Normal)
           .borderRadius(8)
-          .backgroundColor(this.state.soakRunning ? '#607D8B' : '#455A64')
-          .enabled(!this.state.switching)
+          .backgroundColor(this.soakRunning ? '#607D8B' : '#455A64')
+          .enabled(!this.switching)
           .onClick(() => {
             this.onSoakToggle?.()
           })
 
-        if (this.state.soakSummaryText) {
-          Text(this.state.soakSummaryText)
+        if (this.soakSummaryText) {
+          Text(this.soakSummaryText)
             .fontSize(12)
             .fontColor('#CCCCCC')
             .width('100%')
@@ -383,20 +352,20 @@ export struct RuntimeControlPanel {
       .alignItems(VerticalAlign.Center)
 
       List({ space: 16 }) {
-        this.SelectBlock('选择端口', this.state.portOptions, this.state.selectedPortIndex,
-          this.state.currentPortLabel, !this.state.switching, (index: number) => {
+        this.SelectBlock('选择端口', this.portOptions, this.selectedPortIndex,
+          this.currentPortLabel, !this.switching, (index: number) => {
             this.onPortSelect?.(index)
           })
-        this.SelectBlock('输入来源', this.state.inputSourceOptions, this.state.selectedInputSourceIndex,
-          this.state.currentInputSourceLabel, !this.state.switching, (index: number) => {
+        this.SelectBlock('输入来源', this.inputSourceOptions, this.selectedInputSourceIndex,
+          this.currentInputSourceLabel, !this.switching, (index: number) => {
             this.onInputSourceSelect?.(index)
           })
-        this.SelectBlock('选择核心', this.state.coreOptions, this.state.selectedCoreIndex,
-          this.state.currentCoreLabel, !this.state.switching, (index: number) => {
+        this.SelectBlock('选择核心', this.coreOptions, this.selectedCoreIndex,
+          this.currentCoreLabel, !this.switching, (index: number) => {
             this.onCoreSelect?.(index)
           })
-        this.SelectBlock('选择 ROM', this.state.romOptions, this.state.selectedRomIndex,
-          this.state.currentRomLabel, this.state.hasRomOptions && !this.state.switching, (index: number) => {
+        this.SelectBlock('选择 ROM', this.romOptions, this.selectedRomIndex,
+          this.currentRomLabel, this.hasRomOptions && !this.switching, (index: number) => {
             this.onRomSelect?.(index)
           })
         this.CoreCheckBlock()
@@ -406,9 +375,9 @@ export struct RuntimeControlPanel {
         this.GameActionsBlock()
         this.SoakBlock()
 
-        if (this.state.switchError) {
+        if (this.switchError) {
           ListItem() {
-            Text(this.state.switchError)
+            Text(this.switchError)
               .fontSize(12)
               .fontColor('#FF5252')
               .width('100%')

@@ -9,170 +9,57 @@ export struct EmuIcon {
     return this.tone === value
   }
 
-  build() {
-    if (this.name === 'memory') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_memory_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_memory_outline')
-        : this.isTone('muted') ? $r('app.media.icon_memory_muted')
-        : $r('app.media.icon_memory_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'terminal') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_terminal_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_terminal_outline')
-        : this.isTone('muted') ? $r('app.media.icon_terminal_muted')
-        : $r('app.media.icon_terminal_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'settings_input_component') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_settings_input_component_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_settings_input_component_outline')
-        : this.isTone('muted') ? $r('app.media.icon_settings_input_component_muted')
-        : $r('app.media.icon_settings_input_component_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'sports_esports') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_sports_esports_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_sports_esports_outline')
-        : this.isTone('muted') ? $r('app.media.icon_sports_esports_muted')
-        : $r('app.media.icon_sports_esports_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'folder_open') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_folder_open_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_folder_open_outline')
-        : this.isTone('muted') ? $r('app.media.icon_folder_open_muted')
-        : $r('app.media.icon_folder_open_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'chevron_right') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_chevron_right_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_chevron_right_outline')
-        : this.isTone('muted') ? $r('app.media.icon_chevron_right_muted')
-        : $r('app.media.icon_chevron_right_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'check_circle') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_check_circle_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_check_circle_outline')
-        : this.isTone('muted') ? $r('app.media.icon_check_circle_muted')
-        : $r('app.media.icon_check_circle_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'warning') {
-      Image($r('app.media.icon_warning_error'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'search') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_search_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_search_outline')
-        : this.isTone('muted') ? $r('app.media.icon_search_muted')
-        : $r('app.media.icon_search_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'grid_view') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_grid_view_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_grid_view_outline')
-        : this.isTone('muted') ? $r('app.media.icon_grid_view_muted')
-        : $r('app.media.icon_grid_view_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'explore') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_explore_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_explore_outline')
-        : this.isTone('muted') ? $r('app.media.icon_explore_muted')
-        : $r('app.media.icon_explore_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'tune') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_tune_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_tune_outline')
-        : this.isTone('muted') ? $r('app.media.icon_tune_muted')
-        : $r('app.media.icon_tune_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'add_circle') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_add_circle_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_add_circle_outline')
-        : this.isTone('muted') ? $r('app.media.icon_add_circle_muted')
-        : $r('app.media.icon_add_circle_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'eject') {
-      Image(this.isTone('on_surface') ? $r('app.media.icon_eject_on_surface')
-        : this.isTone('outline') ? $r('app.media.icon_eject_outline')
-        : this.isTone('muted') ? $r('app.media.icon_eject_muted')
-        : $r('app.media.icon_eject_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'equalizer') {
-      Image($r('app.media.icon_equalizer_primary'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'play_arrow') {
-      Image($r('app.media.icon_play_arrow_on_surface'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'info') {
-      Image($r('app.media.icon_info_on_surface'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'image_edit_auto') {
-      Image($r('app.media.icon_image_edit_auto_on_surface'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'delete_forever') {
-      Image($r('app.media.icon_delete_forever_error'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'cloud_done') {
-      Image($r('app.media.icon_cloud_done_black'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'videogame_asset') {
-      Image($r('app.media.icon_videogame_asset_on_surface'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'palette') {
-      Image($r('app.media.icon_palette_on_surface'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'image') {
-      Image($r('app.media.icon_image_on_surface'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else if (this.name === 'edit') {
-      Image($r('app.media.icon_edit_on_surface'))
-        .width(this.iconSize)
-        .height(this.iconSize)
-        .opacity(this.opacityValue)
-    } else {
-      Blank()
-        .width(this.iconSize)
-        .height(this.iconSize)
+  private resolveIconResource(): Resource {
+    const multiToneIcons: Record<string, [Resource, Resource, Resource, Resource]> = {
+      'memory': [$r('app.media.icon_memory_primary'), $r('app.media.icon_memory_on_surface'), $r('app.media.icon_memory_outline'), $r('app.media.icon_memory_muted')],
+      'terminal': [$r('app.media.icon_terminal_primary'), $r('app.media.icon_terminal_on_surface'), $r('app.media.icon_terminal_outline'), $r('app.media.icon_terminal_muted')],
+      'settings_input_component': [$r('app.media.icon_settings_input_component_primary'), $r('app.media.icon_settings_input_component_on_surface'), $r('app.media.icon_settings_input_component_outline'), $r('app.media.icon_settings_input_component_muted')],
+      'sports_esports': [$r('app.media.icon_sports_esports_primary'), $r('app.media.icon_sports_esports_on_surface'), $r('app.media.icon_sports_esports_outline'), $r('app.media.icon_sports_esports_muted')],
+      'folder_open': [$r('app.media.icon_folder_open_primary'), $r('app.media.icon_folder_open_on_surface'), $r('app.media.icon_folder_open_outline'), $r('app.media.icon_folder_open_muted')],
+      'chevron_right': [$r('app.media.icon_chevron_right_primary'), $r('app.media.icon_chevron_right_on_surface'), $r('app.media.icon_chevron_right_outline'), $r('app.media.icon_chevron_right_muted')],
+      'check_circle': [$r('app.media.icon_check_circle_primary'), $r('app.media.icon_check_circle_on_surface'), $r('app.media.icon_check_circle_outline'), $r('app.media.icon_check_circle_muted')],
+      'search': [$r('app.media.icon_search_primary'), $r('app.media.icon_search_on_surface'), $r('app.media.icon_search_outline'), $r('app.media.icon_search_muted')],
+      'grid_view': [$r('app.media.icon_grid_view_primary'), $r('app.media.icon_grid_view_on_surface'), $r('app.media.icon_grid_view_outline'), $r('app.media.icon_grid_view_muted')],
+      'explore': [$r('app.media.icon_explore_primary'), $r('app.media.icon_explore_on_surface'), $r('app.media.icon_explore_outline'), $r('app.media.icon_explore_muted')],
+      'tune': [$r('app.media.icon_tune_primary'), $r('app.media.icon_tune_on_surface'), $r('app.media.icon_tune_outline'), $r('app.media.icon_tune_muted')],
+      'add_circle': [$r('app.media.icon_add_circle_primary'), $r('app.media.icon_add_circle_on_surface'), $r('app.media.icon_add_circle_outline'), $r('app.media.icon_add_circle_muted')],
+      'eject': [$r('app.media.icon_eject_primary'), $r('app.media.icon_eject_on_surface'), $r('app.media.icon_eject_outline'), $r('app.media.icon_eject_muted')],
     }
+
+    const singleToneIcons: Record<string, Resource> = {
+      'warning': $r('app.media.icon_warning_error'),
+      'equalizer': $r('app.media.icon_equalizer_primary'),
+      'play_arrow': $r('app.media.icon_play_arrow_on_surface'),
+      'info': $r('app.media.icon_info_on_surface'),
+      'image_edit_auto': $r('app.media.icon_image_edit_auto_on_surface'),
+      'delete_forever': $r('app.media.icon_delete_forever_error'),
+      'cloud_done': $r('app.media.icon_cloud_done_black'),
+      'videogame_asset': $r('app.media.icon_videogame_asset_on_surface'),
+      'palette': $r('app.media.icon_palette_on_surface'),
+      'image': $r('app.media.icon_image_on_surface'),
+      'edit': $r('app.media.icon_edit_on_surface'),
+    }
+
+    const multiTone = multiToneIcons[this.name]
+    if (multiTone !== undefined) {
+      return this.isTone('on_surface') ? multiTone[1]
+        : this.isTone('outline') ? multiTone[2]
+        : this.isTone('muted') ? multiTone[3]
+        : multiTone[0]
+    }
+
+    const singleTone = singleToneIcons[this.name]
+    if (singleTone !== undefined) {
+      return singleTone
+    }
+
+    return $r('app.media.icon_empty')
+  }
+
+  build() {
+    Image(this.resolveIconResource())
+      .width(this.iconSize)
+      .height(this.iconSize)
+      .opacity(this.opacityValue)
   }
 }

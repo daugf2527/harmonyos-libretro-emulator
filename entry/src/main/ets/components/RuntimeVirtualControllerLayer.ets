@@ -1,19 +1,11 @@
 import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
 import { InputLayoutButton } from '../common/InputLayoutRepository'
 
-export interface RuntimeVirtualControllerState {
-  buttons: InputLayoutButton[]
-  layoutWidth: number
-  layoutHeight: number
-}
-
 @Component
 export struct RuntimeVirtualControllerLayer {
-  @Prop state: RuntimeVirtualControllerState = {
-    buttons: [],
-    layoutWidth: 720,
-    layoutHeight: 360
-  }
+  @Prop buttons: InputLayoutButton[] = []
+  @Prop layoutWidth: number = 720
+  @Prop layoutHeight: number = 360
   onButtonChange?: (keyId: number, pressed: boolean) => void
   onAnalogChange?: (index: number, x: number, y: number) => void
   onQuickSave?: () => void

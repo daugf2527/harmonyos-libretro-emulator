@@ -10,37 +10,20 @@ export interface LibraryDetailSummaryCellData {
   value: string
 }
 
-export interface LibraryDetailInfoPanelState {
-  showExtendedDetails: boolean
-  primaryCells: LibraryDetailSummaryCellData[]
-  extendedCells: LibraryDetailSummaryCellData[]
-  hasRuntimeSnapshot: boolean
-  telemetryFpsText: string
-  telemetryAudioText: string
-  telemetryDropText: string
-  telemetryProfile: number[]
-  telemetryScanOffset: number
-  telemetryGlowOpacity: number
-  overviewText: string
-  runtimeSummaryText: string
-}
-
 @Component
 export struct LibraryDetailInfoPanel {
-  @Prop state: LibraryDetailInfoPanelState = {
-    showExtendedDetails: false,
-    primaryCells: [],
-    extendedCells: [],
-    hasRuntimeSnapshot: false,
-    telemetryFpsText: '--.-',
-    telemetryAudioText: '--',
-    telemetryDropText: '--',
-    telemetryProfile: [],
-    telemetryScanOffset: -180,
-    telemetryGlowOpacity: 0.2,
-    overviewText: 'Unknown',
-    runtimeSummaryText: ''
-  }
+  @Prop showExtendedDetails: boolean = false
+  @Prop hasRuntimeSnapshot: boolean = false
+  @Prop telemetryFpsText: string = '--.-'
+  @Prop telemetryAudioText: string = '--'
+  @Prop telemetryDropText: string = '--'
+  @Prop telemetryScanOffset: number = -180
+  @Prop telemetryGlowOpacity: number = 0.2
+  @Prop overviewText: string = 'Unknown'
+  @Prop runtimeSummaryText: string = ''
+  private primaryCells: LibraryDetailSummaryCellData[] = []
+  private extendedCells: LibraryDetailSummaryCellData[] = []
+  private telemetryProfile: number[] = []
   onToggleDetails?: () => void
 
   build() {
@@ -88,7 +71,7 @@ export struct LibraryDetailInfoPanel {
         .fontFamily('monospace')
         .letterSpacing(1.6)
 
-      Text(this.state.showExtendedDetails ? '˄' : '˅')
+      Text(this.showExtendedDetails ? '˄' : '˅')
         .fontSize(10)
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.primary)
@@ -104,7 +87,7 @@ export struct LibraryDetailInfoPanel {
   private SummarySection() {
     Column({ space: 8 }) {
       Row({ space: 1 }) {
-        ForEach(this.state.primaryCells, (cell: LibraryDetailSummaryCellData) => {
+        ForEach(this.primaryCells, (cell: LibraryDetailSummaryCellData) => {
           this.SummaryCell(cell)
         }, (cell: LibraryDetailSummaryCellData) => cell.title)
       }
@@ -112,17 +95,17 @@ export struct LibraryDetailInfoPanel {
 
       this.DetailToggleRow()
 
-      if (this.state.showExtendedDetails) {
+      if (this.showExtendedDetails) {
         Column({ space: 1 }) {
           Row({ space: 1 }) {
-            ForEach(this.state.extendedCells.slice(0, 2), (cell: LibraryDetailSummaryCellData) => {
+            ForEach(this.extendedCells.slice(0, 2), (cell: LibraryDetailSummaryCellData) => {
               this.SummaryCell(cell, true)
             }, (cell: LibraryDetailSummaryCellData) => cell.title)
           }
           .width('100%')
 
           Row({ space: 1 }) {
-            ForEach(this.state.extendedCells.slice(2, 4), (cell: LibraryDetailSummaryCellData) => {
+            ForEach(this.extendedCells.slice(2, 4), (cell: LibraryDetailSummaryCellData) => {
               this.SummaryCell(cell, true)
             }, (cell: LibraryDetailSummaryCellData) => cell.title)
           }
@@ -213,7 +196,7 @@ export struct LibraryDetailInfoPanel {
           .fill('#00FF41')
           .fillOpacity(0.06)
           .strokeWidth(0)
-          .opacity(this.state.telemetryGlowOpacity + 0.12)
+          .opacity(this.telemetryGlowOpacity + 0.12)
 
         Path({
           width: 440,
@@ -250,12 +233,12 @@ export struct LibraryDetailInfoPanel {
               ['#0000FF41', 1]
             ]
           })
-          .translate({ y: this.state.telemetryScanOffset })
+          .translate({ y: this.telemetryScanOffset })
           .opacity(0.72)
 
         Row({ space: 26 }) {
-          this.TelemetryMeta('AUDIO', this.state.telemetryAudioText)
-          this.TelemetryMeta('DROPS', this.state.telemetryDropText)
+          this.TelemetryMeta('AUDIO', this.telemetryAudioText)
+          this.TelemetryMeta('DROPS', this.telemetryDropText)
         }
         .align(Alignment.TopStart)
         .margin({ left: 12, top: 10 })
@@ -270,8 +253,8 @@ export struct LibraryDetailInfoPanel {
   }
 
   private buildTelemetryStatusText(): string {
-    const sessionText = this.state.hasRuntimeSnapshot ? 'LAST SESSION' : 'NO SESSION DATA'
-    return `${this.state.telemetryFpsText} FPS // ${sessionText}`
+    const sessionText = this.hasRuntimeSnapshot ? 'LAST SESSION' : 'NO SESSION DATA'
+    return `${this.telemetryFpsText} FPS // ${sessionText}`
   }
 
   @Builder
@@ -286,13 +269,13 @@ export struct LibraryDetailInfoPanel {
 
       Stack() {
         Column() {
-          Text(this.state.overviewText)
+          Text(this.overviewText)
             .fontSize(14)
             .lineHeight(26)
             .fontColor('#E6E5E5E5')
 
-          if (this.state.showExtendedDetails) {
-            Text(this.state.runtimeSummaryText)
+          if (this.showExtendedDetails) {
+            Text(this.runtimeSummaryText)
               .fontSize(10)
               .fontFamily('monospace')
               .lineHeight(18)
@@ -324,7 +307,7 @@ export struct LibraryDetailInfoPanel {
     const points: TelemetryPoint[] = []
     const spacing = 36
     const chartBottom = 76
-    this.state.telemetryProfile.forEach((height: number, index: number) => {
+    this.telemetryProfile.forEach((height: number, index: number) => {
       points.push({
         x: index * spacing,
         y: chartBottom - Math.min(52, height)

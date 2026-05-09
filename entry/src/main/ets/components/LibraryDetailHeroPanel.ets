@@ -2,23 +2,13 @@ import { EmuColors } from '../common/EmuUiTokens'
 import { EmuCoverArt } from './EmuCoverArt'
 import { EmuIcon } from './EmuIcon'
 
-export interface LibraryDetailHeroPanelState {
-  coverKey: string
-  heroScale: number
-  displayTitle: string
-  localizedTitle: string
-  coreLabel: string
-}
-
 @Component
 export struct LibraryDetailHeroPanel {
-  @Prop state: LibraryDetailHeroPanelState = {
-    coverKey: '',
-    heroScale: 1,
-    displayTitle: '',
-    localizedTitle: '',
-    coreLabel: ''
-  }
+  @Prop coverKey: string = ''
+  @Prop heroScale: number = 1
+  @Prop displayTitle: string = ''
+  @Prop localizedTitle: string = ''
+  @Prop coreLabel: string = ''
   onLaunch?: () => void
   onQuickAction?: (message: string) => void
 
@@ -43,12 +33,12 @@ export struct LibraryDetailHeroPanel {
           .clip(true)
 
         EmuCoverArt({
-          coverKey: this.state.coverKey,
+          coverKey: this.coverKey,
           variant: 'recent'
         })
           .width('100%')
           .aspectRatio(3 / 4)
-          .scale({ x: this.state.heroScale, y: this.state.heroScale })
+          .scale({ x: this.heroScale, y: this.heroScale })
           .borderRadius(4)
           .clip(true)
 
@@ -68,14 +58,14 @@ export struct LibraryDetailHeroPanel {
       .shadow({ radius: 22, color: '#33000000', offsetX: 0, offsetY: 10 })
 
       Column({ space: 4 }) {
-        Text(this.state.displayTitle)
+        Text(this.displayTitle)
           .fontSize(30)
           .fontWeight(FontWeight.Medium)
           .fontColor(EmuColors.onSurface)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-        Text(this.state.localizedTitle)
+        Text(this.localizedTitle)
           .fontSize(14)
           .fontWeight(FontWeight.Medium)
           .fontColor('#CCABABAB')
@@ -117,7 +107,7 @@ export struct LibraryDetailHeroPanel {
 
       Row({ space: 12 }) {
         this.QuickActionButton('按键布局', 'videogame_asset', '游戏页控制面板即将收口到这里')
-        this.QuickActionButton('画面风格', 'palette', `当前核心: ${this.state.coreLabel}`)
+        this.QuickActionButton('画面风格', 'palette', `当前核心: ${this.coreLabel}`)
       }
       .width('100%')
     }

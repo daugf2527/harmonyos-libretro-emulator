@@ -6,10 +6,7 @@ import {
   LibraryDetailHeroPanel,
   LibraryDetailHeroPanelState
 } from '../components/LibraryDetailHeroPanel'
-import {
-  LibraryDetailInfoPanel,
-  LibraryDetailInfoPanelState
-} from '../components/LibraryDetailInfoPanel'
+import { LibraryDetailInfoPanel } from '../components/LibraryDetailInfoPanel'
 import { LibraryLaunchOverlay } from '../components/LibraryLaunchOverlay'
 import { KeyValueSpecItem, KeyValueSpecList } from '../components/KeyValueSpecList'
 import {
@@ -75,10 +72,6 @@ struct LibraryDetailPage {
   @State private isLaunching: boolean = false
   @State private launchProgress: number = 0
   @State private launchStatusText: string = 'READY_TO_HANDOFF'
-  @State private launchCpuText: string = 'FPS: --'
-  @State private telemetryFpsText: string = '--.-'
-  @State private telemetryCpuText: string = '--'
-  @State private telemetryGpuText: string = '--'
   @State private heroScale: number = 1.04
   @State private telemetryScanOffset: number = -180
   @State private telemetryGlowOpacity: number = 0.2
@@ -167,12 +160,7 @@ struct LibraryDetailPage {
     }, 2600)
   }
 
-  private applyTelemetrySnapshot(record: LibraryRecord): void {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(record)
-    this.telemetryFpsText = snapshot.fpsText
-    this.telemetryCpuText = snapshot.audioText
-    this.telemetryGpuText = snapshot.dropText
-    this.launchCpuText = `FPS: ${snapshot.fpsText}`
+  private applyTelemetrySnapshot(_record: LibraryRecord): void {
   }
 
   private startVisualLoop(): void {
@@ -193,6 +181,23 @@ struct LibraryDetailPage {
       clearInterval(this.visualTimer)
       this.visualTimer = -1
     }
+  }
+
+  private get launchCpuText(): string {
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord)
+    return `FPS: ${snapshot.fpsText}`
+  }
+  private get telemetryFpsText(): string {
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord)
+    return snapshot.fpsText
+  }
+  private get telemetryCpuText(): string {
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord)
+    return snapshot.audioText
+  }
+  private get telemetryGpuText(): string {
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord)
+    return snapshot.dropText
   }
 
   private async beginLaunchSequence(record: LibraryRecord): Promise<void> {
@@ -504,33 +509,6 @@ struct LibraryDetailPage {
     return hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord) ? 'RECORDED' : 'NO DATA'
   }
 
-  private getInfoPanelState(record: LibraryRecord): LibraryDetailInfoPanelState {
-    const snapshot: LibraryDetailTelemetrySnapshot = buildLibraryDetailTelemetrySnapshot(record)
-    return {
-      showExtendedDetails: this.showExtendedDetails,
-      primaryCells: [
-        { title: 'CN NAME', value: getLibraryDetailLocalizedTitle(record) },
-        { title: 'YEAR', value: getLibraryDetailYearLabel(record, this.metadataRecord) },
-        { title: 'CONSOLE', value: getLibraryDetailConsoleLabel(record, this.metadataRecord) }
-      ],
-      extendedCells: [
-        { title: 'PUBLISHER', value: getLibraryDetailPublisherLabel(this.metadataRecord) },
-        { title: 'PLAYTIME', value: getLibraryDetailPlaytimeLabel(record) },
-        { title: 'ENGINE', value: getLibraryDetailEngineLabel(record) },
-        { title: 'REGION', value: getLibraryDetailRegionLabel(record) }
-      ],
-      hasRuntimeSnapshot: hasLibraryDetailRuntimeSnapshot(record),
-      telemetryFpsText: this.telemetryFpsText,
-      telemetryAudioText: this.telemetryCpuText,
-      telemetryDropText: this.telemetryGpuText,
-      telemetryProfile: snapshot.profile,
-      telemetryScanOffset: this.telemetryScanOffset,
-      telemetryGlowOpacity: this.telemetryGlowOpacity,
-      overviewText: getLibraryDetailOverviewText(this.metadataRecord),
-      runtimeSummaryText: getLibraryDetailRuntimeSummaryText(record, this.metadataRecord)
-    }
-  }
-
   @Builder
   private SuccessToast() {
     Row({ space: 8 }) {
@@ -597,7 +575,11 @@ struct LibraryDetailPage {
             Scroll() {
               Column({ space: 32 }) {
                 LibraryDetailHeroPanel({
-                  state: this.getHeroPanelState(this.libraryRecord as LibraryRecord),
+                  coverKey: (this.libraryRecord as LibraryRecord).coverKey,
+                  heroScale: this.heroScale,
+                  displayTitle: getLibraryDetailDisplayTitle(this.libraryRecord as LibraryRecord, this.metadataRecord),
+                  localizedTitle: getLibraryDetailLocalizedTitle(this.libraryRecord as LibraryRecord),
+                  coreLabel: (this.libraryRecord as LibraryRecord).preferredCoreId.toUpperCase(),
                   onLaunch: () => {
                     this.beginLaunchSequence(this.libraryRecord as LibraryRecord)
                   },
@@ -606,7 +588,27 @@ struct LibraryDetailPage {
                   }
                 })
                 LibraryDetailInfoPanel({
-                  state: this.getInfoPanelState(this.libraryRecord as LibraryRecord),
+                  showExtendedDetails: this.showExtendedDetails,
+                  primaryCells: [
+                    { title: 'CN NAME', value: getLibraryDetailLocalizedTitle(this.libraryRecord as LibraryRecord) },
+                    { title: 'YEAR', value: getLibraryDetailYearLabel(this.libraryRecord as LibraryRecord, this.metadataRecord) },
+                    { title: 'CONSOLE', value: getLibraryDetailConsoleLabel(this.libraryRecord as LibraryRecord, this.metadataRecord) }
+                  ],
+                  extendedCells: [
+                    { title: 'PUBLISHER', value: getLibraryDetailPublisherLabel(this.metadataRecord) },
+                    { title: 'PLAYTIME', value: getLibraryDetailPlaytimeLabel(this.libraryRecord as LibraryRecord) },
+                    { title: 'ENGINE', value: getLibraryDetailEngineLabel(this.libraryRecord as LibraryRecord) },
+                    { title: 'REGION', value: getLibraryDetailRegionLabel(this.libraryRecord as LibraryRecord) }
+                  ],
+                  hasRuntimeSnapshot: hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord),
+                  telemetryFpsText: this.telemetryFpsText,
+                  telemetryAudioText: this.telemetryCpuText,
+                  telemetryDropText: this.telemetryGpuText,
+                  telemetryProfile: buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord).profile,
+                  telemetryScanOffset: this.telemetryScanOffset,
+                  telemetryGlowOpacity: this.telemetryGlowOpacity,
+                  overviewText: getLibraryDetailOverviewText(this.metadataRecord),
+                  runtimeSummaryText: getLibraryDetailRuntimeSummaryText(this.libraryRecord as LibraryRecord, this.metadataRecord),
                   onToggleDetails: () => {
                     this.showExtendedDetails = !this.showExtendedDetails
                   }
@@ -667,14 +669,12 @@ struct LibraryDetailPage {
 
       if (this.isLaunching && this.libraryRecord) {
         LibraryLaunchOverlay({
-          state: {
-            coverKey: (this.libraryRecord as LibraryRecord).coverKey,
-            progress: this.launchProgress,
-            statusText: this.launchStatusText,
-            cpuText: this.launchCpuText,
-            runtimeStatusText: this.getLaunchRuntimeStatusText(),
-            fileLabel: getLibraryLaunchFileLabel(this.libraryRecord as LibraryRecord)
-          }
+          coverKey: (this.libraryRecord as LibraryRecord).coverKey,
+          progress: this.launchProgress,
+          statusText: this.launchStatusText,
+          cpuText: this.launchCpuText,
+          runtimeStatusText: this.getLaunchRuntimeStatusText(),
+          fileLabel: getLibraryLaunchFileLabel(this.libraryRecord as LibraryRecord)
         })
       }
     }
