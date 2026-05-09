@@ -807,11 +807,9 @@ struct LibretroGamePage {
       // 虚拟按键 (如果游戏运行中)
       if (this.gameRunning && !this.gamePaused && !this.hideVirtualController) {
         RuntimeVirtualControllerLayer({
-          state: {
-            buttons: this.runtimeInputLayoutButtons,
+          buttons: this.runtimeInputLayoutButtons,
             layoutWidth: this.runtimeInputLayoutWidth,
-            layoutHeight: this.runtimeInputLayoutHeight
-          },
+            layoutHeight: this.runtimeInputLayoutHeight,
           onButtonChange: (keyId: number, pressed: boolean) => {
             this.setButton(keyId, pressed);
           },

@@ -714,13 +714,11 @@ struct LibraryPage {
   @Builder
   private GameSections() {
     LibraryGameSections({
-      state: {
-        recentGames: this.filteredRecentGames,
+      recentGames: this.filteredRecentGames,
         games: this.filteredGames,
         highlightedRecentGameId: this.highlightedRecentGameId,
         bottomLoaderActive: this.bottomLoaderActive,
-        spinnerAngle: this.spinnerAngle
-      },
+        spinnerAngle: this.spinnerAngle,
       onCardTouch: (event: TouchEvent, item: LibraryRecord) => {
         this.onCardTouch(event, item)
       },

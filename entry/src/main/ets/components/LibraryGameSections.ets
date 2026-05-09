@@ -49,7 +49,7 @@ export struct LibraryGameSections {
   @Builder
   private RecentContent() {
     Row({ space: 16 }) {
-      ForEach(this.state.recentGames, (item: LibraryRecord) => {
+      ForEach(this.recentGames, (item: LibraryRecord) => {
         Column() {
           GameCard({
             title: item.title,
@@ -102,7 +102,7 @@ export struct LibraryGameSections {
   @Builder
   private AllGamesContent() {
     Column({ space: 18 }) {
-      ForEach(this.state.games, (item: LibraryRecord) => {
+      ForEach(this.games, (item: LibraryRecord) => {
         GameCard({
           title: item.title,
           subtitle: item.subtitle,
@@ -124,10 +124,10 @@ export struct LibraryGameSections {
     Column({ space: 10 }) {
       this.Spinner(30, 2, EmuColors.primary, '#2F484848')
 
-      Text(this.state.bottomLoaderActive ? '继续加载游戏...' : '正在读取游戏库')
+      Text(this.bottomLoaderActive ? '继续加载游戏...' : '正在读取游戏库')
         .fontSize(9)
         .fontFamily('monospace')
-        .fontColor(this.state.bottomLoaderActive ? EmuColors.primary : EmuColors.onSurfaceVariant)
+        .fontColor(this.bottomLoaderActive ? EmuColors.primary : EmuColors.onSurfaceVariant)
         .letterSpacing(1.6)
     }
     .width('100%')
@@ -153,14 +153,14 @@ export struct LibraryGameSections {
           color: activeColor,
           style: BorderStyle.Solid
         })
-        .rotate({ angle: this.state.spinnerAngle })
+        .rotate({ angle: this.spinnerAngle })
     }
   }
 
   private getHighlightedRecentGameId(): string {
-    if (this.state.highlightedRecentGameId.length > 0) {
-      return this.state.highlightedRecentGameId
+    if (this.highlightedRecentGameId.length > 0) {
+      return this.highlightedRecentGameId
     }
-    return this.state.recentGames.length > 0 ? this.state.recentGames[0].id : ''
+    return this.recentGames.length > 0 ? this.recentGames[0].id : ''
   }
 }

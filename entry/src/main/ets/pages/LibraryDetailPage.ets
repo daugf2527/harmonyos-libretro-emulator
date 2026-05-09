@@ -184,19 +184,19 @@ struct LibraryDetailPage {
   }
 
   private get launchCpuText(): string {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord)
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
     return `FPS: ${snapshot.fpsText}`
   }
   private get telemetryFpsText(): string {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord)
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
     return snapshot.fpsText
   }
   private get telemetryCpuText(): string {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord)
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
     return snapshot.audioText
   }
   private get telemetryGpuText(): string {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord)
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
     return snapshot.dropText
   }
 
