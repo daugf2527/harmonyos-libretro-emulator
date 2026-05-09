@@ -2,10 +2,7 @@ import { common } from '@kit.AbilityKit'
 import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { LibraryDetailActionKey, LibraryDetailActionMenu } from '../components/LibraryDetailActionMenu'
-import {
-  LibraryDetailHeroPanel,
-  LibraryDetailHeroPanelState
-} from '../components/LibraryDetailHeroPanel'
+import { LibraryDetailHeroPanel } from '../components/LibraryDetailHeroPanel'
 import { LibraryDetailInfoPanel } from '../components/LibraryDetailInfoPanel'
 import { LibraryLaunchOverlay } from '../components/LibraryLaunchOverlay'
 import { KeyValueSpecItem, KeyValueSpecList } from '../components/KeyValueSpecList'
@@ -480,16 +477,6 @@ struct LibraryDetailPage {
       { label: 'Processor Cluster', value: getLibraryDetailEngineLabel(record) },
       { label: 'Memory Mode', value: getLibraryDetailMemoryModeLabel(record) }
     ]
-  }
-
-  private getHeroPanelState(record: LibraryRecord): LibraryDetailHeroPanelState {
-    return {
-      coverKey: record.coverKey,
-      heroScale: this.heroScale,
-      displayTitle: getLibraryDetailDisplayTitle(record, this.metadataRecord),
-      localizedTitle: getLibraryDetailLocalizedTitle(record),
-      coreLabel: record.preferredCoreId.toUpperCase()
-    }
   }
 
   private getLocalStatusText(): string {

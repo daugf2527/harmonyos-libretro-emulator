@@ -53,7 +53,7 @@ export struct EmuIcon {
       return singleTone
     }
 
-    return $r('app.media.icon_empty')
+    return $r('app.media.icon_videogame_asset_on_surface')
   }
 
   build() {
