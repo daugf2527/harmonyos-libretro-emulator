@@ -836,7 +836,7 @@ struct LibretroGamePage {
 
       // 左上角系统菜单按钮
       if (!this.gameRunning) {
-        Button('▦')
+        Button('MENU')
           .width(46)
           .height(40)
           .fontSize(18)
