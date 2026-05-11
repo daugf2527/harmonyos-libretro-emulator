@@ -14,14 +14,14 @@ const Colors = EmuColors
 
 @Component
 struct ScanningLine {
-  @State offset: number = 0
+  @State scanOffset: number = 0
   private timer: number = -1
 
   aboutToAppear(): void {
-    this.offset = 0
+    this.scanOffset = 0
     this.timer = setInterval(() => {
-      const nextOffset = this.offset + 1
-      this.offset = nextOffset > 191 ? 0 : nextOffset
+      const nextOffset = this.scanOffset + 1
+      this.scanOffset = nextOffset > 191 ? 0 : nextOffset
     }, 16)
   }
 
@@ -39,7 +39,7 @@ struct ScanningLine {
       .backgroundColor('#3300FF41')
       .shadow({ radius: 15, color: '#6600FF41', offsetX: 0, offsetY: 0 })
       .align(Alignment.Top)
-      .translate({ y: this.offset })
+      .translate({ y: this.scanOffset })
   }
 }
 
