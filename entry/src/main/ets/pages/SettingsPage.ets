@@ -107,8 +107,7 @@ struct SettingsPage {
 
         Text(code)
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontWeight(FontWeight.Bold)
+                    .fontWeight(FontWeight.Bold)
           .fontColor(this.activeTab === key ? '#B3ABABAB' : '#666666')
           .letterSpacing(1.8)
       }
@@ -147,8 +146,7 @@ struct SettingsPage {
       Text(code)
         .fontSize(9)
         .fontWeight(FontWeight.Bold)
-        .fontFamily('monospace')
-        .fontColor('#88757575')
+                .fontColor('#88757575')
         .letterSpacing(1.2)
     }
     .width('100%')
@@ -190,15 +188,13 @@ struct SettingsPage {
 
           Text(code)
             .fontSize(9)
-            .fontFamily('monospace')
-            .fontColor('#77666666')
+                        .fontColor('#77666666')
         }
         .alignItems(VerticalAlign.Bottom)
 
         Text(`${value}%`)
           .fontSize(12)
-          .fontFamily('monospace')
-          .fontWeight(FontWeight.Bold)
+                    .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
       }
       .width('100%')
@@ -245,15 +241,13 @@ struct SettingsPage {
 
           Text('ID: RETRO_PAD_TOUCH')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#B3ABABAB')
+                        .fontColor('#B3ABABAB')
         }
         .alignItems(HorizontalAlign.Start)
 
         Text(this.inputDeviceStatus)
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontWeight(FontWeight.Bold)
+                    .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
           .padding({ left: 10, right: 10, top: 6, bottom: 6 })
           .border({ width: 0.5, color: '#6600FF41', style: BorderStyle.Solid })
@@ -274,13 +268,11 @@ struct SettingsPage {
 
           Text('L: 左肩键')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#B3ABABAB')
+                        .fontColor('#B3ABABAB')
 
           Text('R: 右肩键')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#B3ABABAB')
+                        .fontColor('#B3ABABAB')
         }
         .align(Alignment.TopStart)
         .margin({ left: 24, top: 24 })
@@ -299,8 +291,7 @@ struct SettingsPage {
 
       Text('按键布局预览 BUTTON_LAYOUT_PREVIEW')
         .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor('#88757575')
+                .fontColor('#88757575')
         .width('100%')
         .textAlign(TextAlign.Center)
     }
@@ -327,24 +318,20 @@ struct SettingsPage {
         Column({ space: 8 }) {
           Text('CPU_LOAD')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#B3ABABAB')
+                        .fontColor('#B3ABABAB')
           Text('42.8%')
             .fontSize(24)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.primary)
+                        .fontColor(EmuColors.primary)
         }
         .alignItems(HorizontalAlign.Start)
 
         Column({ space: 8 }) {
           Text('MEM_ALLOC')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#B3ABABAB')
+                        .fontColor('#B3ABABAB')
           Text('1.2 GB')
             .fontSize(22)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurface)
+                        .fontColor(EmuColors.onSurface)
         }
         .alignItems(HorizontalAlign.Start)
       }
@@ -368,12 +355,10 @@ struct SettingsPage {
       Row() {
         Text('T-60S')
           .fontSize(9)
-          .fontFamily('monospace')
-          .fontColor('#88757575')
+                    .fontColor('#88757575')
         Text('FPS_60.0_STABLE')
           .fontSize(9)
-          .fontFamily('monospace')
-          .fontColor('#88757575')
+                    .fontColor('#88757575')
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
@@ -451,8 +436,7 @@ struct SettingsPage {
           .fontColor(EmuColors.onSurface)
         Text(value)
           .fontSize(9)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurfaceVariant)
+                    .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1)
       }
       .layoutWeight(1)
@@ -478,8 +462,7 @@ struct SettingsPage {
         .fontColor(EmuColors.onSurface)
       Text(value)
         .fontSize(12)
-        .fontFamily('monospace')
-        .fontColor(EmuColors.primary)
+                .fontColor(EmuColors.primary)
     }
     .width('100%')
     .padding({ top: 18, bottom: 18 })

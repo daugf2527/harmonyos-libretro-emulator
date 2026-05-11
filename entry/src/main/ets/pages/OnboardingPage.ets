@@ -246,8 +246,7 @@ struct OnboardingPage {
           iconSize: 14
         })
         Text('EMU_CORE_v1.0')
-          .fontFamily('monospace')
-          .fontSize(14)
+                    .fontSize(14)
           .fontColor(Colors.primary)
           .letterSpacing(3)
       }
@@ -423,8 +422,7 @@ struct OnboardingPage {
 
           Text('需要文件访问权限')
             .fontSize(12)
-            .fontFamily('monospace')
-            .fontColor(Colors.primary)
+                        .fontColor(Colors.primary)
             .letterSpacing(3)
         }
         .alignItems(VerticalAlign.Center)
@@ -511,14 +509,12 @@ struct OnboardingPage {
         Row() {
           Text('文件访问状态')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#FF666666')
+                        .fontColor('#FF666666')
             .letterSpacing(1)
 
           Text(this.protocolStatus)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(this.protocolStatus === 'VERIFIED' ? Colors.primary : (this.protocolStatus === 'DENIED' ? '#FFBA573F' : Colors.outlineVariant))
+                        .fontColor(this.protocolStatus === 'VERIFIED' ? Colors.primary : (this.protocolStatus === 'DENIED' ? '#FFBA573F' : Colors.outlineVariant))
             .letterSpacing(1)
         }
         .width('100%')
@@ -535,8 +531,7 @@ struct OnboardingPage {
 
             Text(this.getPermissionStatusText(item))
               .fontSize(12)
-              .fontFamily('monospace')
-              .fontColor(Colors.onSurfaceVariant)
+                            .fontColor(Colors.onSurfaceVariant)
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
@@ -598,8 +593,7 @@ struct OnboardingPage {
     Row() {
       Text('Kinetic Obsidian Protocol • Build 2405.01')
         .fontSize(9)
-        .fontFamily('monospace')
-        .fontColor('#66666666')
+                .fontColor('#66666666')
         .letterSpacing(3)
     }
     .width('100%')

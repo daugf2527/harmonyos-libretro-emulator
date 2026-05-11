@@ -311,8 +311,7 @@ struct SaveStatePage {
 
         Text('EMU_CORE_v1.0')
           .fontSize(16)
-          .fontFamily('monospace')
-          .fontWeight(FontWeight.Bold)
+                    .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
           .letterSpacing(3)
           .maxLines(1)
@@ -396,15 +395,13 @@ struct SaveStatePage {
       Column({ space: 6 }) {
         Text(label.toUpperCase())
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontWeight(FontWeight.Bold)
+                    .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(2.4)
 
         Text(value)
           .fontSize(14)
-          .fontFamily('monospace')
-          .fontColor(label === 'Archive' ? EmuColors.primary : EmuColors.onSurfaceVariant)
+                    .fontColor(label === 'Archive' ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .letterSpacing(1.6)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -460,8 +457,7 @@ struct SaveStatePage {
 
           Text(`${item.slotLabel} | ${item.detail}`)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurfaceVariant)
+                        .fontColor(EmuColors.onSurfaceVariant)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -497,15 +493,13 @@ struct SaveStatePage {
     if (item.isActive) {
       Text(item.durationLabel)
         .fontSize(9)
-        .fontFamily('monospace')
-        .fontColor(EmuColors.primary)
+                .fontColor(EmuColors.primary)
         .padding({ left: 6, right: 6, top: 2, bottom: 2 })
         .border({ width: 0.5, color: EmuColors.primary, style: BorderStyle.Solid })
     } else {
       Text(item.durationLabel)
         .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor(EmuColors.onSurfaceVariant)
+                .fontColor(EmuColors.onSurfaceVariant)
     }
   }
 
@@ -552,8 +546,7 @@ struct SaveStatePage {
 
         Text('END OF ARCHIVE STREAM')
           .fontSize(12)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurfaceVariant)
+                    .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(4)
           .opacity(0.48)
       }
@@ -600,8 +593,7 @@ struct SaveStatePage {
 
         Text('此操作不可恢复')
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurfaceVariant)
+                    .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.2)
 
         Button('确定删除')

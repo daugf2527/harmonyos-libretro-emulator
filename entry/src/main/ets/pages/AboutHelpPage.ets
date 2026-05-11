@@ -54,8 +54,7 @@ struct AboutHelpPage {
           .backgroundColor(EmuColors.primary)
         Text('Status: LOCAL_ABOUT_READY')
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurfaceVariant)
+                    .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(2)
       }
       .alignItems(VerticalAlign.Center)
@@ -83,8 +82,7 @@ struct AboutHelpPage {
         Column({ space: 4 }) {
           Text('Core Version')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.secondary)
+                        .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
           Row({ space: 8 }) {
             Text('v1.0.2')
@@ -93,8 +91,7 @@ struct AboutHelpPage {
               .fontColor(EmuColors.onSurface)
             Text('STABLE')
               .fontSize(10)
-              .fontFamily('monospace')
-              .fontColor(EmuColors.primary)
+                            .fontColor(EmuColors.primary)
           }
           .alignItems(VerticalAlign.Bottom)
         }
@@ -103,13 +100,11 @@ struct AboutHelpPage {
         Column({ space: 4 }) {
           Text('Data Source')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.secondary)
+                        .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
           Text('本地模式')
             .fontSize(13)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurfaceVariant)
+                        .fontColor(EmuColors.onSurfaceVariant)
         }
         .alignItems(HorizontalAlign.End)
       }
@@ -141,8 +136,7 @@ struct AboutHelpPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(item.detail)
           .fontSize(9)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurfaceVariant)
+                    .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1)
 
         if (this.selectedHelpId === item.id) {
@@ -176,8 +170,7 @@ struct AboutHelpPage {
     Column({ space: 0 }) {
       Text('DOCUMENTATION & LEGAL')
         .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor(EmuColors.secondary)
+                .fontColor(EmuColors.secondary)
         .letterSpacing(2)
         .padding({ left: 2, bottom: 12 })
         .width('100%')
@@ -200,8 +193,7 @@ struct AboutHelpPage {
 
         Text('DESIGNED FOR LOCAL\nLIBRETRO SHELL.\nHARMONYOS // ARKUI //\nLIBRETRO')
           .fontSize(13)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurfaceVariant)
+                    .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.6)
           .lineHeight(22)
       }

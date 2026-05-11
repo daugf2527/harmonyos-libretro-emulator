@@ -293,16 +293,14 @@ struct InputLayoutPage {
 
           Text(item.label)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurfaceVariant)
+                        .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(1.6)
         }
         .alignItems(VerticalAlign.Center)
 
         Text(item.status)
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor(item.status === 'READY' ? EmuColors.primary : EmuColors.onSurfaceVariant)
+                    .fontColor(item.status === 'READY' ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .backgroundColor(item.status === 'READY' ? '#1800FF41' : EmuColors.surfaceContainerHigh)
       }
@@ -317,15 +315,13 @@ struct InputLayoutPage {
             .fontColor(EmuColors.onSurface)
           Text(`ID: ${item.id.toUpperCase()}_INPUT_BUS`)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#666666')
+                        .fontColor('#666666')
         }
         .alignItems(HorizontalAlign.Start)
 
         Text(item.power)
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurfaceVariant)
+                    .fontColor(EmuColors.onSurfaceVariant)
       }
       .width('100%')
       .alignItems(VerticalAlign.Bottom)
@@ -353,8 +349,7 @@ struct InputLayoutPage {
         .letterSpacing(0.5)
       Text(metric.value)
         .fontSize(12)
-        .fontFamily('monospace')
-        .fontColor(metric.highlight ? EmuColors.primary : EmuColors.onSurface)
+                .fontColor(metric.highlight ? EmuColors.primary : EmuColors.onSurface)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
@@ -383,8 +378,7 @@ struct InputLayoutPage {
 
         Text('中继：未配置')
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor('#666666')
+                    .fontColor('#666666')
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
@@ -417,8 +411,7 @@ struct InputLayoutPage {
           .fontColor(EmuColors.onSurface)
         Text(`Game: ${room.game}`)
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor('#666666')
+                    .fontColor('#666666')
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
@@ -429,8 +422,7 @@ struct InputLayoutPage {
           .fontColor('#666666')
         Text(room.latency)
           .fontSize(12)
-          .fontFamily('monospace')
-          .fontColor(room.color)
+                    .fontColor(room.color)
       }
       .alignItems(HorizontalAlign.End)
 
@@ -440,8 +432,7 @@ struct InputLayoutPage {
           .fontColor('#666666')
         Text(room.players)
           .fontSize(12)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurface)
+                    .fontColor(EmuColors.onSurface)
       }
       .alignItems(HorizontalAlign.End)
 
@@ -498,12 +489,10 @@ struct InputLayoutPage {
     Row() {
       Text(label)
         .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor(EmuColors.onSurfaceVariant)
+                .fontColor(EmuColors.onSurfaceVariant)
       Text(value)
         .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor(value === 'INPUT_QUEUE' || value === this.selectedButtonId.toUpperCase() ? EmuColors.primary : EmuColors.onSurface)
+                .fontColor(value === 'INPUT_QUEUE' || value === this.selectedButtonId.toUpperCase() ? EmuColors.primary : EmuColors.onSurface)
     }
     .width('100%')
     .constraintSize({ maxWidth: 220 })
@@ -538,8 +527,7 @@ struct InputLayoutPage {
         .backgroundColor(EmuColors.primary)
       Text(label)
         .fontSize(10)
-        .fontFamily('monospace')
-        .fontColor(EmuColors.primary)
+                .fontColor(EmuColors.primary)
         .backgroundColor(EmuColors.background)
         .padding({ left: 4, right: 4 })
         .maxLines(1)
@@ -613,8 +601,7 @@ struct InputLayoutPage {
             .backgroundColor(EmuColors.primary)
           Text('EDITOR\nACTIVE')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurfaceVariant)
+                        .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(1.8)
             .lineHeight(18)
         }
@@ -681,8 +668,7 @@ struct InputLayoutPage {
         })
 
         Text('EMU_CORE_v1.0')
-          .fontFamily('monospace')
-          .fontSize(18)
+                    .fontSize(18)
           .fontColor(EmuColors.primary)
           .letterSpacing(4)
       }
@@ -697,8 +683,7 @@ struct InputLayoutPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text('CALIBRATION MODE')
           .fontSize(9)
-          .fontFamily('monospace')
-          .fontWeight(FontWeight.Bold)
+                    .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
           .letterSpacing(2.4)
       }
@@ -807,8 +792,7 @@ struct InputLayoutPage {
         Text('INPUT_LAYOUT_SAVED')
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
-          .fontFamily('monospace')
-          .fontColor('#004C0C')
+                    .fontColor('#004C0C')
           .letterSpacing(1.4)
           .padding({ left: 14, right: 14, top: 8, bottom: 8 })
           .backgroundColor(EmuColors.primary)
