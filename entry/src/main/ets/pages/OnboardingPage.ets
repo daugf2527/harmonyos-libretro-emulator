@@ -12,13 +12,43 @@ interface PermissionItem {
 
 const Colors = EmuColors
 
+@Component
+struct ScanningLine {
+  @State offset: number = 0
+  private timer: number = -1
+
+  aboutToAppear(): void {
+    this.offset = 0
+    this.timer = setInterval(() => {
+      const nextOffset = this.offset + 1
+      this.offset = nextOffset > 191 ? 0 : nextOffset
+    }, 16)
+  }
+
+  aboutToDisappear(): void {
+    if (this.timer !== -1) {
+      clearInterval(this.timer)
+      this.timer = -1
+    }
+  }
+
+  build() {
+    Row()
+      .width('100%')
+      .height(1)
+      .backgroundColor('#3300FF41')
+      .shadow({ radius: 15, color: '#6600FF41', offsetX: 0, offsetY: 0 })
+      .align(Alignment.Top)
+      .translate({ y: this.offset })
+  }
+}
+
 @Entry
 @Component
 struct OnboardingPage {
   @State private currentStep: number = 1
   @State private stepOpacity: number = 1
   @State private stepOffsetY: number = 0
-  @State private scanLineOffsetY: number = 0
   @State private startButtonPressed: boolean = false
   @State private authorizeButtonPressed: boolean = false
   @State private permissions: PermissionItem[] = [
@@ -28,18 +58,15 @@ struct OnboardingPage {
   @State private protocolStatus: string = 'VERIFIED'
   private readonly horizontalGridIndexes: number[] = createIndexRange(120)
   private readonly verticalGridIndexes: number[] = createIndexRange(120)
-  private scanLineTimer: number = -1
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
 
   aboutToAppear() {
     this.lifecycle.activate()
     this.applyPermissionState('GRANTED')
-    this.startScanLineAnimation()
   }
 
   aboutToDisappear() {
     this.lifecycle.deactivate()
-    this.stopScanLineAnimation()
   }
 
   private switchToStep2(): void {
@@ -60,7 +87,6 @@ struct OnboardingPage {
       }
       this.currentStep = 2
       this.stepOffsetY = 20
-      this.scanLineOffsetY = 0
       this.stepOpacity = 0
       this.getUIContext().animateTo(paramIn, () => {
         this.stepOpacity = 1
@@ -124,32 +150,6 @@ struct OnboardingPage {
       return '#BA573F'
     }
     return Colors.outlineVariant
-  }
-
-  private startScanLineAnimation(): void {
-    if (this.scanLineTimer !== -1) {
-      clearInterval(this.scanLineTimer)
-      this.scanLineTimer = -1
-    }
-    this.scanLineOffsetY = 0
-    this.scanLineTimer = this.lifecycle.trackInterval(setInterval(() => {
-      if (!this.lifecycle.isActive()) {
-        return
-      }
-      if (this.currentStep !== 2) {
-        this.scanLineOffsetY = 0
-        return
-      }
-      const nextOffset = this.scanLineOffsetY + 1
-      this.scanLineOffsetY = nextOffset > 191 ? 0 : nextOffset
-    }, 16))
-  }
-
-  private stopScanLineAnimation(): void {
-    if (this.scanLineTimer !== -1) {
-      this.lifecycle.clearIntervalId(this.scanLineTimer)
-      this.scanLineTimer = -1
-    }
   }
 
   private onStartButtonTouch(event: TouchEvent): void {
@@ -478,13 +478,7 @@ struct OnboardingPage {
           .justifyContent(FlexAlign.Center)
           .align(Alignment.Center)
 
-          Row()
-            .width('100%')
-            .height(1)
-            .backgroundColor('#3300FF41')
-            .shadow({ radius: 15, color: '#6600FF41', offsetX: 0, offsetY: 0 })
-            .align(Alignment.Top)
-            .translate({ y: this.scanLineOffsetY })
+          ScanningLine()
         }
         .width('80%')
         .aspectRatio(1)

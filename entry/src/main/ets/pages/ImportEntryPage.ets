@@ -15,19 +15,11 @@ interface ImportParticle {
   opacity: number
 }
 
-@Entry
 @Component
-struct ImportEntryPage {
-  @State private hasGames: boolean = false
-  @State private isScanning: boolean = false
-  @State private scanProgress: number = 0
-  @State private scanStatusText: string = '正在扫描本地文件...'
-  @State private importButtonPressed: boolean = false
-  @State private particleBoosted: boolean = false
-  private scanTimer: number = -1
-  private particleTimer: number = -1
-  private pageActive: boolean = false
-  @State private particlePhase: number = 0
+struct ParticleLayer {
+  @Prop boosted: boolean = false
+  @State particlePhase: number = 0
+  private timer: number = -1
   private readonly particles: ImportParticle[] = [
     { x: 24, y: 88, size: 2, opacity: 0.12 },
     { x: 46, y: 148, size: 2, opacity: 0.16 },
@@ -43,6 +35,61 @@ struct ImportEntryPage {
     { x: 208, y: 484, size: 2, opacity: 0.14 },
     { x: 286, y: 526, size: 2, opacity: 0.12 }
   ]
+
+  aboutToAppear(): void {
+    if (this.timer !== -1) {
+      clearInterval(this.timer)
+      this.timer = -1
+    }
+    this.timer = setInterval(() => {
+      this.particlePhase += 0.08
+      if (this.particlePhase > 1000) {
+        this.particlePhase = 0
+      }
+    }, 32)
+  }
+
+  aboutToDisappear(): void {
+    if (this.timer !== -1) {
+      clearInterval(this.timer)
+      this.timer = -1
+    }
+  }
+
+  private getParticleOffsetX(index: number): number {
+    return Math.sin(this.particlePhase + index) * 2
+  }
+
+  private getParticleOffsetY(index: number): number {
+    return Math.cos(this.particlePhase + index * 0.7) * 3
+  }
+
+  build() {
+    ForEach(this.particles, (particle: ImportParticle, index: number) => {
+      Row()
+        .width(particle.size)
+        .height(particle.size)
+        .backgroundColor(EmuColors.primary)
+        .opacity(this.boosted ? Math.min(1, particle.opacity + 0.25) : particle.opacity)
+        .position({
+          x: particle.x + this.getParticleOffsetX(index),
+          y: particle.y + this.getParticleOffsetY(index)
+        })
+    }, (_p: ImportParticle, index: number) => `particle-${index}`)
+  }
+}
+
+@Entry
+@Component
+struct ImportEntryPage {
+  @State private hasGames: boolean = false
+  @State private isScanning: boolean = false
+  @State private scanProgress: number = 0
+  @State private scanStatusText: string = '正在扫描本地文件...'
+  @State private importButtonPressed: boolean = false
+  @State private particleBoosted: boolean = false
+  private scanTimer: number = -1
+  private pageActive: boolean = false
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: true },
     { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
@@ -68,7 +115,6 @@ struct ImportEntryPage {
 
   aboutToAppear(): void {
     this.pageActive = true
-    this.startParticleMotion()
     if (this.hasGames) {
       this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
         console.error(`[ImportEntryPage] replaceUrl failed: ${err.message}`)
@@ -79,7 +125,6 @@ struct ImportEntryPage {
   aboutToDisappear(): void {
     this.pageActive = false
     this.stopScan()
-    this.stopParticleMotion()
   }
 
   private stopScan(): void {
@@ -87,34 +132,6 @@ struct ImportEntryPage {
       clearInterval(this.scanTimer)
       this.scanTimer = -1
     }
-  }
-
-  private startParticleMotion(): void {
-    if (this.particleTimer !== -1) {
-      clearInterval(this.particleTimer)
-      this.particleTimer = -1
-    }
-    this.particleTimer = setInterval(() => {
-      this.particlePhase += 0.08
-      if (this.particlePhase > 1000) {
-        this.particlePhase = 0
-      }
-    }, 32)
-  }
-
-  private stopParticleMotion(): void {
-    if (this.particleTimer !== -1) {
-      clearInterval(this.particleTimer)
-      this.particleTimer = -1
-    }
-  }
-
-  private getParticleOffsetX(index: number): number {
-    return Math.sin(this.particlePhase + index) * 2
-  }
-
-  private getParticleOffsetY(index: number): number {
-    return Math.cos(this.particlePhase + index * 0.7) * 3
   }
 
   private startImport(): void {
@@ -188,21 +205,6 @@ struct ImportEntryPage {
     .justifyContent(FlexAlign.Center)
   }
 
-  @Builder
-  private ParticleOverlay() {
-    ForEach(this.particles, (particle: ImportParticle, index: number) => {
-      Row()
-        .width(particle.size)
-        .height(particle.size)
-        .backgroundColor(EmuColors.primary)
-        .opacity(this.particleBoosted ? Math.min(1, particle.opacity + 0.25) : particle.opacity)
-        .position({
-          x: particle.x + this.getParticleOffsetX(index),
-          y: particle.y + this.getParticleOffsetY(index)
-        })
-    }, (_particle: ImportParticle, index: number) => `particle-${index}`)
-  }
-
   build() {
     Column() {
       EmuHeaderBar({
@@ -218,7 +220,7 @@ struct ImportEntryPage {
 
       Stack() {
         EmuPrecisionGridBackdrop()
-        this.ParticleOverlay()
+        ParticleLayer({ boosted: this.particleBoosted })
 
         Column()
         .width('100%')

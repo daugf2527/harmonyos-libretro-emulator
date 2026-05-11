@@ -44,6 +44,56 @@ interface TouchPoint {
   y: number
 }
 
+@Component
+struct SpinnerLine {
+  @Prop @Watch('onActiveChange') active: boolean = false
+  @State angle: number = 0
+  private timer: number = -1
+
+  onActiveChange(): void {
+    if (this.active && this.timer === -1) {
+      this.timer = setInterval(() => {
+        this.angle = (this.angle + 14) % 360
+      }, 40)
+    } else if (!this.active && this.timer !== -1) {
+      clearInterval(this.timer)
+      this.timer = -1
+    }
+  }
+
+  aboutToAppear(): void {
+    this.onActiveChange()
+  }
+
+  aboutToDisappear(): void {
+    if (this.timer !== -1) {
+      clearInterval(this.timer)
+      this.timer = -1
+    }
+  }
+
+  build() {
+    Stack() {
+      Row()
+        .width(26)
+        .height(26)
+        .borderRadius(13)
+        .border({ width: 2, color: '#3300FF41', style: BorderStyle.Solid })
+
+      Row()
+        .width(26)
+        .height(26)
+        .borderRadius(13)
+        .border({
+          width: { top: 2, right: 2 },
+          color: EmuColors.primary,
+          style: BorderStyle.Solid
+        })
+        .rotate({ angle: this.angle })
+    }
+  }
+}
+
 @Entry
 @Component
 struct LibraryPage {
@@ -61,10 +111,8 @@ struct LibraryPage {
   @State private pullRefreshOpacity: number = 0
   @State private refreshing: boolean = false
   @State private bottomLoaderActive: boolean = false
-  @State private spinnerAngle: number = 0
   private scroller: Scroller = new Scroller()
   private searchTimer: number = -1
-  private spinnerTimer: number = -1
   private toastTimer: number = -1
   private refreshTimer: number = -1
   private bottomLoaderTimer: number = -1
@@ -84,8 +132,7 @@ struct LibraryPage {
   aboutToAppear(): void {
     this.pageActive = true
     void this.refreshLibraryGames()
-    this.updateSpinnerLoop()
-  }
+      }
 
   aboutToDisappear(): void {
     this.pageActive = false
@@ -93,7 +140,6 @@ struct LibraryPage {
     this.pageActionToken += 1
     this.clearSearchTimer()
     this.clearLongPressTimer()
-    this.stopSpinnerLoop()
     if (this.toastTimer !== -1) {
       clearTimeout(this.toastTimer)
       this.toastTimer = -1
@@ -131,32 +177,6 @@ struct LibraryPage {
 
   private get searchResults(): LibraryRecord[] {
     return buildLibrarySearchResults(this.allGames, this.selectedPlatform, this.searchKeyword)
-  }
-
-  private startSpinnerLoop(): void {
-    if (this.spinnerTimer !== -1) {
-      return
-    }
-    this.spinnerTimer = setInterval(() => {
-      this.spinnerAngle = (this.spinnerAngle + 14) % 360
-    }, 40)
-  }
-
-  private stopSpinnerLoop(): void {
-    if (this.spinnerTimer !== -1) {
-      clearInterval(this.spinnerTimer)
-      this.spinnerTimer = -1
-    }
-    this.spinnerAngle = 0
-  }
-
-  private updateSpinnerLoop(): void {
-    const shouldRun = this.searchBusy || this.refreshing || this.bottomLoaderActive || this.pullRefreshHeight > 0
-    if (shouldRun) {
-      this.startSpinnerLoop()
-      return
-    }
-    this.stopSpinnerLoop()
   }
 
   private clearSearchTimer(): void {
@@ -255,20 +275,17 @@ struct LibraryPage {
     if (trimmed.length === 0) {
       this.searchBusy = false
       this.showSearchResults = false
-      this.updateSpinnerLoop()
-      return
+            return
     }
     this.searchBusy = true
-    this.updateSpinnerLoop()
-    this.searchTimer = setTimeout(() => {
+        this.searchTimer = setTimeout(() => {
       if (!this.pageActive) {
         return
       }
       this.searchBusy = false
       this.showSearchResults = true
       this.searchTimer = -1
-      this.updateSpinnerLoop()
-    }, 180)
+          }, 180)
   }
 
   private hideSearchResults(): void {
@@ -328,8 +345,7 @@ struct LibraryPage {
     this.pullRefreshHeight = 64
     this.pullRefreshOpacity = 1
     this.showSearchResults = false
-    this.updateSpinnerLoop()
-    if (this.refreshTimer !== -1) {
+        if (this.refreshTimer !== -1) {
       clearTimeout(this.refreshTimer)
     }
     this.refreshTimer = setTimeout(() => {
@@ -349,8 +365,7 @@ struct LibraryPage {
     this.refreshing = false
     this.pullRefreshHeight = 0
     this.pullRefreshOpacity = 0
-    this.updateSpinnerLoop()
-  }
+      }
 
   private onMainContentTouch(event: TouchEvent): void {
     const point = this.resolveTouchPoint(event)
@@ -371,14 +386,12 @@ struct LibraryPage {
       if (distance <= 0) {
         this.pullRefreshHeight = 0
         this.pullRefreshOpacity = 0
-        this.updateSpinnerLoop()
-        return
+                return
       }
       const nextHeight = Math.min(distance * 0.4, 80)
       this.pullRefreshHeight = nextHeight
       this.pullRefreshOpacity = nextHeight / 80
-      this.updateSpinnerLoop()
-      return
+            return
     }
     if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
       this.pullTracking = false
@@ -387,8 +400,7 @@ struct LibraryPage {
       } else {
         this.pullRefreshHeight = 0
         this.pullRefreshOpacity = 0
-        this.updateSpinnerLoop()
-      }
+              }
     }
   }
 
@@ -406,14 +418,12 @@ struct LibraryPage {
         clearTimeout(this.bottomLoaderTimer)
         this.bottomLoaderTimer = -1
       }
-      this.updateSpinnerLoop()
-    }
+          }
   }
 
   private onReachEnd(): void {
     this.bottomLoaderActive = true
-    this.updateSpinnerLoop()
-    if (this.bottomLoaderTimer !== -1) {
+        if (this.bottomLoaderTimer !== -1) {
       clearTimeout(this.bottomLoaderTimer)
     }
     this.bottomLoaderTimer = setTimeout(() => {
@@ -422,8 +432,7 @@ struct LibraryPage {
       }
       this.bottomLoaderActive = false
       this.bottomLoaderTimer = -1
-      this.updateSpinnerLoop()
-    }, 1200)
+          }, 1200)
   }
 
   private onBottomNavClick(key: string): void {
@@ -645,31 +654,9 @@ struct LibraryPage {
   }
 
   @Builder
-  private Spinner(size: number, borderWidth: number, activeColor: string, trackColor: string) {
-    Stack() {
-      Row()
-        .width(size)
-        .height(size)
-        .borderRadius(size / 2)
-        .border({ width: borderWidth, color: trackColor, style: BorderStyle.Solid })
-
-      Row()
-        .width(size)
-        .height(size)
-        .borderRadius(size / 2)
-        .border({
-          width: { top: borderWidth, right: borderWidth },
-          color: activeColor,
-          style: BorderStyle.Solid
-        })
-        .rotate({ angle: this.spinnerAngle })
-    }
-  }
-
-  @Builder
   private PullRefreshArea() {
     Column({ space: 6 }) {
-      this.Spinner(26, 2, EmuColors.primary, '#3300FF41')
+      SpinnerLine({ active: this.searchBusy || this.refreshing || this.bottomLoaderActive || this.pullRefreshHeight > 0 })
 
       Text(this.refreshing ? '正在扫描游戏库' : '扫描游戏库')
         .fontSize(9)
@@ -696,7 +683,6 @@ struct LibraryPage {
       telemetryBars: getLibraryTelemetryBars(this.allGames),
       platforms: this.getDisplayPlatformFilters(),
       selectedPlatform: this.selectedPlatform,
-      spinnerAngle: this.spinnerAngle,
       onKeywordChange: (value: string) => {
         this.onSearchKeywordChange(value)
       },
@@ -718,7 +704,6 @@ struct LibraryPage {
         games: this.filteredGames,
         highlightedRecentGameId: this.highlightedRecentGameId,
         bottomLoaderActive: this.bottomLoaderActive,
-        spinnerAngle: this.spinnerAngle,
       onCardTouch: (event: TouchEvent, item: LibraryRecord) => {
         this.onCardTouch(event, item)
       },
