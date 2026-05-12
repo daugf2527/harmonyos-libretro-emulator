@@ -149,6 +149,16 @@ struct LibretroGamePage {
   
   private roms: RuntimeRomConfig[] = [];
   private readonly cores: CoreConfig[] = LIBRETRO_CORE_CATALOG;
+  // CRITICAL fix: cache getAvailableRoms() .filter() result (reference-equality on roms + coreIndex)
+  private availableRomsCache: RuntimeRomConfig[] = [];
+  private availableRomsCacheRef: RuntimeRomConfig[] | null = null;
+  private availableRomsCacheCoreIndex: number = -1;
+  // HIGH fix: reuse HUD metrics array instead of allocating in build() every render
+  private hudMetricsCache: RuntimeHudMetric[] = [
+    { label: 'FPS', value: '--.-' },
+    { label: 'LAT', value: '4ms' },
+    { label: 'CORE', value: 'EMU_V26' }
+  ];
   
   aboutToAppear() {
     this.pageActive = true;
@@ -183,6 +193,7 @@ struct LibretroGamePage {
     this.refreshInputDevices();
     this.syncPortAssignments();
     void this.loadRuntimeInputLayout();
+    this.refreshHudMetricsCache();
   }
   
   aboutToDisappear() {
@@ -279,6 +290,7 @@ struct LibretroGamePage {
     const paused = stateValue === EngineState.PAUSED;
     this.gameRunning = running;
     this.gamePaused = paused;
+    this.refreshHudMetricsCache();
     if (stateValue === EngineState.RUNNING && this.pendingStart) {
       this.pendingStart = false;
       LogHelper.info('LibretroGame', 'Engine', '游戏启动成功');
@@ -446,6 +458,7 @@ struct LibretroGamePage {
     const fps = Number(payload.fps);
     if (!Number.isNaN(fps)) {
       this.coreFps = Math.round(fps);
+      this.refreshHudMetricsCache();
     }
 
     const drops = Number(payload.drops ?? 0);
@@ -511,10 +524,16 @@ struct LibretroGamePage {
     this.selectedRomIndex = 0;
   }
   
-  // 获取当前核心可用的 ROM
+  // 获取当前核心可用的 ROM（缓存结果，避免重复 filter）
   getAvailableRoms(): RuntimeRomConfig[] {
+    if (this.selectedCoreIndex === this.availableRomsCacheCoreIndex && this.roms === this.availableRomsCacheRef) {
+      return this.availableRomsCache;
+    }
+    this.availableRomsCacheCoreIndex = this.selectedCoreIndex;
+    this.availableRomsCacheRef = this.roms;
     const currentCore = this.cores[this.selectedCoreIndex];
-    return this.roms.filter(rom => rom.coreId === currentCore.id);
+    this.availableRomsCache = this.roms.filter(rom => rom.coreId === currentCore.id);
+    return this.availableRomsCache;
   }
 
   private async refreshRomList() {
@@ -650,12 +669,14 @@ struct LibretroGamePage {
     return 'CHRONO_TRIGGER_USA_SNES';
   }
 
+  private refreshHudMetricsCache(): void {
+    this.hudMetricsCache[0].value = this.getRuntimeFpsText();
+    this.hudMetricsCache[1].value = this.getRuntimeLatencyText();
+    this.hudMetricsCache[2].value = this.getRuntimeCoreText();
+  }
+
   private getRuntimeHudMetrics(): RuntimeHudMetric[] {
-    return [
-      { label: 'FPS', value: this.getRuntimeFpsText() },
-      { label: 'LAT', value: this.getRuntimeLatencyText() },
-      { label: 'CORE', value: this.getRuntimeCoreText() }
-    ];
+    return this.hudMetricsCache;
   }
 
   private handleInputSourceSelect(index: number): void {
@@ -1121,6 +1142,7 @@ struct LibretroGamePage {
       this.gameRunning = true;
       this.gamePaused = false;
       this.pendingStart = false;
+      this.refreshHudMetricsCache();
       await markLibraryRecordPlayed(context, rom.file);
       if (!this.isCurrentSwitchTask(token)) {
         return;

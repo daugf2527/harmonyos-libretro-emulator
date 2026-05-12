@@ -1,9 +1,9 @@
 import { common } from '@kit.AbilityKit'
-import { EmuHeaderBar } from '../components/EmuAppShell'
+import { EmuHeaderBar, GridBackground } from '../components/EmuAppShell'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { consumePendingImportUris } from '../common/ImportTaskBridge'
-import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
 import {
   importRomUris,
   inspectRomImportConflicts,
@@ -54,8 +54,6 @@ struct ImportTaskOverlayPage {
   private pageActive: boolean = false
   private importTaskToken: number = 0
   private pulseTimer: number = -1
-  private readonly horizontalGridIndexes: number[] = createIndexRange(120)
-  private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
     { key: 'explore', iconName: 'explore', label: '探索', isActive: false },
@@ -666,7 +664,7 @@ struct ImportTaskOverlayPage {
   @Builder
   private BackgroundWorkspace() {
     Stack() {
-      this.PrecisionGrid(40, '#1A484848', 0.5)
+      GridBackground({ gridSize: 40, lineColor: '#1A484848', lineWidth: 0.5 })
 
       Column({ space: 20 }) {
         Column({ space: 16 }) {
@@ -716,35 +714,6 @@ struct ImportTaskOverlayPage {
     .layoutWeight(1)
     .blur(28)
     .opacity(0.06)
-  }
-
-  @Builder
-  private PrecisionGrid(gridSize: number, lineColor: string, lineWidth: number = 1) {
-    Stack() {
-      Column({ space: Math.max(0, gridSize - lineWidth) }) {
-        ForEach(this.horizontalGridIndexes, (item: number) => {
-          Row()
-            .width('100%')
-            .height(lineWidth)
-            .backgroundColor(lineColor)
-        }, (item: number) => `h-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-
-      Row({ space: Math.max(0, gridSize - lineWidth) }) {
-        ForEach(this.verticalGridIndexes, (item: number) => {
-          Column()
-            .width(lineWidth)
-            .height('100%')
-            .backgroundColor(lineColor)
-        }, (item: number) => `v-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-    }
-    .width('100%')
-    .height('100%')
   }
 
   @Builder

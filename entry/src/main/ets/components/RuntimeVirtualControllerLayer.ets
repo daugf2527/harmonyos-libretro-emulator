@@ -1,5 +1,6 @@
-import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
 import { InputLayoutButton } from '../common/InputLayoutRepository'
+import { ScanlineBackground } from './EmuAppShell'
 
 @Component
 export struct RuntimeVirtualControllerLayer {
@@ -10,7 +11,6 @@ export struct RuntimeVirtualControllerLayer {
   onAnalogChange?: (index: number, x: number, y: number) => void
   onQuickSave?: () => void
 
-  private readonly scanlineIndexes: number[] = createIndexRange(160)
   private readonly quickSaveLetters: string[] = ['Q', 'U', 'I', 'C', 'K', 'S', 'A', 'V', 'E']
 
   build() {
@@ -24,17 +24,10 @@ export struct RuntimeVirtualControllerLayer {
         })
         .hitTestBehavior(HitTestMode.None)
 
-      Column({ space: 1 }) {
-        ForEach(this.scanlineIndexes, (index: number) => {
-          Row()
-            .width('100%')
-            .height(1)
-            .backgroundColor(index % 2 === 0 ? '#1000FF41' : '#10000000')
-        }, (index: number) => `scanline-${index}`)
-      }
-      .width('100%')
-      .height('100%')
-      .opacity(0.32)
+      ScanlineBackground({ lineColor: '#1000FF41', lineSpacing: 1, alternateColor: '#10000000' })
+        .width('100%')
+        .height('100%')
+        .opacity(0.32)
       .hitTestBehavior(HitTestMode.None)
 
       this.buildControllerDeck()

@@ -1,5 +1,6 @@
 import { EmuIcon } from '../components/EmuIcon'
-import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
+import { GridBackground } from '../components/EmuAppShell'
 import { PageLifecycleGuard } from '../common/PageLifecycleGuard'
 
 type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED'
@@ -56,8 +57,6 @@ struct OnboardingPage {
     { key: 'SANDBOX_IMPORT', label: 'SANDBOX_IMPORT', status: 'GRANTED' },
   ]
   @State private protocolStatus: string = 'VERIFIED'
-  private readonly horizontalGridIndexes: number[] = createIndexRange(120)
-  private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
 
   aboutToAppear() {
@@ -179,7 +178,7 @@ struct OnboardingPage {
       this.Header()
 
       Stack() {
-        this.PrecisionGrid(40, '#1A484848', 0.5)
+        GridBackground({ gridSize: 40, lineColor: '#1A484848', lineWidth: 0.5 })
 
         Column() {
           if (this.currentStep === 1) {
@@ -206,35 +205,6 @@ struct OnboardingPage {
     .height('100%')
     .backgroundColor(Colors.background)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-  }
-
-  @Builder
-  private PrecisionGrid(gridSize: number, lineColor: string, lineWidth: number = 1) {
-    Stack() {
-      Column({ space: Math.max(0, gridSize - lineWidth) }) {
-        ForEach(this.horizontalGridIndexes, (item: number) => {
-          Row()
-            .width('100%')
-            .height(lineWidth)
-            .backgroundColor(lineColor)
-        }, (item: number) => `h-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-
-      Row({ space: Math.max(0, gridSize - lineWidth) }) {
-        ForEach(this.verticalGridIndexes, (item: number) => {
-          Column()
-            .width(lineWidth)
-            .height('100%')
-            .backgroundColor(lineColor)
-        }, (item: number) => `v-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-    }
-    .width('100%')
-    .height('100%')
   }
 
   @Builder
@@ -396,7 +366,7 @@ struct OnboardingPage {
 
         Column({ space: 4 }) {
           Text('延迟').fontSize(10).fontColor('#FF666666').letterSpacing(2)
-          Text('0.02ms').fontSize(10).fontFamily('monospace').fontColor(Colors.primary)
+          Text('0.02ms').fontSize(10).fontColor(Colors.primary)
         }
         .alignItems(HorizontalAlign.End)
       }
@@ -458,7 +428,7 @@ struct OnboardingPage {
           .align(Alignment.Center)
 
         Stack() {
-          this.PrecisionGrid(20, '#1A484848', 0.5)
+          GridBackground({ gridSize: 20, lineColor: '#1A484848', lineWidth: 0.5 })
 
           Column({ space: 16 }) {
             EmuIcon({

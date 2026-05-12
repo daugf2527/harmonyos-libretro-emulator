@@ -1,6 +1,7 @@
-import { createIndexRange, EmuColors } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
 import { EmuCoverArt } from './EmuCoverArt'
 import { EmuIcon } from './EmuIcon'
+import { ScanlineBackground } from './EmuAppShell'
 
 @Component
 export struct LibraryLaunchOverlay {
@@ -13,17 +14,10 @@ export struct LibraryLaunchOverlay {
 
   build() {
     Stack() {
-      Column({ space: 2 }) {
-        ForEach(createIndexRange(90), (_: number) => {
-          Row()
-            .width('100%')
-            .height(1)
-            .backgroundColor('#1400FF41')
-        }, (index: number) => index.toString())
-      }
-      .width('100%')
-      .height('100%')
-      .opacity(0.12)
+      ScanlineBackground({ lineColor: '#1400FF41', lineSpacing: 2 })
+        .width('100%')
+        .height('100%')
+        .opacity(0.12)
 
       Column() {
         this.Header()
