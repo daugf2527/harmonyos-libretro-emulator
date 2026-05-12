@@ -46,6 +46,12 @@ static bool ReadFile(const std::string &path, std::vector<uint8_t> &data,
     error = "stat failed";
     return false;
   }
+  constexpr off_t kMaxElfSize = 256 * 1024 * 1024;
+  if (st.st_size > kMaxElfSize) {
+    close(fd);
+    error = "file too large";
+    return false;
+  }
   data.resize(static_cast<size_t>(st.st_size));
   size_t total = 0;
   while (total < data.size()) {
@@ -236,7 +242,8 @@ static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
     for (size_t i = 0; i < dyn_count; ++i) {
       if (dyn[i].d_tag == DT_NEEDED) {
         const size_t needed_offset = static_cast<size_t>(dyn[i].d_un.d_val);
-        if (needed_offset > data.size() - strtab_offset) {
+        if (strtab_offset > data.size() ||
+            needed_offset > data.size() - strtab_offset) {
           result.error = "ELF64 DT_NEEDED offset out of range";
           return result;
         }
@@ -320,7 +327,8 @@ static NeededResult ReadNeededLibrariesFromElf(const std::string &corePath) {
     for (size_t i = 0; i < dyn_count; ++i) {
       if (dyn[i].d_tag == DT_NEEDED) {
         const size_t needed_offset = static_cast<size_t>(dyn[i].d_un.d_val);
-        if (needed_offset > data.size() - strtab_offset) {
+        if (strtab_offset > data.size() ||
+            needed_offset > data.size() - strtab_offset) {
           result.error = "ELF32 DT_NEEDED offset out of range";
           return result;
         }

@@ -82,6 +82,9 @@ ROMLoadResult ROMLoader::LoadFromRawFile(
     return result;
 }
 
+// IMPORTANT: returned retro_game_info contains raw pointers (.path, .data) into
+// `result`. Caller MUST keep `result` alive for the entire duration that
+// retro_game_info is used (until after retro_load_game returns).
 retro_game_info ROMLoader::CreateGameInfo(
     const ROMLoadResult& result,
     bool need_fullpath
@@ -186,7 +189,7 @@ std::string ROMLoader::UriToPath(const std::string& uri) {
     }
     
     // 验证 URI 格式
-    unsigned int length = uri.length();
+    uint32_t length = static_cast<uint32_t>(uri.length());
     if (!OH_FileUri_IsValidUri(uri.c_str(), length)) {
         LOGF(LOG_ERROR, "Invalid URI format: %{public}s", uri.c_str());
         return "";

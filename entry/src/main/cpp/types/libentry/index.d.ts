@@ -45,6 +45,7 @@ export function refactoredSwitchGameAsync(
   token?: number
 ): Promise<boolean>;
 export const refactoredGetRawFileList: (resMgr: object, dir?: string) => Array<string>;
+export const refactoredGetRawFileListAsync: (resMgr: object, dir?: string) => Promise<Array<string>>;
 export const refactoredInitEventBridge: (callback: (data: RefactoredEvent) => void) => boolean;
 export const refactoredSendInput: (port: number, id: number, pressed: boolean) => boolean;
 export const refactoredSendAnalog: (port: number, index: number, id: number, value: number) => boolean;
@@ -73,6 +74,7 @@ export const refactoredSetAudioSyncMode: (mode: number) => boolean; // 0=NonBloc
 
 // Video Config
 export const refactoredSetScalingMode: (mode: number) => boolean; // 0=Hardware, 1=Software, 2=GLES
+export const refactoredSetSwapInterval: (interval: number) => boolean; // 0=Disable VSync, 1=Enable VSync
 export const refactoredSetSoftwareMaxResolution: (maxWidth: number, maxHeight: number) => boolean;
 export const refactoredSetAIUpscale: (enabled: boolean) => boolean;
 export const refactoredSetHwRenderAllowed: (enabled: boolean) => boolean;

@@ -89,6 +89,81 @@ jobs:
           HARMONY_MODULE_TARGET: entry@default
         run: bash scripts/ci/build_harmony_hap.sh
 
+      - name: Prepare Signing Material
+        id: signprep
+        shell: bash
+        env:
+          HARMONY_SIGN_KEYSTORE_B64: ${{ secrets.HARMONY_SIGN_KEYSTORE_B64 }}
+          HARMONY_SIGN_CERT_B64: ${{ secrets.HARMONY_SIGN_CERT_B64 }}
+          HARMONY_SIGN_PROFILE_B64: ${{ secrets.HARMONY_SIGN_PROFILE_B64 }}
+          HARMONY_SIGN_KEY_ALIAS: ${{ secrets.HARMONY_SIGN_KEY_ALIAS }}
+          HARMONY_SIGN_KEY_PWD: ${{ secrets.HARMONY_SIGN_KEY_PWD }}
+          HARMONY_SIGN_KEYSTORE_PWD: ${{ secrets.HARMONY_SIGN_KEYSTORE_PWD }}
+        run: |
+          set -euo pipefail
+
+          required_vars=(
+            HARMONY_SIGN_KEYSTORE_B64
+            HARMONY_SIGN_CERT_B64
+            HARMONY_SIGN_PROFILE_B64
+            HARMONY_SIGN_KEY_ALIAS
+            HARMONY_SIGN_KEY_PWD
+            HARMONY_SIGN_KEYSTORE_PWD
+          )
+          for var_name in "${required_vars[@]}"; do
+            if [[ -z "${!var_name:-}" ]]; then
+              echo "[FAIL] Missing signing secret: ${var_name}" >&2
+              exit 1
+            fi
+          done
+
+          sign_dir="${RUNNER_TEMP}/harmony-sign"
+          mkdir -p "${sign_dir}"
+          echo "${HARMONY_SIGN_KEYSTORE_B64}" | base64 --decode > "${sign_dir}/sign.p12"
+          echo "${HARMONY_SIGN_CERT_B64}" | base64 --decode > "${sign_dir}/sign.cer"
+          echo "${HARMONY_SIGN_PROFILE_B64}" | base64 --decode > "${sign_dir}/sign.p7b"
+
+          unsigned_hap="${{ steps.build.outputs.unsigned_hap }}"
+          if [[ -z "${unsigned_hap}" ]]; then
+            unsigned_hap="${{ steps.build.outputs.primary_hap }}"
+          fi
+          if [[ -z "${unsigned_hap}" ]]; then
+            echo "[FAIL] No unsigned/primary HAP available for signing." >&2
+            exit 1
+          fi
+
+          hap_sign_tool="${HARMONY_COMMANDLINE_TOOLS_HOME}/sdk/default/openharmony/toolchains/lib/hap-sign-tool.jar"
+          if [[ ! -f "${hap_sign_tool}" ]]; then
+            echo "[FAIL] hap-sign-tool.jar not found: ${hap_sign_tool}" >&2
+            exit 1
+          fi
+
+          unsigned_name="$(basename "${unsigned_hap}")"
+          if [[ "${unsigned_name}" == *"-unsigned.hap" ]]; then
+            signed_name="${unsigned_name/-unsigned.hap/-signed.hap}"
+          else
+            signed_name="${unsigned_name%.hap}-signed.hap"
+          fi
+          signed_output="${RUNNER_TEMP}/harmony-hap-artifacts/${signed_name}"
+          mkdir -p "$(dirname "${signed_output}")"
+
+          {
+            echo "HAP_SIGN_TOOL_JAR=${hap_sign_tool}"
+            echo "UNSIGNED_HAP=${unsigned_hap}"
+            echo "SIGNED_HAP_OUTPUT=${signed_output}"
+            echo "SIGN_KEY_ALIAS=${HARMONY_SIGN_KEY_ALIAS}"
+            echo "SIGN_APP_CERT_FILE=${sign_dir}/sign.cer"
+            echo "SIGN_PROFILE_FILE=${sign_dir}/sign.p7b"
+            echo "SIGN_KEYSTORE_FILE=${sign_dir}/sign.p12"
+            echo "SIGN_KEY_PWD=${HARMONY_SIGN_KEY_PWD}"
+            echo "SIGN_KEYSTORE_PWD=${HARMONY_SIGN_KEYSTORE_PWD}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Sign HAP
+        id: sign
+        shell: bash
+        run: bash scripts/ci/sign_harmony_hap.sh
+
       - name: HAP Smoke Check
         shell: bash
         env:

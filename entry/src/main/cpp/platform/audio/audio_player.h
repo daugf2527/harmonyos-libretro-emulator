@@ -91,6 +91,7 @@ public:
      * @return true 正在播放
      */
     bool IsPlaying() const;
+    void ProcessPendingInterruptActions();
     bool EnterCallback();
     void ExitCallback();
     bool IsShuttingDown() const;
@@ -156,6 +157,7 @@ private:
         OH_AudioInterrupt_ForceType type,
         OH_AudioInterrupt_Hint hint
     );
+    bool PauseFromInterrupt();
     
     /**
      * @brief 清理资源
@@ -177,6 +179,9 @@ private:
     int32_t channel_count_ = 2;                 // 声道数
     bool is_playing_ = false;                   // 播放状态
     bool resume_on_interrupt_ = false;          // 中断恢复标志
+    std::atomic<bool> pending_interrupt_pause_{false};
+    std::atomic<bool> pending_interrupt_resume_{false};
+    std::atomic<bool> pending_interrupt_stop_{false};
     mutable std::mutex state_mutex_;
     mutable std::mutex callback_mutex_;
     std::condition_variable callback_cond_;

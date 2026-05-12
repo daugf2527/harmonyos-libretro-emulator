@@ -1,0 +1,102 @@
+#include "engine_napi_common.h"
+
+static napi_value DiskControlSetEjectState(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[1];
+  if (!GetArgs(env, info, 1, 1, args, &argc, "DiskControlSetEjectState")) {
+    return MakeBool(env, false);
+  }
+  bool ejected = false;
+  if (!GetBoolArg(env, args[0], ejected, "DiskControlSetEjectState", "ejected")) {
+    return MakeBool(env, false);
+  }
+  bool ok = GetEngine()->DiskControlSetEjectState(ejected);
+  return MakeBool(env, ok);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+static napi_value DiskControlGetEjectState(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  bool ejected = GetEngine()->DiskControlGetEjectState();
+  return MakeBool(env, ejected);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+static napi_value DiskControlGetImageIndex(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  unsigned index = GetEngine()->DiskControlGetImageIndex();
+  napi_value result;
+  napi_create_uint32(env, index, &result);
+  return result;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+static napi_value DiskControlSetImageIndex(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[1];
+  if (!GetArgs(env, info, 1, 1, args, &argc, "DiskControlSetImageIndex")) {
+    return MakeBool(env, false);
+  }
+  int32_t index = 0;
+  if (!GetInt32Arg(env, args[0], index, "DiskControlSetImageIndex", "index")) {
+    return MakeBool(env, false);
+  }
+  if (index < 0) {
+    return MakeBool(env, false);
+  }
+  bool ok = GetEngine()->DiskControlSetImageIndex(static_cast<unsigned>(index));
+  return MakeBool(env, ok);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+static napi_value DiskControlGetNumImages(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  unsigned num = GetEngine()->DiskControlGetNumImages();
+  napi_value result;
+  napi_create_uint32(env, num, &result);
+  return result;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+static napi_value DiskControlReplaceImageIndex(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[2];
+  if (!GetArgs(env, info, 2, 2, args, &argc, "DiskControlReplaceImageIndex")) {
+    return MakeBool(env, false);
+  }
+  int32_t index = 0;
+  char path[1024];
+  if (!GetInt32Arg(env, args[0], index, "DiskControlReplaceImageIndex", "index") ||
+      !GetStringArg(env, args[1], path, sizeof(path), "DiskControlReplaceImageIndex", "path")) {
+    return MakeBool(env, false);
+  }
+  if (index < 0) {
+    return MakeBool(env, false);
+  }
+  bool ok = GetEngine()->DiskControlReplaceImageIndex(static_cast<unsigned>(index), path);
+  return MakeBool(env, ok);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+static napi_value DiskControlAddImageIndex(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  bool ok = GetEngine()->DiskControlAddImageIndex();
+  return MakeBool(env, ok);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+void RegisterDiskNapi(napi_env env, napi_value exports) {
+  napi_property_descriptor desc[] = {
+      {"refactoredDiskControlSetEjectState", nullptr, DiskControlSetEjectState, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlGetEjectState", nullptr, DiskControlGetEjectState, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlGetImageIndex", nullptr, DiskControlGetImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlSetImageIndex", nullptr, DiskControlSetImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlGetNumImages", nullptr, DiskControlGetNumImages, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlReplaceImageIndex", nullptr, DiskControlReplaceImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlAddImageIndex", nullptr, DiskControlAddImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
+  };
+  napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+}

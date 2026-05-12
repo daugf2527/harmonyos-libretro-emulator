@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <cerrno>
 #include <cstring>
+#include <limits>
 #include <hilog/log.h>
 #include <native_buffer/native_buffer.h>
 #include <native_window/external_window.h>
@@ -215,6 +216,17 @@ bool ShouldLog(size_t &counter, size_t burst, size_t interval) {
   return (counter % interval) == 0;
 }
 
+bool ShouldLog(uint32_t &counter, uint32_t burst, uint32_t interval) {
+  counter++;
+  if (counter <= burst) {
+    return true;
+  }
+  if (interval == 0) {
+    return false;
+  }
+  return (counter % interval) == 0;
+}
+
 void BuildHwRenderConfig(const retro_hw_render_callback &cb,
                          HwRenderConfig &out) {
   if (cb.context_type == RETRO_HW_CONTEXT_OPENGLES2) {
@@ -243,7 +255,320 @@ void ResolveTargetSize(const EnvState &env_state,
     out_h = runtime.video_max_height;
   }
 }
+
 } // namespace
+
+const char *VideoPipeline::PreflightDropReasonToString(
+    PreflightDropReason reason) {
+  switch (reason) {
+  case PreflightDropReason::NONE:
+    return "none";
+  case PreflightDropReason::NULL_WINDOW:
+    return "null_window";
+  case PreflightDropReason::INVALID_WINDOW_SIZE:
+    return "invalid_window_size";
+  case PreflightDropReason::INVALID_FRAME:
+    return "invalid_frame";
+  case PreflightDropReason::CPU_BACKPRESSURE:
+    return "cpu_backpressure";
+  default:
+    return "unknown";
+  }
+}
+
+VideoPipeline::PreflightDropReason VideoPipeline::EvaluateRenderPreflight(
+    OHNativeWindow *window, unsigned width, unsigned height, size_t pitch,
+    ScalingMode mode, bool isDupeRequest) const {
+  if (!window) {
+    return PreflightDropReason::NULL_WINDOW;
+  }
+  if (window_width_.load(std::memory_order_acquire) <= 0 ||
+      window_height_.load(std::memory_order_acquire) <= 0) {
+    return PreflightDropReason::INVALID_WINDOW_SIZE;
+  }
+
+  const bool cpuMode = (mode != ScalingMode::GLES_SCALING);
+  if (cpuMode && !isDupeRequest) {
+    if (width == 0 || height == 0 || pitch == 0) {
+      return PreflightDropReason::INVALID_FRAME;
+    }
+    const auto now = std::chrono::steady_clock::now();
+    if (cpu_backpressure_until_ != std::chrono::steady_clock::time_point{} &&
+        now < cpu_backpressure_until_) {
+      return PreflightDropReason::CPU_BACKPRESSURE;
+    }
+  }
+
+  return PreflightDropReason::NONE;
+}
+
+void VideoPipeline::UpdateCpuBackpressure(int64_t requestUs, bool requestFailed) {
+  constexpr int64_t kSlowThresholdUs = 50000;
+  constexpr int64_t kRecoverThresholdUs = 20000;
+
+  if (requestFailed) {
+    cpu_request_slow_streak_ = std::min<uint32_t>(cpu_request_slow_streak_ + 1, 100);
+  } else if (requestUs >= kSlowThresholdUs) {
+    cpu_request_slow_streak_ = std::min<uint32_t>(cpu_request_slow_streak_ + 1, 100);
+  } else if (requestUs <= kRecoverThresholdUs) {
+    cpu_request_slow_streak_ = 0;
+  } else if (cpu_request_slow_streak_ > 0) {
+    cpu_request_slow_streak_--;
+  }
+
+  int cooldownMs = 0;
+  if (requestFailed) {
+    cooldownMs = 200;
+  } else if (requestUs >= 90000) {
+    cooldownMs = 400;
+  } else if (cpu_request_slow_streak_ >= 3) {
+    cooldownMs = 250;
+  }
+
+  if (cooldownMs <= 0) {
+    return;
+  }
+
+  const auto now = std::chrono::steady_clock::now();
+  const auto until = now + std::chrono::milliseconds(cooldownMs);
+  if (until > cpu_backpressure_until_) {
+    cpu_backpressure_until_ = until;
+  }
+  if (ShouldLog(preflight_drop_log_count_, 5, 60)) {
+    LOGF(LOG_WARN,
+         "CPU backpressure armed: req=%{public}lld us fail=%{public}d streak=%{public}u cooldown=%{public}d ms",
+         static_cast<long long>(requestUs), requestFailed ? 1 : 0,
+         cpu_request_slow_streak_, cooldownMs);
+  }
+}
+
+float VideoPipeline::ResolveSourceAspect(unsigned width, unsigned height) const {
+  float srcAspect = geometry_aspect_ratio_;
+  if (!(srcAspect > 0.0f) && geometry_base_width_ > 0 &&
+      geometry_base_height_ > 0) {
+    srcAspect = static_cast<float>(geometry_base_width_) /
+                static_cast<float>(geometry_base_height_);
+  }
+  if (!(srcAspect > 0.0f) && width > 0 && height > 0) {
+    srcAspect = static_cast<float>(width) / static_cast<float>(height);
+  }
+  if (!(srcAspect > 0.0f)) {
+    srcAspect = 1.0f;
+  }
+  return srcAspect;
+}
+
+void VideoPipeline::EnsureCpuLayout(unsigned width, unsigned height, int dstWidth,
+                                    int dstHeight) {
+  if (dstWidth <= 0 || dstHeight <= 0) {
+    cpu_layout_cache_ = CpuLayoutCache{};
+    return;
+  }
+
+  const float srcAspect = ResolveSourceAspect(width, height);
+  float aspectDelta = srcAspect - cpu_layout_cache_.src_aspect;
+  if (aspectDelta < 0.0f) {
+    aspectDelta = -aspectDelta;
+  }
+
+  const bool needRecalc =
+      !cpu_layout_cache_.valid || cpu_layout_cache_.src_width != width ||
+      cpu_layout_cache_.src_height != height ||
+      cpu_layout_cache_.dst_width != dstWidth ||
+      cpu_layout_cache_.dst_height != dstHeight || aspectDelta > 0.0001f;
+  if (!needRecalc) {
+    return;
+  }
+
+  const float dstAspect = static_cast<float>(dstWidth) /
+                          static_cast<float>(dstHeight);
+  int scaledWidth = dstWidth;
+  int scaledHeight = dstHeight;
+  if (dstAspect > srcAspect) {
+    scaledWidth = static_cast<int>(static_cast<float>(dstHeight) * srcAspect);
+    scaledHeight = dstHeight;
+  } else if (dstAspect < srcAspect) {
+    scaledWidth = dstWidth;
+    scaledHeight = static_cast<int>(static_cast<float>(dstWidth) / srcAspect);
+  }
+
+  if (scaledWidth < 1) {
+    scaledWidth = 1;
+  }
+  if (scaledHeight < 1) {
+    scaledHeight = 1;
+  }
+
+  const int offsetX = (dstWidth - scaledWidth) / 2;
+  const int offsetY = (dstHeight - scaledHeight) / 2;
+  const bool hasBlackBars =
+      !(offsetX == 0 && offsetY == 0 && scaledWidth == dstWidth &&
+        scaledHeight == dstHeight);
+
+  cpu_layout_cache_.valid = true;
+  cpu_layout_cache_.src_width = width;
+  cpu_layout_cache_.src_height = height;
+  cpu_layout_cache_.dst_width = dstWidth;
+  cpu_layout_cache_.dst_height = dstHeight;
+  cpu_layout_cache_.src_aspect = srcAspect;
+  cpu_layout_cache_.scaled_width = scaledWidth;
+  cpu_layout_cache_.scaled_height = scaledHeight;
+  cpu_layout_cache_.offset_x = offsetX;
+  cpu_layout_cache_.offset_y = offsetY;
+  cpu_layout_cache_.has_black_bars = hasBlackBars;
+
+  if (ShouldLog(cpu_layout_recalc_log_count_, 5, 120)) {
+    LOGF(LOG_INFO,
+         "CPU layout recalculated: src=%{public}ux%{public}u dst=%{public}dx%{public}d "
+         "scaled=%{public}dx%{public}d off=%{public}d,%{public}d bars=%{public}d",
+         width, height, dstWidth, dstHeight, scaledWidth, scaledHeight,
+         offsetX, offsetY, hasBlackBars ? 1 : 0);
+  }
+}
+
+void VideoPipeline::MarkHardwarePathFailure(const char *reason) {
+  if (scaling_mode_.load(std::memory_order_acquire) !=
+      ScalingMode::HARDWARE_SCALING) {
+    return;
+  }
+
+  hw_failure_streak_ = std::min<uint32_t>(hw_failure_streak_ + 1, 100);
+  if (ShouldLog(hw_failure_log_count_, 5, 60)) {
+    LOGF(LOG_WARN,
+         "HW path failure: reason=%{public}s streak=%{public}u",
+         reason ? reason : "unknown", hw_failure_streak_);
+  }
+
+  if (hw_failure_streak_ >= 3) {
+    EnterDegradedMode(ScalingMode::HARDWARE_SCALING,
+                      reason ? reason : "hw_path_failed");
+    hw_failure_streak_ = 0;
+  }
+}
+
+void VideoPipeline::MarkHardwarePathRecovered(const char *reason) {
+  if (scaling_mode_.load(std::memory_order_acquire) !=
+      ScalingMode::HARDWARE_SCALING) {
+    return;
+  }
+  if (hw_failure_streak_ > 0 && ShouldLog(hw_failure_log_count_, 5, 60)) {
+    LOGF(LOG_INFO, "HW path recovered: reason=%{public}s",
+         reason ? reason : "unknown");
+  }
+  hw_failure_streak_ = 0;
+  SetRenderModeState(RenderModeState::HW_READY);
+}
+
+const char *VideoPipeline::RenderModeStateToString(RenderModeState state) {
+  switch (state) {
+  case RenderModeState::SW_READY:
+    return "sw_ready";
+  case RenderModeState::GLES_READY:
+    return "gles_ready";
+  case RenderModeState::HW_READY:
+    return "hw_ready";
+  case RenderModeState::DEGRADED_TO_SW:
+    return "degraded_to_sw";
+  case RenderModeState::RECOVERING:
+    return "recovering";
+  default:
+    return "unknown";
+  }
+}
+
+void VideoPipeline::SetRenderModeState(RenderModeState state) {
+  const int next = static_cast<int>(state);
+  const int prev = render_mode_state_.exchange(next, std::memory_order_acq_rel);
+  if (prev == next) {
+    return;
+  }
+
+  degrade_state_log_count_++;
+  if (degrade_state_log_count_ <= 5 || (degrade_state_log_count_ % 60) == 0) {
+    LOGF(LOG_INFO, "RenderModeState: %{public}s -> %{public}s",
+         RenderModeStateToString(static_cast<RenderModeState>(prev)),
+         RenderModeStateToString(state));
+  }
+}
+
+void VideoPipeline::EnterDegradedMode(ScalingMode sourceMode,
+                                      const char *reason) {
+#if defined(__i386__) || defined(__x86_64__)
+  // Windows 模拟器强制 GLES-only：禁止自动降级到软件路径。
+  if (sourceMode != ScalingMode::SOFTWARE_SCALING) {
+    if (ShouldLog(render_log_count_, 5, 60)) {
+      LOGF(LOG_WARN,
+           "Skip software degrade on x86: reason=%{public}s source=%{public}d",
+           reason ? reason : "unknown", static_cast<int>(sourceMode));
+    }
+    return;
+  }
+#endif
+  if (sourceMode == ScalingMode::SOFTWARE_SCALING) {
+    return;
+  }
+
+  degraded_from_mode_ = sourceMode;
+  if (scaling_mode_.load(std::memory_order_acquire) == sourceMode) {
+    scaling_mode_.store(ScalingMode::SOFTWARE_SCALING, std::memory_order_release);
+    geometry_changed_.store(true, std::memory_order_release);
+  }
+
+  degrade_recover_failures_ =
+      std::min<uint32_t>(degrade_recover_failures_ + 1, 100);
+  if (degrade_recover_failures_ >= 3) {
+    // Too many failed recoveries: keep software mode until next explicit switch.
+    degraded_from_mode_ = ScalingMode::SOFTWARE_SCALING;
+  }
+
+  const uint32_t level = std::min<uint32_t>(degrade_recover_failures_, 5);
+  const int cooldownMs = 3000 + static_cast<int>((level - 1) * 1000);
+  degrade_recover_after_ =
+      std::chrono::steady_clock::now() + std::chrono::milliseconds(cooldownMs);
+  SetRenderModeState(RenderModeState::DEGRADED_TO_SW);
+
+  if (ShouldLog(render_log_count_, 5, 60)) {
+    LOGF(LOG_WARN,
+         "Render degraded to software: reason=%{public}s source=%{public}d "
+         "failures=%{public}u recover_after_ms=%{public}d",
+         reason ? reason : "unknown", static_cast<int>(sourceMode),
+         degrade_recover_failures_, cooldownMs);
+  }
+}
+
+void VideoPipeline::MaybeRecoverDegradedMode(
+    ScalingMode &mode, const std::chrono::steady_clock::time_point &now) {
+  if (GetRenderModeState() != RenderModeState::DEGRADED_TO_SW) {
+    return;
+  }
+  if (mode != ScalingMode::SOFTWARE_SCALING) {
+    return;
+  }
+  if (degraded_from_mode_ == ScalingMode::SOFTWARE_SCALING) {
+    return;
+  }
+  if (now < degrade_recover_after_) {
+    return;
+  }
+  if (degrade_recover_attempts_ >= 5) {
+    return;
+  }
+
+  degrade_recover_attempts_++;
+  mode = degraded_from_mode_;
+  scaling_mode_.store(mode, std::memory_order_release);
+  geometry_changed_.store(true, std::memory_order_release);
+  if (mode == ScalingMode::GLES_SCALING) {
+    gles_state_ = GlesState::UNINITIALIZED;
+    gles_next_retry_time_ = std::chrono::steady_clock::time_point{};
+  }
+  SetRenderModeState(RenderModeState::RECOVERING);
+  if (ShouldLog(render_log_count_, 5, 60)) {
+    LOGF(LOG_INFO,
+         "Render recovery attempt: target_mode=%{public}d attempt=%{public}u",
+         static_cast<int>(mode), degrade_recover_attempts_);
+  }
+}
 
 void VideoPipeline::EnsureBackends() {
   if (!software_backend_) {
@@ -476,10 +801,8 @@ void VideoPipeline::EnsureWindowConfiguredIfNeeded(OHNativeWindow *window,
       state.usage = NATIVEBUFFER_USAGE_HW_TEXTURE;
 #endif
     } else if (isCpuWrite) {
-      state.usage = NATIVEBUFFER_USAGE_CPU_WRITE | NATIVEBUFFER_USAGE_HW_TEXTURE;
-      state.swap_interval = 1;
-      state.source_type = OH_SURFACE_SOURCE_GAME;
-      state.scaling_mode = OH_SCALING_MODE_SCALE_TO_WINDOW_V2;
+      // 软件渲染路径仅保留最小必要配置，降低 producer 状态异常风险。
+      state.usage = NATIVEBUFFER_USAGE_CPU_WRITE;
     }
 
     const auto result = window_state_manager_.Apply(window, state, LogOptFail);
@@ -493,7 +816,18 @@ void VideoPipeline::EnsureWindowConfiguredIfNeeded(OHNativeWindow *window,
     }
     if (!result.usage_ok || !result.swap_ok || !result.source_ok ||
         !result.scaling_ok) {
-      geometry_changed_.store(true);
+      // Do not force per-frame reconfiguration on optional opt failures.
+      // Continuous HandleOpt retries can destabilize producer/consumer state.
+      static uint32_t optPartialFailLogCount = 0;
+      optPartialFailLogCount++;
+      if (optPartialFailLogCount <= 5 || (optPartialFailLogCount % 120) == 0) {
+        LOGF(LOG_WARN,
+             "Window opts partial failure: usage=%{public}d swap=%{public}d "
+             "source=%{public}d scaling=%{public}d (geometry_ok=%{public}d)",
+             result.usage_ok ? 1 : 0, result.swap_ok ? 1 : 0,
+             result.source_ok ? 1 : 0, result.scaling_ok ? 1 : 0,
+             geometryOk ? 1 : 0);
+      }
     }
   }
 
@@ -514,82 +848,160 @@ VideoPipeline::RenderResult
 VideoPipeline::RenderGLES(OHNativeWindow *window, const void *data,
                           unsigned width, unsigned height, size_t pitch,
                           bool isDupeRequest) {
-  // 1. 处理 Surface Lost
+  const auto now = std::chrono::steady_clock::now();
+  auto scheduleRetry = [this, &now](size_t failures) {
+    int delayMs = 100;
+    if (failures > 3) {
+      delayMs = 1000;
+    } else if (failures > 1) {
+      delayMs = 300;
+    }
+    gles_next_retry_time_ = now + std::chrono::milliseconds(delayMs);
+  };
+  auto enterReady = [this]() {
+    gles_state_ = GlesState::READY;
+    gles_swap_fail_count_ = 0;
+    gles_surface_recreate_failures_ = 0;
+    gles_full_reinit_failures_ = 0;
+    last_gles_init_fail_time_ = std::chrono::steady_clock::time_point{};
+    gles_next_retry_time_ = std::chrono::steady_clock::time_point{};
+    gles_renderer_.SetXEngineEnabled(xengine_enabled_.load());
+    xengine_dirty_.store(false);
+    degrade_recover_failures_ = 0;
+    degrade_recover_attempts_ = 0;
+    SetRenderModeState(RenderModeState::GLES_READY);
+  };
+
+  if (!window) {
+    if (gles_state_ != GlesState::WAIT_WINDOW) {
+      gles_state_ = GlesState::WAIT_WINDOW;
+      if (ShouldLog(render_log_count_, 3, 60)) {
+        LOGF(LOG_WARN, "GLES entering WAIT_WINDOW (null window)");
+      }
+    }
+    drop_count_++;
+    return RenderResult::DROPPED;
+  }
+  if (gles_state_ == GlesState::WAIT_WINDOW) {
+    gles_state_ = GlesState::UNINITIALIZED;
+    gles_next_retry_time_ = std::chrono::steady_clock::time_point{};
+  }
+
+  if (gles_next_retry_time_.time_since_epoch().count() > 0 &&
+      now < gles_next_retry_time_) {
+    drop_count_++;
+    return RenderResult::DROPPED;
+  }
+
   if (gles_state_ == GlesState::SURFACE_LOST) {
-    if (!gles_renderer_.RecreateSurface(window)) {
+    gles_surface_recreate_attempts_++;
+    if (gles_renderer_.RecreateSurface(window)) {
+      if (ShouldLog(render_log_count_, 3, 60)) {
+        LOGF(LOG_INFO, "GLES surface recreate recovered: attempts=%{public}zu",
+             gles_surface_recreate_attempts_);
+      }
+      enterReady();
+    } else {
       gles_swap_fail_count_++;
-      if (gles_swap_fail_count_ <= 5 || (gles_swap_fail_count_ % 60) == 0) {
-        LOGF(LOG_WARN, "GLES surface recreate failed (count=%{public}u)",
-             gles_swap_fail_count_);
+      gles_surface_recreate_failures_++;
+      scheduleRetry(gles_surface_recreate_failures_);
+      if (gles_surface_recreate_failures_ >= 3) {
+        gles_state_ = GlesState::UNINITIALIZED;
+        if (ShouldLog(render_log_count_, 3, 30)) {
+          LOGF(LOG_WARN,
+               "GLES surface recreate escalate to full reinit: fail=%{public}zu",
+               gles_surface_recreate_failures_);
+        }
+      } else if (ShouldLog(render_log_count_, 3, 60)) {
+        LOGF(LOG_WARN, "GLES surface recreate failed: fail=%{public}zu",
+             gles_surface_recreate_failures_);
       }
       drop_count_++;
       return RenderResult::DROPPED;
     }
-    gles_state_ = GlesState::READY;
   }
 
-  // 2. 初始化 (如果需要)
-  if (gles_state_ == GlesState::UNINITIALIZED) {
-    // Retry cooldown (2 seconds)
-    auto now = std::chrono::steady_clock::now();
-    if (last_gles_init_fail_time_.time_since_epoch().count() > 0) {
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_gles_init_fail_time_).count();
-        if (elapsed < 2) {
-             drop_count_++;
-             return RenderResult::DROPPED;
-        }
-    }
-
+  if (gles_state_ == GlesState::CONTEXT_LOST ||
+      gles_state_ == GlesState::UNINITIALIZED) {
+    gles_full_reinit_attempts_++;
+    gles_renderer_.Deinit();
     if (gles_renderer_.Init(window)) {
-      gles_state_ = GlesState::READY;
-      gles_swap_fail_count_ = 0;
-      last_gles_init_fail_time_ = std::chrono::steady_clock::time_point{};
-      gles_renderer_.SetXEngineEnabled(xengine_enabled_.load());
-      xengine_dirty_.store(false);
+      if (ShouldLog(render_log_count_, 3, 30)) {
+        LOGF(LOG_INFO,
+             "GLES full reinit recovered: attempts=%{public}zu fail=%{public}zu",
+             gles_full_reinit_attempts_, gles_full_reinit_failures_);
+      }
+      enterReady();
     } else {
-      LOGF(LOG_ERROR, "GLES Init failed, will retry later");
-      gles_state_ = GlesState::UNINITIALIZED;
+      gles_full_reinit_failures_++;
+      gles_swap_fail_count_++;
       last_gles_init_fail_time_ = now;
+      gles_state_ = GlesState::UNINITIALIZED;
+      scheduleRetry(gles_full_reinit_failures_);
+      if (gles_full_reinit_failures_ >= 5) {
+        gles_auto_degrade_count_++;
+        EnterDegradedMode(ScalingMode::GLES_SCALING, "gles_full_reinit_failed");
+        gles_state_ = GlesState::FATAL;
+      }
+      if (ShouldLog(render_log_count_, 3, 30)) {
+        LOGF(LOG_ERROR, "GLES full reinit failed: fail=%{public}zu",
+             gles_full_reinit_failures_);
+      }
       drop_count_++;
       return RenderResult::DROPPED;
     }
   }
 
-  // 3. 处理 XEngine 开关更新
+  if (gles_state_ == GlesState::FATAL) {
+    if (ShouldLog(render_log_count_, 3, 120)) {
+      LOGF(LOG_WARN, "GLES in FATAL state, dropping frame");
+    }
+    drop_count_++;
+    return RenderResult::DROPPED;
+  }
+
   if (xengine_dirty_.exchange(false)) {
     gles_renderer_.SetXEngineEnabled(xengine_enabled_.load());
   }
 
-  // 4. 渲染
-  if (gles_state_ == GlesState::READY) {
-    float aspect = geometry_aspect_ratio_;
-    if (!(aspect > 0.0f) && geometry_base_width_ > 0 &&
-        geometry_base_height_ > 0) {
-      aspect = static_cast<float>(geometry_base_width_) /
-               static_cast<float>(geometry_base_height_);
-    }
-
-    gles_renderer_.Render(data, width, height, pitch, pixel_format_, aspect, isDupeRequest);
-
-    // 检查健康状态 (Swap 失败检测)
-    if (!gles_renderer_.IsHealthy()) {
-      gles_swap_fail_count_++;
-      if (gles_swap_fail_count_ <= 5 || (gles_swap_fail_count_ % 60) == 0) {
-        LOGF(LOG_WARN,
-             "GLES swap unhealthy (count=%{public}u), mark surface lost",
-             gles_swap_fail_count_);
-      }
-      gles_state_ = GlesState::SURFACE_LOST;
-      drop_count_++;
-      return RenderResult::DROPPED;
-    }
-
-    frame_count_++;
-    return isDupeRequest ? RenderResult::DUPED : RenderResult::RENDERED;
+  if (gles_state_ != GlesState::READY) {
+    drop_count_++;
+    return RenderResult::DROPPED;
   }
 
-  drop_count_++;
-  return RenderResult::DROPPED;
+  float aspect = geometry_aspect_ratio_;
+  if (!(aspect > 0.0f) && geometry_base_width_ > 0 &&
+      geometry_base_height_ > 0) {
+    aspect = static_cast<float>(geometry_base_width_) /
+             static_cast<float>(geometry_base_height_);
+  }
+
+  gles_renderer_.Render(data, width, height, pitch, pixel_format_, aspect,
+                        isDupeRequest);
+
+  if (!gles_renderer_.IsHealthy()) {
+    gles_swap_fail_count_++;
+    const auto kind = gles_renderer_.GetLastSwapFailureKind();
+    const EGLint err = gles_renderer_.GetLastEglError();
+    if (kind == GLESRenderer::SwapFailureKind::CONTEXT_LOST) {
+      gles_state_ = GlesState::CONTEXT_LOST;
+    } else {
+      gles_state_ = GlesState::SURFACE_LOST;
+    }
+    scheduleRetry(gles_swap_fail_count_);
+    if (ShouldLog(render_log_count_, 3, 60)) {
+      LOGF(LOG_WARN,
+           "GLES unhealthy: kind=%{public}d err=0x%{public}X fail=%{public}u",
+           static_cast<int>(kind), static_cast<unsigned>(err),
+           gles_swap_fail_count_);
+    }
+    drop_count_++;
+    return RenderResult::DROPPED;
+  }
+
+  frame_count_++;
+  SetRenderModeState(RenderModeState::GLES_READY);
+  return isDupeRequest ? RenderResult::DUPED : RenderResult::RENDERED;
 }
 
 VideoPipeline::RenderResult
@@ -597,6 +1009,19 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
                          unsigned width, unsigned height, size_t pitch,
                          bool isDupeRequest, RenderMetrics *m,
                          const std::chrono::steady_clock::time_point &start) {
+  if (!window) {
+    return RenderResult::DROPPED;
+  }
+  OH_NativeWindow_NativeObjectReference(window);
+  struct WindowRefGuard {
+    OHNativeWindow *window = nullptr;
+    ~WindowRefGuard() {
+      if (window) {
+        OH_NativeWindow_NativeObjectUnreference(window);
+      }
+    }
+  } windowGuard{window};
+
   // 2. CPU 渲染路径 (Hardware/Software Scaling)
   auto t_start = std::chrono::steady_clock::now();
   OHNativeWindowBuffer *buffer = nullptr;
@@ -606,8 +1031,12 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
       OH_NativeWindow_NativeWindowRequestBuffer(window, &buffer, &fenceFd);
   
   auto t_req = std::chrono::steady_clock::now();
+  const int64_t requestUs = std::chrono::duration_cast<std::chrono::microseconds>(
+                                t_req - t_start)
+                                .count();
 
   if (ret != 0 || !buffer) {
+    UpdateCpuBackpressure(requestUs, true);
     m->nwRequestBufferFailures++;
     drop_count_++;
     if (drop_count_ % 60 == 0 || drop_count_ < 5) {
@@ -621,11 +1050,10 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
       m->nwAbortBufferCalls++;
       OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
     }
-    if (ret != NATIVE_ERROR_NO_BUFFER) {
-      geometry_changed_.store(true);
-    }
+    // Avoid forcing per-frame HandleOpt retries on transient queue pressure.
     return RenderResult::DROPPED;
   }
+  UpdateCpuBackpressure(requestUs, false);
 
   // 2.5 等待 Fence
   if (fenceFd >= 0) {
@@ -647,7 +1075,6 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
 
       m->nwAbortBufferCalls++;
       OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
-      geometry_changed_.store(true);
       drop_count_++;
       return RenderResult::DROPPED;
     }
@@ -675,7 +1102,6 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     if (nativeBuffer) {
       OH_NativeBuffer_Unreference(nativeBuffer);
     }
-    geometry_changed_.store(true);
     drop_count_++;
     return RenderResult::DROPPED;
   }
@@ -683,11 +1109,73 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
   auto t4 = std::chrono::steady_clock::now();
 
   // 获取 Buffer 实际尺寸
-  OH_NativeBuffer_Config config;
+  OH_NativeBuffer_Config config{};
+  // HarmonyOS NDK 当前签名为 void，直接读取结构体并校验字段。
   OH_NativeBuffer_GetConfig(nativeBuffer, &config);
+  if (config.width <= 0 || config.height <= 0 || config.stride <= 0) {
+    m->nwAbortBufferCalls++;
+    (void)OH_NativeBuffer_Unmap(nativeBuffer);
+    OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
+    OH_NativeBuffer_Unreference(nativeBuffer);
+    drop_count_++;
+    if (ShouldLog(render_log_count_, 5, 60)) {
+      LOGF(LOG_ERROR,
+           "Invalid NativeBuffer config: w=%{public}d h=%{public}d stride=%{public}d",
+           config.width, config.height, config.stride);
+    }
+    return RenderResult::DROPPED;
+  }
+
   int32_t dstWidth = config.width;
   int32_t dstHeight = config.height;
-  int32_t stride = config.stride;
+  int32_t strideBytes = config.stride;
+  constexpr int32_t kBytesPerPixel = 4;
+  if (strideBytes < dstWidth * kBytesPerPixel) {
+    // Defensive fallback: some runtimes may report stride in pixels.
+    if (strideBytes >= dstWidth) {
+      const int64_t converted =
+          static_cast<int64_t>(strideBytes) * kBytesPerPixel;
+      if (converted > std::numeric_limits<int32_t>::max()) {
+        m->nwAbortBufferCalls++;
+        (void)OH_NativeBuffer_Unmap(nativeBuffer);
+        OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
+        OH_NativeBuffer_Unreference(nativeBuffer);
+        drop_count_++;
+        if (ShouldLog(render_log_count_, 5, 60)) {
+          LOGF(LOG_ERROR,
+               "NativeBuffer stride overflow: raw=%{public}d width=%{public}d",
+               config.stride, config.width);
+        }
+        return RenderResult::DROPPED;
+      }
+      strideBytes = static_cast<int32_t>(converted);
+    } else {
+      m->nwAbortBufferCalls++;
+      (void)OH_NativeBuffer_Unmap(nativeBuffer);
+      OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
+      OH_NativeBuffer_Unreference(nativeBuffer);
+      drop_count_++;
+      if (ShouldLog(render_log_count_, 5, 60)) {
+        LOGF(LOG_ERROR,
+             "NativeBuffer stride too small: raw=%{public}d width=%{public}d",
+             config.stride, config.width);
+      }
+      return RenderResult::DROPPED;
+    }
+  }
+  if ((strideBytes % kBytesPerPixel) != 0) {
+    m->nwAbortBufferCalls++;
+    (void)OH_NativeBuffer_Unmap(nativeBuffer);
+    OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
+    OH_NativeBuffer_Unreference(nativeBuffer);
+    drop_count_++;
+    if (ShouldLog(render_log_count_, 5, 60)) {
+      LOGF(LOG_ERROR,
+           "NativeBuffer stride not aligned: raw=%{public}d bytes=%{public}d",
+           config.stride, strideBytes);
+    }
+    return RenderResult::DROPPED;
+  }
 
   bool destIsBgra = false;
 #if defined(NATIVEBUFFER_PIXEL_FMT_RGBA_8888) &&                               \
@@ -703,47 +1191,22 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     OH_NativeBuffer_Unmap(nativeBuffer);
     OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
     OH_NativeBuffer_Unreference(nativeBuffer);
-    geometry_changed_.store(true);
     drop_count_++;
     return RenderResult::DROPPED;
   }
 #endif
 
-  // 4. 计算缩放并转换
-  float srcAspect = geometry_aspect_ratio_;
-  if (!(srcAspect > 0.0f) && geometry_base_width_ > 0 &&
-      geometry_base_height_ > 0) {
-    srcAspect = static_cast<float>(geometry_base_width_) /
-                static_cast<float>(geometry_base_height_);
-  }
-  if (!(srcAspect > 0.0f)) {
-    srcAspect = static_cast<float>(width) / static_cast<float>(height);
-  }
-
-  const float dstAspect =
-      static_cast<float>(dstWidth) / static_cast<float>(dstHeight);
-  int scaledWidth = dstWidth;
-  int scaledHeight = dstHeight;
-  if (dstAspect > srcAspect) {
-    scaledWidth = static_cast<int>(static_cast<float>(dstHeight) * srcAspect);
-    scaledHeight = dstHeight;
-  } else if (dstAspect < srcAspect) {
-    scaledWidth = dstWidth;
-    scaledHeight = static_cast<int>(static_cast<float>(dstWidth) / srcAspect);
-  }
-
-  if (scaledWidth < 1)
-    scaledWidth = 1;
-  if (scaledHeight < 1)
-    scaledHeight = 1;
-  int offsetX = (dstWidth - scaledWidth) / 2;
-  int offsetY = (dstHeight - scaledHeight) / 2;
+  // 4. 计算缩放并转换（仅在关键尺寸/宽高比变化时重算）
+  EnsureCpuLayout(width, height, dstWidth, dstHeight);
+  const int scaledWidth = cpu_layout_cache_.scaled_width;
+  const int scaledHeight = cpu_layout_cache_.scaled_height;
+  const int offsetX = cpu_layout_cache_.offset_x;
+  const int offsetY = cpu_layout_cache_.offset_y;
 
   // 清空背景 (如果有黑边)
   uint8_t *dst = static_cast<uint8_t *>(addr);
-  const int32_t dstStridePixels = stride / 4;
-  if (!(offsetX == 0 && offsetY == 0 && scaledWidth == dstWidth &&
-        scaledHeight == dstHeight)) {
+  const int32_t dstStridePixels = strideBytes / kBytesPerPixel;
+  if (cpu_layout_cache_.has_black_bars) {
     uint32_t *dst32 = reinterpret_cast<uint32_t *>(dst);
     const uint32_t black = 0xFF000000u;
 
@@ -783,7 +1246,9 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
   }
 
   uint32_t *destRegion =
-      reinterpret_cast<uint32_t *>(dst + offsetY * stride) + offsetX;
+      reinterpret_cast<uint32_t *>(
+          dst + static_cast<size_t>(offsetY) * static_cast<size_t>(strideBytes)) +
+      offsetX;
 
   PixelFormat srcFormat;
   switch (pixel_format_) {
@@ -821,8 +1286,7 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
       const uint32_t n = slowConvLogCount.fetch_add(1) + 1;
       if (n <= 5 || (n % 60) == 0) {
         const bool hasBlackBars =
-            !(offsetX == 0 && offsetY == 0 && scaledWidth == dstWidth &&
-              scaledHeight == dstHeight);
+            cpu_layout_cache_.has_black_bars;
         LOGF(LOG_WARN,
              "SlowConv: conv=%{public}lldus mode=%{public}d "
              "src=%{public}ux%{public}u pitch=%{public}zu fmt=%{public}d "
@@ -830,7 +1294,7 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
              "scaled=%{public}dx%{public}d off=%{public}d,%{public}d "
              "bars=%{public}d bgra=%{public}d",
              convUsNow, static_cast<int>(scaling_mode_.load()), width, height,
-             pitch, config.format, dstWidth, dstHeight, stride, scaledWidth,
+             pitch, config.format, dstWidth, dstHeight, strideBytes, scaledWidth,
              scaledHeight, offsetX, offsetY, hasBlackBars ? 1 : 0,
              destIsBgra ? 1 : 0);
       }
@@ -845,13 +1309,13 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     m->nwAbortBufferCalls++;
     OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
     OH_NativeBuffer_Unreference(nativeBuffer);
-    geometry_changed_.store(true);
     drop_count_++;
     return RenderResult::DROPPED;
   }
-  OH_NativeBuffer_Unreference(nativeBuffer);
 
   // 5. 提交
+  // Use API default full-dirty region (rects=nullptr, rectNumber=0).
+  // This avoids passing transient stack rect pointers into vendor surface cache.
   ::Region region{nullptr, 0};
   m->nwFlushBufferCalls++;
   ret =
@@ -866,10 +1330,11 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     }
     m->nwAbortBufferCalls++;
     OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
-    geometry_changed_.store(true);
+    OH_NativeBuffer_Unreference(nativeBuffer);
     drop_count_++;
     return RenderResult::DROPPED;
   }
+  OH_NativeBuffer_Unreference(nativeBuffer);
 
   // Check total time and log breakdown if slow (> 20ms)
   long long totalUs =
@@ -895,14 +1360,14 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
   }
 
   if (frame_count_ % 60 == 0) {
-    long long totalUs =
+    long long perfTotalUs =
         std::chrono::duration_cast<std::chrono::microseconds>(t6 - start)
             .count();
     long long convUs =
         std::chrono::duration_cast<std::chrono::microseconds>(t5 - t4).count();
     LOGF(LOG_INFO,
          "Perf: Total=%{public}lld us, Conv=%{public}lld us, Mode=%{public}d",
-         totalUs, convUs, static_cast<int>(scaling_mode_.load()));
+         perfTotalUs, convUs, static_cast<int>(scaling_mode_.load()));
   }
   frame_count_++;
   return isDupeRequest ? RenderResult::DUPED : RenderResult::RENDERED;
@@ -921,9 +1386,7 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
   }
 
   auto Finish = [&](RenderResult r) {
-    if (r == RenderResult::DROPPED) {
-      framePacer_.EndFrame();
-    }
+    framePacer_.EndFrame();
     if (m) {
       m->frameTimeUs = static_cast<uint64_t>(
           std::chrono::duration_cast<std::chrono::microseconds>(
@@ -933,25 +1396,39 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
     return r;
   };
 
-  if (!window) {
-    m->nwRequestBufferFailures++;
-    drop_count_++;
-    if (drop_count_ % 60 == 0 || drop_count_ < 5) {
-      LOGF(LOG_WARN, "Frame dropped (null window): drops=%{public}zu",
-           drop_count_);
-    }
-    return Finish(RenderResult::DROPPED);
-  }
-
   if (!data) {
     return Finish(RenderResult::RENDERED); // Null frame is considered "rendered" (no-op)
   }
 
+  ScalingMode mode = scaling_mode_.load();
+#if defined(__i386__) || defined(__x86_64__)
+  if (mode != ScalingMode::GLES_SCALING) {
+    mode = ScalingMode::GLES_SCALING;
+    scaling_mode_.store(mode, std::memory_order_release);
+    geometry_changed_.store(true, std::memory_order_release);
+  }
+#endif
+  const auto now = std::chrono::steady_clock::now();
+  MaybeRecoverDegradedMode(mode, now);
+  const bool isDupeRequest = (data == RETRO_HW_FRAME_BUFFER_VALID); // Simplified
+  const auto preflightReason =
+      EvaluateRenderPreflight(window, width, height, pitch, mode, isDupeRequest);
+  if (preflightReason != PreflightDropReason::NONE) {
+    if (preflightReason == PreflightDropReason::NULL_WINDOW) {
+      m->nwRequestBufferFailures++;
+    }
+    drop_count_++;
+    if (ShouldLog(preflight_drop_log_count_, 5, 120)) {
+      LOGF(LOG_WARN, "Frame dropped (preflight=%{public}s): mode=%{public}d "
+                     "frame=%{public}ux%{public}u pitch=%{public}zu",
+           PreflightDropReasonToString(preflightReason),
+           static_cast<int>(mode), width, height, pitch);
+    }
+    return Finish(RenderResult::DROPPED);
+  }
+
   EnsureBackends();
   EnsureWindowConfiguredIfNeeded(window, width, height);
-
-  ScalingMode mode = scaling_mode_.load();
-  bool isDupeRequest = (data == RETRO_HW_FRAME_BUFFER_VALID); // Simplified
 
   // ... Render implementation ...
   RenderResult result = RenderResult::DROPPED;
@@ -965,6 +1442,9 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
       gles_state_ = GlesState::UNINITIALIZED;
     }
     gles_swap_fail_count_ = 0;
+    gles_surface_recreate_failures_ = 0;
+    gles_full_reinit_failures_ = 0;
+    gles_next_retry_time_ = std::chrono::steady_clock::time_point{};
 
     result = software_backend_->RenderFrame(window, data, width, height, pitch,
                                             isDupeRequest, m, start);
@@ -974,6 +1454,20 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
     // Additional sleep for software mode if needed? 
     // Usually CPU render takes enough time, but maybe not.
     // FramePacer handles it if we call EndFrame() for RENDERED too, but for now only for DROPPED.
+  }
+
+  if (result != RenderResult::DROPPED) {
+    if (mode == ScalingMode::GLES_SCALING) {
+      SetRenderModeState(RenderModeState::GLES_READY);
+    } else if (mode == ScalingMode::HARDWARE_SCALING) {
+      SetRenderModeState(RenderModeState::HW_READY);
+    } else {
+      const auto state = GetRenderModeState();
+      if (state != RenderModeState::DEGRADED_TO_SW &&
+          state != RenderModeState::RECOVERING) {
+        SetRenderModeState(RenderModeState::SW_READY);
+      }
+    }
   }
 
   return Finish(result);
@@ -1006,6 +1500,7 @@ bool VideoPipeline::InitializeHardwareRendererImpl(OHNativeWindow *window,
     if (sameWindowReady) {
       UpdateVulkanPresenterContent(env_state, &runtime);
       SyncVulkanSwapchainState(env_state);
+      MarkHardwarePathRecovered("hw_vk_same_window_ready");
       return true;
     }
 
@@ -1015,6 +1510,7 @@ bool VideoPipeline::InitializeHardwareRendererImpl(OHNativeWindow *window,
 
     if (!vulkan_context_->Initialize(window, env_state)) {
       DestroyHardwareRendererImpl(env_state);
+      MarkHardwarePathFailure("hw_vk_context_init_failed");
       return false;
     }
 
@@ -1028,16 +1524,19 @@ bool VideoPipeline::InitializeHardwareRendererImpl(OHNativeWindow *window,
 
     if (!vulkan_presenter_->Initialize(*vulkan_context_)) {
       DestroyHardwareRendererImpl(env_state);
+      MarkHardwarePathFailure("hw_vk_presenter_init_failed");
       return false;
     }
 
     UpdateVulkanPresenterContent(env_state, &runtime);
     if (!SyncVulkanSwapchainState(env_state)) {
       DestroyHardwareRendererImpl(env_state);
+      MarkHardwarePathFailure("hw_vk_sync_swapchain_failed");
       return false;
     }
 
     LOGF(LOG_INFO, " [Vulkan] Hardware Renderer Initialized");
+    MarkHardwarePathRecovered("hw_vk_initialized");
     if (cb.context_reset) {
       cb.context_reset();
     }
@@ -1081,6 +1580,7 @@ bool VideoPipeline::InitializeHardwareRendererImpl(OHNativeWindow *window,
              targetW, targetH);
       }
     }
+    MarkHardwarePathRecovered("hw_egl_same_window_ready");
     return true;
   }
 
@@ -1092,6 +1592,7 @@ bool VideoPipeline::InitializeHardwareRendererImpl(OHNativeWindow *window,
 
   const bool hadContext = graphics_context_->HasContext();
   if (!graphics_context_->Initialize(window, config)) {
+    MarkHardwarePathFailure("hw_egl_context_init_failed");
     return false;
   }
 
@@ -1127,6 +1628,7 @@ bool VideoPipeline::InitializeHardwareRendererImpl(OHNativeWindow *window,
     cb.context_reset();
   }
 
+  MarkHardwarePathRecovered("hw_egl_initialized");
   return true;
 }
 
@@ -1203,6 +1705,7 @@ void VideoPipeline::SwapHardwareBuffersImpl(EnvState &env_state) {
   if (cb.context_type == RETRO_HW_CONTEXT_VULKAN) {
     if (!vulkan_context_ || !vulkan_context_->IsReady() || !vulkan_presenter_ ||
         !vulkan_presenter_->IsReady()) {
+      MarkHardwarePathFailure("hw_vk_not_ready");
       return;
     }
     if (!vulkan_presenter_->Present()) {
@@ -1217,15 +1720,24 @@ void VideoPipeline::SwapHardwareBuffersImpl(EnvState &env_state) {
           if (ShouldLog(vk_present_fail_count_, 3, 60)) {
             LOGF(LOG_WARN, "Vulkan swapchain recreate failed (present)");
           }
+          MarkHardwarePathFailure("hw_vk_recreate_failed");
+        } else {
+          MarkHardwarePathRecovered("hw_vk_recreate_ok");
         }
-      } else if (ShouldLog(vk_present_fail_count_, 3, 60)) {
-        LOGF(LOG_WARN, "Vulkan present failed");
+      } else {
+        if (ShouldLog(vk_present_fail_count_, 3, 60)) {
+          LOGF(LOG_WARN, "Vulkan present failed");
+        }
+        MarkHardwarePathFailure("hw_vk_present_failed");
       }
+    } else {
+      MarkHardwarePathRecovered("hw_vk_present_ok");
     }
     return;
   }
 
   if (!graphics_context_ || !graphics_context_->IsReady()) {
+    MarkHardwarePathFailure("hw_egl_not_ready");
     return;
   }
   static bool logged = false;
@@ -1249,7 +1761,11 @@ void VideoPipeline::SwapHardwareBuffersImpl(EnvState &env_state) {
     }
     hw_presenter_->Present(windowW, windowH, aspect, contentW, contentH);
   }
-  graphics_context_->SwapBuffers();
+  if (!graphics_context_->SwapBuffers()) {
+    MarkHardwarePathFailure("hw_egl_swap_failed");
+  } else {
+    MarkHardwarePathRecovered("hw_egl_swap_ok");
+  }
 }
 
 void VideoPipeline::OnHardwareWindowResized(OHNativeWindow *window, int width,
@@ -1263,17 +1779,26 @@ void VideoPipeline::OnHardwareWindowResizedImpl(OHNativeWindow *window, int widt
   const auto &cb = env_state.GetHwRenderCallback();
   if (cb.context_type == RETRO_HW_CONTEXT_VULKAN) {
     if (!vulkan_context_ || !vulkan_context_->IsReady()) {
+      MarkHardwarePathFailure("hw_vk_resize_not_ready");
       return;
     }
-    RecreateVulkanSwapchain(window, width, height, env_state, false);
+    if (!RecreateVulkanSwapchain(window, width, height, env_state, false)) {
+      MarkHardwarePathFailure("hw_vk_resize_recreate_failed");
+    } else {
+      MarkHardwarePathRecovered("hw_vk_resize_ok");
+    }
     return;
   }
   if (!graphics_context_ || !graphics_context_->HasContext() || !window) {
+    MarkHardwarePathFailure("hw_egl_resize_invalid");
     return;
   }
   if (!graphics_context_->UpdateSurface(window)) {
     LOGF(LOG_WARN, "HW render UpdateSurface failed on resize");
+    MarkHardwarePathFailure("hw_egl_resize_update_failed");
     DestroyHardwareRendererImpl(env_state);
+  } else {
+    MarkHardwarePathRecovered("hw_egl_resize_ok");
   }
 }
 
@@ -1363,7 +1888,10 @@ bool VideoPipeline::HandleVulkanAcquireImpl(
       vulkan_presenter_->ShouldRecreateSwapchain()) {
     int windowW = window_width_.load();
     int windowH = window_height_.load();
-    RecreateVulkanSwapchain(window, windowW, windowH, env_state, false);
+    if (!RecreateVulkanSwapchain(window, windowW, windowH, env_state, false)) {
+      MarkHardwarePathFailure("hw_vk_acquire_recreate_failed");
+      return false;
+    }
   }
 
   if (on_acquire_begin) {
@@ -1392,6 +1920,7 @@ bool VideoPipeline::HandleVulkanAcquireImpl(
     int windowW = window_width_.load();
     int windowH = window_height_.load();
     RecreateVulkanSwapchain(window, windowW, windowH, env_state, true);
+    MarkHardwarePathFailure("hw_vk_acquire_out_of_date");
     if (on_acquire_end) {
       on_acquire_end();
     }
@@ -1404,6 +1933,7 @@ bool VideoPipeline::HandleVulkanAcquireImpl(
     if (on_acquire_end) {
       on_acquire_end();
     }
+    MarkHardwarePathFailure("hw_vk_acquire_failed");
     return false;
   }
 
@@ -1416,6 +1946,7 @@ bool VideoPipeline::HandleVulkanAcquireImpl(
   if (on_acquire_end) {
     on_acquire_end();
   }
+  MarkHardwarePathRecovered("hw_vk_acquire_ok");
   return true;
 }
 

@@ -26,6 +26,17 @@ WindowStateManager::ApplyResult WindowStateManager::Apply(
     return result;
   }
 
+  const bool unchanged = has_state_ &&
+                         last_state_.width == state.width &&
+                         last_state_.height == state.height &&
+                         last_state_.usage == state.usage &&
+                         last_state_.swap_interval == state.swap_interval &&
+                         last_state_.source_type == state.source_type &&
+                         last_state_.scaling_mode == state.scaling_mode;
+  if (unchanged) {
+    return result;
+  }
+
   if (state.width > 0 && state.height > 0) {
     const int32_t err = OH_NativeWindow_NativeWindowHandleOpt(
         window, SET_BUFFER_GEOMETRY, state.width, state.height);

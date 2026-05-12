@@ -54,14 +54,24 @@ bool TempFileManager::WriteTempRom(const std::string& rawfilePath, const std::ve
 }
 
 bool TempFileManager::WriteDependencyFile(const std::string& relativePath, const std::string& parentTempDir, const std::vector<uint8_t>& data) {
-    if (parentTempDir.empty()) {
+    if (parentTempDir.empty() || relativePath.empty()) {
+        return false;
+    }
+
+    if (relativePath.find("..") != std::string::npos) {
+        LOGF(LOG_ERROR, "Path traversal detected in dependency path: %{public}s", relativePath.c_str());
         return false;
     }
 
     std::string fullPath = parentTempDir + "/" + relativePath;
     
     // Ensure parent directory of the dependency exists (handling subdirectories in relativePath)
-    std::string dirName = fullPath.substr(0, fullPath.find_last_of('/'));
+    size_t lastSlash = fullPath.find_last_of('/');
+    if (lastSlash == std::string::npos) {
+        LOGF(LOG_ERROR, "No directory separator in path: %{public}s", fullPath.c_str());
+        return false;
+    }
+    std::string dirName = fullPath.substr(0, lastSlash);
     if (!common::EnsureDirExists(dirName)) {
         LOGF(LOG_ERROR, "Failed to create dependency directory: %{public}s", dirName.c_str());
         return false;

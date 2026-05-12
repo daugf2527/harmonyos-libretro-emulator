@@ -35,7 +35,41 @@ constexpr const char *kAudioChainPrefix = "[AUD][CHAIN]";
 constexpr const char *kAudioDiagPrefix = "[AUDIO_DIAG]";
 }
 
+const char *AudioBridge::AudioRunStateToString(AudioRunState state) {
+  switch (state) {
+  case AudioRunState::INIT:
+    return "init";
+  case AudioRunState::BUFFERING:
+    return "buffering";
+  case AudioRunState::RUNNING:
+    return "running";
+  case AudioRunState::PAUSED:
+    return "paused";
+  case AudioRunState::RECOVERING:
+    return "recovering";
+  default:
+    return "unknown";
+  }
+}
+
+void AudioBridge::SetRunState(AudioRunState state, const char *reason) {
+  const int next = static_cast<int>(state);
+  const int prev = run_state_.exchange(next, std::memory_order_acq_rel);
+  if (prev == next) {
+    return;
+  }
+  run_state_log_count_++;
+  if (run_state_log_count_ <= 5 || (run_state_log_count_ % 120) == 0) {
+    LOGF(LOG_INFO,
+         "%{public}s AudioRunState: %{public}s -> %{public}s (%{public}s)",
+         kAudioChainPrefix, AudioRunStateToString(static_cast<AudioRunState>(prev)),
+         AudioRunStateToString(state), reason ? reason : "no_reason");
+  }
+}
+
 AudioBridge::AudioBridge() {
+  run_state_.store(static_cast<int>(AudioRunState::INIT),
+                   std::memory_order_release);
   LOGF(LOG_INFO, "%{public}s AudioBridge created", kAudioChainPrefix);
 }
 
@@ -83,6 +117,7 @@ AudioBridge::~AudioBridge() {
     }
     audio_player_->Stop();
   }
+  SetRunState(AudioRunState::PAUSED, "destructor");
 
   LOGF(LOG_INFO, "%{public}s AudioBridge destroyed", kAudioChainPrefix);
 }
@@ -136,6 +171,11 @@ bool AudioBridge::Start() {
   if (is_started_) {
     running_.store(true,
                    std::memory_order_release); // 确保 WriteWait 可以写入数据
+    if (audio_player_ && audio_player_->IsPlaying()) {
+      SetRunState(AudioRunState::RUNNING, "start_already_playing");
+    } else {
+      SetRunState(AudioRunState::BUFFERING, "start_already_started");
+    }
     LOGF(LOG_INFO,
          "%{public}s AudioBridge already started, running_ reset to true",
          kAudioChainPrefix);
@@ -163,11 +203,14 @@ bool AudioBridge::Start() {
            kAudioChainPrefix, available_frames);
       if (audio_player_->Start()) {
         buffering_ = false;
+        recover_streak_ = 0;
+        SetRunState(AudioRunState::RUNNING, "start_buffer_ready");
         return true;
       }
     } else {
       // 数据不足，进入缓冲状态
       buffering_ = true;
+      SetRunState(AudioRunState::BUFFERING, "start_buffering");
       LOGF(LOG_INFO,
            "%{public}s AudioBridge starting (buffering... need %{public}zu, has "
            "%{public}zu frames)",
@@ -176,6 +219,7 @@ bool AudioBridge::Start() {
     }
   }
 
+  SetRunState(AudioRunState::RECOVERING, "start_failed");
   return false;
 }
 
@@ -223,6 +267,13 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
            kAudioChainPrefix, data, frames);
     }
     return 0;
+  }
+
+  if (audio_player_) {
+    audio_player_->ProcessPendingInterruptActions();
+    if (audio_player_->IsPlaying()) {
+      SetRunState(AudioRunState::RUNNING, "interrupt_processed_playing");
+    }
   }
   
   // 1.5 Bypass 重采样 (如果采样率相同)
@@ -318,9 +369,20 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
   }
   float usage_after = buffer_ref ? buffer_ref->GetUsage() : 0.0f;
   if (!success) {
+    recover_streak_ = std::min<uint32_t>(recover_streak_ + 1, 100);
+    SetRunState(AudioRunState::RECOVERING, "producer_write_failed");
     LOGF(LOG_WARN,
          "%{public}s %{public}s producer drop: write failed (blocking=%{public}d)",
          kAudioChainPrefix, kAudioDiagPrefix, should_block ? 1 : 0);
+  } else {
+    if (recover_streak_ > 0) {
+      recover_streak_--;
+    }
+    if (buffering_snapshot) {
+      SetRunState(AudioRunState::BUFFERING, "producer_buffering");
+    } else {
+      SetRunState(AudioRunState::RUNNING, "producer_success");
+    }
   }
 
   // [DEBUG] 采样生产日志 (每300次调用打印一次，避免刷屏)
@@ -425,6 +487,8 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
         if (audio_player_ && buffering_) {
           if (audio_player_->Start()) {
             buffering_ = false;
+            recover_streak_ = 0;
+            SetRunState(AudioRunState::RUNNING, "buffering_complete");
           }
         }
       }
@@ -444,6 +508,8 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
     running_.store(true, std::memory_order_release);
     buffering_ = false;
     is_started_ = false;
+    recover_streak_ = 0;
+    SetRunState(AudioRunState::INIT, "initialize_reuse");
     if (ring_buffer_) {
       ring_buffer_->Clear();
     }
@@ -465,9 +531,9 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   // 使用新的 RingBuffer (传入 Samples)
   ring_buffer_ = std::make_unique<RingBuffer>(buffer_capacity_samples);
 
-  // 设定最小缓冲帧数 (64ms, 约2-4帧视频，优先保证低延迟)
-  // 虽然这可能导致启动瞬间的轻微Underrun，但能显著降低操作延迟
-  default_min_buffer_frames_.store(output_sample_rate_ / 16);
+  // 设定最小缓冲帧数 (100ms)。
+  // 120ms 在部分场景会抬高低水位阈值，诱发过度跳帧；回退到 100ms 平衡延迟与稳定性。
+  default_min_buffer_frames_.store(output_sample_rate_ / 10);
   min_buffer_frames_.store(default_min_buffer_frames_.load());
   minimum_latency_ms_.store(0);
 
@@ -490,6 +556,8 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   is_started_ = false;
   buffering_ = false;
   running_.store(true, std::memory_order_release);
+  recover_streak_ = 0;
+  SetRunState(AudioRunState::INIT, "initialize_success");
 
   LOGF(LOG_INFO,
        "%{public}s AudioBridge initialized: core_rate=%{public}d Hz, "
@@ -514,6 +582,7 @@ bool AudioBridge::Reset(int32_t sample_rate) {
       running_.store(true, std::memory_order_release);
       buffering_ = false;
       is_started_ = false;
+      recover_streak_ = 0;
       if (ring_buffer_) {
         ring_buffer_->ResetStats();
         // 清空旧数据，重新缓冲
@@ -522,6 +591,7 @@ bool AudioBridge::Reset(int32_t sample_rate) {
       // 重新初始化重采样器与 DRC 状态，以避免沿用上一次的动态比率
       resampler_.Init(core_sample_rate_, output_sample_rate_);
       drc_skew_.store(1.0);
+      SetRunState(AudioRunState::INIT, "reset_same_rate");
 
       LOGF(LOG_INFO,
            "%{public}s AudioBridge already configured with same core rate: "
@@ -540,6 +610,8 @@ bool AudioBridge::Reset(int32_t sample_rate) {
       }
       ring_buffer_.reset();
       initialized_.store(false);
+      recover_streak_ = 0;
+      SetRunState(AudioRunState::INIT, "reset_reinit");
     }
   }
 
@@ -577,13 +649,17 @@ bool AudioBridge::Pause() {
   is_started_ = false; // Stop logical
   buffering_ = false;
   running_.store(false, std::memory_order_release);
+  recover_streak_ = 0;
   if (ring_buffer_) {
     ring_buffer_->Clear();
   }
 
   bool success = audio_player_->Pause();
   if (success) {
+    SetRunState(AudioRunState::PAUSED, "pause_success");
     LOGF(LOG_INFO, "%{public}s AudioBridge paused", kAudioChainPrefix);
+  } else {
+    SetRunState(AudioRunState::RECOVERING, "pause_failed");
   }
 
   return success;
@@ -599,12 +675,14 @@ bool AudioBridge::Stop() {
   buffering_ = false;
   // 通知停止，以唤醒等待的读写方
   running_.store(false, std::memory_order_release);
+  recover_streak_ = 0;
   if (ring_buffer_) {
     ring_buffer_->Clear();
   }
 
   bool success = audio_player_->Stop();
   if (success) {
+    SetRunState(AudioRunState::PAUSED, "stop_success");
     LOGF(LOG_INFO, "%{public}s AudioBridge stopped", kAudioChainPrefix);
 
     // 打印缓冲区统计信息
@@ -619,6 +697,9 @@ bool AudioBridge::Stop() {
            static_cast<int32_t>(underruns),
            static_cast<int32_t>(overruns));
     }
+  }
+  if (!success) {
+    SetRunState(AudioRunState::RECOVERING, "stop_failed");
   }
   return success;
 }
@@ -639,6 +720,14 @@ float AudioBridge::GetBufferUsage() const {
   }
 
   return ring_buffer_->GetUsage();
+}
+
+size_t AudioBridge::GetBufferedFrames() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!initialized_ || !ring_buffer_) {
+    return 0;
+  }
+  return ring_buffer_->AvailableRead() / 2;
 }
 
 void AudioBridge::GetBufferStats(size_t &underruns, size_t &overruns) const {

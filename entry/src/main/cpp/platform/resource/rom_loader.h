@@ -16,11 +16,11 @@ namespace libretro {
  * ROM 加载结果
  */
 struct ROMLoadResult {
-  bool success;              // 是否成功
+  bool success = false;      // 是否成功
   std::string error_message; // 错误信息
   std::vector<uint8_t> data; // ROM 数据
   std::string path;          // ROM 路径
-  size_t size;               // ROM 大小
+  size_t size = 0;           // ROM 大小
 };
 
 /**

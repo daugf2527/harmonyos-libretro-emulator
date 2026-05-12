@@ -14,6 +14,7 @@
  */
 
 #include "plugin_manager.h"
+#include "core/engine/input_manager.h"
 #include "core/engine/libretro_engine.h"
 #include "core/libretro/libretro.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
@@ -181,8 +182,11 @@ static bool NormalizeAndSendPointer(OH_NativeXComponent *component,
   if (normY > 32767.0f)
     normY = 32767.0f;
 
-  libretro::LibretroEngine::GetInstance()->SendPointer(
-      port, static_cast<int16_t>(normX), static_cast<int16_t>(normY), pressed);
+  auto *inputMgr = libretro::InputManager::GetInstance();
+  if (inputMgr) {
+    inputMgr->SendPointer(port, static_cast<int16_t>(normX),
+                          static_cast<int16_t>(normY), pressed);
+  }
   return true;
 }
 
@@ -203,8 +207,11 @@ static std::string BuildMouseDeviceId() { return std::string("mouse:0"); }
 static bool ResolvePortForDevice(const std::string &deviceId,
                                  libretro::InputSourceType sourceType,
                                  int &outPort) {
-  return libretro::LibretroEngine::GetInstance()->ResolvePortForDevice(
-      deviceId, sourceType, outPort);
+  auto *inputMgr = libretro::InputManager::GetInstance();
+  if (!inputMgr) {
+    return false;
+  }
+  return inputMgr->ResolvePortForDevice(deviceId, sourceType, outPort);
 }
 
 static bool MapKeyCodeToJoypad(OH_NativeXComponent_KeyCode code, int &outId) {
@@ -349,9 +356,10 @@ static bool HandleNewArchKeyEvent(OH_NativeXComponent *component) {
   if (deviceId.empty()) {
     deviceId = "key:unknown";
   }
-  libretro::LibretroEngine::GetInstance()->RecordInputDevice(
-      deviceId, libretro::InputSourceType::Keyboard,
-      std::string("Keyboard ") + deviceId);
+  if (auto *im = libretro::InputManager::GetInstance()) {
+    im->RecordInputDevice(deviceId, libretro::InputSourceType::Keyboard,
+                          std::string("Keyboard ") + deviceId);
+  }
 
   bool joypadDispatched = false;
   if (mapToJoypad) {
@@ -361,64 +369,15 @@ static bool HandleNewArchKeyEvent(OH_NativeXComponent *component) {
       return keyboardDispatched;
     }
 
-    libretro::LibretroEngine::GetInstance()->SendInput(port, joypadId, isDown);
+    if (auto *im = libretro::InputManager::GetInstance()) {
+      im->SendInput(port, joypadId, isDown);
+    }
     joypadDispatched = true;
   }
 
   return keyboardDispatched || joypadDispatched;
 }
 
-std::mutex &NewArchWindowMutex() {
-  static std::mutex *m = new std::mutex();
-  return *m;
-}
-
-std::unordered_map<std::string, OHNativeWindow *> &NewArchWindowById() {
-  static std::unordered_map<std::string, OHNativeWindow *> *m =
-      new std::unordered_map<std::string, OHNativeWindow *>();
-  return *m;
-}
-
-void StoreNewArchWindowForId(const std::string &xId, OHNativeWindow *w) {
-  if (xId.empty()) {
-    return;
-  }
-  std::lock_guard<std::mutex> lock(NewArchWindowMutex());
-  auto &map = NewArchWindowById();
-  auto it = map.find(xId);
-  if (it != map.end()) {
-    if (it->second == w) {
-      return;
-    }
-    if (it->second) {
-      OH_NativeWindow_NativeObjectUnreference(it->second);
-    }
-    map.erase(it);
-  }
-  if (w) {
-    OH_NativeWindow_NativeObjectReference(w);
-  }
-  map[xId] = w;
-}
-
-OHNativeWindow *RemoveNewArchWindowForIdIfMatch(const std::string &xId,
-                                                OHNativeWindow *match) {
-  if (xId.empty()) {
-    return nullptr;
-  }
-  std::lock_guard<std::mutex> lock(NewArchWindowMutex());
-  auto &map = NewArchWindowById();
-  auto it = map.find(xId);
-  if (it == map.end()) {
-    return nullptr;
-  }
-  if (match != nullptr && it->second != match) {
-    return nullptr;
-  }
-  OHNativeWindow *w = it->second;
-  map.erase(it);
-  return w;
-}
 } // namespace
 
 PluginManager *PluginManager::GetInstance() {
@@ -429,17 +388,6 @@ PluginManager *PluginManager::GetInstance() {
 PluginManager::~PluginManager() {
   LOGF(LOG_INFO, "~PluginManager");
   nativeXComponentMap_.clear();
-
-  {
-    std::lock_guard<std::mutex> lock(NewArchWindowMutex());
-    auto &map = NewArchWindowById();
-    for (auto &kv : map) {
-      if (kv.second) {
-        OH_NativeWindow_NativeObjectUnreference(kv.second);
-      }
-    }
-    map.clear();
-  }
   ClearAllNewArchPointerStates();
 }
 
@@ -504,7 +452,6 @@ void PluginManager::Export(napi_env env, napi_value exports) {
           return;
         }
         const std::string xId = GetNewArchXComponentId(component);
-        StoreNewArchWindowForId(xId, static_cast<OHNativeWindow *>(window));
         LOGF(LOG_INFO,
              " [NEW_ARCH] Surface Created: %{public}s window=%{public}p",
              xId.c_str(), window);
@@ -515,8 +462,7 @@ void PluginManager::Export(napi_env env, napi_value exports) {
         uint64_t height = 0;
         if (OH_NativeXComponent_GetXComponentSize(component, window, &width,
                                                   &height) ==
-                OH_NATIVEXCOMPONENT_RESULT_SUCCESS &&
-            width > 0 && height > 0) {
+            OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
           libretro::LibretroEngine::GetInstance()->OnNativeWindowResized(
               xId, static_cast<int>(width), static_cast<int>(height));
         }
@@ -527,7 +473,6 @@ void PluginManager::Export(napi_env env, napi_value exports) {
           return;
         }
         const std::string xId = GetNewArchXComponentId(component);
-        StoreNewArchWindowForId(xId, static_cast<OHNativeWindow *>(window));
         uint64_t width = 0, height = 0;
         (void)OH_NativeXComponent_GetXComponentSize(component, window, &width,
                                                     &height);
@@ -535,34 +480,20 @@ void PluginManager::Export(napi_env env, napi_value exports) {
              " [NEW_ARCH] Surface Changed: %{public}s %{public}lux%{public}lu",
              xId.c_str(), width, height);
         auto *engine = libretro::LibretroEngine::GetInstance();
-        engine->SetNativeWindow(xId, (OHNativeWindow *)window);
-        if (width > 0 && height > 0) {
-          engine->OnNativeWindowResized(xId, static_cast<int>(width),
-                                        static_cast<int>(height));
-        }
+        // SurfaceChanged 可能在 window 指针不变时发生，显式触发 generation 切换。
+        engine->SetNativeWindow(xId, (OHNativeWindow *)window, true);
+        engine->OnNativeWindowResized(xId, static_cast<int>(width),
+                                      static_cast<int>(height));
       };
       callback.OnSurfaceDestroyed = [](OH_NativeXComponent *component,
                                        void *window) {
         const std::string xId = GetNewArchXComponentId(component);
-        OHNativeWindow *argWindow = static_cast<OHNativeWindow *>(window);
-        OHNativeWindow *storedWindow = nullptr;
-        if (argWindow) {
-          storedWindow = RemoveNewArchWindowForIdIfMatch(xId, argWindow);
-        } else {
-          storedWindow = RemoveNewArchWindowForIdIfMatch(xId, nullptr);
-        }
-        OHNativeWindow *destroyed = argWindow ? argWindow : storedWindow;
+        OHNativeWindow *destroyed = static_cast<OHNativeWindow *>(window);
         LOGF(LOG_INFO,
              " [NEW_ARCH] Surface Destroyed: %{public}s window=%{public}p",
              xId.c_str(), destroyed);
-        if (destroyed) {
-          libretro::LibretroEngine::GetInstance()->ClearNativeWindowIfMatch(
-              xId, destroyed);
-        }
-
-        if (storedWindow) {
-          OH_NativeWindow_NativeObjectUnreference(storedWindow);
-        }
+        libretro::LibretroEngine::GetInstance()->ClearNativeWindowIfMatch(
+            xId, destroyed);
         ClearNewArchPointerState(xId);
       };
       callback.DispatchTouchEvent = [](OH_NativeXComponent *component,
@@ -623,9 +554,10 @@ void PluginManager::Export(napi_env env, napi_value exports) {
             bool pressed = (touchEvent.type == OH_NATIVEXCOMPONENT_DOWN ||
                             touchEvent.type == OH_NATIVEXCOMPONENT_MOVE);
 
-            libretro::LibretroEngine::GetInstance()->SendPointer(
-                port, static_cast<int16_t>(normX), static_cast<int16_t>(normY),
-                pressed);
+            if (auto *im = libretro::InputManager::GetInstance()) {
+              im->SendPointer(port, static_cast<int16_t>(normX),
+                              static_cast<int16_t>(normY), pressed);
+            }
           }
         }
       };
@@ -657,8 +589,10 @@ void PluginManager::Export(napi_env env, napi_value exports) {
         }
 
         const std::string deviceId = BuildMouseDeviceId();
-        libretro::LibretroEngine::GetInstance()->RecordInputDevice(
-            deviceId, libretro::InputSourceType::Mouse, "Mouse");
+        if (auto *im = libretro::InputManager::GetInstance()) {
+          im->RecordInputDevice(deviceId, libretro::InputSourceType::Mouse,
+                                "Mouse");
+        }
         int port = 0;
         if (!ResolvePortForDevice(deviceId, libretro::InputSourceType::Mouse,
                                   port)) {
@@ -715,16 +649,16 @@ void PluginManager::Export(napi_env env, napi_value exports) {
             SetNewArchMouseDown(xId, false);
             const std::string deviceId = BuildMouseDeviceId();
             int port = 0;
+            auto *im = libretro::InputManager::GetInstance();
             if (ResolvePortForDevice(deviceId, libretro::InputSourceType::Mouse,
                                      port)) {
-              libretro::LibretroEngine::GetInstance()->SendPointer(port, 0, 0,
-                                                                   false);
+              if (im) im->SendPointer(port, 0, 0, false);
               return;
             }
-            // 未解析到端口时兜底清理常见端口，避免残留 pressed 状态。
-            for (int fallbackPort = 0; fallbackPort < 4; ++fallbackPort) {
-              libretro::LibretroEngine::GetInstance()->SendPointer(
-                  fallbackPort, 0, 0, false);
+            if (im) {
+              for (int fallbackPort = 0; fallbackPort < 4; ++fallbackPort) {
+                im->SendPointer(fallbackPort, 0, 0, false);
+              }
             }
           });
       if (blurRet != OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {

@@ -1,5 +1,6 @@
 /*
  * 新架构测试页面 - 使用 refactored* NAPI 接口
+ * DEV DIAGNOSTIC ONLY: 不注册到产品 main_pages.json，不作为默认产品路由入口。
  */
 
 import testNapi from 'libentry.so';
@@ -495,6 +496,11 @@ struct LibretroNewArchTestPage {
     }
   }
 
+  private resolveAbiPath(): string {
+    const rawAbiList = String(deviceInfo.abiList ?? '').toLowerCase();
+    return rawAbiList.indexOf('x86_64') >= 0 ? 'x86_64' : 'arm64';
+  }
+
 
   parseOptionsJson(s: string): CoreOptionItem[] {
   try {
@@ -952,7 +958,7 @@ struct LibretroNewArchTestPage {
                     this.log('获取上下文失败');
                     return;
                   }
-                  const abiPath = deviceInfo.abiList === 'x86_64' ? 'x86_64' : 'arm64';
+                  const abiPath = this.resolveAbiPath();
                   const corePath = `${context.bundleCodeDir}/libs/${abiPath}/libgambatte_libretro.so`;
                   this.log(`调用 refactoredLoadCore: ${corePath}`);
                   const ok: boolean = nativeApi.refactoredLoadCore(corePath);
@@ -1180,7 +1186,7 @@ struct LibretroNewArchTestPage {
                 }
                 .width('100%')
                 .padding(4)
-              })
+              }, (opt: CoreOptionItem) => opt.key)
             }
             .width('100%')
             .padding(10)
@@ -1331,7 +1337,7 @@ struct LibretroNewArchTestPage {
                   .fontColor('#CCC')
                   .width('100%')
                   .textAlign(TextAlign.Start)
-                })
+                }, (log: string, index: number) => 'log-' + index)
               }
               .width('100%')
               .height('30%')
@@ -1372,7 +1378,7 @@ struct LibretroNewArchTestPage {
                     .fontColor('#CCC')
                     .width('100%')
                     .textAlign(TextAlign.Start)
-                })
+                }, (log: string, index: number) => 'log-' + index)
               }
               .width('100%')
             }
@@ -1453,7 +1459,7 @@ struct LibretroNewArchTestPage {
                     this.log('获取上下文失败');
                     return;
                   }
-                  const abiPath = deviceInfo.abiList === 'x86_64' ? 'x86_64' : 'arm64';
+                  const abiPath = this.resolveAbiPath();
                   const corePath = `${context.bundleCodeDir}/libs/${abiPath}/libgambatte_libretro.so`;
                   this.log(`调用 refactoredLoadCore: ${corePath}`);
                   const ok: boolean = nativeApi.refactoredLoadCore(corePath);
@@ -1677,7 +1683,7 @@ struct LibretroNewArchTestPage {
                 }
                 .width('100%')
                 .padding(4)
-              })
+              }, (opt: CoreOptionItem) => opt.key)
             }
             .width('100%')
             .padding(10)

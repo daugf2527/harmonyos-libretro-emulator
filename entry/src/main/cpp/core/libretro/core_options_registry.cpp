@@ -11,6 +11,8 @@
 namespace libretro {
 namespace core_options {
 
+// Thread safety: only called from Engine thread (single-threaded access).
+// If multi-core loading is ever needed, wrap with std::mutex.
 static common::FileConfiguration &GetConfig() {
   static common::FileConfiguration config;
   return config;

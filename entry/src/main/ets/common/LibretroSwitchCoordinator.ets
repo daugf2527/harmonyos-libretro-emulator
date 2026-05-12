@@ -96,10 +96,7 @@ export default class LibretroSwitchCoordinator {
     timeoutMs: number
   ): Promise<LibretroSwitchResult> {
     nativeApi.refactoredStopEngineAsync();
-    const ok = await nativeApi.refactoredWaitForStateAsync(
-      EngineState.STOPPED,
-      timeoutMs
-    );
+    const ok = await this.waitEngineQuiesced(timeoutMs);
     if (!ok) {
       const resetTriggered = nativeApi.refactoredResetEngine();
       if (resetTriggered) {
@@ -198,5 +195,17 @@ export default class LibretroSwitchCoordinator {
     const step = err.step ? ` step=${err.step}` : '';
     const message = err.message ? ` message=${err.message}` : '';
     return `${prefix} failed: reason=${err.reason}${step}${message}`;
+  }
+
+  private async waitEngineQuiesced(timeoutMs: number): Promise<boolean> {
+    const stopped = await nativeApi.refactoredWaitForStateAsync(
+      EngineState.STOPPED,
+      timeoutMs
+    );
+    if (stopped) {
+      return true;
+    }
+    // 引擎未运行时可能保持 INIT，不一定进入 STOPPED。
+    return nativeApi.refactoredWaitForStateAsync(EngineState.INIT, 0);
   }
 }

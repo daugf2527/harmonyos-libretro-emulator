@@ -121,7 +121,7 @@ private:
   uint32_t content_width_ = 0;
   uint32_t content_height_ = 0;
   VkExtent2D swapchain_extent_{};
-  bool swapchain_out_of_date_ = false;
+  std::atomic<bool> swapchain_out_of_date_{false};
   VkImageUsageFlags swapchain_usage_ = 0;
   size_t submit_fail_count_ = 0;
   size_t present_fail_count_ = 0;

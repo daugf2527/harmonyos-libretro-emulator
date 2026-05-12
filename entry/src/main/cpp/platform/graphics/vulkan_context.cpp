@@ -138,6 +138,7 @@ void VulkanContext::Destroy() {
 
   if (has_negotiation_ && negotiation_.destroy_device) {
     negotiation_.destroy_device();
+    device_ = VK_NULL_HANDLE;
   }
   if (device_ && loader_.GetApi().destroy_device) {
     loader_.GetApi().destroy_device(device_, nullptr);

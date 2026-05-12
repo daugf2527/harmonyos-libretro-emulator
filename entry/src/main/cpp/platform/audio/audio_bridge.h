@@ -34,6 +34,14 @@ namespace libretro {
  */
 class AudioBridge : public interfaces::IAudioSink { // 2. 继承接口
 public:
+  enum class AudioRunState : uint8_t {
+    INIT = 0,
+    BUFFERING = 1,
+    RUNNING = 2,
+    PAUSED = 3,
+    RECOVERING = 4,
+  };
+
   static AudioBridge *GetInstance();
   static void DestroyInstance();
 
@@ -58,8 +66,14 @@ public:
 
   bool Pause();
   bool IsPlaying() const;
+  AudioRunState GetRunState() const {
+    return static_cast<AudioRunState>(run_state_.load(std::memory_order_acquire));
+  }
+  static const char *AudioRunStateToString(AudioRunState state);
 
   float GetBufferUsage() const;
+  size_t GetBufferedFrames() const;
+  size_t GetMinBufferFrames() const { return min_buffer_frames_.load(); }
   void GetBufferStats(size_t &underruns, size_t &overruns) const;
   void ResetBufferStats();
 
@@ -122,6 +136,11 @@ private:
 
   mutable std::mutex mutex_;
   std::atomic<bool> initialized_{false};
+  std::atomic<int> run_state_{static_cast<int>(AudioRunState::INIT)};
+  uint32_t run_state_log_count_{0};
+  uint32_t recover_streak_{0};
+
+  void SetRunState(AudioRunState state, const char *reason = nullptr);
 
   AudioBridge(const AudioBridge &) = delete;
   AudioBridge &operator=(const AudioBridge &) = delete;

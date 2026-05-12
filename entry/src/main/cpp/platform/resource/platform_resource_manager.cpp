@@ -83,7 +83,8 @@ bool PlatformResourceManager::LoadRawFileUnlocked(
       if (size > 0) {
         out_data.resize(size);
         if (file.read(reinterpret_cast<char *>(out_data.data()), size)) {
-          LOGF(LOG_INFO, "Loaded file from filesystem: %{public}zu bytes", size);
+          LOGF(LOG_INFO, "Loaded file from filesystem: %{public}lld bytes",
+               static_cast<long long>(size));
           return true;
         }
         out_data.clear();

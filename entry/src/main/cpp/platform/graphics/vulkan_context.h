@@ -2,6 +2,7 @@
 #define PLATFORM_GRAPHICS_VULKAN_CONTEXT_H
 
 #include "vulkan_loader.h"
+#include <atomic>
 #include <native_window/external_window.h>
 #include <vector>
 
@@ -85,7 +86,7 @@ private:
 
   retro_hw_render_context_negotiation_interface_vulkan negotiation_{};
   bool has_negotiation_ = false;
-  bool swapchain_out_of_date_ = false;
+  std::atomic<bool> swapchain_out_of_date_{false};
 
   retro_vulkan_context core_context_{};
 };

@@ -35,6 +35,7 @@ NativeFenceApi &GetNativeFenceApi() {
   static NativeFenceApi api;
   static std::once_flag once;
   std::call_once(once, []() {
+    // handle intentionally kept open for process lifetime (static singleton)
     api.handle = dlopen("libnative_fence.so", RTLD_NOW | RTLD_LOCAL);
     if (!api.handle) {
       api.available = false;

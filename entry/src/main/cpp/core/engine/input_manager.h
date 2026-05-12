@@ -13,6 +13,7 @@
 namespace libretro {
 
 class InputPortRouter;
+enum class InputSourceType : uint8_t;
 
 /**
  * @brief InputManager
@@ -43,6 +44,13 @@ public:
   void SetPortRouter(InputPortRouter *router);
   void SetControllerPortDeviceCallback(
       std::function<void(unsigned, unsigned)> callback);
+
+  bool CanSendVirtual(int port) const;
+  bool ResolvePortForDevice(const std::string &deviceId,
+                            InputSourceType sourceType, int &outPort);
+  void RecordInputDevice(const std::string &deviceId,
+                         InputSourceType sourceType,
+                         const std::string &name);
 
   // --- State Management ---
   void Clear();

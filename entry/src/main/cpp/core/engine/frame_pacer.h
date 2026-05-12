@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <thread>
@@ -43,7 +44,8 @@ public:
     auto remaining = std::chrono::duration_cast<std::chrono::microseconds>(
         target_end - now).count();
     
-    const int64_t spin_reserve_us = period_us / 10;
+    const int64_t spin_reserve_us =
+        std::max<int64_t>(50, std::min<int64_t>(300, period_us / 20));
     if (remaining > spin_reserve_us) {
       std::this_thread::sleep_for(
           std::chrono::microseconds(remaining - spin_reserve_us));

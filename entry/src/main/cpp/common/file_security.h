@@ -32,6 +32,7 @@ bool ValidateCorePath(const std::string &corePath);
  * - roms/ (rawfile 资源，不需要完整路径)
  * - /data/storage/el2/base/haps/entry/files/roms/ (用户 ROM)
  * - /data/storage/el2/base/haps/entry/files/system/ (ROM 暂存目录)
+ * - /data/storage/el2/base/haps/entry/files/temp_roms/ (rawfile 解包临时目录)
  *
  * @param romPath ROM 文件路径
  * @return true 如果路径合法

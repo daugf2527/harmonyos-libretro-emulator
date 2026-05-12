@@ -27,6 +27,7 @@ void PreloadGraphicsLibs() {
     const char *libs[] = {"libGLESv3.so", "libGLESv2.so", "libGLESv1_CM.so",
                           "libEGL.so"};
     for (const char *lib : libs) {
+      // handle intentionally leaked: keeps GL symbols loaded for core's lifetime
       void *handle = dlopen(lib, RTLD_NOW | RTLD_LOCAL);
       if (handle) {
         LOGF(LOG_INFO, "Preloaded graphics lib: %{public}s", lib);
@@ -102,14 +103,16 @@ bool CoreLoader::LoadCore(const std::string &corePath) {
     LOGF(LOG_ERROR,
                  "File does not exist or cannot be accessed: %{public}s",
                  corePath.c_str());
+    char errBuf[128] = {};
+    strerror_r(errno, errBuf, sizeof(errBuf));
     LOGF(LOG_ERROR,
-                 "errno: %{public}d (%{public}s)", errno, strerror(errno));
-    SetLastError("stat", strerror(errno));
+                 "errno: %{public}d (%{public}s)", errno, errBuf);
+    SetLastError("stat", errBuf);
     return false;
   }
   LOGF(LOG_INFO,
-               "File found! Size: %{public}ld bytes, Mode: %{public}o",
-               (long)fileStat.st_size, fileStat.st_mode);
+               "File found! Size: %{public}lld bytes, Mode: %{public}o",
+               static_cast<long long>(fileStat.st_size), fileStat.st_mode);
 
   // 1. 使用 dlopen 加载动态库 (仅 RTLD_LOCAL，避免符号污染)
   std::string dlopenErr;

@@ -17,10 +17,13 @@
 #include "core_state_manager.h"
 #include "engine_messages.h"
 #include "event_bridge.h"
+#include "frame_buffer_pool.h"
 #include "input_manager.h"
 #include "input_port_router.h"
 #include "message_queue.h"
+#include "render_thread.h"
 #include "video_pipeline.h"
+#include "window_guard.h"
 
 namespace interfaces {
 class IInputManager;
@@ -66,6 +69,19 @@ struct RuntimeStats {
   uint64_t frameTimeSum = 0;
   uint64_t frameCount = 0;
 
+  // RenderThread + Queue 统计
+  uint64_t queuePushed = 0;
+  uint64_t queuePopped = 0;
+  uint64_t queueDroppedOldest = 0;
+  uint64_t queueDroppedStaleOnPop = 0;
+  uint64_t queueDepthMax = 0;
+  uint64_t renderTickNoFrame = 0;
+  uint64_t renderThreadRenderedFrames = 0;
+  uint64_t renderThreadDroppedFrames = 0;
+  uint64_t vsyncCallbacks = 0;
+  uint64_t vsyncFallbackTicks = 0;
+  uint64_t vsyncRequestFailures = 0;
+
   void Reset() {
     videoRefreshCalls = videoNullFrames = videoDupeFrames = videoDroppedFrames =
         0;
@@ -77,6 +93,10 @@ struct RuntimeStats {
     frameTimeMin = UINT64_MAX;
     frameTimeMax = 0;
     frameTimeSum = frameCount = 0;
+    queuePushed = queuePopped = queueDroppedOldest = 0;
+    queueDroppedStaleOnPop = queueDepthMax = 0;
+    renderTickNoFrame = renderThreadRenderedFrames = renderThreadDroppedFrames = 0;
+    vsyncCallbacks = vsyncFallbackTicks = vsyncRequestFailures = 0;
   }
 };
 
@@ -136,7 +156,8 @@ public:
   bool LoadGame(const std::string &gamePath,
                 std::shared_ptr<std::vector<uint8_t>> data = nullptr);
 
-  void SetNativeWindow(const std::string &xcomponentId, OHNativeWindow *window);
+  void SetNativeWindow(const std::string &xcomponentId, OHNativeWindow *window,
+                       bool forceRebind = false);
   void ClearNativeWindowIfMatch(const std::string &xcomponentId,
                                 OHNativeWindow *destroyedWindow);
 
@@ -147,26 +168,10 @@ public:
   void OnNativeWindowResized(const std::string &xcomponentId, int width,
                              int height);
 
-  void SendInput(int port, int id, bool pressed);
-  void SendAnalog(int port, int index, int id, int16_t value);
-  bool SendVirtualInput(int port, int id, bool pressed);
-  bool SendVirtualAnalog(int port, int index, int id, int16_t value);
   bool DispatchKeyboardEvent(bool down, unsigned keycode, uint32_t character,
                              uint16_t key_modifiers);
-  void SendPointer(int port, int16_t x, int16_t y, bool pressed);
-  void SendSensor(int port, int id, float value);
-  bool AssignPortSource(int port, InputSourceType sourceType,
-                        const std::string &deviceId);
-  bool UnassignPortSource(int port);
-  bool ResolvePortForDevice(const std::string &deviceId,
-                            InputSourceType sourceType, int &outPort);
-  void RecordInputDevice(const std::string &deviceId,
-                         InputSourceType sourceType, const std::string &name);
-  std::vector<InputDeviceInfo> ListInputDevices() const;
-  bool CanSendVirtual(int port) const;
   bool SetFilesDir(const std::string &filesDir);
   std::string GetFilesDir() const;
-  interfaces::IInputManager *GetInputInterface() const;
   interfaces::IRenderer *GetRendererInterface() const;
 
   // --- SaveState 接口 ---
@@ -198,9 +203,13 @@ public:
 
   // --- 视频配置 ---
   void SetScalingMode(int mode); // 0=Hardware, 1=Software, 2=GLES
+  void SetSwapInterval(int interval); // 0=Disable VSync, 1=Enable VSync
   void SetSoftwareMaxResolution(unsigned maxWidth, unsigned maxHeight);
   void SetAIUpscale(bool enabled);
   void SetHwRenderAllowed(bool allowed);
+  void SetRenderThreadEnabled(bool enabled);
+  void SetNativeVSyncEnabled(bool enabled);
+  void SetGlesDiagEnabled(bool enabled);
 
   bool SetCoreOption(const std::string &key, const std::string &value);
   std::string GetCoreOptionsJson() const;
@@ -237,6 +246,8 @@ public:
   bool WaitForState(EngineState target, uint32_t timeoutMs);
   EngineErrorInfo GetLastErrorInfo() const;
   void ClearLastErrorInfo();
+  void SetLastErrorInfo(const std::string &reason, const std::string &step,
+                        const std::string &message);
 
 private:
   enum class EnginePhase : uint8_t {
@@ -278,8 +289,6 @@ private:
   // --- 状态转换辅助 ---
   void TransitionTo(EngineState newState);
   void UnloadGameIfNeeded(const char *reason);
-  void SetLastErrorInfo(const std::string &reason, const std::string &step,
-                        const std::string &message);
   void DetectCoreQuirks();
   bool ExecuteSyncTask(const std::function<void()> &task, uint32_t timeoutMs);
 
@@ -303,6 +312,7 @@ private:
   // 核心管理
   CoreLoader coreLoader_;
   VideoPipeline videoPipeline_;
+  FrameBufferPool frameBufferPool_{3};
   EnvState envState_; // Libretro 环境状态
   std::atomic<EnginePhase> phase_{EnginePhase::IDLE};
   std::atomic<int64_t> phaseStartUs_{0};
@@ -312,6 +322,7 @@ private:
   std::unique_ptr<InputManager> inputManager_;
   std::unique_ptr<InputPortRouter> inputPortRouter_;
   std::unique_ptr<interfaces::IRenderer> rendererInterface_;
+  std::unique_ptr<RenderThread> renderThread_;
   std::unique_ptr<CoreStateManager> stateManager_;
   std::unique_ptr<DiskController> diskController_;
 
@@ -319,16 +330,19 @@ private:
   // Render/EGL 保护锁：与 windowMutex_ 同时使用时必须先锁 renderMutex_
   std::mutex renderMutex_;
   std::mutex windowMutex_;
-  OHNativeWindow *window_{nullptr};
+  WindowGuard windowGuard_;
   std::string current_xcomponent_id_;
 
   enum class SurfaceState {
     UNINITIALIZED,
     CREATED,
     VALID,
+    PAUSED,
     DESTROYED,
   };
   std::atomic<SurfaceState> surface_state_{SurfaceState::UNINITIALIZED};
+  std::atomic<uint64_t> surface_session_id_{0};
+  std::atomic<uint64_t> surface_generation_{0};
   std::atomic<int> last_window_width_{0};
   std::atomic<int> last_window_height_{0};
 
@@ -383,23 +397,22 @@ private:
   std::atomic<unsigned> lastVideoRenderWidth_{0};
   std::atomic<unsigned> lastVideoRenderHeight_{0};
   std::atomic<size_t> lastVideoRenderPitch_{0};
+  std::atomic<uint64_t> videoFrameSeq_{0};
+  std::atomic<int64_t> lastAudioStatusEmitUs_{0};
   size_t lastAudioUnderruns_{0};
   size_t lastAudioOverruns_{0};
   std::atomic<bool> hw_render_enabled_{false};
+  std::atomic<bool> render_thread_enabled_{true};
+  std::atomic<bool> native_vsync_enabled_{true};
+  std::atomic<bool> gles_diag_enabled_{false};
   size_t slowRetroRunLogCount_{0};
   size_t slowVideoRenderLogCount_{0};
   size_t skip_frame_counter_{0};
 
 public:
   // 统计接口
-  RuntimeStats GetStats() const {
-    std::lock_guard<std::mutex> lock(statsMutex_);
-    return stats_;
-  }
-  void ResetStats() {
-    std::lock_guard<std::mutex> lock(statsMutex_);
-    stats_.Reset();
-  }
+  RuntimeStats GetStats() const;
+  void ResetStats();
 };
 
 } // namespace libretro

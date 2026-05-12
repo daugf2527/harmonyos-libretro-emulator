@@ -32,6 +32,9 @@ set(CORE_SOURCES
 # Core层: 重构后的引擎核心 (Phase 1)
 set(REFACTORED_ENGINE_SOURCES
     core/engine/libretro_engine.cpp
+    core/engine/frame_buffer_pool.cpp
+    core/engine/render_thread.cpp
+    core/engine/window_session.cpp
     core/engine/video_pipeline.cpp
     core/engine/window_state_manager.cpp
     core/engine/event_bridge.cpp
@@ -61,6 +64,10 @@ set(PLATFORM_GRAPHICS_SOURCES
     platform/graphics/vulkan_presenter.cpp
 )
 
+set(PLATFORM_SYNC_SOURCES
+    platform/sync/native_vsync_driver.cpp
+)
+
 if (${OHOS_ARCH} STREQUAL "arm64-v8a" OR ${OHOS_ARCH} STREQUAL "armeabi-v7a")
     list(APPEND PLATFORM_GRAPHICS_SOURCES platform/graphics/pixel_converter_neon.cpp)
 else()
@@ -81,11 +88,17 @@ set(APP_FRAMEWORK_SOURCES
     app/framework/plugin_manager.cpp
 )
 
-# Application层: NAPI入口
+# Application层: NAPI入口 (libretro_engine_napi 已拆分为领域模块)
 set(APP_NAPI_SOURCES
     app/napi/module_init.cpp
     app/napi/core_loader_napi.cpp
     app/napi/libretro_engine_napi.cpp
+    app/napi/engine_lifecycle_napi.cpp
+    app/napi/engine_input_napi.cpp
+    app/napi/engine_video_napi.cpp
+    app/napi/engine_state_napi.cpp
+    app/napi/engine_disk_napi.cpp
+    app/napi/engine_query_napi.cpp
 )
 
 add_library(entry SHARED
@@ -94,6 +107,7 @@ add_library(entry SHARED
     ${REFACTORED_ENGINE_SOURCES}
     ${PLATFORM_AUDIO_SOURCES}
     ${PLATFORM_GRAPHICS_SOURCES}
+    ${PLATFORM_SYNC_SOURCES}
     ${PLATFORM_RESOURCE_SOURCES}
     ${APP_FRAMEWORK_SOURCES}
     ${APP_NAPI_SOURCES}

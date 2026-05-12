@@ -1,9 +1,19 @@
 {
   "src": [
+    "pages/OnboardingPage",
     "pages/Index",
-    "pages/CoreLoaderTest",
-    "pages/TestGambatte",
-    "pages/LibretroGamePage",
-    "pages/LibretroNewArchTestPage"
+    "pages/ImportEntryPage",
+    "pages/LibraryPage",
+    "pages/LibraryDetailPage",
+    "pages/SettingsPage",
+    "pages/SaveStatePage",
+    "pages/MultiplayerInputPage",
+    "pages/InputLayoutPage",
+    "pages/CoreManagerPage",
+    "pages/ShaderPreviewPage",
+    "pages/AboutHelpPage",
+    "pages/MetadataEditPage",
+    "pages/ImportTaskOverlayPage",
+    "pages/LibretroGamePage"
   ]
 }
