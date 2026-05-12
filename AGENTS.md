@@ -77,6 +77,8 @@ AudioPlayer::OnWriteDataCallback
 ArkTS 虚拟手柄 / 键盘 / 触控
   -> refactoredSendInput / PluginManager 指针/键盘回调
   -> InputManager::SendInput/SendPointer
+ |
+  
   -> Libretro input_poll/input_state 回调读取 InputSnapshot
 ```
 

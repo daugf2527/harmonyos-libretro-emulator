@@ -23,6 +23,8 @@ interface RuntimeSessionNapi {
   refactoredResumeEngine(): boolean
   refactoredSaveState(): ArrayBuffer | null
   refactoredLoadState(data: ArrayBuffer): boolean
+  refactoredSaveStateAsync(): Promise<ArrayBuffer | null>
+  refactoredLoadStateAsync(data: ArrayBuffer): Promise<boolean>
   refactoredGetLastErrorInfo(): EngineErrorInfo
   refactoredClearLastErrorInfo(): boolean
 }
@@ -49,6 +51,16 @@ export class RuntimeSessionController {
 
   loadState(data: ArrayBuffer): boolean {
     return nativeApi.refactoredLoadState(data)
+  }
+
+  // Async versions — offload heavy serialization/deserialization to
+  // napi_async_work so the main thread is never blocked >500ms.
+  async saveStateAsync(): Promise<ArrayBuffer | null> {
+    return nativeApi.refactoredSaveStateAsync()
+  }
+
+  async loadStateAsync(data: ArrayBuffer): Promise<boolean> {
+    return nativeApi.refactoredLoadStateAsync(data)
   }
 
   pause(): boolean {

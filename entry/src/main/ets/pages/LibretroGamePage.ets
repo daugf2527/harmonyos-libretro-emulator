@@ -1210,7 +1210,7 @@ struct LibretroGamePage {
   stopGame() {
     if (this.gameRunning || this.gamePaused) {
       void this.finalizeActiveLibrarySession();
-      // 避免 UI 线程同步 Stop 阻塞导致卡死
+      // stopAsync uses napi_async_work — returns immediately, real stop on worker
       runtimeSessionController.stopAsync();
       this.gameRunning = false;
       this.gamePaused = false;
