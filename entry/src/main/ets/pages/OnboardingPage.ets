@@ -20,10 +20,16 @@ struct ScanningLine {
 
   aboutToAppear(): void {
     this.scanOffset = 0
+    // Reduced from 16ms (60fps) to 50ms (20fps) — the scanning line is
+    // purely decorative and 20fps is smooth enough while cutting render
+    // pressure by 67%.  Combined with shadow and blur effects on this
+    // page, 60fps saturated the main-thread render pipeline, causing
+    // VSync timeouts and APP_INPUT_BLOCK ANRs under native memory
+    // pressure (~168 MB RSS).
     this.timer = setInterval(() => {
       const nextOffset = this.scanOffset + 1
       this.scanOffset = nextOffset > 191 ? 0 : nextOffset
-    }, 16)
+    }, 50)
   }
 
   aboutToDisappear(): void {

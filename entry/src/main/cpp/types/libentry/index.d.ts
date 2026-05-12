@@ -83,6 +83,8 @@ export const refactoredSetHwRenderAllowed: (enabled: boolean) => boolean;
 export const refactoredGetSaveStateSize: () => number;
 export const refactoredSaveState: () => ArrayBuffer | null;
 export const refactoredLoadState: (data: ArrayBuffer) => boolean;
+export const refactoredSaveStateAsync: () => Promise<ArrayBuffer | null>;
+export const refactoredLoadStateAsync: (data: ArrayBuffer) => Promise<boolean>;
 
 // SRAM
 export const refactoredGetSRAM: () => ArrayBuffer | null;
