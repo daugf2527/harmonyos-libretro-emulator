@@ -43,7 +43,6 @@ export struct LibraryDetailInfoPanel {
   }
 
   build() {
-    this.refreshRowCaches()
     Column({ space: 30 }) {
       this.SummarySection()
       this.TelemetrySection()
@@ -115,14 +114,14 @@ export struct LibraryDetailInfoPanel {
       if (this.showExtendedDetails) {
         Column({ space: 1 }) {
           Row({ space: 1 }) {
-            ForEach(this.cachedTopRow, (cell: LibraryDetailSummaryCellData) => {
+            ForEach(this.extendedCells.slice(0, 2), (cell: LibraryDetailSummaryCellData) => {
               this.SummaryCell(cell, true)
             }, (cell: LibraryDetailSummaryCellData) => cell.title)
           }
           .width('100%')
 
           Row({ space: 1 }) {
-            ForEach(this.cachedBottomRow, (cell: LibraryDetailSummaryCellData) => {
+            ForEach(this.extendedCells.slice(2, 4), (cell: LibraryDetailSummaryCellData) => {
               this.SummaryCell(cell, true)
             }, (cell: LibraryDetailSummaryCellData) => cell.title)
           }
