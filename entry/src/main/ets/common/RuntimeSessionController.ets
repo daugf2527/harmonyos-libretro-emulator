@@ -23,6 +23,8 @@ interface RuntimeSessionNapi {
   refactoredResumeEngine(): boolean
   refactoredSaveState(): ArrayBuffer | null
   refactoredLoadState(data: ArrayBuffer): boolean
+  refactoredSaveStateAsync(): Promise<ArrayBuffer | null>
+  refactoredLoadStateAsync(data: ArrayBuffer): Promise<boolean>
   refactoredGetLastErrorInfo(): EngineErrorInfo
   refactoredClearLastErrorInfo(): boolean
 }
