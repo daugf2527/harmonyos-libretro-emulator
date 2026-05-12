@@ -224,16 +224,14 @@ struct MultiplayerInputPage {
 
           Text(item.label)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurfaceVariant)
+                        .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(1.4)
         }
         .alignItems(VerticalAlign.Center)
 
         Text(item.status)
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor(item.isActive ? EmuColors.primary : EmuColors.onSurfaceVariant)
+                    .fontColor(item.isActive ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .backgroundColor(item.isActive ? '#1800FF41' : EmuColors.surfaceContainerHigh)
       }
@@ -251,8 +249,7 @@ struct MultiplayerInputPage {
 
           Text(`ID: ${item.deviceId}`)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#666666')
+                        .fontColor('#666666')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
@@ -262,8 +259,7 @@ struct MultiplayerInputPage {
         Column({ space: 4 }) {
           Text(item.powerText)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurfaceVariant)
+                        .fontColor(EmuColors.onSurfaceVariant)
 
           Row()
             .width(64)
@@ -299,8 +295,7 @@ struct MultiplayerInputPage {
 
       Text(value)
         .fontSize(12)
-        .fontFamily('monospace')
-        .fontColor(highlight ? EmuColors.primary : EmuColors.onSurface)
+                .fontColor(highlight ? EmuColors.primary : EmuColors.onSurface)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
@@ -329,14 +324,12 @@ struct MultiplayerInputPage {
         Row({ space: 12 }) {
           Text('中继：未配置')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#777777')
+                        .fontColor('#777777')
 
           Button('创建\n房间')
             .height(44)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurface)
+                        .fontColor(EmuColors.onSurface)
             .backgroundColor(Color.Transparent)
             .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
             .borderRadius(0)
@@ -390,8 +383,7 @@ struct MultiplayerInputPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(room.game)
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor('#666666')
+                    .fontColor('#666666')
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
@@ -404,8 +396,7 @@ struct MultiplayerInputPage {
           .fontColor('#666666')
         Text(room.latency)
           .fontSize(12)
-          .fontFamily('monospace')
-          .fontColor(room.color)
+                    .fontColor(room.color)
       }
       .alignItems(HorizontalAlign.End)
 
@@ -415,15 +406,13 @@ struct MultiplayerInputPage {
           .fontColor('#666666')
         Text(room.players)
           .fontSize(12)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurface)
+                    .fontColor(EmuColors.onSurface)
       }
       .alignItems(HorizontalAlign.End)
 
       Text(room.status)
         .fontSize(9)
-        .fontFamily('monospace')
-        .fontColor(room.status === '未配置' ? EmuColors.error : room.color)
+                .fontColor(room.status === '未配置' ? EmuColors.error : room.color)
         .padding({ left: 6, right: 6, top: 3, bottom: 3 })
         .backgroundColor(room.status === '未配置' ? '#227E2B17' : '#1800FF41')
         .maxLines(1)
@@ -452,8 +441,7 @@ struct MultiplayerInputPage {
           EmuIcon({ name: 'equalizer', iconSize: 16 })
           Text('输入延迟抖动')
             .fontSize(11)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.onSurface)
+                        .fontColor(EmuColors.onSurface)
             .letterSpacing(1.2)
         }
         .alignItems(VerticalAlign.Center)
@@ -461,16 +449,14 @@ struct MultiplayerInputPage {
         Row({ space: 8 }) {
           Text('实时')
             .fontSize(8)
-            .fontFamily('monospace')
-            .fontColor(EmuColors.primary)
+                        .fontColor(EmuColors.primary)
             .padding({ left: 6, right: 6, top: 3, bottom: 3 })
             .backgroundColor('#1800FF41')
             .border({ width: 0.5, color: '#3300FF41', style: BorderStyle.Solid })
 
           Text('采样：16.6ms')
             .fontSize(8)
-            .fontFamily('monospace')
-            .fontColor('#777777')
+                        .fontColor('#777777')
         }
         .alignItems(VerticalAlign.Center)
       }
@@ -503,8 +489,7 @@ struct MultiplayerInputPage {
 
         Text('抖动样本：本地输入')
           .fontSize(8)
-          .fontFamily('monospace')
-          .fontColor('#777777')
+                    .fontColor('#777777')
           .align(Alignment.TopStart)
           .margin({ left: 12, top: 10 })
       }
@@ -527,8 +512,7 @@ struct MultiplayerInputPage {
         EmuIcon({ name: 'info', tone: 'muted', iconSize: 16 })
         Text('输入检测')
           .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor(EmuColors.onSurface)
+                    .fontColor(EmuColors.onSurface)
           .letterSpacing(1.2)
       }
       .alignItems(VerticalAlign.Center)
@@ -538,16 +522,14 @@ struct MultiplayerInputPage {
           Row() {
             Text(`${item.time} ${item.eventName}`)
               .fontSize(10)
-              .fontFamily('monospace')
-              .fontColor('#777777')
+                            .fontColor('#777777')
               .layoutWeight(1)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
 
             Text(item.state)
               .fontSize(10)
-              .fontFamily('monospace')
-              .fontColor(item.isPrimary ? EmuColors.primary : EmuColors.onSurfaceVariant)
+                            .fontColor(item.isPrimary ? EmuColors.primary : EmuColors.onSurfaceVariant)
           }
           .width('100%')
         }, (item: InputLogItem) => item.id)

@@ -14,17 +14,18 @@
  */
 import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
-import testNapi from 'libentry.so';
 import LogHelper from '../common/LogHelper';
 import { LibretroEventHub } from '../common/LibretroEventHub';
 
-// 为 NAPI 导出的接口提供明确类型，避免使用 any/unknown
-interface LibentryNapi {
-  // [NEW_ARCH] 新架构接口
-  refactoredPauseEngine?: () => boolean;
-  refactoredResumeEngine?: () => boolean;
-  refactoredStopEngine?: () => boolean;
-}
+// REMOVED: import testNapi from 'libentry.so' — eager load caused ~157 MB native
+// allocations (168 MB RSS) before any page rendered.  The static constructors in
+// libentry.so (LibretroEngine, VideoPipeline, AudioBridge, InputManager, etc.)
+// made malloc slow under memory pressure, causing APP_INPUT_BLOCK ANRs on
+// lightweight pages like OnboardingPage.
+//
+// libentry.so is now loaded lazily by LibretroGamePage via
+// RuntimeSessionController / RuntimeInputCommandBridge imports — only when the
+// user actually navigates to the game page.
 
 export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
@@ -62,34 +63,16 @@ export default class EntryAbility extends UIAbility {
   onForeground(): void {
     // Ability has brought to foreground
     LogHelper.info('EntryAbility', 'Lifecycle', 'Ability onForeground');
-
-    const napi: LibentryNapi = testNapi as LibentryNapi;
-
-    // 1. [LEGACY] 前台自动恢复正在运行的 Libretro 游戏
-
-    // 2. [NEW_ARCH] 前台自动恢复新架构引擎
-    try {
-      const ok = napi.refactoredResumeEngine?.();
-      LogHelper.info('EntryAbility', 'Engine', `[NEW_ARCH] 前台自动恢复: ok=${ok}`);
-    } catch (e) {
-      LogHelper.warn('EntryAbility', 'Engine', '[NEW_ARCH] 前台自动恢复异常');
-    }
+    // Engine pause/resume is handled by LibretroGamePage's lifecycle
+    // (aboutToAppear / aboutToDisappear).  libentry.so is loaded lazily
+    // when the user navigates to the game page — see imports note above.
   }
 
   onBackground(): void {
     // Ability has back to background
     LogHelper.info('EntryAbility', 'Lifecycle', 'Ability onBackground');
-
-    const napi: LibentryNapi = testNapi as LibentryNapi;
-
-    // 1. [LEGACY] 后台自动暂停正在运行的 Libretro 游戏
-
-    // 2. [NEW_ARCH] 后台自动暂停新架构引擎
-    try {
-      const ok = napi.refactoredPauseEngine?.();
-      LogHelper.info('EntryAbility', 'Engine', `[NEW_ARCH] 后台自动暂停: ok=${ok}`);
-    } catch (e) {
-      LogHelper.warn('EntryAbility', 'Engine', '[NEW_ARCH] 后台自动暂停异常');
-    }
+    // Engine pause/resume is handled by LibretroGamePage's lifecycle
+    // (aboutToAppear / aboutToDisappear).  libentry.so is loaded lazily
+    // when the user navigates to the game page — see imports note above.
   }
 };

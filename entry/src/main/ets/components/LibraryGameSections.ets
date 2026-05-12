@@ -4,6 +4,39 @@ import { EmuIcon } from './EmuIcon'
 import { GameCard } from './GameCard'
 import { LibrarySection } from './LibrarySection'
 
+class LibraryDataSource implements IDataSource {
+  private games: LibraryRecord[] = [];
+  private listeners: DataChangeListener[] = [];
+
+  public updateGames(games: LibraryRecord[]): void {
+    this.games = games;
+    this.listeners.forEach((listener) => {
+      listener.onDataReloaded();
+    });
+  }
+
+  totalCount(): number {
+    return this.games.length;
+  }
+
+  getData(index: number): LibraryRecord {
+    return this.games[index];
+  }
+
+  registerDataChangeListener(listener: DataChangeListener): void {
+    if (this.listeners.indexOf(listener) < 0) {
+      this.listeners.push(listener);
+    }
+  }
+
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    const pos = this.listeners.indexOf(listener);
+    if (pos >= 0) {
+      this.listeners.splice(pos, 1);
+    }
+  }
+}
+
 export interface LibraryGameSectionsState {
   recentGames: LibraryRecord[]
   games: LibraryRecord[]
@@ -15,12 +48,17 @@ export interface LibraryGameSectionsState {
 @Component
 export struct LibraryGameSections {
   @Prop recentGames: LibraryRecord[] = []
-  @Prop games: LibraryRecord[] = []
+  @Prop @Watch('onGamesChanged') games: LibraryRecord[] = []
   @Prop highlightedRecentGameId: string = ''
   @Prop bottomLoaderActive: boolean = false
   @Prop spinnerAngle: number = 0
   onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
   onHideSearchResults?: () => void
+  private allGamesDataSource: LibraryDataSource = new LibraryDataSource();
+
+  aboutToAppear(): void {
+    this.allGamesDataSource.updateGames(this.games);
+  }
 
   build() {
     Column({ space: 28 }) {
@@ -102,7 +140,7 @@ export struct LibraryGameSections {
   @Builder
   private AllGamesContent() {
     Column({ space: 18 }) {
-      ForEach(this.games, (item: LibraryRecord) => {
+      LazyForEach(this.allGamesDataSource, (item: LibraryRecord) => {
         GameCard({
           title: item.title,
           subtitle: item.subtitle,
@@ -162,5 +200,9 @@ export struct LibraryGameSections {
       return this.highlightedRecentGameId
     }
     return this.recentGames.length > 0 ? this.recentGames[0].id : ''
+  }
+
+  private onGamesChanged(): void {
+    this.allGamesDataSource.updateGames(this.games);
   }
 }

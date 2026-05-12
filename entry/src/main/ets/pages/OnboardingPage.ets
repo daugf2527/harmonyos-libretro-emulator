@@ -1,5 +1,6 @@
 import { EmuIcon } from '../components/EmuIcon'
-import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
+import { GridBackground } from '../components/EmuAppShell'
 import { PageLifecycleGuard } from '../common/PageLifecycleGuard'
 
 type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED'
@@ -19,10 +20,16 @@ struct ScanningLine {
 
   aboutToAppear(): void {
     this.scanOffset = 0
+    // Reduced from 16ms (60fps) to 50ms (20fps) — the scanning line is
+    // purely decorative and 20fps is smooth enough while cutting render
+    // pressure by 67%.  Combined with shadow and blur effects on this
+    // page, 60fps saturated the main-thread render pipeline, causing
+    // VSync timeouts and APP_INPUT_BLOCK ANRs under native memory
+    // pressure (~168 MB RSS).
     this.timer = setInterval(() => {
       const nextOffset = this.scanOffset + 1
       this.scanOffset = nextOffset > 191 ? 0 : nextOffset
-    }, 16)
+    }, 50)
   }
 
   aboutToDisappear(): void {
@@ -56,8 +63,6 @@ struct OnboardingPage {
     { key: 'SANDBOX_IMPORT', label: 'SANDBOX_IMPORT', status: 'GRANTED' },
   ]
   @State private protocolStatus: string = 'VERIFIED'
-  private readonly horizontalGridIndexes: number[] = createIndexRange(120)
-  private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
 
   aboutToAppear() {
@@ -179,7 +184,7 @@ struct OnboardingPage {
       this.Header()
 
       Stack() {
-        this.PrecisionGrid(40, '#1A484848', 0.5)
+        GridBackground({ gridSize: 40, lineColor: '#1A484848', lineWidth: 0.5 })
 
         Column() {
           if (this.currentStep === 1) {
@@ -209,35 +214,6 @@ struct OnboardingPage {
   }
 
   @Builder
-  private PrecisionGrid(gridSize: number, lineColor: string, lineWidth: number = 1) {
-    Stack() {
-      Column({ space: Math.max(0, gridSize - lineWidth) }) {
-        ForEach(this.horizontalGridIndexes, (item: number) => {
-          Row()
-            .width('100%')
-            .height(lineWidth)
-            .backgroundColor(lineColor)
-        }, (item: number) => `h-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-
-      Row({ space: Math.max(0, gridSize - lineWidth) }) {
-        ForEach(this.verticalGridIndexes, (item: number) => {
-          Column()
-            .width(lineWidth)
-            .height('100%')
-            .backgroundColor(lineColor)
-        }, (item: number) => `v-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-    }
-    .width('100%')
-    .height('100%')
-  }
-
-  @Builder
   private Header() {
     Row() {
       Row({ space: 6 }) {
@@ -246,8 +222,7 @@ struct OnboardingPage {
           iconSize: 14
         })
         Text('EMU_CORE_v1.0')
-          .fontFamily('monospace')
-          .fontSize(14)
+                    .fontSize(14)
           .fontColor(Colors.primary)
           .letterSpacing(3)
       }
@@ -397,7 +372,7 @@ struct OnboardingPage {
 
         Column({ space: 4 }) {
           Text('延迟').fontSize(10).fontColor('#FF666666').letterSpacing(2)
-          Text('0.02ms').fontSize(10).fontFamily('monospace').fontColor(Colors.primary)
+          Text('0.02ms').fontSize(10).fontColor(Colors.primary)
         }
         .alignItems(HorizontalAlign.End)
       }
@@ -423,8 +398,7 @@ struct OnboardingPage {
 
           Text('需要文件访问权限')
             .fontSize(12)
-            .fontFamily('monospace')
-            .fontColor(Colors.primary)
+                        .fontColor(Colors.primary)
             .letterSpacing(3)
         }
         .alignItems(VerticalAlign.Center)
@@ -460,7 +434,7 @@ struct OnboardingPage {
           .align(Alignment.Center)
 
         Stack() {
-          this.PrecisionGrid(20, '#1A484848', 0.5)
+          GridBackground({ gridSize: 20, lineColor: '#1A484848', lineWidth: 0.5 })
 
           Column({ space: 16 }) {
             EmuIcon({
@@ -511,14 +485,12 @@ struct OnboardingPage {
         Row() {
           Text('文件访问状态')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor('#FF666666')
+                        .fontColor('#FF666666')
             .letterSpacing(1)
 
           Text(this.protocolStatus)
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(this.protocolStatus === 'VERIFIED' ? Colors.primary : (this.protocolStatus === 'DENIED' ? '#FFBA573F' : Colors.outlineVariant))
+                        .fontColor(this.protocolStatus === 'VERIFIED' ? Colors.primary : (this.protocolStatus === 'DENIED' ? '#FFBA573F' : Colors.outlineVariant))
             .letterSpacing(1)
         }
         .width('100%')
@@ -535,8 +507,7 @@ struct OnboardingPage {
 
             Text(this.getPermissionStatusText(item))
               .fontSize(12)
-              .fontFamily('monospace')
-              .fontColor(Colors.onSurfaceVariant)
+                            .fontColor(Colors.onSurfaceVariant)
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
@@ -598,8 +569,7 @@ struct OnboardingPage {
     Row() {
       Text('Kinetic Obsidian Protocol • Build 2405.01')
         .fontSize(9)
-        .fontFamily('monospace')
-        .fontColor('#66666666')
+                .fontColor('#66666666')
         .letterSpacing(3)
     }
     .width('100%')

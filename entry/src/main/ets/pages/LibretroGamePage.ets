@@ -91,6 +91,19 @@ interface PendingSwitch {
   romIndex: number;
 }
 
+interface PerfDisplayState {
+  realtimeFps: number;
+  coreFps: number;
+  audioStatusText: string;
+  perfStatsText: string;
+  geometryText: string;
+}
+
+interface CoreCheckState {
+  running: boolean;
+  text: string;
+}
+
 @Entry
 @Component
 struct LibretroGamePage {
@@ -100,11 +113,8 @@ struct LibretroGamePage {
   @State gamePaused: boolean = false;
   @State switching: boolean = false;
   @State switchError: string = '';
-  @State coreCheckRunning: boolean = false;
-  @State coreCheckText: string = '';
-  @State soakRunning: boolean = false;
-  @State soakSecondsLeft: number = 0;
-  @State soakSummaryText: string = '';
+  @State coreCheck: CoreCheckState = { running: false, text: '' };
+  @State soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
   @State selectedCoreIndex: number = 0;
   @State selectedRomIndex: number = 0;
   @State selectedPortIndex: number = 0;
@@ -113,11 +123,7 @@ struct LibretroGamePage {
   private coreOptions: SelectOption[] = [];
   private romOptions: SelectOption[] = [];
   @State showControls: boolean = false;
-  @State realtimeFps: number = 0;
-  @State coreFps: number = 0;
-  @State audioStatusText: string = '';
-  @State perfStatsText: string = '';
-  @State geometryText: string = '';
+  @State perfDisplay: PerfDisplayState = { realtimeFps: 0, coreFps: 0, audioStatusText: '', perfStatsText: '', geometryText: '' };
   @State inputDebugText: string = '';
   @State inputFocusText: string = '';
   @State uiInputDebugText: string = '';
@@ -149,6 +155,16 @@ struct LibretroGamePage {
   
   private roms: RuntimeRomConfig[] = [];
   private readonly cores: CoreConfig[] = LIBRETRO_CORE_CATALOG;
+  // CRITICAL fix: cache getAvailableRoms() .filter() result (reference-equality on roms + coreIndex)
+  private availableRomsCache: RuntimeRomConfig[] = [];
+  private availableRomsCacheRef: RuntimeRomConfig[] | null = null;
+  private availableRomsCacheCoreIndex: number = -1;
+  // HIGH fix: reuse HUD metrics array instead of allocating in build() every render
+  private hudMetricsCache: RuntimeHudMetric[] = [
+    { label: 'FPS', value: '--.-' },
+    { label: 'LAT', value: '4ms' },
+    { label: 'CORE', value: 'EMU_V26' }
+  ];
   
   aboutToAppear() {
     this.pageActive = true;
@@ -183,6 +199,7 @@ struct LibretroGamePage {
     this.refreshInputDevices();
     this.syncPortAssignments();
     void this.loadRuntimeInputLayout();
+    this.refreshHudMetricsCache();
   }
   
   aboutToDisappear() {
@@ -279,6 +296,7 @@ struct LibretroGamePage {
     const paused = stateValue === EngineState.PAUSED;
     this.gameRunning = running;
     this.gamePaused = paused;
+    this.refreshHudMetricsCache();
     if (stateValue === EngineState.RUNNING && this.pendingStart) {
       this.pendingStart = false;
       LogHelper.info('LibretroGame', 'Engine', '游戏启动成功');
@@ -445,7 +463,8 @@ struct LibretroGamePage {
   handleFpsUpdate(payload: FpsUpdatePayload) {
     const fps = Number(payload.fps);
     if (!Number.isNaN(fps)) {
-      this.coreFps = Math.round(fps);
+      this.perfDisplay.coreFps = Math.round(fps);
+      this.refreshHudMetricsCache();
     }
 
     const drops = Number(payload.drops ?? 0);
@@ -456,7 +475,7 @@ struct LibretroGamePage {
     const buf = Number(payload.audioBufferUsage ?? 0);
     this.librarySessionTracker.updateFrameStats(fps, drops, dupes, nulls, underruns, overruns, buf);
 
-    this.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
+    this.perfDisplay.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
   }
 
   handleAudioStatus(payload: AudioStatusPayload) {
@@ -466,7 +485,7 @@ struct LibretroGamePage {
       return;
     }
     this.librarySessionTracker.updateAudioStatus(occupancy, underruns, Number(payload.overruns));
-    this.audioStatusText = `Buf:${occupancy.toFixed(0)}% U:${underruns}`;
+    this.perfDisplay.audioStatusText = `Buf:${occupancy.toFixed(0)}% U:${underruns}`;
   }
 
   handleGeometryUpdate(payload: GeometryUpdatePayload) {
@@ -475,7 +494,7 @@ struct LibretroGamePage {
     const a = Number(payload.aspect_ratio ?? 0);
     if (w > 0 && h > 0) {
       const aspectText = (a > 0) ? a.toFixed(3) : (w / h).toFixed(3);
-      this.geometryText = `Base:${w}x${h} AR:${aspectText}`;
+      this.perfDisplay.geometryText = `Base:${w}x${h} AR:${aspectText}`;
     }
   }
 
@@ -511,10 +530,16 @@ struct LibretroGamePage {
     this.selectedRomIndex = 0;
   }
   
-  // 获取当前核心可用的 ROM
+  // 获取当前核心可用的 ROM（缓存结果，避免重复 filter）
   getAvailableRoms(): RuntimeRomConfig[] {
+    if (this.selectedCoreIndex === this.availableRomsCacheCoreIndex && this.roms === this.availableRomsCacheRef) {
+      return this.availableRomsCache;
+    }
+    this.availableRomsCacheCoreIndex = this.selectedCoreIndex;
+    this.availableRomsCacheRef = this.roms;
     const currentCore = this.cores[this.selectedCoreIndex];
-    return this.roms.filter(rom => rom.coreId === currentCore.id);
+    this.availableRomsCache = this.roms.filter(rom => rom.coreId === currentCore.id);
+    return this.availableRomsCache;
   }
 
   private async refreshRomList() {
@@ -589,43 +614,43 @@ struct LibretroGamePage {
   }
 
   async runCoreCheck(): Promise<void> {
-    if (this.coreCheckRunning) {
+    if (this.coreCheck.running) {
       return;
     }
     const core = this.cores[this.selectedCoreIndex];
     if (!core) {
-      this.coreCheckText = '核心无效';
+      this.coreCheck.text = '核心无效';
       return;
     }
-    this.coreCheckRunning = true;
-    this.coreCheckText = '正在验证核心符号...';
+    this.coreCheck.running = true;
+    this.coreCheck.text = '正在验证核心符号...';
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       if (!context) {
-        this.coreCheckText = '获取 Context 失败';
-        this.coreCheckRunning = false;
+        this.coreCheck.text = '获取 Context 失败';
+        this.coreCheck.running = false;
         return;
       }
       const bundleCodeDir = context.bundleCodeDir;
       const corePath = await resolveRuntimeCorePath(bundleCodeDir, core.soFile);
       const result = runtimeCoreDiagnosticController.testCoreLoader(corePath);
-      this.coreCheckText = result;
+      this.coreCheck.text = result;
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
-      this.coreCheckText = `Failed: ${msg}`;
+      this.coreCheck.text = `Failed: ${msg}`;
       LogHelper.error('LibretroGame', 'Core', `符号验证异常: ${msg}`);
     } finally {
-      this.coreCheckRunning = false;
+      this.coreCheck.running = false;
     }
   }
 
   private resetCoreCheckState() {
-    this.coreCheckRunning = false;
-    this.coreCheckText = '';
+    this.coreCheck.running = false;
+    this.coreCheck.text = '';
   }
 
   private getRuntimeFpsText(): string {
-    const fps = this.coreFps > 0 ? this.coreFps : this.realtimeFps;
+    const fps = this.perfDisplay.coreFps > 0 ? this.perfDisplay.coreFps : this.perfDisplay.realtimeFps;
     return fps > 0 ? fps.toFixed(1) : '--.-';
   }
 
@@ -650,12 +675,14 @@ struct LibretroGamePage {
     return 'CHRONO_TRIGGER_USA_SNES';
   }
 
+  private refreshHudMetricsCache(): void {
+    this.hudMetricsCache[0].value = this.getRuntimeFpsText();
+    this.hudMetricsCache[1].value = this.getRuntimeLatencyText();
+    this.hudMetricsCache[2].value = this.getRuntimeCoreText();
+  }
+
   private getRuntimeHudMetrics(): RuntimeHudMetric[] {
-    return [
-      { label: 'FPS', value: this.getRuntimeFpsText() },
-      { label: 'LAT', value: this.getRuntimeLatencyText() },
-      { label: 'CORE', value: this.getRuntimeCoreText() }
-    ];
+    return this.hudMetricsCache;
   }
 
   private handleInputSourceSelect(index: number): void {
@@ -685,16 +712,16 @@ struct LibretroGamePage {
 
   private clearRuntimeStatsForConfigChange(): void {
     const okStats = runtimeRenderSettingsController.resetStats();
-    this.realtimeFps = 0;
-    this.coreFps = 0;
-    this.audioStatusText = '';
-    this.perfStatsText = '';
-    this.geometryText = '';
+    this.perfDisplay.realtimeFps = 0;
+    this.perfDisplay.coreFps = 0;
+    this.perfDisplay.audioStatusText = '';
+    this.perfDisplay.perfStatsText = '';
+    this.perfDisplay.geometryText = '';
     LogHelper.info('LibretroGame', 'Config', `重置性能统计: okStats=${okStats}`);
   }
 
   private stopSoakBeforeConfigChange(): void {
-    if (this.soakRunning) {
+    if (this.soakState.running) {
       this.stopSoak();
       this.clearSoakSummary();
     }
@@ -836,7 +863,7 @@ struct LibretroGamePage {
 
       // 左上角系统菜单按钮
       if (!this.gameRunning) {
-        Button('▦')
+        Button('MENU')
           .width(46)
           .height(40)
           .fontSize(18)
@@ -924,8 +951,8 @@ struct LibretroGamePage {
         currentRomLabel: this.currentRomLabel,
         hasRomOptions: this.hasRomOptions,
         switching: this.switching,
-        coreCheckRunning: this.coreCheckRunning,
-        coreCheckText: this.coreCheckText,
+        coreCheckRunning: this.coreCheck.running,
+        coreCheckText: this.coreCheck.text,
         scalingMode: this.scalingMode,
         softwareMaxPresetIndex: this.softwareMaxPresetIndex,
         hwRenderAllowed: this.hwRenderAllowed,
@@ -933,9 +960,9 @@ struct LibretroGamePage {
         gameRunning: this.gameRunning,
         gamePaused: this.gamePaused,
         runtimeSaveStatusText: this.runtimeSaveStatusText,
-        soakRunning: this.soakRunning,
-        soakSecondsLeft: this.soakSecondsLeft,
-        soakSummaryText: this.soakSummaryText,
+        soakRunning: this.soakState.running,
+        soakSecondsLeft: this.soakState.secondsLeft,
+        soakSummaryText: this.soakState.summaryText,
         switchError: this.switchError,
         onClose: () => {
           this.showControls = false;
@@ -992,7 +1019,7 @@ struct LibretroGamePage {
           void this.quickLoadRuntimeState();
         },
         onSoakToggle: () => {
-          if (this.soakRunning) {
+          if (this.soakState.running) {
             this.stopSoak();
           } else {
             this.startSoak(600);
@@ -1121,6 +1148,7 @@ struct LibretroGamePage {
       this.gameRunning = true;
       this.gamePaused = false;
       this.pendingStart = false;
+      this.refreshHudMetricsCache();
       await markLibraryRecordPlayed(context, rom.file);
       if (!this.isCurrentSwitchTask(token)) {
         return;
@@ -1182,7 +1210,7 @@ struct LibretroGamePage {
   stopGame() {
     if (this.gameRunning || this.gamePaused) {
       void this.finalizeActiveLibrarySession();
-      // 避免 UI 线程同步 Stop 阻塞导致卡死
+      // stopAsync uses napi_async_work — returns immediately, real stop on worker
       runtimeSessionController.stopAsync();
       this.gameRunning = false;
       this.gamePaused = false;
@@ -1211,8 +1239,8 @@ struct LibretroGamePage {
   }
 
   private applySoakState(state: RuntimeSoakState): void {
-    this.soakRunning = state.running;
-    this.soakSecondsLeft = state.secondsLeft;
-    this.soakSummaryText = state.summaryText;
+    this.soakState.running = state.running;
+    this.soakState.secondsLeft = state.secondsLeft;
+    this.soakState.summaryText = state.summaryText;
   }
 }

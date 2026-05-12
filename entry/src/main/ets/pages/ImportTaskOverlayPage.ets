@@ -1,9 +1,9 @@
 import { common } from '@kit.AbilityKit'
-import { EmuHeaderBar } from '../components/EmuAppShell'
+import { EmuHeaderBar, GridBackground } from '../components/EmuAppShell'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { consumePendingImportUris } from '../common/ImportTaskBridge'
-import { EmuColors, createIndexRange } from '../common/EmuUiTokens'
+import { EmuColors } from '../common/EmuUiTokens'
 import {
   importRomUris,
   inspectRomImportConflicts,
@@ -54,8 +54,6 @@ struct ImportTaskOverlayPage {
   private pageActive: boolean = false
   private importTaskToken: number = 0
   private pulseTimer: number = -1
-  private readonly horizontalGridIndexes: number[] = createIndexRange(120)
-  private readonly verticalGridIndexes: number[] = createIndexRange(120)
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
     { key: 'explore', iconName: 'explore', label: '探索', isActive: false },
@@ -528,8 +526,7 @@ struct ImportTaskOverlayPage {
               Text(item.detail)
                 .width('100%')
                 .fontSize(10)
-                .fontFamily('monospace')
-                .fontColor(Colors.onSurfaceVariant)
+                                .fontColor(Colors.onSurfaceVariant)
                 .maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
@@ -538,8 +535,7 @@ struct ImportTaskOverlayPage {
 
             Text(this.getResultStatusText(item))
               .fontSize(9)
-              .fontFamily('monospace')
-              .fontColor(this.getResultStatusColor(item))
+                            .fontColor(this.getResultStatusColor(item))
               .letterSpacing(0.8)
           }
           .width('100%')
@@ -565,8 +561,7 @@ struct ImportTaskOverlayPage {
             Text(name)
               .width('100%')
               .fontSize(11)
-              .fontFamily('monospace')
-              .fontColor(Colors.onSurface)
+                            .fontColor(Colors.onSurface)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
@@ -669,15 +664,14 @@ struct ImportTaskOverlayPage {
   @Builder
   private BackgroundWorkspace() {
     Stack() {
-      this.PrecisionGrid(40, '#1A484848', 0.5)
+      GridBackground({ gridSize: 40, lineColor: '#1A484848', lineWidth: 0.5 })
 
       Column({ space: 20 }) {
         Column({ space: 16 }) {
           Row() {
             Text('System Load')
               .fontSize(10)
-              .fontFamily('monospace')
-              .fontColor(Colors.onSurfaceVariant)
+                            .fontColor(Colors.onSurfaceVariant)
               .letterSpacing(1.5)
           }
           .width('100%')
@@ -720,35 +714,6 @@ struct ImportTaskOverlayPage {
     .layoutWeight(1)
     .blur(28)
     .opacity(0.06)
-  }
-
-  @Builder
-  private PrecisionGrid(gridSize: number, lineColor: string, lineWidth: number = 1) {
-    Stack() {
-      Column({ space: Math.max(0, gridSize - lineWidth) }) {
-        ForEach(this.horizontalGridIndexes, (item: number) => {
-          Row()
-            .width('100%')
-            .height(lineWidth)
-            .backgroundColor(lineColor)
-        }, (item: number) => `h-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-
-      Row({ space: Math.max(0, gridSize - lineWidth) }) {
-        ForEach(this.verticalGridIndexes, (item: number) => {
-          Column()
-            .width(lineWidth)
-            .height('100%')
-            .backgroundColor(lineColor)
-        }, (item: number) => `v-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-    }
-    .width('100%')
-    .height('100%')
   }
 
   @Builder
@@ -801,8 +766,7 @@ struct ImportTaskOverlayPage {
         Column({ space: 2 }) {
           Text('正在导入')
             .fontSize(10)
-            .fontFamily('monospace')
-            .fontColor(Colors.primary)
+                        .fontColor(Colors.primary)
             .letterSpacing(1.4)
 
           Text(this.currentProgressText)
@@ -816,8 +780,7 @@ struct ImportTaskOverlayPage {
 
         Text(this.etaText)
           .fontSize(10)
-          .fontFamily('monospace')
-          .fontColor(Colors.onSurfaceVariant)
+                    .fontColor(Colors.onSurfaceVariant)
       }
       .width('100%')
       .alignItems(VerticalAlign.Bottom)
@@ -852,8 +815,7 @@ struct ImportTaskOverlayPage {
           Text(this.sourceText)
             .layoutWeight(1)
             .fontSize(11)
-            .fontFamily('monospace')
-            .fontColor(Colors.onSurfaceVariant)
+                        .fontColor(Colors.onSurfaceVariant)
             .letterSpacing(0.3)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -862,8 +824,7 @@ struct ImportTaskOverlayPage {
 
         Text(this.transferRateText)
           .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor(Colors.onSurfaceVariant)
+                    .fontColor(Colors.onSurfaceVariant)
           .maxLines(1)
       }
       .width('100%')
@@ -874,8 +835,7 @@ struct ImportTaskOverlayPage {
         Text(this.importedNamesPreviewText)
           .width('100%')
           .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor(Colors.onSurfaceVariant)
+                    .fontColor(Colors.onSurfaceVariant)
           .maxLines(3)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .margin({ bottom: 18 })
@@ -885,8 +845,7 @@ struct ImportTaskOverlayPage {
         Button('取消导入')
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
-          .fontFamily('monospace')
-          .fontColor(Colors.onSurfaceVariant)
+                    .fontColor(Colors.onSurfaceVariant)
           .height(48)
           .padding({ left: 28, right: 28 })
           .border({ width: 0.5, color: '#4D757575', style: BorderStyle.Solid })
@@ -905,13 +864,11 @@ struct ImportTaskOverlayPage {
       Row() {
         Text(this.processIdText)
           .fontSize(9)
-          .fontFamily('monospace')
-          .fontColor('#FF666666')
+                    .fontColor('#FF666666')
 
         Text(this.processStatusText)
           .fontSize(9)
-          .fontFamily('monospace')
-          .fontColor('#FF666666')
+                    .fontColor('#FF666666')
           .opacity(this.pulseDotVisible ? 1 : 0.5)
       }
       .width('100%')
@@ -959,8 +916,7 @@ struct ImportTaskOverlayPage {
       if (this.conflictDetailText.length > 0) {
         Text(this.conflictDetailText)
           .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor('#9A6D5954')
+                    .fontColor('#9A6D5954')
           .textAlign(TextAlign.Center)
           .margin({ bottom: 16 })
       }
@@ -978,8 +934,7 @@ struct ImportTaskOverlayPage {
         .height(36)
         .fontSize(10)
         .fontWeight(FontWeight.Bold)
-        .fontFamily('monospace')
-        .fontColor(Colors.onSurface)
+                .fontColor(Colors.onSurface)
         .backgroundColor(this.confirmPressed ? '#33FFFFFF' : '#1AFFFFFF')
         .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
         .scale({ x: this.confirmPressed ? 0.95 : 1, y: this.confirmPressed ? 0.95 : 1 })
@@ -994,8 +949,7 @@ struct ImportTaskOverlayPage {
         .height(36)
         .fontSize(10)
         .fontWeight(FontWeight.Bold)
-        .fontFamily('monospace')
-        .fontColor(Colors.onSurface)
+                .fontColor(Colors.onSurface)
         .backgroundColor(this.overwritePressed ? '#33FFFFFF' : '#1AFFFFFF')
         .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
         .scale({ x: this.overwritePressed ? 0.95 : 1, y: this.overwritePressed ? 0.95 : 1 })
@@ -1010,8 +964,7 @@ struct ImportTaskOverlayPage {
         .height(36)
         .fontSize(10)
         .fontWeight(FontWeight.Bold)
-        .fontFamily('monospace')
-        .fontColor(Colors.onSurfaceVariant)
+                .fontColor(Colors.onSurfaceVariant)
         .backgroundColor(this.cancelPressed ? Colors.surfaceContainerHighest : Color.Transparent)
         .border({ width: 0.5, color: '#4D757575', style: BorderStyle.Solid })
         .scale({ x: this.cancelPressed ? 0.95 : 1, y: this.cancelPressed ? 0.95 : 1 })
@@ -1058,8 +1011,7 @@ struct ImportTaskOverlayPage {
       if (this.resultDetailText.length > 0) {
         Text(this.resultDetailText)
           .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor('#8AABABAB')
+                    .fontColor('#8AABABAB')
           .margin({ bottom: 16 })
       }
 
@@ -1073,8 +1025,7 @@ struct ImportTaskOverlayPage {
         Text(this.importedNamesPreviewText)
           .width('100%')
           .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor('#8AABABAB')
+                    .fontColor('#8AABABAB')
           .textAlign(TextAlign.Center)
           .maxLines(3)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -1087,8 +1038,7 @@ struct ImportTaskOverlayPage {
           .height(36)
           .fontSize(11)
           .fontWeight(FontWeight.Bold)
-          .fontFamily('monospace')
-          .fontColor(Colors.onSurface)
+                    .fontColor(Colors.onSurface)
           .backgroundColor(this.overwritePressed ? '#33FFFFFF' : '#1AFFFFFF')
           .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
           .scale({ x: this.overwritePressed ? 0.95 : 1, y: this.overwritePressed ? 0.95 : 1 })
@@ -1104,8 +1054,7 @@ struct ImportTaskOverlayPage {
         .height(36)
         .fontSize(11)
         .fontWeight(FontWeight.Bold)
-        .fontFamily('monospace')
-        .fontColor(Colors.primary)
+                .fontColor(Colors.primary)
         .backgroundColor('#1A00FF41')
         .border({ width: 0.5, color: '#4D00FF41', style: BorderStyle.Solid })
         .scale({ x: this.confirmPressed ? 0.95 : 1, y: this.confirmPressed ? 0.95 : 1 })
@@ -1152,8 +1101,7 @@ struct ImportTaskOverlayPage {
       if (this.resultDetailText.length > 0) {
         Text(this.resultDetailText)
           .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor('#9A6D5954')
+                    .fontColor('#9A6D5954')
           .margin({ bottom: 16 })
       }
 
@@ -1167,8 +1115,7 @@ struct ImportTaskOverlayPage {
         Text(this.importedNamesPreviewText)
           .width('100%')
           .fontSize(11)
-          .fontFamily('monospace')
-          .fontColor('#9A6D5954')
+                    .fontColor('#9A6D5954')
           .textAlign(TextAlign.Center)
           .maxLines(3)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -1181,8 +1128,7 @@ struct ImportTaskOverlayPage {
           .height(36)
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
-          .fontFamily('monospace')
-          .fontColor(Colors.onSurfaceVariant)
+                    .fontColor(Colors.onSurfaceVariant)
           .backgroundColor(Color.Transparent)
           .border({ width: 0.5, color: '#4D757575', style: BorderStyle.Solid })
           .onClick(() => this.handleRetryAction())
@@ -1192,8 +1138,7 @@ struct ImportTaskOverlayPage {
           .height(36)
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
-          .fontFamily('monospace')
-          .fontColor(Colors.error)
+                    .fontColor(Colors.error)
           .backgroundColor(this.retryPressed ? '#3DED7F64' : '#1AED7F64')
           .border({ width: 0.5, color: '#4DED7F64', style: BorderStyle.Solid })
           .scale({ x: this.retryPressed ? 0.95 : 1, y: this.retryPressed ? 0.95 : 1 })
@@ -1208,8 +1153,7 @@ struct ImportTaskOverlayPage {
           .height(36)
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
-          .fontFamily('monospace')
-          .fontColor(Colors.onSurface)
+                    .fontColor(Colors.onSurface)
           .backgroundColor(this.overwritePressed ? '#33FFFFFF' : '#1AFFFFFF')
           .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
           .scale({ x: this.overwritePressed ? 0.95 : 1, y: this.overwritePressed ? 0.95 : 1 })

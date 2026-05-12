@@ -25,6 +25,22 @@ export struct LibraryDetailInfoPanel {
   private extendedCells: LibraryDetailSummaryCellData[] = []
   private telemetryProfile: number[] = []
   onToggleDetails?: () => void
+  // Pre-computed row caches to avoid .slice() allocation in build()
+  private cachedTopRow: LibraryDetailSummaryCellData[] = []
+  private cachedBottomRow: LibraryDetailSummaryCellData[] = []
+  private lastCellsRef: LibraryDetailSummaryCellData[] | null = null
+
+  aboutToAppear(): void {
+    this.refreshRowCaches()
+  }
+
+  private refreshRowCaches(): void {
+    if (this.extendedCells !== this.lastCellsRef) {
+      this.lastCellsRef = this.extendedCells
+      this.cachedTopRow = this.extendedCells.slice(0, 2)
+      this.cachedBottomRow = this.extendedCells.slice(2, 4)
+    }
+  }
 
   build() {
     Column({ space: 30 }) {

@@ -21,7 +21,8 @@ export class RuntimeSaveStateController {
       return 'CONTEXT_MISSING'
     }
     try {
-      const stateData = runtimeSessionController.saveState()
+      // Use async version to avoid blocking main thread on save serialization
+      const stateData = await runtimeSessionController.saveStateAsync()
       if (!stateData || stateData.byteLength <= 0) {
         return 'SAVE_STATE_UNAVAILABLE'
       }
@@ -53,7 +54,8 @@ export class RuntimeSaveStateController {
         return 'NO_SAVE_FOR_CURRENT_ROM'
       }
       const stateData = readSaveStateData(context, item.fileName)
-      const loaded = runtimeSessionController.loadState(stateData)
+      // Use async version to avoid blocking main thread on load deserialization
+      const loaded = await runtimeSessionController.loadStateAsync(stateData)
       LogHelper.info('RuntimeSaveState', 'Save', `运行态即时读档: file=${item.fileName} ok=${loaded}`)
       return loaded ? 'SAVE_STATE_LOADED' : 'LOAD_STATE_REJECTED'
     } catch (err) {
