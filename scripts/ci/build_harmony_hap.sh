@@ -5,12 +5,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
-if ! command -v hvigorw >/dev/null 2>&1; then
-  echo "[FAIL] hvigorw is required in PATH." >&2
-  exit 1
+hvigorw_bin="${ROOT_DIR}/hvigorw"
+if [[ ! -x "${hvigorw_bin}" ]]; then
+  if ! command -v hvigorw >/dev/null 2>&1; then
+    echo "[FAIL] hvigorw is required in PATH." >&2
+    exit 1
+  fi
+  hvigorw_bin="$(command -v hvigorw)"
 fi
 
-hvigorw_bin="$(command -v hvigorw)"
 if [[ ! -x "${hvigorw_bin}" ]]; then
   echo "[FAIL] hvigorw is not executable: ${hvigorw_bin}" >&2
   exit 1
