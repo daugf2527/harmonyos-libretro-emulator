@@ -11,18 +11,22 @@ export struct GameCard {
   @Prop coverColor: string = '#2C2C2C'
   @Prop coverKey: string = ''
   @Prop variant: GameCardVariant = 'recent'
-  @Prop isHighlighted: boolean = false
+  @Prop @Watch('onHighlightChanged') isHighlighted: boolean = false
   onCardClick?: () => void
   @State private scannerOffset: number = -120
   @State private glowOpacity: number = 0.28
   private scannerTimer: number = -1
 
   aboutToAppear(): void {
-    this.startScannerLoop()
+    this.syncScannerLoop()
   }
 
   aboutToDisappear(): void {
     this.stopScannerLoop()
+  }
+
+  private onHighlightChanged(): void {
+    this.syncScannerLoop()
   }
 
   private startScannerLoop(): void {
@@ -42,6 +46,16 @@ export struct GameCard {
       clearInterval(this.scannerTimer)
       this.scannerTimer = -1
     }
+    this.scannerOffset = -120
+    this.glowOpacity = 0.28
+  }
+
+  private syncScannerLoop(): void {
+    if (this.isHighlighted) {
+      this.startScannerLoop()
+      return
+    }
+    this.stopScannerLoop()
   }
 
   build() {

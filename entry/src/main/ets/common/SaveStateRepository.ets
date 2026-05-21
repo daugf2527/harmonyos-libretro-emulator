@@ -135,12 +135,13 @@ async function buildManifestFromDirectory(context: common.UIAbilityContext): Pro
   const items: SaveStateManifestItem[] = []
   try {
     const entries = await fs.listFile(saveDir)
-    entries.forEach((fileName: string) => {
+    for (let index = 0; index < entries.length; index += 1) {
+      const fileName = entries[index]
       if (!fileName.endsWith('.state')) {
-        return
+        continue
       }
       const path = buildSaveFilePath(context.filesDir, fileName)
-      const stat = fs.statSync(path)
+      const stat = await fs.stat(path)
       items.push({
         id: fileName,
         fileName: fileName,
@@ -148,7 +149,7 @@ async function buildManifestFromDirectory(context: common.UIAbilityContext): Pro
         createdAt: readTimestampFromFileName(fileName),
         byteLength: Number(stat.size)
       })
-    })
+    }
   } catch (err) {
     const message = (err as Error).message || String(err)
     LogHelper.warn('SaveStateRepository', 'Index', `扫描存档目录失败: ${message}`)

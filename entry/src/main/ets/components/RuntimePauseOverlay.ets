@@ -43,7 +43,7 @@ export struct RuntimePauseOverlay {
       }
       .alignItems(VerticalAlign.Center)
 
-      Text(`${this.fpsText} FPS | CPU ${this.cpuLoadText} | GPU 22%`)
+      Text(`${this.fpsText} FPS | CPU ${this.cpuLoadText} | GPU --`)
         .fontSize(13)
         .fontWeight(FontWeight.Bold)
         .fontFamily('monospace')

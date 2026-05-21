@@ -47,6 +47,24 @@ export struct RuntimeControlPanel {
   onQuickLoad?: () => void
   onSoakToggle?: () => void
 
+  private readonly renderModeLabels: ResourceStr[] = ['硬件渲染', '软件渲染', 'GLES渲染']
+  private readonly softwareResolutionLabels: ResourceStr[] = ['480p', '720p', '1080p']
+
+  private clampIndex(index: number, size: number): number {
+    if (size <= 0) {
+      return 0
+    }
+    return Math.max(0, Math.min(size - 1, Math.floor(index)))
+  }
+
+  private getSafeRenderModeIndex(): number {
+    return this.clampIndex(this.scalingMode, this.renderModeLabels.length)
+  }
+
+  private getSafeSoftwareResolutionIndex(): number {
+    return this.clampIndex(this.softwareMaxPresetIndex, this.softwareResolutionLabels.length)
+  }
+
   @Builder
   private SelectBlock(
     label: string,
@@ -119,8 +137,8 @@ export struct RuntimeControlPanel {
         { value: '软件渲染 (CPU)' },
         { value: 'GLES渲染 (GPU)' }
       ],
-      this.scalingMode,
-      ['硬件渲染', '软件渲染', 'GLES渲染'][this.scalingMode],
+      this.getSafeRenderModeIndex(),
+      this.renderModeLabels[this.getSafeRenderModeIndex()],
       !this.switching,
       (index: number) => {
         this.onRenderModeSelect?.(index)
@@ -138,8 +156,8 @@ export struct RuntimeControlPanel {
           { value: '720p (1280x720)' },
           { value: '1080p (1920x1080)' }
         ],
-        this.softwareMaxPresetIndex,
-        ['480p', '720p', '1080p'][this.softwareMaxPresetIndex],
+        this.getSafeSoftwareResolutionIndex(),
+        this.softwareResolutionLabels[this.getSafeSoftwareResolutionIndex()],
         !this.switching,
         (index: number) => {
           this.onSoftwareResolutionSelect?.(index)

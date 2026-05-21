@@ -13,10 +13,66 @@ import {
   RomImportResult
 } from '../common/RomImportService'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
+import { PageLifecycleGuard } from '../common/PageLifecycleGuard'
 
 type FeedbackState = 'CONFLICT' | 'IMPORTING' | 'SUCCESS' | 'ERROR'
 
 const Colors = EmuColors
+
+@Component
+struct ImportPulseDot {
+  @State private visible: boolean = true
+  private pulseTimer: number = -1
+
+  aboutToAppear(): void {
+    this.pulseTimer = setInterval(() => {
+      this.visible = !this.visible
+    }, 420)
+  }
+
+  aboutToDisappear(): void {
+    if (this.pulseTimer !== -1) {
+      clearInterval(this.pulseTimer)
+      this.pulseTimer = -1
+    }
+  }
+
+  build() {
+    Row()
+      .width(4)
+      .height(4)
+      .borderRadius(2)
+      .backgroundColor(Colors.primary)
+      .opacity(this.visible ? 1 : 0.3)
+  }
+}
+
+@Component
+struct ImportPulseStatusText {
+  @Prop text: string = ''
+  @State private visible: boolean = true
+  private pulseTimer: number = -1
+
+  aboutToAppear(): void {
+    this.pulseTimer = setInterval(() => {
+      this.visible = !this.visible
+    }, 420)
+  }
+
+  aboutToDisappear(): void {
+    if (this.pulseTimer !== -1) {
+      clearInterval(this.pulseTimer)
+      this.pulseTimer = -1
+    }
+  }
+
+  build() {
+    Text(this.text)
+      .fontSize(9)
+      .fontColor('#FF666666')
+      .opacity(this.visible ? 1 : 0.5)
+  }
+}
 
 @Entry
 @Component
@@ -28,7 +84,6 @@ struct ImportTaskOverlayPage {
   @State private confirmPressed: boolean = false
   @State private retryPressed: boolean = false
   @State private overwritePressed: boolean = false
-  @State private pulseDotVisible: boolean = true
   @State private etaText: string = '剩余约 02:45'
   @State private sourceText: string = '来源：本地文件选择器'
   @State private transferRateText: string = '--'
@@ -53,7 +108,7 @@ struct ImportTaskOverlayPage {
   private importStartedAtMs: number = 0
   private pageActive: boolean = false
   private importTaskToken: number = 0
-  private pulseTimer: number = -1
+  private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
   private readonly navItems: EmuBottomNavItem[] = [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
     { key: 'explore', iconName: 'explore', label: '探索', isActive: false },
@@ -62,10 +117,10 @@ struct ImportTaskOverlayPage {
 
   aboutToAppear(): void {
     this.pageActive = true
+    this.lifecycle.activate()
     this.cancelRequested = false
     this.importTaskToken += 1
     const token = this.importTaskToken
-    this.startPulseTimer()
     const pendingUris = consumePendingImportUris()
     if (pendingUris.length > 0) {
       void this.prepareActualImport(pendingUris, token)
@@ -76,31 +131,13 @@ struct ImportTaskOverlayPage {
 
   aboutToDisappear(): void {
     this.pageActive = false
+    this.lifecycle.deactivate()
     this.cancelRequested = true
     this.importTaskToken += 1
-    this.stopPulseTimer()
   }
 
   private isCurrentImportTask(token: number): boolean {
     return this.pageActive && token === this.importTaskToken
-  }
-
-  private startPulseTimer(): void {
-    if (this.pulseTimer !== -1) {
-      clearInterval(this.pulseTimer)
-      this.pulseTimer = -1
-    }
-    this.pulseDotVisible = true
-    this.pulseTimer = setInterval(() => {
-      this.pulseDotVisible = !this.pulseDotVisible
-    }, 420)
-  }
-
-  private stopPulseTimer(): void {
-    if (this.pulseTimer !== -1) {
-      clearInterval(this.pulseTimer)
-      this.pulseTimer = -1
-    }
   }
 
   private showMissingImportTask(): void {
@@ -126,11 +163,15 @@ struct ImportTaskOverlayPage {
     if (this.feedbackState === nextState) {
       return
     }
+    const token = this.lifecycle.beginTask()
     this.getUIContext().animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
       this.overlayOpacity = 0
       this.overlayScale = 0.96
     })
-    setTimeout(() => {
+    this.lifecycle.trackTimeout(setTimeout(() => {
+      if (!this.lifecycle.isCurrentTask(token)) {
+        return
+      }
       this.feedbackState = nextState
       this.overlayOpacity = 0
       this.overlayScale = 0.96
@@ -138,7 +179,7 @@ struct ImportTaskOverlayPage {
         this.overlayOpacity = 1
         this.overlayScale = 1
       })
-    }, 120)
+    }, 120))
   }
 
   private onCancelTouch(event: TouchEvent): void {
@@ -628,7 +669,7 @@ struct ImportTaskOverlayPage {
     Stack() {
       Column() {
         EmuHeaderBar({
-          titleText: 'EMU_OS // 0.1',
+          titleText: '碳影 / Carbon Shade',
           titleIcon: 'terminal',
           rightLabel: '导入监控',
           rightIcon: 'settings_input_component',
@@ -805,12 +846,7 @@ struct ImportTaskOverlayPage {
 
       Row() {
         Row({ space: 8 }) {
-          Row()
-            .width(4)
-            .height(4)
-            .borderRadius(2)
-            .backgroundColor(Colors.primary)
-            .opacity(this.pulseDotVisible ? 1 : 0.3)
+          ImportPulseDot()
 
           Text(this.sourceText)
             .layoutWeight(1)
@@ -866,10 +902,7 @@ struct ImportTaskOverlayPage {
           .fontSize(9)
                     .fontColor('#FF666666')
 
-        Text(this.processStatusText)
-          .fontSize(9)
-                    .fontColor('#FF666666')
-          .opacity(this.pulseDotVisible ? 1 : 0.5)
+        ImportPulseStatusText({ text: this.processStatusText })
       }
       .width('100%')
       .height(30)

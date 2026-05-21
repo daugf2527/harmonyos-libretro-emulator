@@ -216,24 +216,33 @@ struct InputLayoutPage {
   }
 
   private nudgeSelectedButton(deltaX: number, deltaY: number): void {
-    const nextButtons: InputLayoutButton[] = []
-    this.layoutButtons.forEach((button: InputLayoutButton) => {
-      if (button.id === this.selectedButtonId) {
-        nextButtons.push({
-          id: button.id,
-          label: button.label,
-          caption: button.caption,
-          x: Math.max(0, Math.min(360, button.x + deltaX)),
-          y: Math.max(40, Math.min(280, button.y + deltaY)),
-          size: button.size,
-          shape: button.shape
-        })
-      } else {
-        nextButtons.push(button)
-      }
-    })
+    const idx = this.layoutButtons.findIndex((b: InputLayoutButton) => b.id === this.selectedButtonId)
+    if (idx === -1) {
+      return
+    }
+    const b = this.layoutButtons[idx]
+    const horizontalLimit = Math.max(0, this.editorLayoutWidth - this.getButtonVisualWidth(b))
+    const verticalLimit = Math.max(0, this.editorLayoutHeight - this.getButtonVisualHeight(b))
+    const nextButtons = [...this.layoutButtons]
+    nextButtons[idx] = {
+      id: b.id,
+      label: b.label,
+      caption: b.caption,
+      x: Math.max(0, Math.min(horizontalLimit, b.x + deltaX)),
+      y: Math.max(0, Math.min(verticalLimit, b.y + deltaY)),
+      size: b.size,
+      shape: b.shape
+    }
     this.layoutButtons = nextButtons
     this.layoutStatusText = 'LOCAL_LAYOUT_DIRTY'
+  }
+
+  private getButtonVisualWidth(button: InputLayoutButton): number {
+    return button.shape === 'shoulder' ? 96 : button.size + 20
+  }
+
+  private getButtonVisualHeight(button: InputLayoutButton): number {
+    return button.shape === 'shoulder' ? 58 : button.size + 20
   }
 
   private isEditorMode(): boolean {
@@ -269,14 +278,8 @@ struct InputLayoutPage {
     if (route.length === 0) {
       return
     }
-    if (key === 'library') {
-      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[InputLayoutPage] replaceUrl ${route} failed: ${err.message}`)
-      })
-      return
-    }
-    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[InputLayoutPage] pushUrl ${route} failed: ${err.message}`)
+    this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+      console.error(`[InputLayoutPage] replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
@@ -541,8 +544,8 @@ struct InputLayoutPage {
   private EditableButtonLayer() {
     Stack() {
       ForEach(this.layoutButtons, (button: InputLayoutButton) => {
-        this.EditableButton(button)
-      }, (button: InputLayoutButton) => button.id)
+        this.EditableButton(button, this.selectedButtonId === button.id)
+      }, (button: InputLayoutButton) => `${button.id}:${this.selectedButtonId === button.id ? '1' : '0'}`)
     }
     .width('100%')
     .constraintSize({ maxWidth: this.editorLayoutWidth, maxHeight: this.editorLayoutHeight })
@@ -551,7 +554,7 @@ struct InputLayoutPage {
   }
 
   @Builder
-  private EditableButton(button: InputLayoutButton) {
+  private EditableButton(button: InputLayoutButton, isSelected: boolean) {
     Stack() {
       Row() {
         Text(button.label)
@@ -564,10 +567,10 @@ struct InputLayoutPage {
       .width(button.shape === 'shoulder' ? 86 : button.size)
       .height(button.shape === 'shoulder' ? 34 : button.size)
       .borderRadius(button.shape === 'circle' ? button.size / 2 : 3)
-      .backgroundColor(this.selectedButtonId === button.id ? '#6600FF41' : '#33FFFFFF')
+      .backgroundColor(isSelected ? '#6600FF41' : '#33FFFFFF')
       .border({
         width: 1,
-        color: this.selectedButtonId === button.id ? EmuColors.primary : '#55FFFFFF',
+        color: isSelected ? EmuColors.primary : '#55FFFFFF',
         style: BorderStyle.Dashed
       })
       .justifyContent(FlexAlign.Center)
@@ -579,8 +582,8 @@ struct InputLayoutPage {
       .align(Alignment.TopStart)
       .margin({ top: -24 })
     }
-    .width(button.shape === 'shoulder' ? 96 : button.size + 20)
-    .height(button.shape === 'shoulder' ? 58 : button.size + 20)
+    .width(this.getButtonVisualWidth(button))
+    .height(this.getButtonVisualHeight(button))
     .padding(10)
     .align(Alignment.TopStart)
     .position({ x: this.getEditorPercentX(button.x), y: this.getEditorPercentY(button.y) })
@@ -667,7 +670,7 @@ struct InputLayoutPage {
           iconSize: 28
         })
 
-        Text('EMU_CORE_v1.0')
+        Text('碳影 / Carbon Shade')
                     .fontSize(18)
           .fontColor(EmuColors.primary)
           .letterSpacing(4)
@@ -830,7 +833,7 @@ struct InputLayoutPage {
         this.EditorHeaderBar()
       } else {
         EmuHeaderBar({
-          titleText: 'OS_EMU_v2.4.1',
+          titleText: '碳影 / Carbon Shade',
           rightLabel: '输入映射与联机中心',
           titleIcon: 'terminal',
           rightIcon: 'settings_input_component',

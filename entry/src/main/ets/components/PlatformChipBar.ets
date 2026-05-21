@@ -12,7 +12,7 @@ export struct PlatformChipBar {
 
   private getDisplayLabel(item: string): string {
     if (item === 'ALL') {
-      return 'FC'
+      return 'ALL'
     }
     return item
   }

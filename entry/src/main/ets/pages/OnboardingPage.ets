@@ -1,14 +1,18 @@
+import { common } from '@kit.AbilityKit'
+import { fileIo as fs, picker } from '@kit.CoreFileKit'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors } from '../common/EmuUiTokens'
 import { GridBackground } from '../components/EmuAppShell'
 import { PageLifecycleGuard } from '../common/PageLifecycleGuard'
 
 type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED'
+type ProtocolStatus = 'VERIFIED' | 'DENIED' | 'PENDING'
 
 interface PermissionItem {
   key: string
   label: string
   status: PermissionStatus
+  detail: string
 }
 
 const Colors = EmuColors
@@ -59,15 +63,16 @@ struct OnboardingPage {
   @State private startButtonPressed: boolean = false
   @State private authorizeButtonPressed: boolean = false
   @State private permissions: PermissionItem[] = [
-    { key: 'DOCUMENT_PICKER', label: 'DOCUMENT_PICKER', status: 'GRANTED' },
-    { key: 'SANDBOX_IMPORT', label: 'SANDBOX_IMPORT', status: 'GRANTED' },
+    { key: 'DOCUMENT_PICKER', label: 'DOCUMENT_PICKER', status: 'PENDING', detail: '等待检查系统文件选择器' },
+    { key: 'SANDBOX_IMPORT', label: 'SANDBOX_IMPORT', status: 'PENDING', detail: '等待检查应用沙箱写入能力' },
   ]
-  @State private protocolStatus: string = 'VERIFIED'
+  @State private protocolStatus: ProtocolStatus = 'PENDING'
+  @State private protocolDetailText: string = '正在检查导入前置条件'
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
 
   aboutToAppear() {
     this.lifecycle.activate()
-    this.applyPermissionState('GRANTED')
+    void this.refreshImportReadiness()
   }
 
   aboutToDisappear() {
@@ -86,7 +91,7 @@ struct OnboardingPage {
       this.stepOpacity = 0
       this.stepOffsetY = 20
     })
-    setTimeout(() => {
+    this.lifecycle.trackTimeout(setTimeout(() => {
       if (!this.lifecycle.isCurrentTask(token)) {
         return
       }
@@ -97,7 +102,7 @@ struct OnboardingPage {
         this.stepOpacity = 1
         this.stepOffsetY = 0
       })
-      setTimeout(() => {
+      this.lifecycle.trackTimeout(setTimeout(() => {
         if (!this.lifecycle.isCurrentTask(token)) {
           return
         }
@@ -105,8 +110,8 @@ struct OnboardingPage {
           this.stepOpacity = 1
           this.stepOffsetY = 0
         }
-      }, 380)
-    }, 350)
+      }, 380))
+    }, 350))
   }
 
   private openImportEntry(): void {
@@ -122,19 +127,79 @@ struct OnboardingPage {
     })
   }
 
-  private applyPermissionState(status: PermissionStatus): void {
+  private async refreshImportReadiness(): Promise<void> {
+    const token = this.lifecycle.beginTask()
+    this.protocolStatus = 'PENDING'
+    this.protocolDetailText = '正在检查系统文件选择器与沙箱目录'
     this.permissions = this.permissions.map((item: PermissionItem): PermissionItem => {
-      return { key: item.key, label: item.label, status: status }
+      return {
+        key: item.key,
+        label: item.label,
+        status: 'PENDING',
+        detail: item.key === 'DOCUMENT_PICKER' ? '等待检查系统文件选择器' : '等待检查应用沙箱写入能力'
+      }
     })
-    if (status === 'GRANTED') {
-      this.protocolStatus = 'VERIFIED'
+    const nextPermissions = await this.checkImportReadiness()
+    if (!this.lifecycle.isCurrentTask(token)) {
       return
     }
-    if (status === 'DENIED') {
+    this.permissions = nextPermissions
+    const allGranted = nextPermissions.every((item: PermissionItem) => item.status === 'GRANTED')
+    const anyDenied = nextPermissions.some((item: PermissionItem) => item.status === 'DENIED')
+    if (allGranted) {
+      this.protocolStatus = 'VERIFIED'
+      this.protocolDetailText = '导入前置条件已就绪'
+      return
+    }
+    if (anyDenied) {
       this.protocolStatus = 'DENIED'
+      this.protocolDetailText = '至少一个导入前置条件不可用'
       return
     }
     this.protocolStatus = 'PENDING'
+    this.protocolDetailText = '仍有导入前置条件待确认'
+  }
+
+  private async checkImportReadiness(): Promise<PermissionItem[]> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      return [
+        this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', '未获取到 UIAbilityContext'),
+        this.createPermissionItem('SANDBOX_IMPORT', 'DENIED', '未获取到 UIAbilityContext')
+      ]
+    }
+    const documentPickerStatus = this.checkDocumentPickerAvailability(context)
+    const sandboxStatus = await this.checkSandboxImportAvailability(context)
+    return [documentPickerStatus, sandboxStatus]
+  }
+
+  private createPermissionItem(key: string, status: PermissionStatus, detail: string): PermissionItem {
+    return { key: key, label: key, status: status, detail: detail }
+  }
+
+  private checkDocumentPickerAvailability(context: common.UIAbilityContext): PermissionItem {
+    try {
+      const documentPicker = new picker.DocumentViewPicker(context)
+      if (documentPicker) {
+        return this.createPermissionItem('DOCUMENT_PICKER', 'GRANTED', '系统文件选择器实例可创建')
+      }
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      return this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', `文件选择器不可用: ${message}`)
+    }
+    return this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', '文件选择器实例创建失败')
+  }
+
+  private async checkSandboxImportAvailability(context: common.UIAbilityContext): Promise<PermissionItem> {
+    const romDir = `${context.filesDir}/roms`
+    try {
+      await fs.mkdir(romDir, true)
+      await fs.access(romDir)
+      return this.createPermissionItem('SANDBOX_IMPORT', 'GRANTED', `导入目录可访问: ${romDir}`)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      return this.createPermissionItem('SANDBOX_IMPORT', 'DENIED', `导入目录不可写: ${message}`)
+    }
   }
 
   private getPermissionStatusText(item: PermissionItem): string {
@@ -153,6 +218,16 @@ struct OnboardingPage {
     }
     if (item.status === 'DENIED') {
       return '#BA573F'
+    }
+    return Colors.outlineVariant
+  }
+
+  private getProtocolColor(): string {
+    if (this.protocolStatus === 'VERIFIED') {
+      return Colors.primary
+    }
+    if (this.protocolStatus === 'DENIED') {
+      return '#FFBA573F'
     }
     return Colors.outlineVariant
   }
@@ -221,10 +296,10 @@ struct OnboardingPage {
           name: 'memory',
           iconSize: 14
         })
-        Text('EMU_CORE_v1.0')
+        Text('碳影 / Carbon Shade')
                     .fontSize(14)
           .fontColor(Colors.primary)
-          .letterSpacing(3)
+          .letterSpacing(1.6)
       }
 
       Row({ space: 16 }) {
@@ -410,7 +485,7 @@ struct OnboardingPage {
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-        Text('EMU_CORE 使用系统文件选择器获取一次性文件 URI，并把 ROM 复制到应用沙箱。')
+        Text('碳影使用系统文件选择器获取一次性文件 URI，并把 ROM 复制到应用沙箱。')
           .fontSize(14)
           .fontColor(Colors.onSurfaceVariant)
           .lineHeight(22)
@@ -490,7 +565,7 @@ struct OnboardingPage {
 
           Text(this.protocolStatus)
             .fontSize(10)
-                        .fontColor(this.protocolStatus === 'VERIFIED' ? Colors.primary : (this.protocolStatus === 'DENIED' ? '#FFBA573F' : Colors.outlineVariant))
+                        .fontColor(this.getProtocolColor())
             .letterSpacing(1)
         }
         .width('100%')
@@ -508,11 +583,27 @@ struct OnboardingPage {
             Text(this.getPermissionStatusText(item))
               .fontSize(12)
                             .fontColor(Colors.onSurfaceVariant)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
           .width('100%')
           .alignItems(VerticalAlign.Center)
           .margin({ bottom: 8 })
+
+          Text(item.detail)
+            .fontSize(10)
+            .fontColor('#FF777777')
+            .margin({ left: 18, bottom: 8 })
+            .width('100%')
+            .maxLines(2)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
         }, (item: PermissionItem) => item.key)
+
+        Text(this.protocolDetailText)
+          .fontSize(10)
+          .fontColor(Colors.onSurfaceVariant)
+          .width('100%')
+          .margin({ top: 4 })
       }
       .width('100%')
       .constraintSize({ maxWidth: 460 })

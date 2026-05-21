@@ -80,6 +80,10 @@ interface FileIoCompat {
   stat(path: string): Promise<FileStatCompat>
 }
 
+interface AsyncReadResultCompat {
+  buffer?: ArrayBuffer
+}
+
 interface PickerSelectOptionsCompat {
   maxSelectNumber: number
 }
@@ -577,9 +581,9 @@ function getFileNameFromUri(uri: string, index: number): string {
     return `imported_${Date.now()}_${index}.rom`
   }
   try {
-    return decodeURIComponent(encodedName)
+    return sanitizeImportFileName(decodeURIComponent(encodedName), `imported_${Date.now()}_${index}.rom`)
   } catch (err) {
-    return encodedName
+    return sanitizeImportFileName(encodedName, `imported_${Date.now()}_${index}.rom`)
   }
 }
 
@@ -702,7 +706,10 @@ function appendDependencyName(names: string[], name: string): void {
 function extractBaseName(path: string): string {
   const normalized = path.replace(/\\/g, '/')
   const slashIndex = normalized.lastIndexOf('/')
-  return slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized
+  return sanitizeImportFileName(
+    slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized,
+    ''
+  )
 }
 
 function normalizeFileNameKey(fileName: string): string {
@@ -710,13 +717,6 @@ function normalizeFileNameKey(fileName: string): string {
 }
 
 async function resolveFileSize(path: string): Promise<number> {
-  try {
-    const syncStatSize: number = Number(fs.statSync(path).size)
-    return normalizeFileSize(syncStatSize)
-  } catch (err) {
-    LogHelper.warn('RomImport', 'Stat', `statSync 读取文件大小失败: ${(err as Error).message || String(err)}`)
-  }
-
   try {
     const statSize: number = Number((await fs.stat(path)).size)
     return normalizeFileSize(statSize)
@@ -742,25 +742,22 @@ async function copyFileFromUri(
   let srcFile: fs.File | undefined = undefined
   let destFile: fs.File | undefined = undefined
   try {
-    srcFile = fs.openSync(sourceUri, fs.OpenMode.READ_ONLY)
-    destFile = fs.openSync(destPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
+    srcFile = await fs.open(sourceUri, fs.OpenMode.READ_ONLY)
+    destFile = await fs.open(destPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     const bufSize = 64 * 1024
-    const buf = new ArrayBuffer(bufSize)
     let readSize = 0
-    const readOptions: ReadOptions = {
-      offset: readSize,
-      length: bufSize
-    }
-    let readLen = fs.readSync(srcFile.fd, buf, readOptions)
-    while (readLen > 0) {
+    while (true) {
       if (shouldCancel?.()) {
         throw new ImportCanceledError(readSize)
       }
-      readSize += readLen
-      const writeOptions: WriteOptions = {
-        length: readLen
+      const readResult = await fs.read(srcFile.fd, bufSize, readSize) as AsyncReadResultCompat
+      const chunk = readResult.buffer
+      const readLen = chunk ? chunk.byteLength : 0
+      if (readLen <= 0) {
+        break
       }
-      fs.writeSync(destFile.fd, buf, writeOptions)
+      readSize += readLen
+      await fs.write(destFile.fd, chunk as ArrayBuffer)
       onChunkCopied?.(readSize)
       if (readSize % (1024 * 1024) === 0) {
         await Promise.resolve()
@@ -768,17 +765,23 @@ async function copyFileFromUri(
       if (shouldCancel?.()) {
         throw new ImportCanceledError(readSize)
       }
-      readOptions.offset = readSize
-      readLen = fs.readSync(srcFile.fd, buf, readOptions)
     }
   } finally {
     if (srcFile) {
-      fs.closeSync(srcFile.fd)
+      await fs.close(srcFile.fd)
     }
     if (destFile) {
-      fs.closeSync(destFile.fd)
+      await fs.close(destFile.fd)
     }
   }
+}
+
+function sanitizeImportFileName(fileName: string, fallback: string): string {
+  const decoded = fileName.trim()
+  const withoutPaths = decoded.replace(/[\\\/]/g, '')
+  const withoutTraversal = withoutPaths.replace(/\.\.+/g, '.')
+  const normalized = withoutTraversal.replace(/[:*?"<>|]/g, '_').trim()
+  return normalized.length > 0 ? normalized : fallback
 }
 
 async function deletePathIfExists(path: string): Promise<void> {

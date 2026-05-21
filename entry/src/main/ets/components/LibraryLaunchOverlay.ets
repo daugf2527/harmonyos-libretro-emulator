@@ -12,6 +12,10 @@ export struct LibraryLaunchOverlay {
   @Prop runtimeStatusText: string = 'NO DATA'
   @Prop fileLabel: string = ''
 
+  private get normalizedProgress(): number {
+    return Math.max(0, Math.min(100, Math.round(this.progress)))
+  }
+
   build() {
     Stack() {
       ScanlineBackground({ lineColor: '#1400FF41', lineSpacing: 2 })
@@ -181,7 +185,7 @@ export struct LibraryLaunchOverlay {
             color: EmuColors.primary,
             style: BorderStyle.Solid
           })
-          .rotate({ angle: this.progress * 3.6 })
+          .rotate({ angle: this.normalizedProgress * 3.6 })
 
         Row()
           .width(6)
@@ -208,7 +212,7 @@ export struct LibraryLaunchOverlay {
           .backgroundColor('#222222')
 
         Row()
-          .width(`${this.progress}%`)
+          .width(`${this.normalizedProgress}%`)
           .height(2)
           .backgroundColor(EmuColors.primary)
           .shadow({ radius: 10, color: '#5500FF41', offsetX: 0, offsetY: 0 })
@@ -225,7 +229,7 @@ export struct LibraryLaunchOverlay {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
 
-        Text(`${this.progress}%`)
+        Text(`${this.normalizedProgress}%`)
           .fontSize(10)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)

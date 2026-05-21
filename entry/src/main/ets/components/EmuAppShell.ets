@@ -6,7 +6,7 @@ import { EmuIcon } from './EmuIcon'
 
 @Component
 export struct EmuHeaderBar {
-  @Prop titleText: string = 'EMU_CORE_v1.0'
+  @Prop titleText: string = '碳影 / Carbon Shade'
   @Prop titleIcon: string = 'memory'
   @Prop rightLabel: string = ''
   @Prop rightIcon: string = 'settings_input_component'
@@ -25,7 +25,6 @@ export struct EmuHeaderBar {
         })
 
         Text(this.titleText)
-          .fontFamily('monospace')
           .fontSize(13)
           .fontColor(this.activeTextColor.length > 0 ? this.activeTextColor : EmuColors.primary)
           .letterSpacing(2.2)
@@ -55,7 +54,6 @@ export struct EmuHeaderBar {
     .padding({ left: 24, right: 24 })
     .justifyContent(FlexAlign.SpaceBetween)
     .alignItems(VerticalAlign.Center)
-    .backdropBlur(24)
     .backgroundColor('#D9000000')
     .border({
       width: { bottom: 1 },
@@ -78,12 +76,16 @@ export struct EmuPrecisionGridBackdrop {
       .onReady(() => {
         this.drawGrid()
       })
+      .onAreaChange((_oldValue, _newValue) => {
+        this.drawGrid()
+      })
   }
 
   private drawGrid(): void {
     const ctx = this.context
     const w = ctx.width
     const h = ctx.height
+    ctx.clearRect(0, 0, w, h)
     const gridSize = EmuMetrics.gridSize
     ctx.strokeStyle = EmuMetrics.gridLineColor
     ctx.lineWidth = 1
@@ -115,12 +117,16 @@ export struct ScanlineBackground {
       .onReady(() => {
         this.drawScanlines()
       })
+      .onAreaChange((_oldValue, _newValue) => {
+        this.drawScanlines()
+      })
   }
 
   private drawScanlines(): void {
     const ctx = this.context
     const w = ctx.width
     const h = ctx.height
+    ctx.clearRect(0, 0, w, h)
     const step = 1 + this.lineSpacing
     ctx.lineWidth = 1
     let row = 0
@@ -152,12 +158,16 @@ export struct GridBackground {
       .onReady(() => {
         this.drawGrid()
       })
+      .onAreaChange((_oldValue, _newValue) => {
+        this.drawGrid()
+      })
   }
 
   private drawGrid(): void {
     const ctx = this.context
     const w = ctx.width
     const h = ctx.height
+    ctx.clearRect(0, 0, w, h)
     ctx.strokeStyle = this.lineColor
     ctx.lineWidth = this.lineWidth
     ctx.beginPath()
@@ -170,5 +180,52 @@ export struct GridBackground {
       ctx.lineTo(x, h)
     }
     ctx.stroke()
+  }
+}
+
+export interface BarChartItem {
+  height: number
+  isPrimary: boolean
+}
+
+@Component
+export struct BarChartBackground {
+  @Prop bars: BarChartItem[] = []
+  @Prop primaryColor: string = '#00FF41'
+  @Prop secondaryColor: string = '#333333'
+  @Prop barGap: number = 2
+  private settings: RenderingContextSettings = new RenderingContextSettings(true)
+  private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings)
+
+  build() {
+    Canvas(this.context)
+      .width('100%')
+      .height('100%')
+      .onReady(() => {
+        this.drawBars()
+      })
+      .onAreaChange((_oldValue, _newValue) => {
+        this.drawBars()
+      })
+  }
+
+  private drawBars(): void {
+    const ctx = this.context
+    const w = ctx.width
+    const h = ctx.height
+    ctx.clearRect(0, 0, w, h)
+    const count = this.bars.length
+    if (count === 0) {
+      return
+    }
+    const barW = (w - this.barGap * (count - 1)) / count
+    for (let i = 0; i < count; i++) {
+      const bar = this.bars[i]
+      const x = i * (barW + this.barGap)
+      ctx.fillStyle = bar.isPrimary ? this.primaryColor : this.secondaryColor
+      ctx.globalAlpha = bar.isPrimary ? 0.5 : 1.0
+      ctx.fillRect(x, h - bar.height, barW, bar.height)
+    }
+    ctx.globalAlpha = 1.0
   }
 }
