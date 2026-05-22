@@ -4,6 +4,7 @@
 #include <cctype>
 #include <cstdio>
 #include <fstream>
+#include <unistd.h>
 
 namespace common {
 namespace {
@@ -90,9 +91,12 @@ bool FileConfiguration::LoadKeyValues(
 bool FileConfiguration::SaveKeyValues(
     const std::string &path,
     const std::map<std::string, std::string> &kv) {
-  FILE *fp = fopen(path.c_str(), "wb");
+  // 原子写入:先写临时文件,fsync 落盘,再 rename 原子替换。避免崩溃/断电
+  // 时直接 fopen("wb") 把目标文件截断为空导致配置丢失。
+  const std::string tmpPath = path + ".tmp";
+  FILE *fp = fopen(tmpPath.c_str(), "wb");
   if (!fp) {
-    LogConfigFailure("Config save failed: " + path);
+    LogConfigFailure("Config save failed (open tmp): " + tmpPath);
     return false;
   }
 
@@ -101,7 +105,15 @@ bool FileConfiguration::SaveKeyValues(
     fprintf(fp, "%s = \"%s\"\n", it.first.c_str(), escaped.c_str());
   }
 
+  fflush(fp);
+  fsync(fileno(fp));
   fclose(fp);
+
+  if (rename(tmpPath.c_str(), path.c_str()) != 0) {
+    LogConfigFailure("Config save failed (rename): " + path);
+    unlink(tmpPath.c_str());
+    return false;
+  }
   return true;
 }
 

@@ -387,7 +387,10 @@ PluginManager *PluginManager::GetInstance() {
 
 PluginManager::~PluginManager() {
   LOGF(LOG_INFO, "~PluginManager");
-  nativeXComponentMap_.clear();
+  {
+    std::lock_guard<std::mutex> lock(map_mutex_);
+    nativeXComponentMap_.clear();
+  }
   ClearAllNewArchPointerStates();
 }
 
@@ -704,6 +707,7 @@ void PluginManager::SetNativeXComponent(std::string &id,
     return;
   }
 
+  std::lock_guard<std::mutex> lock(map_mutex_);
   if (nativeXComponentMap_.find(id) == nativeXComponentMap_.end()) {
     nativeXComponentMap_[id] = nativeXComponent;
     return;
