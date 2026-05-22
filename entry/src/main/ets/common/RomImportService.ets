@@ -766,12 +766,20 @@ async function copyFileFromUri(
         throw new ImportCanceledError(readSize)
       }
     }
+  } catch (err) {
+    throw err as Error
   } finally {
     if (srcFile) {
-      await fs.close(srcFile.fd)
+      try {
+        await fs.close(srcFile.fd)
+      } catch (_closeErr) {
+      }
     }
     if (destFile) {
-      await fs.close(destFile.fd)
+      try {
+        await fs.close(destFile.fd)
+      } catch (_closeErr) {
+      }
     }
   }
 }

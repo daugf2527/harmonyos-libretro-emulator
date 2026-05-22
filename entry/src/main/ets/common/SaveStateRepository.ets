@@ -65,7 +65,12 @@ export function readSaveStateData(
   fileName: string
 ): ArrayBuffer {
   const targetPath = buildSaveFilePath(context.filesDir, sanitizeFileName(fileName))
-  const stat = fs.statSync(targetPath)
+  let stat: fs.Stat
+  try {
+    stat = fs.statSync(targetPath)
+  } catch (err) {
+    throw err as Error
+  }
   const byteLength = Number(stat.size)
   const data = new ArrayBuffer(byteLength)
   let file: fs.File | undefined = undefined
@@ -80,9 +85,14 @@ export function readSaveStateData(
       return data
     }
     return data.slice(0, Math.max(0, readLength))
+  } catch (err) {
+    throw err as Error
   } finally {
     if (file) {
-      fs.closeSync(file.fd)
+      try {
+        fs.closeSync(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
 }
@@ -169,9 +179,14 @@ async function saveManifest(
   try {
     file = await fs.open(buildManifestPath(context.filesDir), fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     await fs.write(file.fd, JSON.stringify(document, null, 2))
+  } catch (err) {
+    throw err as Error
   } finally {
     if (file) {
-      await fs.close(file.fd)
+      try {
+        await fs.close(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
 }
@@ -184,9 +199,14 @@ function writeArrayBufferToFile(path: string, data: ArrayBuffer): void {
       length: data.byteLength
     }
     fs.writeSync(file.fd, data, writeOptions)
+  } catch (err) {
+    throw err as Error
   } finally {
     if (file) {
-      fs.closeSync(file.fd)
+      try {
+        fs.closeSync(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
 }
