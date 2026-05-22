@@ -132,7 +132,7 @@ struct LibraryPage {
   private cardLongPressed: boolean = false
   private cachedFilteredGames: LibraryRecord[] = []
   private cachedFilteredRecentGames: LibraryRecord[] = []
-  private cachedSearchResults: LibraryRecord[] = []
+  @State private cachedSearchResults: LibraryRecord[] = []
   private cachedDisplayPlatformFilters: string[] = []
   aboutToAppear(): void {
     this.pageActive = true

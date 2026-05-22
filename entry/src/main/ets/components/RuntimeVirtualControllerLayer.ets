@@ -260,6 +260,12 @@ export struct RuntimeVirtualControllerLayer {
       style: BorderStyle.Solid
     })
     .borderRadius(radius)
+    .responseRegion({
+      width: Math.max(buttonWidth, 44),
+      height: Math.max(buttonHeight, 44),
+      x: buttonWidth >= 44 ? 0 : (buttonWidth - 44) / 2,
+      y: buttonHeight >= 44 ? 0 : (buttonHeight - 44) / 2
+    })
     .shadow({
       radius: this.isPrimaryRuntimeButton(buttonId) ? 18 : 10,
       color: this.isPrimaryRuntimeButton(buttonId) ? '#4400FF41' : '#99000000',
