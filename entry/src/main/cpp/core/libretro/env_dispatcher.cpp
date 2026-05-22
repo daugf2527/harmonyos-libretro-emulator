@@ -584,7 +584,7 @@ static void RetroLog(enum retro_log_level level, const char *fmt, ...) {
     prio = LOG_DEBUG;
     break;
   case RETRO_LOG_INFO:
-    prio = LOG_DEBUG;
+    prio = LOG_INFO;
     break;
   case RETRO_LOG_WARN:
     prio = LOG_WARN;
@@ -1326,6 +1326,13 @@ bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data) {
   case RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO: {
     if (!data)
       return false;
+    const auto *av = (const ::retro_system_av_info *)data;
+    state.SetPendingAvInfo(*av);
+    LOGF(LOG_INFO,
+         "SET_SYSTEM_AV_INFO: geom=%{public}ux%{public}u aspect=%{public}.3f "
+         "fps=%{public}.3f sr=%{public}.0f",
+         av->geometry.base_width, av->geometry.base_height,
+         av->geometry.aspect_ratio, av->timing.fps, av->timing.sample_rate);
     return true;
   }
 
