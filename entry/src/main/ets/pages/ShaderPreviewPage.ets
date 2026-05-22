@@ -35,6 +35,22 @@ struct ShaderPreviewPage {
     return Math.max(0, Math.min(100, value))
   }
 
+  private clampPercent(value: number): number {
+    return Math.max(0, Math.min(200, Math.round(value)))
+  }
+
+  private onScanlineIntensityChange = (value: number): void => {
+    this.scanlineIntensity = Math.max(0, Math.min(100, Math.round(value)))
+  }
+
+  private onCurvatureChange = (value: number): void => {
+    this.curvature = Math.max(0, Math.min(100, Math.round(value)))
+  }
+
+  private onSaturationChange = (value: number): void => {
+    this.saturation = this.clampPercent(value)
+  }
+
   private onBottomNavClick(key: string): void {
     const route = getEmuBottomNavTargetRoute(key, 'engine')
     if (route.length === 0) {
@@ -119,8 +135,8 @@ struct ShaderPreviewPage {
   private SplitPreview() {
     Stack() {
       Row({ space: 1 }) {
-        this.PreviewPane('SOURCE_RAW', 'NEAREST / NO_SHADER', false)
-        this.PreviewPane('LIVE_SHADER', this.selectedMode, true)
+        this.PreviewPane('原始画面', '原始输出', false)
+        this.PreviewPane('滤镜预览', this.selectedMode, true)
       }
       .width('100%')
       .height('100%')
@@ -161,9 +177,9 @@ struct ShaderPreviewPage {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      this.SliderRow('扫描线强度', this.scanlineIntensity, '%')
-      this.SliderRow('CRT 曲率', this.curvature, '%')
-      this.SliderRow('色彩饱和度', this.saturation, '%')
+      this.SliderRow('扫描线强度', this.scanlineIntensity, '%', 0, 100, this.onScanlineIntensityChange)
+      this.SliderRow('CRT 曲率', this.curvature, '%', 0, 100, this.onCurvatureChange)
+      this.SliderRow('色彩饱和度', this.saturation, '%', 0, 200, this.onSaturationChange)
 
       Row({ space: 12 }) {
         Button('重置')
@@ -198,7 +214,14 @@ struct ShaderPreviewPage {
   }
 
   @Builder
-  private SliderRow(label: string, value: number, suffix: string) {
+  private SliderRow(
+    label: string,
+    value: number,
+    suffix: string,
+    min: number,
+    max: number,
+    onChange: (value: number) => void
+  ) {
     Column({ space: 8 }) {
       Row() {
         Text(label)
@@ -212,30 +235,19 @@ struct ShaderPreviewPage {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      Stack() {
-        Row()
-          .width('100%')
-          .height(1)
-          .backgroundColor(EmuColors.outlineVariant)
-        Row()
-          .width(`${this.getSliderTrackValue(value)}%`)
-          .height(1)
-          .backgroundColor(EmuColors.primary)
-          .align(Alignment.Start)
-
-        Row() {
-          Row()
-            .width(2)
-            .height(12)
-            .backgroundColor(EmuColors.onSurface)
-        }
-        .width(`${this.getSliderTrackValue(value)}%`)
-        .height(1)
-        .justifyContent(FlexAlign.End)
-        .align(Alignment.Start)
-      }
-      .width('100%')
-      .height(14)
+      Slider({
+        value: value,
+        min: min,
+        max: max,
+        step: 1
+      })
+        .width('100%')
+        .blockColor(EmuColors.onSurface)
+        .trackColor(EmuColors.outlineVariant)
+        .selectedColor(EmuColors.primary)
+        .showSteps(false)
+        .showTips(false)
+        .onChange(onChange)
     }
     .width('100%')
   }
@@ -296,7 +308,7 @@ struct ShaderPreviewPage {
   build() {
     Column() {
       EmuHeaderBar({
-        titleText: 'OS_EMU_v2.4.1',
+        titleText: '碳影',
         titleIcon: 'terminal',
         rightLabel: '滤镜预览',
         rightIcon: 'settings_input_component',

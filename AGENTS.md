@@ -332,6 +332,7 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 - 新增页面后，必须同步注册到 `entry/src/main/resources/base/profile/main_pages.json`，否则页面跳转可能表面成功但无法正常展示
 - 页面跳转参数必须有明确类型，不要依赖随手拼接的匿名对象透传
 - 当前阶段页面导航仍以 ArkUI `router` / `getUIContext().getRouter()` 与 `main_pages.json` 为准；新增页面必须注册 `main_pages.json`。
+- 底部导航中的顶级 tab（如 `library / engine / input / system`）默认视为平级页面切换，优先使用 `replaceUrl`，不要对平级 tab 使用 `pushUrl` 叠栈；需要保留返回栈时，必须先说明理由。
 - `Navigation + NavPathStack` 只作为后续重构目标；未启动导航架构重构前，不要把局部页面强行改成 Navigation 体系。
 - 如后续正式迁移到 `Navigation`：`Navigation.hideNavBar(true)` 时不要让页面栈为空；需要首屏走栈时先 `pushPath`。
 - 如后续正式迁移到 `Navigation`：不要把返回 `NavDestination()` 的页面直接当作 `Navigation` 的首屏内容，应通过 `navDestination` builder 渲染；根级目的地显式包 `NavDestination().hideTitleBar(true)`。
@@ -357,6 +358,7 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 - 列表刷新必须走响应式数据更新；不要依赖“重新进入页面”或整页重建来掩盖刷新问题
 - 滚动容器中的列表项、卡片项避免做重计算、重复创建重量级对象或层级过深的嵌套结构
 - 不要把几十个同构组件手写展开在页面里
+- 做页面切换性能排障时，先排查路由策略、页面栈增长、`aboutToAppear()` 内同步 native 调用、共享 `backdropBlur` 等高成本链路；不要先入为主把 `Canvas` 当作主因。若要验证 `Canvas`，用“只撤 `Canvas`、保留其余逻辑”的最小实验法。
 
 ### SDK / HarmonyOS 版本适配要求
 - 每次升级 `compileSdkVersion`、`targetSdkVersion` 或相关 Kit 版本时，先检查官方 Upgrade Guide、API diff 与已知问题清单，再决定是否直接改代码。

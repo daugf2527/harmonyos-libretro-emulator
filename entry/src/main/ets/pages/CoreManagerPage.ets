@@ -3,6 +3,12 @@ import { fileIo as fs } from '@kit.CoreFileKit'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
+import {
+  buildCoreFirmwareDependencyState,
+  CoreFirmwareDependencyState,
+  formatCoreFirmwarePathList,
+  loadSystemFirmwareEntries
+} from '../common/CoreFirmwareRepository'
 import { EmuColors } from '../common/EmuUiTokens'
 import { CoreConfig, LIBRETRO_CORE_CATALOG } from '../common/LibretroCoreCatalog'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
@@ -14,14 +20,23 @@ interface ManagedCoreItem {
   soFile: string
   status: string
   installed: boolean
+  firmwareStatus: string
+  firmwareDetail: string
+  firmwareFoundText: string
+  firmwareMissingText: string
+  hasFirmwareDependencies: boolean
 }
 
 @Entry
 @Component
 struct CoreManagerPage {
   @State private coreItems: ManagedCoreItem[] = []
-  @State private statusText: string = 'SCANNING_LOCAL_CORES'
+  @State private statusText: string = '正在扫描本地核心'
   @State private selectedCoreId: string = ''
+  @State private firmwareSummaryText: string = '正在读取本地 system 目录'
+  @State private firmwareFilesText: string = 'system/ 尚未扫描'
+  @State private firmwareDirectoryText: string = 'filesDir/system'
+  @State private remoteUpdateText: string = '当前构建未配置远端 core / firmware 仓库'
   private pageActive: boolean = false
   private coreRefreshToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = [
@@ -54,29 +69,42 @@ struct CoreManagerPage {
     const token = this.beginCoreRefresh()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.statusText = 'CONTEXT_MISSING'
+      this.statusText = '上下文不可用'
       this.coreItems = this.buildCatalogItems()
       return
     }
     const nextItems: ManagedCoreItem[] = []
     const catalogItems = this.buildCatalogItems()
+    this.firmwareDirectoryText = `${context.filesDir}/system`
+    const systemEntries = await loadSystemFirmwareEntries(context)
+    if (!this.isCurrentCoreRefresh(token)) {
+      return
+    }
+    this.firmwareFilesText = formatCoreFirmwarePathList(systemEntries)
     for (let index = 0; index < catalogItems.length; index += 1) {
       const item = catalogItems[index]
       const installed = await this.hasCoreFile(context, item.soFile)
       if (!this.isCurrentCoreRefresh(token)) {
         return
       }
+      const firmwareState: CoreFirmwareDependencyState = buildCoreFirmwareDependencyState(item.id, systemEntries)
       nextItems.push({
         id: item.id,
         name: item.name,
         platform: item.platform,
         soFile: item.soFile,
-        status: installed ? 'INSTALLED' : 'NOT_FOUND',
-        installed: installed
+        status: installed ? '已安装' : '未找到',
+        installed: installed,
+        firmwareStatus: firmwareState.statusText,
+        firmwareDetail: firmwareState.detailText,
+        firmwareFoundText: firmwareState.foundFilesText,
+        firmwareMissingText: firmwareState.missingFilesText,
+        hasFirmwareDependencies: firmwareState.hasDependencies
       })
     }
     this.coreItems = nextItems
     this.statusText = this.buildStatusText(nextItems)
+    this.firmwareSummaryText = this.buildFirmwareSummaryText(nextItems, systemEntries)
   }
 
   private async hasCoreFile(context: common.UIAbilityContext, soFile: string): Promise<boolean> {
@@ -100,7 +128,21 @@ struct CoreManagerPage {
         installedCount += 1
       }
     })
-    return `${installedCount}/${items.length}_LOCAL_CORES_READY`
+    return `已安装 ${installedCount}/${items.length} 个本地核心`
+  }
+
+  private buildFirmwareSummaryText(items: ManagedCoreItem[], systemEntries: string[]): string {
+    const dependencyItems = items.filter((item: ManagedCoreItem) => item.hasFirmwareDependencies)
+    if (dependencyItems.length === 0) {
+      return `system/ 已扫描 · ${systemEntries.length} 个文件`
+    }
+    let readyCount = 0
+    dependencyItems.forEach((item: ManagedCoreItem) => {
+      if (item.firmwareMissingText === '无缺失项') {
+        readyCount += 1
+      }
+    })
+    return `${readyCount}/${dependencyItems.length} 个需固件核心已就绪`
   }
 
   private buildCatalogItems(): ManagedCoreItem[] {
@@ -113,8 +155,13 @@ struct CoreManagerPage {
         name: config.name,
         platform: config.description,
         soFile: config.soFile,
-        status: 'LOCAL',
-        installed: false
+        status: '待扫描',
+        installed: false,
+        firmwareStatus: '尚未扫描',
+        firmwareDetail: '等待读取 system/ 目录',
+        firmwareFoundText: '尚未扫描',
+        firmwareMissingText: '尚未扫描',
+        hasFirmwareDependencies: false
       })
     }
     return items
@@ -125,23 +172,17 @@ struct CoreManagerPage {
     if (route.length === 0) {
       return
     }
-    if (key === 'library') {
-      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[CoreManagerPage] replaceUrl ${route} failed: ${err.message}`)
-      })
-      return
-    }
-    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[CoreManagerPage] pushUrl ${route} failed: ${err.message}`)
+    this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+      console.error(`[CoreManagerPage] replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
   @Builder
   private MemoryFootprint() {
     Row({ space: 1 }) {
-      this.FootprintCell('CORE CATALOG', `${this.coreItems.length}`, 72)
-      this.FootprintCell('FIRMWARE SOURCE', '本地', 44)
-      this.FootprintCell('NETWORK UPDATE', '已关闭', 18)
+      this.FootprintCell('LOCAL CORE', `${this.coreItems.length} 项`, 72)
+      this.FootprintCell('FIRMWARE', this.firmwareSummaryText, 44)
+      this.FootprintCell('REMOTE UPDATE', '未配置', 18)
     }
     .width('100%')
     .backgroundColor('#33484848')
@@ -202,6 +243,11 @@ struct CoreManagerPage {
                     .fontColor(EmuColors.onSurfaceVariant)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(item.firmwareDetail)
+          .fontSize(9)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
@@ -214,9 +260,9 @@ struct CoreManagerPage {
           .padding({ left: 8, right: 8, top: 5, bottom: 5 })
           .border({ width: 0.5, color: item.installed ? EmuColors.primary : EmuColors.error, style: BorderStyle.Solid })
 
-        Text('REMOTE_DISABLED')
+        Text(item.firmwareStatus)
           .fontSize(9)
-                    .fontColor(EmuColors.onSurfaceVariant)
+          .fontColor(item.hasFirmwareDependencies ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .padding({ left: 8, right: 8, top: 6, bottom: 6 })
           .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
       }
@@ -234,17 +280,23 @@ struct CoreManagerPage {
   @Builder
   private KernelLog() {
     Column({ space: 6 }) {
-      Text('KERNEL_LOG')
+      Text('运行日志')
         .fontSize(10)
                 .fontColor(EmuColors.onSurfaceVariant)
         .letterSpacing(2)
-      Text('[SYS] Local core scan reads packaged libs only.')
+      Text('[SCAN] 仅扫描 bundleCodeDir/libs 下已打包的 core 文件')
         .fontSize(10)
                 .fontColor(EmuColors.onSurfaceVariant)
-      Text('[FW] Firmware database is not connected. Missing firmware remains UNKNOWN.')
+      Text(`[FW] 本地固件目录: ${this.firmwareDirectoryText}`)
+        .fontSize(10)
+        .fontColor(EmuColors.onSurfaceVariant)
+      Text(`[FW] ${this.firmwareSummaryText}`)
         .fontSize(10)
                 .fontColor(EmuColors.onSurfaceVariant)
-      Text('[NET] Remote updater intentionally disabled in this phase.')
+      Text(`[FW] ${this.firmwareFilesText}`)
+        .fontSize(10)
+        .fontColor(EmuColors.onSurfaceVariant)
+      Text(`[NET] ${this.remoteUpdateText}，在线更新与固件库下载入口当前不可用`)
         .fontSize(10)
                 .fontColor(EmuColors.primary)
     }
@@ -257,7 +309,7 @@ struct CoreManagerPage {
   build() {
     Column() {
       EmuHeaderBar({
-        titleText: 'OS_EMU_v2.4.1',
+        titleText: '碳影',
         titleIcon: 'terminal',
         rightLabel: '内核与固件管理',
         rightIcon: 'settings_input_component',
@@ -269,7 +321,7 @@ struct CoreManagerPage {
       Scroll() {
         Column({ space: 24 }) {
           Row() {
-            Text('MEMORY_FOOTPRINT')
+            Text('内存占用')
               .fontSize(10)
                             .fontColor(EmuColors.onSurfaceVariant)
               .letterSpacing(2)
@@ -282,10 +334,15 @@ struct CoreManagerPage {
 
           this.MemoryFootprint()
 
-          Text('ACTIVE_CORES')
+          Text('已识别核心')
             .fontSize(10)
                         .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(2)
+            .width('100%')
+
+          Text('本页只展示本地已打包 core 与 filesDir/system 下的固件依赖状态；远端更新、在线固件库当前未接入。')
+            .fontSize(10)
+            .fontColor(EmuColors.onSurfaceVariant)
             .width('100%')
 
           Column({ space: 1 }) {
@@ -295,6 +352,13 @@ struct CoreManagerPage {
           }
           .width('100%')
           .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+
+          if (this.selectedCoreId.length > 0) {
+            Text(this.buildSelectedCoreFirmwareText())
+              .fontSize(10)
+              .fontColor(EmuColors.onSurfaceVariant)
+              .width('100%')
+          }
 
           this.KernelLog()
         }
@@ -320,5 +384,16 @@ struct CoreManagerPage {
     .height('100%')
     .backgroundColor(EmuColors.background)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+  }
+
+  private buildSelectedCoreFirmwareText(): string {
+    const currentItem = this.coreItems.find((item: ManagedCoreItem) => item.id === this.selectedCoreId)
+    if (!currentItem) {
+      return ''
+    }
+    if (!currentItem.hasFirmwareDependencies) {
+      return `${currentItem.name}: 当前未配置额外固件依赖`
+    }
+    return `${currentItem.name}: ${currentItem.firmwareDetail} / ${currentItem.firmwareFoundText} / ${currentItem.firmwareMissingText}`
   }
 }

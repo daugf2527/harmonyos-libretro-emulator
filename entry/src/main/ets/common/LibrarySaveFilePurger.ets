@@ -13,7 +13,12 @@ export async function purgeSaveFilesForBaseName(
 ): Promise<LibrarySavePurgeResult> {
   const saveDir = `${context.filesDir}/saves`
   const normalizedBaseName = normalizeContentKey(baseName)
-  const entries = await fs.listFile(saveDir)
+  let entries: string[] = []
+  try {
+    entries = await fs.listFile(saveDir)
+  } catch (err) {
+    throw err as Error
+  }
   if (!shouldContinue()) {
     return { deletedCount: 0, cancelled: true }
   }
@@ -25,7 +30,11 @@ export async function purgeSaveFilesForBaseName(
     if (!shouldContinue()) {
       return { deletedCount: index, cancelled: true }
     }
-    await fs.unlink(`${saveDir}/${candidates[index]}`)
+    try {
+      await fs.unlink(`${saveDir}/${candidates[index]}`)
+    } catch (err) {
+      throw err as Error
+    }
   }
   if (!shouldContinue()) {
     return { deletedCount: candidates.length, cancelled: true }

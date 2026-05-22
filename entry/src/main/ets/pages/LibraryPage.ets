@@ -122,6 +122,7 @@ struct LibraryPage {
   private pageActionToken: number = 0
   private readonly coverCycleKeys: string[] = ['', 'metroid_fusion', 'zelda_triforce']
   private readonly coverPalette: string[] = ['#274530', '#27405E', '#4E2A41', '#5A4331']
+  private readonly navItems = createEmuBottomNavItems('library')
   private pullTracking: boolean = false
   private pullStartY: number = 0
   private scrollOffsetY: number = 0
@@ -129,6 +130,10 @@ struct LibraryPage {
   private cardTouchStartY: number = 0
   private cardTouchMoved: boolean = false
   private cardLongPressed: boolean = false
+  private cachedFilteredGames: LibraryRecord[] = []
+  private cachedFilteredRecentGames: LibraryRecord[] = []
+  private cachedSearchResults: LibraryRecord[] = []
+  private cachedDisplayPlatformFilters: string[] = []
   aboutToAppear(): void {
     this.pageActive = true
     void this.refreshLibraryGames()
@@ -168,15 +173,22 @@ struct LibraryPage {
   }
 
   private get filteredGames(): LibraryRecord[] {
-    return filterLibraryGames(this.allGames, this.selectedPlatform, this.searchKeyword)
+    return this.cachedFilteredGames
   }
 
   private get filteredRecentGames(): LibraryRecord[] {
-    return filterRecentLibraryGames(this.allGames, this.selectedPlatform, this.searchKeyword)
+    return this.cachedFilteredRecentGames
   }
 
   private get searchResults(): LibraryRecord[] {
-    return buildLibrarySearchResults(this.allGames, this.selectedPlatform, this.searchKeyword)
+    return this.cachedSearchResults
+  }
+
+  private recomputeFilteredCaches(): void {
+    this.cachedFilteredGames = filterLibraryGames(this.allGames, this.selectedPlatform, this.searchKeyword)
+    this.cachedFilteredRecentGames = filterRecentLibraryGames(this.allGames, this.selectedPlatform, this.searchKeyword)
+    this.cachedSearchResults = buildLibrarySearchResults(this.allGames, this.selectedPlatform, this.searchKeyword)
+    this.cachedDisplayPlatformFilters = buildDisplayPlatformFilters(this.allGames)
   }
 
   private clearSearchTimer(): void {
@@ -262,14 +274,16 @@ struct LibraryPage {
     if (this.selectedPlatform !== 'ALL' && !platforms.includes(this.selectedPlatform)) {
       this.selectedPlatform = 'ALL'
     }
+    this.recomputeFilteredCaches()
   }
 
   private getDisplayPlatformFilters(): string[] {
-    return buildDisplayPlatformFilters(this.allGames)
+    return this.cachedDisplayPlatformFilters
   }
 
   private onSearchKeywordChange(value: string): void {
     this.searchKeyword = value
+    this.recomputeFilteredCaches()
     const trimmed = value.trim()
     this.clearSearchTimer()
     if (trimmed.length === 0) {
@@ -435,19 +449,40 @@ struct LibraryPage {
           }, 1200)
   }
 
+  private suspendBeforeRoute(): void {
+    this.pageActive = false
+    this.libraryRefreshToken += 1
+    this.pageActionToken += 1
+    this.clearSearchTimer()
+    this.clearLongPressTimer()
+    if (this.toastTimer !== -1) {
+      clearTimeout(this.toastTimer)
+      this.toastTimer = -1
+    }
+    if (this.refreshTimer !== -1) {
+      clearTimeout(this.refreshTimer)
+      this.refreshTimer = -1
+    }
+    if (this.bottomLoaderTimer !== -1) {
+      clearTimeout(this.bottomLoaderTimer)
+      this.bottomLoaderTimer = -1
+    }
+    this.searchBusy = false
+    this.refreshing = false
+    this.bottomLoaderActive = false
+    this.showSearchResults = false
+    this.pullRefreshHeight = 0
+    this.pullRefreshOpacity = 0
+  }
+
   private onBottomNavClick(key: string): void {
     const route = getEmuBottomNavTargetRoute(key, 'library')
     if (route.length === 0) {
       return
     }
-    if (key === 'library') {
-      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[LibraryPage] replaceUrl ${route} failed: ${err.message}`)
-      })
-      return
-    }
-    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[LibraryPage] pushUrl ${route} failed: ${err.message}`)
+    this.suspendBeforeRoute()
+    this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+      console.error(`[LibraryPage] replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
@@ -688,11 +723,13 @@ struct LibraryPage {
       },
       onSearchResultLaunch: (item: LibraryRecord) => {
         this.searchKeyword = item.title
+        this.recomputeFilteredCaches()
         this.hideSearchResults()
         this.openGame(item)
       },
       onPlatformChange: (value: string) => {
         this.selectedPlatform = value
+        this.recomputeFilteredCaches()
       }
     })
   }
@@ -767,7 +804,7 @@ struct LibraryPage {
     Stack() {
       Column() {
         EmuHeaderBar({
-          titleText: 'EMU_OS // 0.1',
+          titleText: '碳影 / Carbon Shade',
           titleIcon: 'terminal',
           rightIcon: 'settings_input_component',
           activeTextColor: EmuColors.primary,
@@ -788,7 +825,7 @@ struct LibraryPage {
         .justifyContent(FlexAlign.Center)
 
         EmuBottomNav({
-          items: createEmuBottomNavItems('library'),
+          items: this.navItems,
           activeFontColor: EmuColors.primary,
           inactiveFontColor: '#FF666666',
           indicatorStyle: 'dot',

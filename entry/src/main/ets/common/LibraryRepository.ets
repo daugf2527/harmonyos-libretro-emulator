@@ -706,7 +706,10 @@ async function saveLibraryIndexToJson(filesDir: string, records: LibraryRecord[]
     LogHelper.error('LibraryRepository', 'Save', `保存 JSON 索引失败: ${message}`)
   } finally {
     if (file) {
-      await fs.close(file.fd)
+      try {
+        await fs.close(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
 }

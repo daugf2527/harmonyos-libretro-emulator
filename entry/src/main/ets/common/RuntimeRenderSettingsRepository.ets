@@ -58,9 +58,14 @@ export async function saveRuntimeRenderSettingsProfile(
       fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC
     )
     await fs.write(file.fd, JSON.stringify(nextProfile, null, 2))
+  } catch (err) {
+    throw err as Error
   } finally {
     if (file) {
-      await fs.close(file.fd)
+      try {
+        await fs.close(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
   return nextProfile

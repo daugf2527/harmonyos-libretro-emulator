@@ -75,9 +75,16 @@ export async function saveInputLayoutProfile(
   try {
     file = await fs.open(buildInputLayoutPath(context.filesDir), fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     await fs.write(file.fd, JSON.stringify(nextProfile, null, 2))
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.error('InputLayoutRepository', 'Save', `保存输入布局失败: ${message}`)
+    throw err as Error
   } finally {
     if (file) {
-      await fs.close(file.fd)
+      try {
+        await fs.close(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
   return nextProfile

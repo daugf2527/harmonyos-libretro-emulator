@@ -99,7 +99,10 @@ async function saveMetadataDocument(
     LogHelper.error('GameMetadataRepository', 'Save', `保存本地 metadata 失败: ${message}`)
   } finally {
     if (file) {
-      await fs.close(file.fd)
+      try {
+        await fs.close(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
 }

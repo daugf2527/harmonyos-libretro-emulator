@@ -309,11 +309,11 @@ struct SaveStatePage {
           iconSize: 21
         })
 
-        Text('EMU_CORE_v1.0')
+        Text('碳影 / Carbon Shade')
           .fontSize(16)
                     .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
-          .letterSpacing(3)
+          .letterSpacing(1.6)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }

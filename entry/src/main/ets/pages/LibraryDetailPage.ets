@@ -3,7 +3,10 @@ import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNa
 import { EmuIcon } from '../components/EmuIcon'
 import { LibraryDetailActionKey, LibraryDetailActionMenu } from '../components/LibraryDetailActionMenu'
 import { LibraryDetailHeroPanel } from '../components/LibraryDetailHeroPanel'
-import { LibraryDetailInfoPanel } from '../components/LibraryDetailInfoPanel'
+import {
+  LibraryDetailInfoPanel,
+  LibraryDetailSummaryCellData
+} from '../components/LibraryDetailInfoPanel'
 import { LibraryLaunchOverlay } from '../components/LibraryLaunchOverlay'
 import { KeyValueSpecItem, KeyValueSpecList } from '../components/KeyValueSpecList'
 import {
@@ -57,6 +60,104 @@ interface LibraryLaunchRouteParams {
   autoStart?: boolean
 }
 
+@Component
+struct AnimatedDetailBody {
+  @Prop coverKey: string = ''
+  @Prop displayTitle: string = ''
+  @Prop localizedTitle: string = ''
+  @Prop coreLabel: string = ''
+  @Prop showExtendedDetails: boolean = false
+  @Prop primaryCells: LibraryDetailSummaryCellData[] = []
+  @Prop extendedCells: LibraryDetailSummaryCellData[] = []
+  @Prop hasRuntimeSnapshot: boolean = false
+  @Prop telemetryFpsText: string = ''
+  @Prop telemetryAudioText: string = ''
+  @Prop telemetryDropText: string = ''
+  @Prop telemetryProfile: number[] = []
+  @Prop overviewText: string = ''
+  @Prop runtimeSummaryText: string = ''
+  @Prop coreSpecItems: KeyValueSpecItem[] = []
+  onLaunch?: () => void
+  onQuickAction?: (message: string) => void
+  onToggleDetails?: () => void
+  @State private heroScale: number = 1.04
+  @State private telemetryScanOffset: number = -180
+  @State private telemetryGlowOpacity: number = 0.2
+  private visualTimer: number = -1
+
+  aboutToAppear(): void {
+    if (this.visualTimer !== -1) {
+      return
+    }
+    let frame = 0
+    this.visualTimer = setInterval(() => {
+      frame += 1
+      this.heroScale = 1.08 + Math.sin(frame / 18) * 0.035
+      this.telemetryScanOffset = -180 + (frame % 100) * 5
+      this.telemetryGlowOpacity = 0.14 + (Math.sin(frame / 6) + 1) * 0.1
+    }, 90)
+  }
+
+  aboutToDisappear(): void {
+    if (this.visualTimer !== -1) {
+      clearInterval(this.visualTimer)
+      this.visualTimer = -1
+    }
+  }
+
+  build() {
+    Scroll() {
+      Column({ space: 32 }) {
+        LibraryDetailHeroPanel({
+          coverKey: this.coverKey,
+          heroScale: this.heroScale,
+          displayTitle: this.displayTitle,
+          localizedTitle: this.localizedTitle,
+          coreLabel: this.coreLabel,
+          onLaunch: () => {
+            if (this.onLaunch) {
+              this.onLaunch()
+            }
+          },
+          onQuickAction: (message: string) => {
+            if (this.onQuickAction) {
+              this.onQuickAction(message)
+            }
+          }
+        })
+        LibraryDetailInfoPanel({
+          showExtendedDetails: this.showExtendedDetails,
+          primaryCells: this.primaryCells,
+          extendedCells: this.extendedCells,
+          hasRuntimeSnapshot: this.hasRuntimeSnapshot,
+          telemetryFpsText: this.telemetryFpsText,
+          telemetryAudioText: this.telemetryAudioText,
+          telemetryDropText: this.telemetryDropText,
+          telemetryProfile: this.telemetryProfile,
+          telemetryScanOffset: this.telemetryScanOffset,
+          telemetryGlowOpacity: this.telemetryGlowOpacity,
+          overviewText: this.overviewText,
+          runtimeSummaryText: this.runtimeSummaryText,
+          onToggleDetails: () => {
+            if (this.onToggleDetails) {
+              this.onToggleDetails()
+            }
+          }
+        })
+        KeyValueSpecList({
+          title: 'CORE SPECIFICATIONS',
+          items: this.coreSpecItems
+        })
+      }
+      .width('100%')
+      .padding({ left: 24, right: 24, top: 26, bottom: 42 })
+    }
+    .width('100%')
+    .constraintSize({ maxWidth: 390 })
+    .scrollBar(BarState.Off)
+  }
+}
+
 @Entry
 @Component
 struct LibraryDetailPage {
@@ -69,20 +170,20 @@ struct LibraryDetailPage {
   @State private isLaunching: boolean = false
   @State private launchProgress: number = 0
   @State private launchStatusText: string = 'READY_TO_HANDOFF'
-  @State private heroScale: number = 1.04
-  @State private telemetryScanOffset: number = -180
-  @State private telemetryGlowOpacity: number = 0.2
   private readonly coverCycleKeys: string[] = ['', 'metroid_fusion', 'zelda_triforce']
   private readonly coverPalette: string[] = ['#274530', '#27405E', '#4E2A41', '#5A4331']
+  private readonly navItems = createEmuBottomNavItems('library')
   private toastTimer: number = -1
-  private visualTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0
+  private cachedSnapshot: LibraryDetailTelemetrySnapshot | undefined = undefined
+  private cachedSnapshotRomFile: string = ''
+  private cachedCoreSpecItems: KeyValueSpecItem[] = []
+  private cachedCoreSpecRomFile: string = ''
 
   aboutToAppear(): void {
     this.pageActive = true
     void this.loadRecord()
-    this.startVisualLoop()
   }
 
   aboutToDisappear(): void {
@@ -92,7 +193,13 @@ struct LibraryDetailPage {
       clearTimeout(this.toastTimer)
       this.toastTimer = -1
     }
-    this.stopVisualLoop()
+  }
+
+  private invalidateDerivedCaches(): void {
+    this.cachedSnapshot = undefined
+    this.cachedSnapshotRomFile = ''
+    this.cachedCoreSpecItems = []
+    this.cachedCoreSpecRomFile = ''
   }
 
   private beginPageTask(): number {
@@ -130,6 +237,7 @@ struct LibraryDetailPage {
     }
     this.libraryRecord = record
     this.metadataRecord = metadata
+    this.invalidateDerivedCaches()
     this.applyTelemetrySnapshot(record)
   }
 
@@ -160,41 +268,28 @@ struct LibraryDetailPage {
   private applyTelemetrySnapshot(_record: LibraryRecord): void {
   }
 
-  private startVisualLoop(): void {
-    if (this.visualTimer !== -1) {
-      return
+  private getSnapshot(): LibraryDetailTelemetrySnapshot {
+    const romFile = this.libraryRecord?.romFile ?? ''
+    if (romFile.length > 0 && romFile === this.cachedSnapshotRomFile && this.cachedSnapshot) {
+      return this.cachedSnapshot
     }
-    let frame = 0
-    this.visualTimer = setInterval(() => {
-      frame += 1
-      this.heroScale = 1.08 + Math.sin(frame / 18) * 0.035
-      this.telemetryScanOffset = -180 + (frame % 100) * 5
-      this.telemetryGlowOpacity = 0.14 + (Math.sin(frame / 6) + 1) * 0.1
-    }, 90)
-  }
-
-  private stopVisualLoop(): void {
-    if (this.visualTimer !== -1) {
-      clearInterval(this.visualTimer)
-      this.visualTimer = -1
-    }
+    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
+    this.cachedSnapshot = snapshot
+    this.cachedSnapshotRomFile = romFile
+    return snapshot
   }
 
   private get launchCpuText(): string {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
-    return `FPS: ${snapshot.fpsText}`
+    return `FPS: ${this.getSnapshot().fpsText}`
   }
   private get telemetryFpsText(): string {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
-    return snapshot.fpsText
+    return this.getSnapshot().fpsText
   }
   private get telemetryCpuText(): string {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
-    return snapshot.audioText
+    return this.getSnapshot().audioText
   }
   private get telemetryGpuText(): string {
-    const snapshot = buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord)
-    return snapshot.dropText
+    return this.getSnapshot().dropText
   }
 
   private async beginLaunchSequence(record: LibraryRecord): Promise<void> {
@@ -283,6 +378,7 @@ struct LibraryDetailPage {
       return
     }
     this.libraryRecord = updated
+    this.invalidateDerivedCaches()
     this.applyTelemetrySnapshot(updated)
     this.showActionMenu = false
     this.showToastMessage('已切换内置封面 COVER_UPDATED')
@@ -401,11 +497,10 @@ struct LibraryDetailPage {
           iconSize: 15
         })
 
-        Text('EMU_OS // 0.1')
-          .fontFamily('monospace')
+        Text('碳影 / Carbon Shade')
           .fontSize(13)
           .fontColor(EmuColors.primary)
-          .letterSpacing(2.2)
+          .letterSpacing(1.2)
       }
 
       Blank()
@@ -472,11 +567,63 @@ struct LibraryDetailPage {
   }
 
   private getCoreSpecItems(record: LibraryRecord): KeyValueSpecItem[] {
-    return [
+    if (record.romFile === this.cachedCoreSpecRomFile && this.cachedCoreSpecItems.length > 0) {
+      return this.cachedCoreSpecItems
+    }
+    this.cachedCoreSpecItems = [
       { label: 'ROM Version', value: getLibraryDetailRomVersionLabel(record, this.metadataRecord) },
       { label: 'Processor Cluster', value: getLibraryDetailEngineLabel(record) },
       { label: 'Memory Mode', value: getLibraryDetailMemoryModeLabel(record) }
     ]
+    this.cachedCoreSpecRomFile = record.romFile
+    return this.cachedCoreSpecItems
+  }
+
+  private buildPrimaryCells(record: LibraryRecord): LibraryDetailSummaryCellData[] {
+    return [
+      { title: 'CN NAME', value: getLibraryDetailLocalizedTitle(record) },
+      { title: 'YEAR', value: getLibraryDetailYearLabel(record, this.metadataRecord) },
+      { title: 'CONSOLE', value: getLibraryDetailConsoleLabel(record, this.metadataRecord) }
+    ]
+  }
+
+  private buildExtendedCells(record: LibraryRecord): LibraryDetailSummaryCellData[] {
+    return [
+      { title: 'PUBLISHER', value: getLibraryDetailPublisherLabel(this.metadataRecord) },
+      { title: 'PLAYTIME', value: getLibraryDetailPlaytimeLabel(record) },
+      { title: 'ENGINE', value: getLibraryDetailEngineLabel(record) },
+      { title: 'REGION', value: getLibraryDetailRegionLabel(record) }
+    ]
+  }
+
+  @Builder
+  private DetailContent(record: LibraryRecord) {
+    AnimatedDetailBody({
+      coverKey: record.coverKey,
+      displayTitle: getLibraryDetailDisplayTitle(record, this.metadataRecord),
+      localizedTitle: getLibraryDetailLocalizedTitle(record),
+      coreLabel: record.preferredCoreId.toUpperCase(),
+      showExtendedDetails: this.showExtendedDetails,
+      primaryCells: this.buildPrimaryCells(record),
+      extendedCells: this.buildExtendedCells(record),
+      hasRuntimeSnapshot: hasLibraryDetailRuntimeSnapshot(record),
+      telemetryFpsText: this.telemetryFpsText,
+      telemetryAudioText: this.telemetryCpuText,
+      telemetryDropText: this.telemetryGpuText,
+      telemetryProfile: this.getSnapshot().profile,
+      overviewText: getLibraryDetailOverviewText(this.metadataRecord),
+      runtimeSummaryText: getLibraryDetailRuntimeSummaryText(record, this.metadataRecord),
+      coreSpecItems: this.getCoreSpecItems(record),
+      onLaunch: () => {
+        this.beginLaunchSequence(record)
+      },
+      onQuickAction: (message: string) => {
+        this.showToastMessage(message)
+      },
+      onToggleDetails: () => {
+        this.showExtendedDetails = !this.showExtendedDetails
+      }
+    })
   }
 
   private getLocalStatusText(): string {
@@ -559,58 +706,7 @@ struct LibraryDetailPage {
 
         Row() {
           if (this.libraryRecord) {
-            Scroll() {
-              Column({ space: 32 }) {
-                LibraryDetailHeroPanel({
-                  coverKey: (this.libraryRecord as LibraryRecord).coverKey,
-                  heroScale: this.heroScale,
-                  displayTitle: getLibraryDetailDisplayTitle(this.libraryRecord as LibraryRecord, this.metadataRecord),
-                  localizedTitle: getLibraryDetailLocalizedTitle(this.libraryRecord as LibraryRecord),
-                  coreLabel: (this.libraryRecord as LibraryRecord).preferredCoreId.toUpperCase(),
-                  onLaunch: () => {
-                    this.beginLaunchSequence(this.libraryRecord as LibraryRecord)
-                  },
-                  onQuickAction: (message: string) => {
-                    this.showToastMessage(message)
-                  }
-                })
-                LibraryDetailInfoPanel({
-                  showExtendedDetails: this.showExtendedDetails,
-                  primaryCells: [
-                    { title: 'CN NAME', value: getLibraryDetailLocalizedTitle(this.libraryRecord as LibraryRecord) },
-                    { title: 'YEAR', value: getLibraryDetailYearLabel(this.libraryRecord as LibraryRecord, this.metadataRecord) },
-                    { title: 'CONSOLE', value: getLibraryDetailConsoleLabel(this.libraryRecord as LibraryRecord, this.metadataRecord) }
-                  ],
-                  extendedCells: [
-                    { title: 'PUBLISHER', value: getLibraryDetailPublisherLabel(this.metadataRecord) },
-                    { title: 'PLAYTIME', value: getLibraryDetailPlaytimeLabel(this.libraryRecord as LibraryRecord) },
-                    { title: 'ENGINE', value: getLibraryDetailEngineLabel(this.libraryRecord as LibraryRecord) },
-                    { title: 'REGION', value: getLibraryDetailRegionLabel(this.libraryRecord as LibraryRecord) }
-                  ],
-                  hasRuntimeSnapshot: hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord),
-                  telemetryFpsText: this.telemetryFpsText,
-                  telemetryAudioText: this.telemetryCpuText,
-                  telemetryDropText: this.telemetryGpuText,
-                  telemetryProfile: buildLibraryDetailTelemetrySnapshot(this.libraryRecord as LibraryRecord).profile,
-                  telemetryScanOffset: this.telemetryScanOffset,
-                  telemetryGlowOpacity: this.telemetryGlowOpacity,
-                  overviewText: getLibraryDetailOverviewText(this.metadataRecord),
-                  runtimeSummaryText: getLibraryDetailRuntimeSummaryText(this.libraryRecord as LibraryRecord, this.metadataRecord),
-                  onToggleDetails: () => {
-                    this.showExtendedDetails = !this.showExtendedDetails
-                  }
-                })
-                KeyValueSpecList({
-                  title: 'CORE SPECIFICATIONS',
-                  items: this.getCoreSpecItems(this.libraryRecord as LibraryRecord)
-                })
-              }
-              .width('100%')
-              .padding({ left: 24, right: 24, top: 26, bottom: 42 })
-            }
-            .width('100%')
-            .constraintSize({ maxWidth: 390 })
-            .scrollBar(BarState.Off)
+            this.DetailContent(this.libraryRecord as LibraryRecord)
           } else {
             Column() {
               this.EmptyState()
@@ -624,7 +720,7 @@ struct LibraryDetailPage {
         .justifyContent(FlexAlign.Center)
 
         EmuBottomNav({
-          items: createEmuBottomNavItems('library'),
+          items: this.navItems,
           activeFontColor: EmuColors.primary,
           inactiveFontColor: '#665E5E67',
           indicatorStyle: 'dot',

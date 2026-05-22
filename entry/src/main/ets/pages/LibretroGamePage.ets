@@ -67,6 +67,12 @@ import { RuntimeLibrarySessionTracker } from '../common/RuntimeLibrarySessionTra
 import { RuntimeSaveStateController } from '../common/RuntimeSaveStateController'
 import { runtimeSessionController } from '../common/RuntimeSessionController'
 import {
+  createDefaultRuntimeRenderSettingsProfile,
+  loadRuntimeRenderSettingsProfile,
+  RuntimeRenderSettingsProfile,
+  saveRuntimeRenderSettingsProfile
+} from '../common/RuntimeRenderSettingsRepository'
+import {
   RuntimeSoakState,
   RuntimeSoakTestController
 } from '../common/RuntimeSoakTestController'
@@ -147,6 +153,7 @@ struct LibretroGamePage {
   private readonly inputDebugTracker: RuntimeInputDebugTracker = new RuntimeInputDebugTracker();
   private readonly runtimeSaveStateController: RuntimeSaveStateController = new RuntimeSaveStateController();
   private readonly soakController: RuntimeSoakTestController = new RuntimeSoakTestController();
+  private renderSettingsProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile();
   private readonly startOrSwitchDebounceMs: number = 600;
   private readonly runtimeInputLayoutWidth: number = 440;
   private readonly runtimeInputLayoutHeight: number = 340;
@@ -199,6 +206,7 @@ struct LibretroGamePage {
     this.refreshInputDevices();
     this.syncPortAssignments();
     void this.loadRuntimeInputLayout();
+    void this.loadRuntimeRenderSettings();
     this.refreshHudMetricsCache();
   }
   
@@ -239,6 +247,33 @@ struct LibretroGamePage {
       LogHelper.warn('LibretroGame', 'Input', `读取本地输入布局失败: ${message}`);
       this.runtimeInputLayoutButtons = createDefaultInputLayoutProfile().buttons;
     }
+  }
+
+  private async loadRuntimeRenderSettings(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      return;
+    }
+    const profile = await loadRuntimeRenderSettingsProfile(context);
+    this.renderSettingsProfile = profile;
+    this.scalingMode = profile.scalingMode;
+    this.softwareMaxPresetIndex = profile.softwareMaxPresetIndex;
+    this.hwRenderAllowed = profile.hwRenderAllowed;
+  }
+
+  private async persistRuntimeRenderSettingsProfile(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      return;
+    }
+    this.renderSettingsProfile = {
+      version: this.renderSettingsProfile.version,
+      scalingMode: this.scalingMode,
+      softwareMaxPresetIndex: this.softwareMaxPresetIndex,
+      hwRenderAllowed: this.hwRenderAllowed,
+      updatedAt: this.renderSettingsProfile.updatedAt
+    };
+    this.renderSettingsProfile = await saveRuntimeRenderSettingsProfile(context, this.renderSettingsProfile);
   }
 
   private getCurrentRuntimeRomFile(): string {
@@ -738,6 +773,7 @@ struct LibretroGamePage {
     const preset = presets[index] || presets[1];
     const okMax = runtimeRenderSettingsController.setSoftwareMaxResolution(preset.w, preset.h);
     this.clearRuntimeStatsForConfigChange();
+    void this.persistRuntimeRenderSettingsProfile();
     LogHelper.info('LibretroGame', 'Config', `设置软件最大分辨率: ${preset.w}x${preset.h}, okMax=${okMax}`);
   }
 
@@ -755,6 +791,7 @@ struct LibretroGamePage {
       runtimeRenderSettingsController.setSoftwareMaxResolution(preset.w, preset.h);
     }
     this.clearRuntimeStatsForConfigChange();
+    void this.persistRuntimeRenderSettingsProfile();
     LogHelper.info('LibretroGame', 'Config', `设置缩放模式: ${index}, okMode=${okMode}`);
   }
 
@@ -991,6 +1028,7 @@ struct LibretroGamePage {
         onHwRenderChange: (value: boolean) => {
           this.hwRenderAllowed = value;
           const ok = runtimeRenderSettingsController.setHwRenderAllowed(value);
+          void this.persistRuntimeRenderSettingsProfile();
           LogHelper.info('LibretroGame', 'Config', `设置 HW_RENDER 允许: ${value}, ok=${ok}`);
         },
         onHideVirtualControllerChange: (value: boolean) => {

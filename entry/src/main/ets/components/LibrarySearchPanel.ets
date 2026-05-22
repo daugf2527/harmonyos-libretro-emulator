@@ -15,10 +15,10 @@ export struct LibrarySearchPanel {
   @Prop showSearchResults: boolean = false
   @Prop selectedPlatform: string = 'ALL'
   @Prop spinnerAngle: number = 0
-  private searchResults: LibraryRecord[] = []
-  private telemetryCells: EmuTelemetryCellItem[] = []
-  private telemetryBars: EmuTelemetryBarItem[] = []
-  private platforms: string[] = ['ALL']
+  @Prop searchResults: LibraryRecord[] = []
+  @Prop telemetryCells: EmuTelemetryCellItem[] = []
+  @Prop telemetryBars: EmuTelemetryBarItem[] = []
+  @Prop platforms: string[] = ['ALL']
   onKeywordChange?: (value: string) => void
   onSearchResultLaunch?: (item: LibraryRecord) => void
   onPlatformChange?: (value: string) => void

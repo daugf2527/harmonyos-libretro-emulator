@@ -208,7 +208,7 @@ struct MetadataEditPage {
   build() {
     Column() {
       EmuHeaderBar({
-        titleText: 'EMU_CORE_v1.0',
+        titleText: '碳影 / Carbon Shade',
         titleIcon: 'memory',
         rightLabel: this.statusText,
         rightIcon: 'settings_input_component',
