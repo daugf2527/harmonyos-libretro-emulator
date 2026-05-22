@@ -113,6 +113,14 @@ add_library(entry SHARED
     ${APP_NAPI_SOURCES}
 )
 
+find_library(
+    # Sets the name of the path variable.
+    hilog-lib
+    # Specifies the name of the NDK library that
+    # you want CMake to locate.
+    hilog_ndk.z
+)
+
 # ========== 测试可执行目标 (独立于 libentry.so) ==========
 # 启用方式: cmake -DBUILD_LIBRETRO_TESTS=ON ...
 # 默认 OFF: HAP 构建不引入测试,避免污染发布产物。
@@ -127,13 +135,6 @@ if(BUILD_LIBRETRO_TESTS)
     target_link_libraries(libretro_tests PRIVATE ${hilog-lib} dl)
 endif()
 
-find_library(
-    # Sets the name of the path variable.
-    hilog-lib
-    # Specifies the name of the NDK library that
-    # you want CMake to locate.
-    hilog_ndk.z
-)
 target_link_libraries(entry PUBLIC ${hilog-lib})
 target_link_libraries(entry PUBLIC libace_napi.z.so)
 target_link_libraries(entry PUBLIC libace_ndk.z.so)
