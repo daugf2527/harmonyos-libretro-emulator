@@ -12,7 +12,15 @@
 
 namespace libretro {
 
-NativeVSyncDriver::~NativeVSyncDriver() { Stop(); }
+NativeVSyncDriver::NativeVSyncDriver()
+    : alive_(std::make_shared<Alive>()) {}
+
+NativeVSyncDriver::~NativeVSyncDriver() {
+  Stop();
+  // 标记对象已死,任何残留的 OH_NativeVSync 回调进入 OnFrame 后会立即返回。
+  // alive_ 是 shared_ptr,回调端持有的 weak_ptr 仍能安全 lock 检测。
+  alive_->v.store(false, std::memory_order_release);
+}
 
 bool NativeVSyncDriver::Start(const std::string &name,
                               const FrameCallback &callback) {
@@ -53,6 +61,9 @@ void NativeVSyncDriver::Stop() {
 #endif
   running_ = false;
   callback_ = nullptr;
+  // 注意:callbackContext_ 不在此释放,因为 OH_NativeVSync_Destroy 不保证
+  // 已 pending 的回调被取消。析构时再释放(此时 alive_ 已置 false,
+  // 任何残留回调会安全返回)。
 }
 
 bool NativeVSyncDriver::RequestNextFrame() {
@@ -61,7 +72,13 @@ bool NativeVSyncDriver::RequestNextFrame() {
   if (!running_ || !nativeVsync_) {
     return false;
   }
-  return OH_NativeVSync_RequestFrame(nativeVsync_, OnFrame, this) == 0;
+  if (!callbackContext_) {
+    callbackContext_ = std::make_unique<CallbackContext>();
+    callbackContext_->alive = alive_;
+    callbackContext_->self = this;
+  }
+  return OH_NativeVSync_RequestFrame(nativeVsync_, OnFrame,
+                                     callbackContext_.get()) == 0;
 #else
   return false;
 #endif
@@ -77,7 +94,13 @@ void NativeVSyncDriver::OnFrame(long long timestamp, void *data) {
   if (!data) {
     return;
   }
-  auto *self = static_cast<NativeVSyncDriver *>(data);
+  auto *ctx = static_cast<CallbackContext *>(data);
+  auto alive = ctx->alive.lock();
+  if (!alive || !alive->v.load(std::memory_order_acquire)) {
+    // driver 已析构,不能访问 ctx->self
+    return;
+  }
+  auto *self = ctx->self;
   FrameCallback callback;
   {
     std::lock_guard<std::mutex> lock(self->mutex_);

@@ -98,6 +98,23 @@ public:
     return updated;
   }
 
+  // SET_SYSTEM_AV_INFO 支持:核心运行时变更分辨率/帧率/采样率,
+  // 由 Engine 线程在 retro_run 返回后 ConsumePendingAvInfo 消费并应用。
+  void SetPendingAvInfo(const ::retro_system_av_info &av) {
+    std::lock_guard<std::mutex> lock(av_info_mutex_);
+    pending_av_info_ = av;
+    has_pending_av_info_ = true;
+  }
+  bool ConsumePendingAvInfo(::retro_system_av_info &out) {
+    std::lock_guard<std::mutex> lock(av_info_mutex_);
+    if (!has_pending_av_info_) {
+      return false;
+    }
+    out = pending_av_info_;
+    has_pending_av_info_ = false;
+    return true;
+  }
+
   void SetSupportsNoGame(bool supports) { supports_no_game_ = supports; }
   bool SupportsNoGame() const { return supports_no_game_; }
 
@@ -234,6 +251,9 @@ private:
   unsigned geometry_base_height_ = 0;
   float geometry_aspect_ratio_ = 0.0f;
   bool geometry_updated_ = false;
+  mutable std::mutex av_info_mutex_;
+  ::retro_system_av_info pending_av_info_{};
+  bool has_pending_av_info_ = false;
   unsigned performance_level_ = 0;
 
   uint64_t input_capabilities_ =

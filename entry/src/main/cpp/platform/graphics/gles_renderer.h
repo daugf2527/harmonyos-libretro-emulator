@@ -55,6 +55,14 @@ public:
       deleter_(id_);
     id_ = new_id;
   }
+  // 放弃句柄而不调用 deleter。用于 EGL 上下文已失效的场景,避免在
+  // context-less 状态下调用 glDelete* 导致驱动 UB。GPU 端资源会随
+  // EGL display 的整体清理被释放,短暂泄漏可接受。
+  T release() {
+    T old = id_;
+    id_ = 0;
+    return old;
+  }
 
 private:
   T id_;

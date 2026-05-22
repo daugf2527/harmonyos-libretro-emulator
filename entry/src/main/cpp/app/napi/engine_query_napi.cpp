@@ -104,16 +104,40 @@ static napi_value WaitForEngineStateAsync(napi_env env,
   ctx->env = env;
   ctx->target = static_cast<libretro::EngineState>(stateValue);
   ctx->timeoutMs = static_cast<uint32_t>(timeoutMs);
+  ctx->work = nullptr;
 
-  napi_value promise;
-  napi_create_promise(env, &ctx->deferred, &promise);
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return MakeResolvedPromise(env, false);
+  }
 
   napi_value resourceName;
-  napi_create_string_utf8(env, "WaitForEngineStateAsync", NAPI_AUTO_LENGTH,
-                          &resourceName);
-  napi_create_async_work(env, nullptr, resourceName, ExecuteWaitForState,
-                         CompleteWaitForState, ctx, &ctx->work);
-  napi_queue_async_work(env, ctx->work);
+  if (napi_create_string_utf8(env, "WaitForEngineStateAsync", NAPI_AUTO_LENGTH,
+                              &resourceName) != napi_ok) {
+    napi_value falseVal;
+    napi_get_boolean(env, false, &falseVal);
+    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    delete ctx;
+    return promise;
+  }
+
+  if (napi_create_async_work(env, nullptr, resourceName, ExecuteWaitForState,
+                             CompleteWaitForState, ctx, &ctx->work) != napi_ok) {
+    napi_value falseVal;
+    napi_get_boolean(env, false, &falseVal);
+    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    delete ctx;
+    return promise;
+  }
+  if (napi_queue_async_work(env, ctx->work) != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    napi_value falseVal;
+    napi_get_boolean(env, false, &falseVal);
+    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    delete ctx;
+    return promise;
+  }
 
   return promise;
   NAPI_TRY_CATCH_END(env, nullptr)

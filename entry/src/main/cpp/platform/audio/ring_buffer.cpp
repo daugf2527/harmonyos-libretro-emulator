@@ -355,20 +355,17 @@ size_t RingBuffer::AvailableWrite() const {
 }
 
 void RingBuffer::Clear() {
-  // 1. 重置指针
-  head_.v.store(0, std::memory_order_relaxed);
-  tail_.v.store(0, std::memory_order_relaxed);
-  
-  // 2. 唤醒所有等待者 (重要!)
-  // 因为 Clear 通常意味着重置或停止，等待中的线程应该被唤醒并重新检查条件
+  // head_/tail_ 归零必须在 mutex_ 内完成,否则与 WriteWait/ReadWait 慢路径
+  // 在持锁期间执行的 store(curr_head + samples) 形成竞态,可能把大偏移写回
+  // 已归零的 head_/tail_,造成 memcpy 越界。
   {
       std::lock_guard<std::mutex> lock(mutex_);
-      // 注意：这里的 notify 不一定能让 wait 返回 true (因为 head/tail 重置了可能还是不满/不空)
-      // 但配合 running=false 的外部状态，可以确保线程退出
+      head_.v.store(0, std::memory_order_relaxed);
+      tail_.v.store(0, std::memory_order_relaxed);
       cv_not_empty_.notify_all();
       cv_not_full_.notify_all();
   }
-  
+
   LOGF(LOG_INFO, "%{public}s RingBuffer cleared and waiters notified",
        kAudioChainPrefix);
 }
