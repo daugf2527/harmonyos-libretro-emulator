@@ -30,6 +30,16 @@
 namespace libretro {
 
 // 静态实例指针，用于回调桥接（Phase 1 简化处理，仅支持单实例）
+//
+// 设计警告:本项目同时存在 GetInstance() 的 Meyer's singleton (line ~282) 和
+// 此处的 g_engineInstance 全局指针,后者由构造函数 store(this)。两套生命周期:
+//   - GetInstance() 的静态局部 `instance` 在程序退出最末才析构
+//   - g_engineInstance 由构造函数写入,析构函数不写回 nullptr
+// 当前默认只创建一个实例,无冲突;但若未来某处在单例外另建实例,
+// g_engineInstance 会被覆盖,且析构顺序可能不一致。修复方向:
+//   1) 彻底删除 g_engineInstance,所有回调改走 GetInstance(),或
+//   2) 把 g_engineInstance 改为只在 GetInstance() 首次访问时设置一次。
+// 在此之前,新增代码请只通过 GetInstanceSnapshot() 访问当前实例。
 static std::atomic<LibretroEngine *> g_engineInstance{nullptr};
 
 class EngineSyncTask {
@@ -37,6 +47,13 @@ public:
   explicit EngineSyncTask(std::function<void()> task) : task_(std::move(task)) {}
 
   void Run() {
+    // 调用方 Wait 超时后会标记 abandoned_,此时捕获的栈引用已悬空,跳过执行
+    if (abandoned_.load(std::memory_order_acquire)) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      done_ = true;
+      cond_.notify_all();
+      return;
+    }
     if (task_) {
       task_();
     }
@@ -49,8 +66,13 @@ public:
 
   bool Wait(uint32_t timeoutMs) {
     std::unique_lock<std::mutex> lock(mutex_);
-    return cond_.wait_for(lock, std::chrono::milliseconds(timeoutMs),
-                          [this]() { return done_; });
+    const bool ok = cond_.wait_for(
+        lock, std::chrono::milliseconds(timeoutMs),
+        [this]() { return done_; });
+    if (!ok) {
+      abandoned_.store(true, std::memory_order_release);
+    }
+    return ok;
   }
 
 private:
@@ -58,6 +80,7 @@ private:
   std::mutex mutex_;
   std::condition_variable cond_;
   bool done_ = false;
+  std::atomic<bool> abandoned_{false};
 };
 
 namespace {
@@ -1915,6 +1938,33 @@ void LibretroEngine::ProcessFrame() {
     eventBridge_.Emit("options_update", "{}", false);
   }
 
+  // 5. 消费核心运行时 SET_SYSTEM_AV_INFO 请求(分辨率/帧率/采样率热切换)
+  ::retro_system_av_info pendingAv{};
+  if (envState_.ConsumePendingAvInfo(pendingAv)) {
+    if (pendingAv.geometry.base_width > 0 && pendingAv.geometry.base_height > 0) {
+      videoPipeline_.SetGeometry(pendingAv.geometry.base_width,
+                                 pendingAv.geometry.base_height,
+                                 pendingAv.geometry.aspect_ratio);
+      videoWidth_ = static_cast<int>(pendingAv.geometry.base_width);
+      videoHeight_ = static_cast<int>(pendingAv.geometry.base_height);
+    }
+    if (pendingAv.timing.fps > 0.0) {
+      targetFps_ = pendingAv.timing.fps;
+      videoPipeline_.SetTargetFps(pendingAv.timing.fps);
+    }
+    if (pendingAv.timing.sample_rate > 0.0 &&
+        std::abs(audioSampleRate_ - pendingAv.timing.sample_rate) > 1.0) {
+      audioSampleRate_ = pendingAv.timing.sample_rate;
+      auto *audioBridge = AudioBridge::GetInstance();
+      if (audioBridge) {
+        audioBridge->Reset(static_cast<int32_t>(pendingAv.timing.sample_rate));
+        LOGF(LOG_INFO,
+             "%{public}s AV info update: sample_rate -> %{public}.0f",
+             kAudioChainPrefix, pendingAv.timing.sample_rate);
+      }
+    }
+  }
+
   // 更新时间戳
   lastRunTimestamp_ = now;
   hasLastRunTimestamp_ = true;
@@ -2391,19 +2441,25 @@ bool LibretroEngine::DiskControlAddImageIndex() {
 }
 
 void LibretroEngine::TransitionTo(EngineState newState) {
+  // 使用 CAS 循环避免 load → validate → store 之间的 TOCTOU。
   EngineState oldState = state_.load();
-  if (!IsValidTransition(oldState, newState)) {
-    LOGF(LOG_WARN, "Illegal state transition: %{public}d -> %{public}d",
-         static_cast<int>(oldState), static_cast<int>(newState));
-    return;
+  while (true) {
+    if (oldState == newState) {
+      return;
+    }
+    if (!IsValidTransition(oldState, newState)) {
+      LOGF(LOG_WARN, "Illegal state transition: %{public}d -> %{public}d",
+           static_cast<int>(oldState), static_cast<int>(newState));
+      return;
+    }
+    if (state_.compare_exchange_strong(oldState, newState)) {
+      break;
+    }
+    // CAS 失败:oldState 已被更新为当前实际值,重试。
   }
-  if (oldState == newState) {
-    return;
-  }
-  state_.store(newState);
   stateCond_.notify_all();
-  LOGF(LOG_INFO, "State Transition: %{public}d -> %{public}d",
-       static_cast<int>(oldState), static_cast<int>(newState));
+  LOGF(LOG_INFO, "State Transition: -> %{public}d",
+       static_cast<int>(newState));
 
   // 通知 ArkTS 侧状态变更
   char payload[64];

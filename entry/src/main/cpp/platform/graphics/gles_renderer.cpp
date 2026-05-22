@@ -522,7 +522,20 @@ void GLESRenderer::Deinit() {
   }
 
   if (!contextCurrent) {
-    LOGF(LOG_WARN, "EGL context not current during Deinit, skipping GL resource cleanup");
+    LOGF(LOG_ERROR,
+         "EGL context not current during Deinit, releasing GL handles "
+         "without glDelete* to avoid UB (resources will be reclaimed by "
+         "EGL display teardown)");
+    (void)texture_.release();
+    (void)program_.release();
+    (void)vbo_.release();
+    (void)vao_.release();
+    for (auto &f : upload_fence_ring_) {
+      f = nullptr;  // 丢弃 fence sync 句柄
+    }
+    for (auto &pbo : pbo_ring_) {
+      pbo = 0;  // 丢弃 PBO 句柄
+    }
   } else {
     texture_.reset();
     program_.reset();
