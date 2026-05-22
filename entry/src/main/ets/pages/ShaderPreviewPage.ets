@@ -1,5 +1,5 @@
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
-import { EmuHeaderBar } from '../components/EmuAppShell'
+import { EmuHeaderBar, ScanlineBackground } from '../components/EmuAppShell'
 import { EmuColors } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
@@ -81,17 +81,10 @@ struct ShaderPreviewPage {
         })
 
       if (processed) {
-        Column({ space: 3 }) {
-          ForEach(this.scanlineRows, (item: number) => {
-            Row()
-              .width('100%')
-              .height(1)
-              .backgroundColor('#55000000')
-              .opacity(0.5)
-          }, (item: number) => `scan-${item}`)
-        }
-        .width('100%')
-        .height('100%')
+        ScanlineBackground({
+          lineColor: '#55000000',
+          lineSpacing: 4
+        })
       }
 
       Column({ space: 10 }) {
