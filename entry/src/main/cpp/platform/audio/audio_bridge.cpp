@@ -277,8 +277,11 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
   }
   
   // 1.5 Bypass 重采样 (如果采样率相同)
-  // 注意：需要在锁内判断以安全访问 resampler_，写入逻辑保持一致
-  const bool bypass = (resampler_.GetRatio() == 1.0);
+  // 注意:不能仅用 resampler_.GetRatio() == 1.0 判断,因为 DRC 在 1.0 附近微调时
+  // ratio 与 1.0 浮点相等的概率不稳定,bypass 与否会跳变。
+  // 改用整数比较 core/output 采样率 + DRC skew 严格等于 1.0(初始未触发) 双重判定。
+  const bool bypass = (core_sample_rate_ == output_sample_rate_) &&
+                      (drc_skew_.load() == 1.0);
   const double ratio_snapshot = resampler_.GetCurrentRatio();
   size_t out_frames = 0;
 
@@ -446,16 +449,10 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
         skew = std::max(skew - kDrcStep, static_cast<double>(kDrcMinSkew));
       }
       
-      // 更新 Ratio 需要加锁，因为 Resample 也在用
-      // 重新获取锁进行简短的更新
-      // 这里的竞争很小，因为只有这里会修改 ratio
-      // 实际上 Resample 和 UpdateRatio 都是在 ProcessAudio 线程调用的，
-      // 所以理论上是单线程的，除了 Reset 可能会在另一线程。
-      // 为安全起见，这里不需要 AudioBridge 的锁，Resampler 内部没有锁
-      // 但 Resample 和 UpdateRatio 都在 ProcessAudio 中调用，所以是序列化的。
-      // 唯一的风险是 Reset 在另一线程重置 Resampler。
-      // 考虑到 Reset 调用时 Core 应该已暂停或正在加载，风险可控。
+      // 更新 Ratio 需要加锁,因为 Reset() 可能在另一线程重置 Resampler。
+      // 原实现注释承认"风险可控"但实际是数据竞争 UB,这里恢复加锁。
       if (skew != drc_skew_.load()) {
+        std::lock_guard<std::mutex> drc_guard(mutex_);
         drc_skew_.store(skew);
         resampler_.UpdateRatio(skew);
         int32_t skew_ppm = static_cast<int32_t>(skew * 1000000.0);

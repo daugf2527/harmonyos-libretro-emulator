@@ -111,10 +111,6 @@ add_library(entry SHARED
     ${PLATFORM_RESOURCE_SOURCES}
     ${APP_FRAMEWORK_SOURCES}
     ${APP_NAPI_SOURCES}
-    # 测试文件已移动到tests/目录，暂时从构建中排除
-    # tests/unit/core_loader_test.cpp
-    # tests/integration/test_gambatte_load.cpp
-    # tests/integration/test_gambatte_rom.cpp
 )
 
 find_library(
@@ -124,6 +120,21 @@ find_library(
     # you want CMake to locate.
     hilog_ndk.z
 )
+
+# ========== 测试可执行目标 (独立于 libentry.so) ==========
+# 启用方式: cmake -DBUILD_LIBRETRO_TESTS=ON ...
+# 默认 OFF: HAP 构建不引入测试,避免污染发布产物。
+# CI 应在独立 step 中以 ON 构建并执行 libretro_tests。
+option(BUILD_LIBRETRO_TESTS "Build libretro unit/integration tests" OFF)
+if(BUILD_LIBRETRO_TESTS)
+    add_executable(libretro_tests
+        tests/unit/core_loader_test.cpp
+        tests/integration/test_gambatte_load.cpp
+        tests/integration/test_gambatte_rom.cpp
+    )
+    target_link_libraries(libretro_tests PRIVATE ${hilog-lib} dl)
+endif()
+
 target_link_libraries(entry PUBLIC ${hilog-lib})
 target_link_libraries(entry PUBLIC libace_napi.z.so)
 target_link_libraries(entry PUBLIC libace_ndk.z.so)

@@ -41,9 +41,12 @@ inline napi_value MakeBool(napi_env env, bool value) {
 }
 
 inline napi_value MakeResolvedPromise(napi_env env, bool value) {
-  napi_deferred deferred;
-  napi_value promise;
-  napi_create_promise(env, &deferred, &promise);
+  napi_deferred deferred = nullptr;
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &deferred, &promise) != napi_ok || !deferred) {
+    napi_throw_error(env, nullptr, "Failed to create promise");
+    return nullptr;
+  }
   napi_value result;
   napi_get_boolean(env, value, &result);
   napi_resolve_deferred(env, deferred, result);
@@ -189,9 +192,12 @@ inline napi_value BuildStringArray(napi_env env,
 
 inline napi_value MakeResolvedStringArrayPromise(
     napi_env env, const std::vector<std::string> &files) {
-  napi_deferred deferred;
-  napi_value promise;
-  napi_create_promise(env, &deferred, &promise);
+  napi_deferred deferred = nullptr;
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &deferred, &promise) != napi_ok || !deferred) {
+    napi_throw_error(env, nullptr, "Failed to create promise");
+    return nullptr;
+  }
   napi_value result = BuildStringArray(env, files);
   napi_resolve_deferred(env, deferred, result);
   return promise;

@@ -19,6 +19,7 @@
 #include <cstdint>
 #include <js_native_api.h>
 #include <js_native_api_types.h>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -45,6 +46,9 @@ public:
   bool GetNewArchInputStats(NewArchInputStats &out) const;
 
 private:
+  // nativeXComponentMap_ 在 napi 调用线程(Export)与 UI 线程(SetNativeXComponent
+  // 经由 Surface 回调)之间共享,必须用 mutex 保护避免哈希表内部状态损坏。
+  mutable std::mutex map_mutex_;
   std::unordered_map<std::string, OH_NativeXComponent *> nativeXComponentMap_;
 };
 #endif // PLUGIN_MANAGER_H
