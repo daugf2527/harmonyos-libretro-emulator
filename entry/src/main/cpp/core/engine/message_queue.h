@@ -31,6 +31,12 @@ public:
   /**
    * @brief 推送并尝试合并。如果队尾元素满足条件，则用新值替换队尾元素。
    * 适用于高频事件（如 Resize），只保留最新值。
+   *
+   * **限制**:仅检查队尾元素。若同类消息已被其他类型消息"夹"在队列中部,
+   * 此函数不会向前扫描合并,而是把新消息追加到队尾。对于持续高频推送
+   * (如连续多个 Resize),实际效果良好;但若交替推送(Resize→Other→Resize)
+   * 会保留中部旧 Resize。如需严格"仅留最新一条"语义,需改为全队列扫描替换。
+   *
    * @param value 新消息
    * @param shouldReplace 判定函数：bool(const T& back, const T& incoming)
    */

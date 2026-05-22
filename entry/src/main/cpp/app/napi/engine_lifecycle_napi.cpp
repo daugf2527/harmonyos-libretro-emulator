@@ -6,6 +6,11 @@
 #include <rawfile/raw_dir.h>
 #include <rawfile/raw_file_manager.h>
 
+// 警告:以下文件级 static 变量绑定到 .so 生命周期而非 napi_env。
+// 当前 HarmonyOS ArkTS 单实例场景下没问题;但若未来引入 Worker / 多 env,
+// 所有 env 会共享同一套全局状态,可能出现 stale token 干扰或互斥锁在已销毁
+// 线程持有时死锁。若启用 Worker 支持,需将这些状态包装在 EngineNapiState
+// 类中,并通过 napi_set_instance_data(env, ...) 按 env 隔离。
 static std::atomic<bool> stop_in_progress{false};
 static std::atomic<uint64_t> switch_token{0};
 static std::mutex switch_mutex;

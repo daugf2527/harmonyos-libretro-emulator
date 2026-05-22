@@ -151,6 +151,17 @@ bool TestCoreLoader(const std::string &corePath) {
 
 /**
  * 测试错误处理
+ *
+ * 已知局限 (XFAIL): Test 2 "Double loading" 依赖一个真实存在的 .so 文件,
+ * 在 CI 环境下该路径永远不存在,所以 Test 2 实际上会被 Skipped(line ~180)。
+ * 这导致"防止双重加载"路径在 CI 中**未被验证**。
+ *
+ * 改造方向(单独 PR):
+ *   1) 写一个最小化 stub .so(只导出 retro_api_version 等必须符号),
+ *      让 Test 2 始终能跑;或
+ *   2) 改测试预期为"两次加载不存在路径都返回 false",虽然不验真实分支,
+ *      但能跑;或
+ *   3) 引入测试框架(doctest)按平台条件 SKIP 而非静默"成功"。
  */
 bool TestErrorHandling() {
   LOGF(LOG_INFO, "========== Error Handling Test Start ==========");
