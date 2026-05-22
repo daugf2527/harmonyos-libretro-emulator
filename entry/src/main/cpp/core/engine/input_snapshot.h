@@ -20,8 +20,7 @@ public:
   InputSnapshot() {
     for (int port = 0; port < kMaxPorts; ++port) {
       buttons_mask_[port].store(0);
-      pointer_xy_[port].store(0);
-      pointer_pressed_[port].store(false);
+      pointer_state_[port].store(0);
       for (int i = 0; i < kMaxAnalogAxes; ++i) {
         analog_axes_[port][i].store(0);
       }
@@ -102,8 +101,7 @@ public:
       for (int i = 0; i < kMaxAnalogAxes; ++i) {
         analog_axes_[port][i].store(0, std::memory_order_relaxed);
       }
-      pointer_xy_[port].store(0, std::memory_order_relaxed);
-      pointer_pressed_[port].store(false, std::memory_order_relaxed);
+      pointer_state_[port].store(0, std::memory_order_relaxed);
       for (int i = 0; i < kMaxSensors; ++i) {
         sensor_values_[port][i].store(0.0f, std::memory_order_relaxed);
       }
@@ -121,8 +119,7 @@ public:
     for (int i = 0; i < kMaxAnalogAxes; ++i) {
       analog_axes_[port][i].store(0, std::memory_order_relaxed);
     }
-    pointer_xy_[port].store(0, std::memory_order_relaxed);
-    pointer_pressed_[port].store(false, std::memory_order_relaxed);
+    pointer_state_[port].store(0, std::memory_order_relaxed);
     for (int i = 0; i < kMaxSensors; ++i) {
       sensor_values_[port][i].store(0.0f, std::memory_order_relaxed);
     }
@@ -131,17 +128,22 @@ public:
   /**
    * @brief 设置指针状态 (Touch/Mouse)
    * 坐标应归一化到 [-0x8000, 0x7fff]
+   *
+   * 单原子 64-bit 打包 (xy + pressed),保证 GetPointer 不会读到"新坐标 + 旧
+   * pressed"撕裂状态(原 xy 与 pressed 分两个 atomic,可能跨 1 帧不一致)。
    */
   void SetPointer(int port, int16_t x, int16_t y, bool pressed) {
     if (!IsValidPort(port)) {
       return;
     }
-    // Pack X and Y into a single 32-bit integer for atomic update
-    // Low 16 bits: X, High 16 bits: Y
-    uint32_t packed =
-        (static_cast<uint16_t>(y) << 16) | static_cast<uint16_t>(x);
-    pointer_xy_[port].store(packed, std::memory_order_relaxed);
-    pointer_pressed_[port].store(pressed, std::memory_order_relaxed);
+    // 位布局: bit 63 = pressed, bits 31..16 = y, bits 15..0 = x
+    uint64_t packed =
+        (static_cast<uint64_t>(static_cast<uint16_t>(y)) << 16) |
+        static_cast<uint64_t>(static_cast<uint16_t>(x));
+    if (pressed) {
+      packed |= (1ULL << 63);
+    }
+    pointer_state_[port].store(packed, std::memory_order_relaxed);
   }
 
   /**
@@ -154,10 +156,10 @@ public:
       pressed = false;
       return;
     }
-    uint32_t packed = pointer_xy_[port].load(std::memory_order_relaxed);
+    uint64_t packed = pointer_state_[port].load(std::memory_order_relaxed);
     x = static_cast<int16_t>(packed & 0xFFFF);
-    y = static_cast<int16_t>(packed >> 16);
-    pressed = pointer_pressed_[port].load(std::memory_order_relaxed);
+    y = static_cast<int16_t>((packed >> 16) & 0xFFFF);
+    pressed = ((packed >> 63) & 1ULL) != 0;
   }
 
   /**
@@ -193,9 +195,9 @@ private:
   // 使用原子数组存储模拟量（支持 32 个轴）
   std::atomic<int16_t> analog_axes_[kMaxPorts][kMaxAnalogAxes];
 
-  // 指针状态
-  std::atomic<uint32_t> pointer_xy_[kMaxPorts];
-  std::atomic<bool> pointer_pressed_[kMaxPorts];
+  // 指针状态 (xy + pressed 打包到单个 64-bit atomic,避免跨原子撕裂)
+  // 位布局: bit 63 = pressed, bits 31..16 = y, bits 15..0 = x
+  std::atomic<uint64_t> pointer_state_[kMaxPorts];
 
   // 传感器数据 (支持 16 个通道，足以覆盖 Accel(3) + Gyro(3) + Light(1) + others)
   std::atomic<float> sensor_values_[kMaxPorts][kMaxSensors];

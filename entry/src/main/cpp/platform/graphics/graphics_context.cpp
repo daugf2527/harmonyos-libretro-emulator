@@ -215,6 +215,14 @@ bool GraphicsContext::SwapBuffers() {
 }
 
 bool GraphicsContext::UpdateSurface(OHNativeWindow *window) {
+  // 上下文未就绪时直接拒绝,避免 CreateSurface 内部 eglMakeCurrent 用
+  // EGL_NO_CONTEXT 失败但失败原因不可观测。
+  if (!ready_ || egl_context_ == EGL_NO_CONTEXT) {
+    LOGF(LOG_ERROR,
+         "UpdateSurface called before context is ready (ready=%{public}d)",
+         ready_ ? 1 : 0);
+    return false;
+  }
   // Recreate surface simply calls CreateSurface which handles destruction of
   // old one. Assuming context is preserved.
   return CreateSurface(window);

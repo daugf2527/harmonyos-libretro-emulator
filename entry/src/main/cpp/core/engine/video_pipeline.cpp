@@ -1410,7 +1410,11 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
 #endif
   const auto now = std::chrono::steady_clock::now();
   MaybeRecoverDegradedMode(mode, now);
-  const bool isDupeRequest = (data == RETRO_HW_FRAME_BUFFER_VALID); // Simplified
+  // 注意:命名为 isDupeRequest 但实际语义是"HW 有效帧标记"。按 libretro 协议
+  // dupe 是 (data == NULL),但 line 1399 已把 NULL 直接当 no-op RENDERED 返回,
+  // 因此此处只剩 HW 有效帧的语义。彻底协议化的 dupe 处理(在 NULL 时复用上帧)
+  // 留作后续单独 PR,需同步评估 GLES/Vulkan 路径的 DUPED 返回值含义。
+  const bool isDupeRequest = (data == RETRO_HW_FRAME_BUFFER_VALID);
   const auto preflightReason =
       EvaluateRenderPreflight(window, width, height, pitch, mode, isDupeRequest);
   if (preflightReason != PreflightDropReason::NONE) {

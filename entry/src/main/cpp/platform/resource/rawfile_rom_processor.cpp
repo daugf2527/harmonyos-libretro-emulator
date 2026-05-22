@@ -97,7 +97,9 @@ RawfileRomProcessor::Result RawfileRomProcessor::Process(
 
   TempFileManager temp_mgr(files_dir);
   if (!temp_mgr.Initialize()) {
-    LOGF(LOG_WARN, "TempFileManager failed to initialize");
+    LOGF(LOG_WARN,
+         "TempFileManager failed to initialize, skip temp ROM write");
+    return result;  // 内存数据已加载,直接返回,不再尝试写盘
   }
 
   std::string temp_path;

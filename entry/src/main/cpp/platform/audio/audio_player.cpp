@@ -980,10 +980,9 @@ void AudioPlayer::Cleanup() {
   ring_buffer_ = nullptr;
   running_ = nullptr;
 
-  {
-    std::lock_guard<std::mutex> lock(callback_mutex_);
-    shutting_down_ = false;
-  }
+  // 注意:不再把 shutting_down_ 重置为 false。Cleanup 是单次最终态,
+  // 残留 OHAudio 回调必须通过 shutting_down_ == true 检查拦截,
+  // 避免回调访问已置 nullptr 的 ring_buffer_。
 }
 
 } // namespace libretro

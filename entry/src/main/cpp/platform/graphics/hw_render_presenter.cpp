@@ -235,7 +235,9 @@ void HwRenderPresenter::Present(int viewport_width, int viewport_height,
   const float v_top = config_.bottom_left_origin ? v_max : 0.0f;
   const float v_bottom = config_.bottom_left_origin ? 0.0f : v_max;
 
-  // GLStateBackup state = CaptureState(attrib_pos_, attrib_tex_); // Removed to avoid pipeline stall
+  // 恢复 Core GL 状态备份(Viewport/Blend/Depth/Scissor/Cull/Program/FBO 等),
+  // 避免 Present 内 glDisable/glClear 等操作污染 Core 协议假设。
+  GLStateBackup state = CaptureState(attrib_pos_, attrib_tex_);
 
   glBindFramebuffer(GL_FRAMEBUFFER, 0);
   glViewport(0, 0, viewport_width, viewport_height);
@@ -270,7 +272,7 @@ void HwRenderPresenter::Present(int viewport_width, int viewport_height,
 
   glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-  // RestoreState(state, attrib_pos_, attrib_tex_); // Removed
+  RestoreState(state, attrib_pos_, attrib_tex_);
   // Restore FBO binding for the core
   glBindFramebuffer(GL_FRAMEBUFFER, framebuffer_);
 }

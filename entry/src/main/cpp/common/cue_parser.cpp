@@ -64,6 +64,12 @@ std::vector<std::string> ParseCueReferencedFiles(const std::vector<uint8_t>& cue
             }
 
             if (!filename.empty()) {
+                // 拒绝路径遍历与绝对路径:解析结果会被调用方拼接到 cue 同级目录加载,
+                // 含 ".." 或绝对路径的项会导致越界访问。
+                if (filename.find("..") != std::string::npos ||
+                    filename[0] == '/' || filename[0] == '\\') {
+                    continue;
+                }
                 files.push_back(filename);
             }
         }
