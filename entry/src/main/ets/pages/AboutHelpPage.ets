@@ -25,7 +25,7 @@ struct AboutHelpPage {
     { id: 'import', title: '怎么导入游戏？', detail: 'Procedure / Storage / Pathing', value: '使用导入入口选择本地 ROM，导入完成后进入库页同步。' },
     { id: 'input', title: '按键没反应怎么办？', detail: 'Input / Mapping / Calibration', value: '进入 INPUT 页面检查端口映射；布局编辑只保存本地 UI 配置。' },
     { id: 'legal', title: '合规声明', detail: 'Compliance / Licensing / EULA', value: '应用不提供商业 ROM；用户需自行确认 ROM 与 BIOS 使用权。' },
-    { id: 'version', title: '当前版本', detail: 'System Architecture / Build Info', value: 'EMU_CORE_v1.0 / HarmonyOS ArkUI native shell。' }
+    { id: 'version', title: '当前版本', detail: 'System Architecture / Build Info', value: '碳影 / Carbon Shade / HarmonyOS ArkUI native shell。' }
   ]
 
   private onBottomNavClick(key: string): void {
@@ -33,14 +33,8 @@ struct AboutHelpPage {
     if (route.length === 0) {
       return
     }
-    if (key === 'library') {
-      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[AboutHelpPage] replaceUrl ${route} failed: ${err.message}`)
-      })
-      return
-    }
-    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[AboutHelpPage] pushUrl ${route} failed: ${err.message}`)
+    this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+      console.error(`[AboutHelpPage] replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
@@ -65,7 +59,7 @@ struct AboutHelpPage {
         .fontColor(EmuColors.onSurface)
         .letterSpacing(0)
 
-      Text('EMU_CORE 是基于 libretro 的本地模拟运行壳。页面只描述当前已接入的本地能力；未接入联网资料与远端服务时会显示 UNKNOWN 或 NOT CONFIGURED。')
+      Text('碳影是基于 libretro 的本地模拟运行壳。当前页面仅展示已接入的本地能力；联网资料与远端服务尚未纳入当前版本。')
         .fontSize(13)
         .fontColor(EmuColors.onSurfaceVariant)
         .lineHeight(20)
@@ -80,7 +74,7 @@ struct AboutHelpPage {
     Column({ space: 14 }) {
       Row() {
         Column({ space: 4 }) {
-          Text('Core Version')
+          Text('当前版本')
             .fontSize(10)
                         .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
@@ -98,7 +92,7 @@ struct AboutHelpPage {
         .alignItems(HorizontalAlign.Start)
 
         Column({ space: 4 }) {
-          Text('Data Source')
+          Text('数据来源')
             .fontSize(10)
                         .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
@@ -168,7 +162,7 @@ struct AboutHelpPage {
   @Builder
   private HelpList() {
     Column({ space: 0 }) {
-      Text('DOCUMENTATION & LEGAL')
+      Text('文档与说明')
         .fontSize(10)
                 .fontColor(EmuColors.secondary)
         .letterSpacing(2)
@@ -191,7 +185,7 @@ struct AboutHelpPage {
           .height(2)
           .backgroundColor(EmuColors.primary)
 
-        Text('DESIGNED FOR LOCAL\nLIBRETRO SHELL.\nHARMONYOS // ARKUI //\nLIBRETRO')
+        Text('面向本地模拟体验\n构建于 HarmonyOS ArkUI\n基于 libretro 运行架构')
           .fontSize(13)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.6)
@@ -225,9 +219,9 @@ struct AboutHelpPage {
   build() {
     Column() {
       EmuHeaderBar({
-        titleText: 'EMU_CORE_v1.0',
+        titleText: '碳影 / Carbon Shade',
         titleIcon: 'memory',
-        rightLabel: 'SYSTEM',
+        rightLabel: '系统',
         rightIcon: 'settings_input_component',
         activeTextColor: EmuColors.primary,
         iconSize: 16,

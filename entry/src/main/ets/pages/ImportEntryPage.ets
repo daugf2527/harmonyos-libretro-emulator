@@ -102,14 +102,8 @@ struct ImportEntryPage {
     if (route.length === 0) {
       return
     }
-    if (key === 'library') {
-      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[ImportEntryPage] replaceUrl ${route} failed: ${err.message}`)
-      })
-      return
-    }
-    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[ImportEntryPage] pushUrl ${route} failed: ${err.message}`)
+    this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+      console.error(`[ImportEntryPage] replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
@@ -208,7 +202,7 @@ struct ImportEntryPage {
   build() {
     Column() {
       EmuHeaderBar({
-        titleText: 'EMU_CORE_v1.0',
+        titleText: '碳影 / Carbon Shade',
         rightLabel: '本地导入',
         titleIcon: 'memory',
         rightIcon: 'settings_input_component',

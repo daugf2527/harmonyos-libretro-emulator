@@ -21,26 +21,12 @@ export struct LibraryDetailInfoPanel {
   @Prop telemetryGlowOpacity: number = 0.2
   @Prop overviewText: string = 'Unknown'
   @Prop runtimeSummaryText: string = ''
-  private primaryCells: LibraryDetailSummaryCellData[] = []
-  private extendedCells: LibraryDetailSummaryCellData[] = []
-  private telemetryProfile: number[] = []
+  @Prop primaryCells: LibraryDetailSummaryCellData[] = []
+  @Prop extendedCells: LibraryDetailSummaryCellData[] = []
+  @Prop telemetryProfile: number[] = []
   onToggleDetails?: () => void
-  // Pre-computed row caches to avoid .slice() allocation in build()
-  private cachedTopRow: LibraryDetailSummaryCellData[] = []
-  private cachedBottomRow: LibraryDetailSummaryCellData[] = []
-  private lastCellsRef: LibraryDetailSummaryCellData[] | null = null
-
-  aboutToAppear(): void {
-    this.refreshRowCaches()
-  }
-
-  private refreshRowCaches(): void {
-    if (this.extendedCells !== this.lastCellsRef) {
-      this.lastCellsRef = this.extendedCells
-      this.cachedTopRow = this.extendedCells.slice(0, 2)
-      this.cachedBottomRow = this.extendedCells.slice(2, 4)
-    }
-  }
+  private readonly telemetryVerticalLines: number[] = createIndexRange(13)
+  private readonly telemetryHorizontalLines: number[] = createIndexRange(4)
 
   build() {
     Column({ space: 30 }) {
@@ -181,7 +167,7 @@ export struct LibraryDetailInfoPanel {
 
       Stack() {
         Row({ space: 23 }) {
-          ForEach(createIndexRange(13), (_: number) => {
+          ForEach(this.telemetryVerticalLines, (_: number) => {
             Column()
               .width(1)
               .height('100%')
@@ -192,7 +178,7 @@ export struct LibraryDetailInfoPanel {
         .height('100%')
 
         Column({ space: 16 }) {
-          ForEach(createIndexRange(4), (_: number) => {
+          ForEach(this.telemetryHorizontalLines, (_: number) => {
             Row()
               .width('100%')
               .height(1)

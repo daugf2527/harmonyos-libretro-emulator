@@ -1,12 +1,9 @@
-import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
+import { BarChartBackground, BarChartItem, EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
-import {
-  InputDeviceInfo,
-  InputSourceType
-} from '../common/InputPortRouting'
+import { InputDeviceInfo } from '../common/InputPortRouting'
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
 
 interface ControllerSlotItem {
@@ -40,95 +37,72 @@ interface InputLogItem {
   isPrimary: boolean
 }
 
-interface TelemetryBarItem {
-  id: string
-  height: number
-  isPrimary: boolean
-}
 
 @Entry
 @Component
 struct MultiplayerInputPage {
-  @State private deviceNamesText: string = 'NO_EXTERNAL_DEVICE'
+  @State private deviceNamesText: string = ''
   @State private deviceCountText: string = '0'
   @State private selectedRoomId: string = 'local'
-  @State private localLatencyText: string = 'FRAME_SYNC'
+  @State private localLatencyText: string = '本地触控'
+  @State private inputLogTitleText: string = '等待输入'
+  @State private inputLogDetailText: string = '刷新设备后可查看当前外接手柄状态'
+  private readonly navItems = createEmuBottomNavItems('input')
 
-  private readonly telemetryBars: TelemetryBarItem[] = [
-    { id: 'j-01', height: 24, isPrimary: false },
-    { id: 'j-02', height: 30, isPrimary: false },
-    { id: 'j-03', height: 18, isPrimary: true },
-    { id: 'j-04', height: 22, isPrimary: true },
-    { id: 'j-05', height: 26, isPrimary: true },
-    { id: 'j-06', height: 44, isPrimary: false },
-    { id: 'j-07', height: 16, isPrimary: true },
-    { id: 'j-08', height: 20, isPrimary: true },
-    { id: 'j-09', height: 34, isPrimary: false },
-    { id: 'j-10', height: 14, isPrimary: true },
-    { id: 'j-11', height: 18, isPrimary: true },
-    { id: 'j-12', height: 20, isPrimary: true },
-    { id: 'j-13', height: 28, isPrimary: false },
-    { id: 'j-14', height: 23, isPrimary: true },
-    { id: 'j-15', height: 17, isPrimary: true },
-    { id: 'j-16', height: 21, isPrimary: true },
-    { id: 'j-17', height: 24, isPrimary: false },
-    { id: 'j-18', height: 22, isPrimary: true },
-    { id: 'j-19', height: 30, isPrimary: false },
-    { id: 'j-20', height: 16, isPrimary: true },
-    { id: 'j-21', height: 14, isPrimary: true },
-    { id: 'j-22', height: 20, isPrimary: true },
-    { id: 'j-23', height: 40, isPrimary: false },
-    { id: 'j-24', height: 18, isPrimary: true }
+  private readonly lobbyRooms: LobbyRoomItem[] = [
+    {
+      id: 'local',
+      title: '本地游玩',
+      game: '当前运行输入桥',
+      latency: '0ms',
+      players: '1 / 1',
+      status: 'READY',
+      color: EmuColors.primary
+    },
+    {
+      id: 'adapter',
+      title: 'Netplay 联机',
+      game: '中继 / 房间服务未配置',
+      latency: '--',
+      players: 'OFFLINE',
+      status: '未配置',
+      color: EmuColors.error
+    },
+    {
+      id: 'layout',
+      title: '按键布局编辑',
+      game: '触控按键与热区校准',
+      latency: '本地',
+      players: 'P1',
+      status: '可编辑',
+      color: EmuColors.secondary
+    }
+  ]
+  @State private controllerSlots: ControllerSlotItem[] = []
+
+  private readonly telemetryBars: BarChartItem[] = [
+    { height: 24, isPrimary: false }, { height: 30, isPrimary: false },
+    { height: 18, isPrimary: true },  { height: 22, isPrimary: true },
+    { height: 26, isPrimary: true },  { height: 44, isPrimary: false },
+    { height: 16, isPrimary: true },  { height: 20, isPrimary: true },
+    { height: 34, isPrimary: false }, { height: 14, isPrimary: true },
+    { height: 18, isPrimary: true },  { height: 20, isPrimary: true },
+    { height: 28, isPrimary: false }, { height: 23, isPrimary: true },
+    { height: 17, isPrimary: true },  { height: 21, isPrimary: true },
+    { height: 24, isPrimary: false }, { height: 22, isPrimary: true },
+    { height: 30, isPrimary: false }, { height: 16, isPrimary: true },
+    { height: 14, isPrimary: true },  { height: 20, isPrimary: true },
+    { height: 40, isPrimary: false }, { height: 18, isPrimary: true }
   ]
 
-  private readonly inputLogs: InputLogItem[] = [
-    { id: 'l-01', time: '[00:48:12]', eventName: 'P1_BTN_A', state: 'PRESS', isPrimary: true },
-    { id: 'l-02', time: '[00:48:12]', eventName: 'P1_DIR_RT', state: 'HOLD', isPrimary: false },
-    { id: 'l-03', time: '[00:48:13]', eventName: 'P1_BTN_A', state: 'RELEASE', isPrimary: false },
-    { id: 'l-04', time: '[00:48:14]', eventName: 'P2_BTN_ST', state: 'WAIT', isPrimary: false },
-    { id: 'l-05', time: '[00:48:14]', eventName: 'P1_DIR_UP', state: 'PRESS', isPrimary: true },
-    { id: 'l-06', time: '[00:48:15]', eventName: 'P1_BTN_B', state: 'PRESS', isPrimary: true }
-  ]
+  @State private inputLogs: InputLogItem[] = []
 
   aboutToAppear(): void {
-    this.refreshInputDevices()
+    this.refreshDevices()
   }
 
-  private refreshInputDevices(): void {
-    const devices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
-    this.deviceCountText = `${devices.length}`
-    this.deviceNamesText = this.buildDeviceNamesText(devices)
-    this.localLatencyText = devices.length > 0 ? 'INPUT_QUEUE' : 'FRAME_SYNC'
-  }
-
-  private buildDeviceNamesText(devices: InputDeviceInfo[]): string {
-    if (devices.length === 0) {
-      return 'NO_EXTERNAL_DEVICE'
-    }
-    const names: string[] = []
-    devices.forEach((device: InputDeviceInfo) => {
-      names.push(this.buildDeviceLabel(device))
-    })
-    return names.join(' / ')
-  }
-
-  private buildDeviceLabel(device: InputDeviceInfo): string {
-    if (device.sourceType === InputSourceType.Keyboard) {
-      return `KEYBOARD:${device.name}`
-    }
-    if (device.sourceType === InputSourceType.Mouse) {
-      return `MOUSE:${device.name}`
-    }
-    if (device.sourceType === InputSourceType.Gamepad) {
-      return `GAMEPAD:${device.name}`
-    }
-    if (device.sourceType === InputSourceType.BluetoothGamepad) {
-      return `BT_PAD:${device.name}`
-    }
-    return device.name.length > 0 ? device.name : device.deviceId
-  }
-
-  private getControllerSlots(): ControllerSlotItem[] {
+  private buildControllerSlots(): ControllerSlotItem[] {
+    const hasExternal = this.deviceNamesText.length > 0
     return [
       {
         id: 'p1',
@@ -145,48 +119,52 @@ struct MultiplayerInputPage {
       {
         id: 'p2',
         label: '外接手柄',
-        name: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '等待连接手柄' : this.deviceNamesText,
-        deviceId: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '等待 HID / 蓝牙手柄' : `${this.deviceCountText} 个输入设备`,
-        status: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '未绑定' : '已连接',
-        powerText: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '无设备' : '输入总线',
-        pollingRate: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '--' : 'DEVICE',
-        latency: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? '--' : 'NATIVE',
-        protocol: this.deviceNamesText === 'NO_EXTERNAL_DEVICE' ? 'HID_WAIT' : 'HID',
-        isActive: this.deviceNamesText !== 'NO_EXTERNAL_DEVICE'
+        name: hasExternal ? this.deviceNamesText : '等待连接手柄',
+        deviceId: hasExternal ? `${this.deviceCountText} 个输入设备` : '等待 HID / 蓝牙手柄',
+        status: hasExternal ? '已连接' : '未绑定',
+        powerText: hasExternal ? '输入总线' : '无设备',
+        pollingRate: hasExternal ? '设备轮询' : '--',
+        latency: hasExternal ? '系统直连' : '--',
+        protocol: hasExternal ? 'HID' : '等待接入',
+        isActive: hasExternal
       }
     ]
   }
 
-  private getLobbyRooms(): LobbyRoomItem[] {
-    return [
+  private refreshDevices(): void {
+    const devices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
+    const names: string[] = []
+    const logs: InputLogItem[] = [
       {
-        id: 'local',
-        title: '本地游玩',
-        game: '当前运行输入桥',
-        latency: '0ms',
-        players: '1 / 1',
-        status: 'READY',
-        color: EmuColors.primary
-      },
-      {
-        id: 'adapter',
-        title: 'Netplay 联机',
-        game: '中继 / 房间服务未配置',
-        latency: '--',
-        players: 'OFFLINE',
-        status: '未配置',
-        color: EmuColors.error
-      },
-      {
-        id: 'layout',
-        title: '按键布局编辑',
-        game: '触控按键与热区校准',
-        latency: '本地',
-        players: 'P1',
-        status: '可编辑',
-        color: EmuColors.secondary
+        id: 'local-touch',
+        time: '[本地]',
+        eventName: '触控布局',
+        state: '就绪',
+        isPrimary: true
       }
     ]
+    devices.forEach((item: InputDeviceInfo, index: number) => {
+      const deviceName = `${item.name}`.trim()
+      if (deviceName.length > 0) {
+        names.push(deviceName)
+      }
+      logs.push({
+        id: `device-${index}`,
+        time: '[设备]',
+        eventName: deviceName.length > 0 ? deviceName : `设备 ${index + 1}`,
+        state: `${item.deviceId}`.trim().length > 0 ? '已识别' : '已连接',
+        isPrimary: true
+      })
+    })
+    this.deviceNamesText = names.join(' / ')
+    this.deviceCountText = `${devices.length}`
+    this.localLatencyText = devices.length > 0 ? '多源输入' : '本地触控'
+    this.controllerSlots = this.buildControllerSlots()
+    this.inputLogs = logs
+    this.inputLogTitleText = devices.length > 0 ? `已识别 ${devices.length} 个外接设备` : '未检测到外接手柄'
+    this.inputLogDetailText = devices.length > 0 ?
+      '当前已读取本机输入设备列表' :
+      '当前仅启用本地触控布局'
   }
 
   private onBottomNavClick(key: string): void {
@@ -194,14 +172,8 @@ struct MultiplayerInputPage {
     if (route.length === 0) {
       return
     }
-    if (key === 'library') {
-      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[MultiplayerInputPage] replaceUrl ${route} failed: ${err.message}`)
-      })
-      return
-    }
-    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[MultiplayerInputPage] pushUrl ${route} failed: ${err.message}`)
+    this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
+      console.error(`[MultiplayerInputPage] replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
@@ -345,7 +317,7 @@ struct MultiplayerInputPage {
       .justifyContent(FlexAlign.SpaceBetween)
 
       Column({ space: 1 }) {
-        ForEach(this.getLobbyRooms(), (room: LobbyRoomItem) => {
+        ForEach(this.lobbyRooms, (room: LobbyRoomItem) => {
           this.RoomRow(room)
         }, (room: LobbyRoomItem) => room.id)
       }
@@ -467,19 +439,15 @@ struct MultiplayerInputPage {
         EmuPrecisionGridBackdrop()
           .opacity(0.26)
 
-        Row({ space: 2 }) {
-          ForEach(this.telemetryBars, (item: TelemetryBarItem) => {
-            Row()
-              .layoutWeight(1)
-              .height(item.height)
-              .backgroundColor(item.isPrimary ? EmuColors.primary : EmuColors.surfaceContainerHighest)
-              .opacity(item.isPrimary ? 0.5 : 1)
-          }, (item: TelemetryBarItem) => item.id)
-        }
-        .width('100%')
-        .height('100%')
-        .padding({ left: 10, right: 10, bottom: 10 })
-        .alignItems(VerticalAlign.Bottom)
+        BarChartBackground({
+          bars: this.telemetryBars,
+          primaryColor: EmuColors.primary,
+          secondaryColor: EmuColors.surfaceContainerHighest,
+          barGap: 2
+        })
+          .width('100%')
+          .height('100%')
+          .padding({ left: 10, right: 10, bottom: 10 })
 
         Row()
           .width('100%')
@@ -517,6 +485,16 @@ struct MultiplayerInputPage {
       }
       .alignItems(VerticalAlign.Center)
 
+      Text(this.inputLogTitleText)
+        .fontSize(12)
+        .fontColor(EmuColors.onSurface)
+        .width('100%')
+
+      Text(this.inputLogDetailText)
+        .fontSize(10)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .width('100%')
+
       Column({ space: 6 }) {
         ForEach(this.inputLogs, (item: InputLogItem) => {
           Row() {
@@ -552,7 +530,7 @@ struct MultiplayerInputPage {
         .backgroundColor(EmuColors.surfaceContainerHigh)
         .borderRadius(0)
         .onClick(() => {
-          this.refreshInputDevices()
+          this.refreshDevices()
         })
 
       Button('编辑按键布局')
@@ -573,7 +551,7 @@ struct MultiplayerInputPage {
   build() {
     Column() {
       EmuHeaderBar({
-        titleText: 'OS_EMU_v2.4.1',
+        titleText: '碳影 / Carbon Shade',
         titleIcon: 'terminal',
         rightLabel: '输入映射与联机中心',
         rightIcon: 'settings_input_component',
@@ -588,7 +566,7 @@ struct MultiplayerInputPage {
       Scroll() {
         Column({ space: 22 }) {
           Column({ space: 14 }) {
-            ForEach(this.getControllerSlots(), (item: ControllerSlotItem) => {
+            ForEach(this.controllerSlots, (item: ControllerSlotItem) => {
               this.ControllerCard(item)
             }, (item: ControllerSlotItem) => item.id)
           }
@@ -613,7 +591,7 @@ struct MultiplayerInputPage {
       .scrollBar(BarState.Off)
 
       EmuBottomNav({
-        items: createEmuBottomNavItems('input'),
+        items: this.navItems,
         activeFontColor: EmuColors.primary,
         inactiveFontColor: '#FF666666',
         indicatorStyle: 'line',

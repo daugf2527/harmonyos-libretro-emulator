@@ -24,10 +24,10 @@ export struct RuntimeControlPanel {
   @Prop soakSummaryText: string = ''
   @Prop switchError: string = ''
 
-  private portOptions: SelectOption[] = []
-  private inputSourceOptions: SelectOption[] = []
-  private coreOptions: SelectOption[] = []
-  private romOptions: SelectOption[] = []
+  @Prop portOptions: SelectOption[] = []
+  @Prop inputSourceOptions: SelectOption[] = []
+  @Prop coreOptions: SelectOption[] = []
+  @Prop romOptions: SelectOption[] = []
   onClose?: () => void
   onPortSelect?: (index: number) => void
   onInputSourceSelect?: (index: number) => void
