@@ -498,7 +498,7 @@ struct LibretroGamePage {
   handleFpsUpdate(payload: FpsUpdatePayload) {
     const fps = Number(payload.fps);
     if (!Number.isNaN(fps)) {
-      this.perfDisplay.coreFps = Math.round(fps);
+      this.perfDisplay = { ...this.perfDisplay, coreFps: Math.round(fps) };
       this.refreshHudMetricsCache();
     }
 
@@ -510,7 +510,7 @@ struct LibretroGamePage {
     const buf = Number(payload.audioBufferUsage ?? 0);
     this.librarySessionTracker.updateFrameStats(fps, drops, dupes, nulls, underruns, overruns, buf);
 
-    this.perfDisplay.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
+    this.perfDisplay = { ...this.perfDisplay, perfStatsText: `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%` };
   }
 
   handleAudioStatus(payload: AudioStatusPayload) {
@@ -520,7 +520,7 @@ struct LibretroGamePage {
       return;
     }
     this.librarySessionTracker.updateAudioStatus(occupancy, underruns, Number(payload.overruns));
-    this.perfDisplay.audioStatusText = `Buf:${occupancy.toFixed(0)}% U:${underruns}`;
+    this.perfDisplay = { ...this.perfDisplay, audioStatusText: `Buf:${occupancy.toFixed(0)}% U:${underruns}` };
   }
 
   handleGeometryUpdate(payload: GeometryUpdatePayload) {
@@ -529,7 +529,7 @@ struct LibretroGamePage {
     const a = Number(payload.aspect_ratio ?? 0);
     if (w > 0 && h > 0) {
       const aspectText = (a > 0) ? a.toFixed(3) : (w / h).toFixed(3);
-      this.perfDisplay.geometryText = `Base:${w}x${h} AR:${aspectText}`;
+      this.perfDisplay = { ...this.perfDisplay, geometryText: `Base:${w}x${h} AR:${aspectText}` };
     }
   }
 
@@ -654,34 +654,31 @@ struct LibretroGamePage {
     }
     const core = this.cores[this.selectedCoreIndex];
     if (!core) {
-      this.coreCheck.text = '核心无效';
+      this.coreCheck = { ...this.coreCheck, text: '核心无效' };
       return;
     }
-    this.coreCheck.running = true;
-    this.coreCheck.text = '正在验证核心符号...';
+    this.coreCheck = { ...this.coreCheck, running: true, text: '正在验证核心符号...' };
     try {
       const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
       if (!context) {
-        this.coreCheck.text = '获取 Context 失败';
-        this.coreCheck.running = false;
+        this.coreCheck = { ...this.coreCheck, text: '获取 Context 失败', running: false };
         return;
       }
       const bundleCodeDir = context.bundleCodeDir;
       const corePath = await resolveRuntimeCorePath(bundleCodeDir, core.soFile);
       const result = runtimeCoreDiagnosticController.testCoreLoader(corePath);
-      this.coreCheck.text = result;
+      this.coreCheck = { ...this.coreCheck, text: result };
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
-      this.coreCheck.text = `Failed: ${msg}`;
+      this.coreCheck = { ...this.coreCheck, text: `Failed: ${msg}` };
       LogHelper.error('LibretroGame', 'Core', `符号验证异常: ${msg}`);
     } finally {
-      this.coreCheck.running = false;
+      this.coreCheck = { ...this.coreCheck, running: false };
     }
   }
 
   private resetCoreCheckState() {
-    this.coreCheck.running = false;
-    this.coreCheck.text = '';
+    this.coreCheck = { running: false, text: '' };
   }
 
   private getRuntimeFpsText(): string {
@@ -747,11 +744,13 @@ struct LibretroGamePage {
 
   private clearRuntimeStatsForConfigChange(): void {
     const okStats = runtimeRenderSettingsController.resetStats();
-    this.perfDisplay.realtimeFps = 0;
-    this.perfDisplay.coreFps = 0;
-    this.perfDisplay.audioStatusText = '';
-    this.perfDisplay.perfStatsText = '';
-    this.perfDisplay.geometryText = '';
+    this.perfDisplay = {
+      realtimeFps: 0,
+      coreFps: 0,
+      audioStatusText: '',
+      perfStatsText: '',
+      geometryText: ''
+    };
     LogHelper.info('LibretroGame', 'Config', `重置性能统计: okStats=${okStats}`);
   }
 
@@ -1277,8 +1276,10 @@ struct LibretroGamePage {
   }
 
   private applySoakState(state: RuntimeSoakState): void {
-    this.soakState.running = state.running;
-    this.soakState.secondsLeft = state.secondsLeft;
-    this.soakState.summaryText = state.summaryText;
+    this.soakState = {
+      running: state.running,
+      secondsLeft: state.secondsLeft,
+      summaryText: state.summaryText
+    };
   }
 }
