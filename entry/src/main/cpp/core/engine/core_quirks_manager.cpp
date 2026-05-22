@@ -36,6 +36,11 @@ bool CoreQuirksManager::NameMatchesToken(const std::string &name,
 }
 
 const std::array<CoreQuirksManager::Rule, 1> &CoreQuirksManager::GetRules() {
+  // 警告:当前 quirks 识别仅基于 library_name 子串匹配,属启发式。若核心未来
+  // 重命名(如 "gambatte" → "gambatte-speedrun")或另一款核心名称包含此子串,
+  // 规则会漏匹配或误匹配。更稳健的做法是结合 system_info.library_version 范围、
+  // valid_extensions 集合,或在 retro_init 后通过实际行为探测(capability 检测)
+  // 决定 quirks。规则表也建议抽到独立 JSON/config 文件,避免重新编译即可调整。
   static const std::array<Rule, 1> rules = {{
       {"gambatte", {true, true}},
   }};
