@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ "${OS:-}" == "Windows_NT" ]] || [[ "${OSTYPE:-}" == msys* ]] || [[ "${OSTYPE:-}" == cygwin* ]] || [[ "${OSTYPE:-}" == win32* ]]; then
+  comspec_path="${ComSpec:-C:\\Windows\\System32\\cmd.exe}"
+  exec "${comspec_path}" //c "${script_dir}\\hvigorw.bat" "$@"
+fi
+
+if [[ -n "${HARMONY_COMMANDLINE_TOOLS_HOME:-}" ]] && [[ -x "${HARMONY_COMMANDLINE_TOOLS_HOME}/bin/hvigorw" ]]; then
+  exec "${HARMONY_COMMANDLINE_TOOLS_HOME}/bin/hvigorw" "$@"
+fi
+
+if command -v hvigorw >/dev/null 2>&1; then
+  exec "$(command -v hvigorw)" "$@"
+fi
+
+echo "[FAIL] Unable to locate hvigorw. Set HARMONY_COMMANDLINE_TOOLS_HOME or add hvigorw to PATH." >&2
+exit 1

@@ -338,6 +338,12 @@ export async function getLibraryRecordByRomFile(
   return records.find((record: LibraryRecord) => record.romFile === romFile)
 }
 
+export async function loadAllLibraryRecords(
+  context: common.UIAbilityContext
+): Promise<LibraryRecord[]> {
+  return await loadLibraryIndex(context)
+}
+
 export async function updateLibraryRecordCover(
   context: common.UIAbilityContext,
   romFile: string,

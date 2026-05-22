@@ -80,10 +80,6 @@ interface FileIoCompat {
   stat(path: string): Promise<FileStatCompat>
 }
 
-interface AsyncReadResultCompat {
-  buffer?: ArrayBuffer
-}
-
 interface PickerSelectOptionsCompat {
   maxSelectNumber: number
 }
@@ -750,14 +746,18 @@ async function copyFileFromUri(
       if (shouldCancel?.()) {
         throw new ImportCanceledError(readSize)
       }
-      const readResult = await fs.read(srcFile.fd, bufSize, readSize) as AsyncReadResultCompat
-      const chunk = readResult.buffer
-      const readLen = chunk ? chunk.byteLength : 0
+      const chunk = new ArrayBuffer(bufSize)
+      const readOptions: ReadOptions = {
+        offset: 0,
+        length: bufSize
+      }
+      const readLen = await fs.read(srcFile.fd, chunk, readOptions)
       if (readLen <= 0) {
         break
       }
       readSize += readLen
-      await fs.write(destFile.fd, chunk as ArrayBuffer)
+      const chunkToWrite = readLen >= chunk.byteLength ? chunk : chunk.slice(0, readLen)
+      await fs.write(destFile.fd, chunkToWrite)
       onChunkCopied?.(readSize)
       if (readSize % (1024 * 1024) === 0) {
         await Promise.resolve()

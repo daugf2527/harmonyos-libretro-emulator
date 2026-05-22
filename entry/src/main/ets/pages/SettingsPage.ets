@@ -29,6 +29,11 @@ interface SettingOptionItem {
   isActive: boolean
 }
 
+interface SoftwareResolutionPreset {
+  width: number
+  height: number
+}
+
 @Entry
 @Component
 struct SettingsPage {
@@ -129,6 +134,16 @@ struct SettingsPage {
     return '仅打开本地滤镜预览，不会写入当前运行时 shader preset'
   }
 
+  private cloneRenderProfile(): RuntimeRenderSettingsProfile {
+    return {
+      version: this.renderProfile.version,
+      scalingMode: this.renderProfile.scalingMode,
+      softwareMaxPresetIndex: this.renderProfile.softwareMaxPresetIndex,
+      hwRenderAllowed: this.renderProfile.hwRenderAllowed,
+      updatedAt: this.renderProfile.updatedAt
+    }
+  }
+
   aboutToAppear(): void {
     this.pageActive = true
     void this.refreshPageData()
@@ -171,7 +186,7 @@ struct SettingsPage {
     const inputDevices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
     const externalNames: string[] = []
     inputDevices.forEach((item: InputDeviceInfo) => {
-      const label = `${item.deviceName}`.trim()
+      const label = `${item.name}`.trim()
       if (label.length > 0) {
         externalNames.push(label)
       }
@@ -244,10 +259,8 @@ struct SettingsPage {
 
   private async toggleHwRenderAllowed(): Promise<void> {
     const nextValue = !this.renderProfile.hwRenderAllowed
-    const nextProfile: RuntimeRenderSettingsProfile = {
-      ...this.renderProfile,
-      hwRenderAllowed: nextValue
-    }
+    const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
+    nextProfile.hwRenderAllowed = nextValue
     const ok = runtimeRenderSettingsController.setHwRenderAllowed(nextValue)
     this.setRuntimeApplyStatus('GPU Backend', ok)
     if (!ok) {
@@ -258,10 +271,8 @@ struct SettingsPage {
 
   private async cycleRenderMode(): Promise<void> {
     const nextMode = (this.renderProfile.scalingMode + 1) % 3
-    const nextProfile: RuntimeRenderSettingsProfile = {
-      ...this.renderProfile,
-      scalingMode: nextMode
-    }
+    const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
+    nextProfile.scalingMode = nextMode
     const okMode = runtimeRenderSettingsController.setScalingMode(nextMode)
     let okResolution = true
     if (nextMode === 1) {
@@ -278,11 +289,9 @@ struct SettingsPage {
 
   private async cycleSoftwareResolutionPreset(): Promise<void> {
     const nextPreset = (this.renderProfile.softwareMaxPresetIndex + 1) % 3
-    const nextProfile: RuntimeRenderSettingsProfile = {
-      ...this.renderProfile,
-      scalingMode: 1,
-      softwareMaxPresetIndex: nextPreset
-    }
+    const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
+    nextProfile.scalingMode = 1
+    nextProfile.softwareMaxPresetIndex = nextPreset
     const resolution = this.getSoftwareResolutionForPreset(nextPreset)
     const okMode = runtimeRenderSettingsController.setScalingMode(1)
     const okResolution = runtimeRenderSettingsController.setSoftwareMaxResolution(
@@ -297,7 +306,7 @@ struct SettingsPage {
     await this.persistRenderProfile(nextProfile)
   }
 
-  private getSoftwareResolutionForPreset(index: number): { width: number, height: number } {
+  private getSoftwareResolutionForPreset(index: number): SoftwareResolutionPreset {
     if (index === 0) {
       return { width: 640, height: 480 }
     }
@@ -341,12 +350,14 @@ struct SettingsPage {
       this.telemetryBars = this.createEmptyTelemetryBars()
       return
     }
-    this.telemetryBars = telemetryBars.map((item: LibraryTelemetryBar) => {
-      return {
+    const mappedBars: BarChartItem[] = telemetryBars.map((item: LibraryTelemetryBar): BarChartItem => {
+      const nextBar: BarChartItem = {
         height: item.height * 3.5,
         isPrimary: item.color !== '#22484848'
       }
+      return nextBar
     })
+    this.telemetryBars = mappedBars
   }
 
   @Builder
