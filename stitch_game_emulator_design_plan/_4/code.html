@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EMU_OS // SYSTEM SETTINGS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#0e0e0e",
+              "secondary": "#9d9e9e",
+              "outline": "#757575",
+              "on-primary-container": "#00f13d",
+              "on-primary": "#004c0c",
+              "secondary-fixed": "#e2e2e2",
+              "surface-container-highest": "#262626",
+              "surface-bright": "#2c2c2c",
+              "on-tertiary-fixed-variant": "#626267",
+              "secondary-dim": "#9d9e9e",
+              "primary-container": "#00530e",
+              "tertiary": "#faf9fe",
+              "outline-variant": "#484848",
+              "on-error-container": "#ff9b82",
+              "primary-fixed": "#72ff70",
+              "secondary-container": "#3a3c3c",
+              "inverse-surface": "#f9f9f9",
+              "inverse-on-surface": "#555555",
+              "surface-container-low": "#131313",
+              "on-tertiary": "#5e5f63",
+              "on-primary-fixed": "#004b0c",
+              "on-secondary-fixed": "#3e4040",
+              "background": "#0e0e0e",
+              "on-tertiary-container": "#56565b",
+              "surface-container-high": "#1f1f1f",
+              "primary-fixed-dim": "#00f63e",
+              "on-secondary-container": "#bfbfbf",
+              "error-dim": "#ba573f",
+              "surface-container-lowest": "#000000",
+              "tertiary-fixed": "#eeedf3",
+              "surface": "#0e0e0e",
+              "inverse-primary": "#006f16",
+              "error": "#ed7f64",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "on-background": "#e5e5e5",
+              "tertiary-dim": "#e0dfe4",
+              "surface-container": "#191919",
+              "on-primary-fixed-variant": "#006b15",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "error-container": "#7e2b17",
+              "surface-tint": "#00e639",
+              "secondary-fixed-dim": "#d4d4d4",
+              "on-surface-variant": "#ababab",
+              "tertiary-container": "#ebeaf0",
+              "primary": "#00e639",
+              "on-error": "#450900",
+              "on-secondary": "#1e2021",
+              "on-tertiary-fixed": "#45464a",
+              "surface-variant": "#262626",
+              "primary-dim": "#00d635",
+              "on-surface": "#e5e5e5"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        font-size: 20px;
+      }
+      ::-webkit-scrollbar { width: 0px; background: transparent; }
+      body { -webkit-tap-highlight-color: transparent; }
+      .range-thumb-custom::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 2px;
+        height: 12px;
+        background: #e5e5e5;
+        border-radius: 0;
+        cursor: pointer;
+      }
+      .tab-active { border-bottom: 2px solid #00e639; color: #e5e5e5; }
+      .tab-inactive { color: #ababab; }
+      .tab-content { display: none; }
+      .tab-content.active { display: block; }
+    </style>
+<script>
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('tab-active'));
+      document.querySelectorAll('.tab-btn').forEach(el => el.classList.add('tab-inactive'));
+      
+      document.getElementById(tabId).classList.add('active');
+      event.currentTarget.classList.add('tab-active');
+      event.currentTarget.classList.remove('tab-inactive');
+    }
+  </script>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar -->
+<header class="bg-black text-[#00FF41] font-['Inter'] tracking-tighter uppercase text-xs font-semibold docked full-width top-0 border-b border-zinc-900 flex justify-between items-center w-full px-6 py-4 fixed z-50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00FF41]" data-icon="terminal">terminal</span>
+<span class="text-[#00FF41] font-mono tracking-widest text-sm">EMU_OS // 0.1</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-white" data-icon="settings_input_component">settings_input_component</span>
+</div>
+</header>
+<main class="pt-20 pb-24 px-6 max-w-md mx-auto min-h-screen">
+<!-- TAB NAVIGATION -->
+<div class="flex border-b border-outline-variant/30 mb-8">
+<button class="tab-btn flex-1 py-3 text-xs font-bold tracking-widest tab-active" onclick="switchTab('basic-settings')">基础设置<span class="block text-[8px] font-mono opacity-50">BASIC</span></button>
+<button class="tab-btn flex-1 py-3 text-xs font-bold tracking-widest tab-inactive" onclick="switchTab('advanced-settings')">高级设置<span class="block text-[8px] font-mono opacity-50">ADVANCED</span></button>
+</div>
+<!-- BASIC SETTINGS TAB -->
+<div class="tab-content active" id="basic-settings">
+<!-- VIDEO SECTION (BASIC) -->
+<section class="mb-10">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-1 h-3 bg-primary"></div>
+<h2 class="text-xs font-bold tracking-wider text-on-surface uppercase">画面设置 <span class="text-[8px] font-mono text-on-surface-variant ml-1">VIDEO_PROCESSING</span></h2>
+</div>
+<div class="space-y-6">
+<!-- Aspect Ratio Selector -->
+<div class="flex flex-col gap-3">
+<label class="text-[11px] font-semibold text-on-surface-variant uppercase">画面比例 <span class="text-[8px] font-mono lowercase opacity-60">aspect_ratio</span></label>
+<div class="flex gap-1 bg-surface-container-low p-1 rounded-sm">
+<button class="flex-1 py-2 text-[10px] font-bold transition-colors bg-surface-container-highest text-white rounded-sm">4:3</button>
+<button class="flex-1 py-2 text-[10px] font-bold transition-colors text-on-surface-variant hover:bg-surface-container-high rounded-sm">16:9</button>
+<button class="flex-1 py-2 text-[10px] font-bold transition-colors text-on-surface-variant hover:bg-surface-container-high rounded-sm">NATIVE</button>
+</div>
+</div>
+<!-- CRT Intensity Slider -->
+<div class="flex flex-col gap-3">
+<div class="flex justify-between items-end">
+<label class="text-[11px] font-semibold text-on-surface-variant uppercase">CRT 复古扫描线强度 <span class="text-[8px] font-mono lowercase opacity-60">scanline_intensity</span></label>
+<span class="text-[10px] font-mono text-primary">64%</span>
+</div>
+<div class="relative h-6 flex items-center">
+<div class="absolute w-full h-[1px] bg-outline-variant"></div>
+<input class="absolute w-full appearance-none bg-transparent cursor-pointer range-thumb-custom" max="100" min="0" type="range" value="64"/>
+</div>
+</div>
+</div>
+</section>
+<!-- INPUT SECTION (BASIC) -->
+<section class="mb-10">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-1 h-3 bg-primary"></div>
+<h2 class="text-xs font-bold tracking-wider text-on-surface uppercase">输入设备 <span class="text-[8px] font-mono text-on-surface-variant ml-1">INPUT_INTERFACE</span></h2>
+</div>
+<div class="bg-surface-container-low rounded-sm p-4 mb-4 border border-outline-variant/20">
+<div class="flex justify-between items-start mb-6">
+<div>
+<h3 class="text-xs font-bold text-white uppercase mb-1">DualSense Wireless</h3>
+<p class="text-[10px] text-on-surface-variant font-mono">ID: BT_CONTROLLER_09X</p>
+</div>
+<span class="text-[10px] font-bold text-primary px-2 py-0.5 border border-primary/30 rounded-sm">ACTIVE</span>
+</div>
+<div class="relative w-full aspect-video flex items-center justify-center bg-surface-container-lowest rounded-sm overflow-hidden mb-4">
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: radial-gradient(circle at 2px 2px, #484848 1px, transparent 0); background-size: 16px 16px;"></div>
+<img class="w-48 h-auto object-contain mix-blend-lighten grayscale brightness-125" data-alt="Modern white gaming controller" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBLJFvnm4zqH52l3NINiczG__-0R59B-EPaRRDFMWflTMUR_Xjc31TbZSsCtlV9bobWIZYT83XsibWqvRQ-hpT-ZpiaClcVzHPU6A_Fu7QfDI8wMeSCFp5ywRX9s5-gKcaARiw8Z1DdKVee_mNlTonBglZUqa-3VpTS0ebPXavsZWVVNqCltMP8VMvMk6FRjEfNQ4NJAZ9o9oRoMh-4SGZorQ5w67AM8THGDIbqKVUwq02Ol0d8pqb_pIDPDg4aCcvRGnRwUkt0Mw"/>
+<!-- Mapping UI Overlays -->
+<div class="absolute top-4 left-4 flex flex-col gap-1">
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="text-[8px] font-mono text-on-surface-variant">L2: BRAKE</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="text-[8px] font-mono text-on-surface-variant">L1: SHIFT_DOWN</span>
+</div>
+</div>
+</div>
+<div class="text-center text-[9px] text-on-surface-variant font-mono uppercase">按键布局映射预览 <span class="opacity-40">button_layout_preview</span></div>
+</div>
+</section>
+<!-- VOLUME SECTION (BASIC) -->
+<section class="mb-10">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-1 h-3 bg-primary"></div>
+<h2 class="text-xs font-bold tracking-wider text-on-surface uppercase">音频音量 <span class="text-[8px] font-mono text-on-surface-variant ml-1">AUDIO_VOLUME</span></h2>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex justify-between items-end">
+<label class="text-[11px] font-semibold text-on-surface-variant uppercase">主音量 <span class="text-[8px] font-mono lowercase opacity-60">master_volume</span></label>
+<span class="text-[10px] font-mono text-primary">80%</span>
+</div>
+<div class="relative h-6 flex items-center">
+<div class="absolute w-full h-[1px] bg-outline-variant"></div>
+<input class="absolute w-full appearance-none bg-transparent cursor-pointer range-thumb-custom" max="100" min="0" type="range" value="80"/>
+</div>
+</div>
+</section>
+</div>
+<!-- ADVANCED SETTINGS TAB -->
+<div class="tab-content" id="advanced-settings">
+<!-- VIDEO SECTION (ADVANCED) -->
+<section class="mb-10">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-1 h-3 bg-primary"></div>
+<h2 class="text-xs font-bold tracking-wider text-on-surface uppercase">高级画面 <span class="text-[8px] font-mono text-on-surface-variant ml-1">ADV_VIDEO</span></h2>
+</div>
+<div class="space-y-4">
+<!-- V-Sync Toggle -->
+<div class="flex justify-between items-center py-2">
+<span class="text-[11px] font-semibold text-on-surface-variant uppercase">垂直同步 <span class="text-[8px] font-mono lowercase opacity-60 ml-1">vertical_sync</span></span>
+<div class="flex items-center gap-3">
+<span class="text-[10px] font-bold text-white uppercase">ON</span>
+<div class="w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(0,255,65,0.4)]"></div>
+</div>
+</div>
+</div>
+</section>
+<!-- CONTROLLER REMAP (ADVANCED) -->
+<section class="mb-10">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-1 h-3 bg-primary"></div>
+<h2 class="text-xs font-bold tracking-wider text-on-surface uppercase">控制器重映射 <span class="text-[8px] font-mono text-on-surface-variant ml-1">INPUT_REMAP</span></h2>
+</div>
+<button class="w-full border border-outline py-3 text-[10px] font-bold text-white uppercase tracking-widest hover:bg-surface-container-highest transition-colors active:scale-[0.98] duration-150">
+                    REMAP_CONTROLLER_LAYOUT
+                </button>
+</section>
+<!-- AUDIO ENGINE (ADVANCED) -->
+<section class="mb-10">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-1 h-3 bg-primary"></div>
+<h2 class="text-xs font-bold tracking-wider text-on-surface uppercase">音频引擎 <span class="text-[8px] font-mono text-on-surface-variant ml-1">AUDIO_ENGINE</span></h2>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex justify-between items-end">
+<label class="text-[11px] font-semibold text-on-surface-variant uppercase">缓冲延迟 <span class="text-[8px] font-mono lowercase opacity-60 ml-1">buffer_latency</span></label>
+<span class="text-[10px] font-mono text-primary">12ms</span>
+</div>
+<div class="relative h-6 flex items-center">
+<div class="absolute w-full h-[1px] bg-outline-variant"></div>
+<input class="absolute w-full appearance-none bg-transparent cursor-pointer range-thumb-custom" max="64" min="4" type="range" value="12"/>
+</div>
+</div>
+</section>
+<!-- SYSTEM INFO (ADVANCED) -->
+<section class="mb-10">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-1 h-3 bg-primary"></div>
+<h2 class="text-xs font-bold tracking-wider text-on-surface uppercase">系统内核 <span class="text-[8px] font-mono text-on-surface-variant ml-1">KERNEL_INFO</span></h2>
+</div>
+<div class="bg-surface-container-low p-4 border border-outline-variant/10 font-mono">
+<div class="flex justify-between items-center text-[10px]">
+<span class="text-on-surface-variant">VERSION:</span>
+<span class="text-white">v0.1.24-stable-gnu</span>
+</div>
+</div>
+</section>
+</div>
+<!-- TELEMETRY DASHBOARD (ALWAYS VISIBLE) -->
+<section class="mb-4">
+<div class="flex items-center gap-2 mb-4">
+<div class="w-1 h-3 bg-primary"></div>
+<h2 class="text-[10px] font-bold tracking-[0.2em] text-on-surface-variant uppercase">系统实时监测 <span class="text-[8px] font-mono ml-1">SYSTEM_TELEMETRY</span></h2>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant/30 p-4 font-mono">
+<div class="grid grid-cols-2 gap-4 mb-6">
+<div>
+<div class="text-[8px] text-on-surface-variant uppercase mb-1">CPU_LOAD</div>
+<div class="text-lg text-primary leading-none">42.8%</div>
+</div>
+<div>
+<div class="text-[8px] text-on-surface-variant uppercase mb-1">MEM_ALLOC</div>
+<div class="text-lg text-on-surface leading-none">1.2 GB</div>
+</div>
+</div>
+<!-- Performance History Chart -->
+<div class="relative h-20 w-full flex items-end gap-[2px]">
+<div class="flex-1 bg-primary/20 h-[30%]"></div>
+<div class="flex-1 bg-primary/20 h-[45%]"></div>
+<div class="flex-1 bg-primary/20 h-[38%]"></div>
+<div class="flex-1 bg-primary/40 h-[62%]"></div>
+<div class="flex-1 bg-primary/40 h-[58%]"></div>
+<div class="flex-1 bg-primary/20 h-[40%]"></div>
+<div class="flex-1 bg-primary/30 h-[50%]"></div>
+<div class="flex-1 bg-primary/20 h-[35%]"></div>
+<div class="flex-1 bg-primary/10 h-[20%]"></div>
+<div class="flex-1 bg-primary/30 h-[45%]"></div>
+<div class="flex-1 bg-primary/60 h-[85%]"></div>
+<div class="flex-1 bg-primary/40 h-[55%]"></div>
+<div class="flex-1 bg-primary/20 h-[40%]"></div>
+<div class="flex-1 bg-primary/30 h-[48%]"></div>
+<div class="flex-1 bg-primary/40 h-[60%]"></div>
+<div class="absolute inset-0 border-b border-l border-outline-variant/40 pointer-events-none"></div>
+</div>
+<div class="flex justify-between mt-2">
+<span class="text-[8px] text-on-surface-variant">T-60S</span>
+<span class="text-[8px] text-on-surface-variant">FPS_60.0_STABLE</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden bg-black text-zinc-600 font-['Inter'] text-[10px] font-medium tracking-widest uppercase fixed bottom-0 w-full z-50 border-t border-zinc-900 flex justify-around items-center h-20 pb-safe px-4">
+<a class="flex flex-col items-center justify-center hover:text-zinc-300 transition-colors linear transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1">grid_view</span>
+<span>LIBRARY</span>
+</a>
+<a class="flex flex-col items-center justify-center hover:text-zinc-300 transition-colors linear transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1">terminal</span>
+<span>ENGINE</span>
+</a>
+<a class="flex flex-col items-center justify-center hover:text-zinc-300 transition-colors linear transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1">sports_esports</span>
+<span>INPUT</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#00FF41] relative after:content-[''] after:absolute after:top-0 after:w-1 after:h-1 after:bg-[#00FF41] after:rounded-full linear transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1">tune</span>
+<span>SYSTEM</span>
+</a>
+</nav>
+</body></html>

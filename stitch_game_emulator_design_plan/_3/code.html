@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>OS_EMU_v2.4.1 - Shader Preview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "secondary-dim": "#9d9e9e",
+              "tertiary-fixed": "#eeedf3",
+              "on-background": "#e5e5e5",
+              "surface-container-high": "#1f1f1f",
+              "secondary-container": "#3a3c3c",
+              "primary-fixed-dim": "#00f63e",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "on-secondary": "#1e2021",
+              "on-error": "#450900",
+              "surface-container-low": "#131313",
+              "surface-variant": "#262626",
+              "error-dim": "#ba573f",
+              "surface-container-highest": "#262626",
+              "on-tertiary-container": "#56565b",
+              "on-tertiary": "#5e5f63",
+              "surface-tint": "#00e639",
+              "primary-fixed": "#72ff70",
+              "inverse-primary": "#006f16",
+              "tertiary-container": "#ebeaf0",
+              "error": "#ed7f64",
+              "secondary-fixed-dim": "#d4d4d4",
+              "on-surface": "#e5e5e5",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "on-primary-fixed": "#004b0c",
+              "surface-container": "#191919",
+              "on-surface-variant": "#ababab",
+              "primary": "#00FF41",
+              "outline-variant": "#484848",
+              "inverse-on-surface": "#555555",
+              "on-primary": "#004c0c",
+              "on-error-container": "#ff9b82",
+              "background": "#000000",
+              "on-secondary-container": "#bfbfbf",
+              "surface-bright": "#2c2c2c",
+              "on-tertiary-fixed-variant": "#626267",
+              "surface": "#0e0e0e",
+              "on-primary-container": "#00f13d",
+              "on-secondary-fixed": "#3e4040",
+              "surface-dim": "#0e0e0e",
+              "tertiary": "#faf9fe",
+              "secondary": "#9d9e9e",
+              "on-tertiary-fixed": "#45464a",
+              "error-container": "#7e2b17",
+              "outline": "#757575",
+              "secondary-fixed": "#e2e2e2",
+              "surface-container-lowest": "#000000",
+              "primary-dim": "#00d635",
+              "tertiary-dim": "#e0dfe4",
+              "primary-container": "#00530e",
+              "on-primary-fixed-variant": "#006b15",
+              "inverse-surface": "#f9f9f9"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 20px;
+        }
+        .split-divider {
+            width: 1px;
+            background: #00FF41;
+            position: absolute;
+            left: 50%;
+            top: 0;
+            bottom: 0;
+            z-index: 10;
+        }
+        .scanline-overlay {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%;
+            pointer-events: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container-lowest text-on-surface font-body selection:bg-primary/30 overflow-hidden h-screen flex flex-col">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center px-6 h-14 w-full bg-black fixed top-0 w-full z-50 border-b-[0.5px] border-zinc-800">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00FF41]" data-icon="terminal">terminal</span>
+<h1 class="font-['Inter'] font-semibold tracking-tighter text-xs uppercase text-[#00FF41]">OS_EMU_v2.4.1</h1>
+</div>
+<div class="text-[#00FF41] font-mono text-sm tracking-[0.2em]">ENGINE_PREVIEW_MODE</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-zinc-500 hover:text-[#00FF41] transition-colors duration-150 cursor-pointer active:scale-95 duration-100" data-icon="settings_input_component">settings_input_component</span>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-1 mt-14 mb-20 relative flex overflow-hidden">
+<!-- Left Side: Raw Game Art -->
+<div class="w-1/2 relative bg-surface-container-low overflow-hidden group">
+<img alt="Raw digital interface" class="w-full h-full object-cover grayscale brightness-75 contrast-125" data-alt="Retro 16-bit pixel art landscape with vibrant purples and neon blues, crisp sharp edges and no texture filtering" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDTmLpZT8zz3ebALBjOklGZ3OtqcKhtJMNsJhd0_gwZDS6xBdQ_ODB60-aGO7wjccGefWw_BHi8KMLsY2gj0iHv6kou48XvnjBQghQp1HXnqxgnWEWNB6Wt6oqOs4jnON3jW3l_pkndqcNAzjN5AYWdSKnXSRp_IhWpd7159RAbFN3wX164RHDWiVNxz5hp5Fmxa7Oq7pWn-MF4wb1lgVy7P_83r3pDLtY1cMpIa_buUKlSwhfhAP0fNeh6HVycbKuhWl_0AxWu-Q"/>
+<div class="absolute top-4 left-6 z-20">
+<span class="bg-black/80 px-3 py-1 text-[10px] font-mono tracking-widest text-on-surface-variant border-[0.5px] border-outline-variant">SOURCE_RAW</span>
+</div>
+</div>
+<!-- Split Divider -->
+<div class="split-divider flex items-center justify-center">
+<div class="bg-primary text-black p-1 rounded-sm flex flex-col items-center shadow-[0_0_15px_rgba(0,255,65,0.4)]">
+<span class="material-symbols-outlined !text-sm" data-icon="unfold_more">unfold_more</span>
+</div>
+</div>
+<!-- Right Side: Post-Processed Art -->
+<div class="w-1/2 relative bg-surface-container-low overflow-hidden">
+<img alt="Processed digital interface" class="w-full h-full object-cover" data-alt="Retro 16-bit pixel art landscape with heavy scanline filters, CRT curvature distortion, and warm phosphorescent glow" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC3qTmZpO4StZ6XYMONhxtizlQNL-lko8bmhOZj2xI_WtqCUiRmuiyLoe2V6TabMdFJLxNfQMPaPCsoSH2yxkhEAu4VY0FZh1rgr0PGutvPwvB-plEdOyyBLGjj8AXxhg8IYyGbFKBFTf7hTP_aadVS4lA5T9qk7IKmnJsnIBTc4RpP0z6i3S6g6s3sqGqKRWvh5xMCKLRT_hDuS5j_6oyvsfGmuzchVausOVTeNA0daB1E6GdT9qEemQZYJtieUqRRBmZQ5znGKw"/>
+<div class="absolute inset-0 scanline-overlay"></div>
+<div class="absolute top-4 right-6 z-20 flex flex-col items-end gap-2">
+<span class="bg-primary px-3 py-1 text-[10px] font-mono tracking-widest text-black font-bold">LIVE_SHADER</span>
+<div class="text-[10px] font-mono text-primary text-right tracking-tight opacity-80">
+                    CRT-ROYALE_V4.2<br/>
+                    INTERLACE_MODE: ACTIVE
+                </div>
+</div>
+</div>
+<!-- Telemetry Overlay (Floating) -->
+<div class="absolute bottom-6 left-6 z-30 flex flex-col gap-1">
+<div class="bg-black/60 backdrop-blur-md p-4 border-[0.5px] border-outline-variant rounded-sm flex flex-col gap-3 min-w-[180px]">
+<div class="flex justify-between items-center">
+<span class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest">GPU Load</span>
+<span class="text-primary font-mono text-xs">84.2%</span>
+</div>
+<div class="w-full h-[2px] bg-zinc-800">
+<div class="h-full bg-primary w-[84%]"></div>
+</div>
+<div class="flex justify-between items-center pt-1">
+<span class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest">Latency</span>
+<span class="text-primary font-mono text-xs">4.2ms</span>
+</div>
+<div class="flex gap-[2px] items-end h-8">
+<div class="w-1 bg-zinc-800 h-[20%]"></div>
+<div class="w-1 bg-zinc-800 h-[40%]"></div>
+<div class="w-1 bg-primary h-[60%]"></div>
+<div class="w-1 bg-primary h-[30%]"></div>
+<div class="w-1 bg-primary h-[80%]"></div>
+<div class="w-1 bg-primary h-[45%]"></div>
+<div class="w-1 bg-primary h-[90%]"></div>
+<div class="w-1 bg-primary h-[70%]"></div>
+</div>
+</div>
+</div>
+<!-- Shader Parameters Panel (Floating Control Panel) -->
+<div class="absolute top-1/2 -translate-y-1/2 right-6 z-40">
+<div class="bg-surface-container-high/90 backdrop-blur-xl border-[0.5px] border-outline-variant w-72 p-6 flex flex-col gap-6 shadow-2xl">
+<div class="flex items-center justify-between border-b-[0.5px] border-outline-variant pb-3">
+<h2 class="text-xs font-semibold tracking-[0.15em] text-on-surface">实时视觉滤镜预览</h2>
+<span class="material-symbols-outlined text-primary !text-sm" data-icon="tune">tune</span>
+</div>
+<!-- Sliders -->
+<div class="space-y-6">
+<!-- Scanline Intensity -->
+<div class="space-y-2">
+<div class="flex justify-between text-[10px] font-mono tracking-widest text-on-surface-variant">
+<span>SCANLINE INTENSITY</span>
+<span class="text-on-surface">65%</span>
+</div>
+<div class="relative h-4 flex items-center">
+<div class="w-full h-[1px] bg-outline-variant"></div>
+<div class="absolute left-0 h-[1px] bg-primary w-[65%]"></div>
+<div class="absolute left-[65%] -translate-x-1/2 w-[2px] h-3 bg-on-surface border-[0.5px] border-black"></div>
+</div>
+</div>
+<!-- CRT Curvature -->
+<div class="space-y-2">
+<div class="flex justify-between text-[10px] font-mono tracking-widest text-on-surface-variant">
+<span>CRT CURVATURE</span>
+<span class="text-on-surface">12%</span>
+</div>
+<div class="relative h-4 flex items-center">
+<div class="w-full h-[1px] bg-outline-variant"></div>
+<div class="absolute left-0 h-[1px] bg-primary w-[12%]"></div>
+<div class="absolute left-[12%] -translate-x-1/2 w-[2px] h-3 bg-on-surface border-[0.5px] border-black"></div>
+</div>
+</div>
+<!-- Color Saturation -->
+<div class="space-y-2">
+<div class="flex justify-between text-[10px] font-mono tracking-widest text-on-surface-variant">
+<span>COLOR SATURATION</span>
+<span class="text-on-surface">115%</span>
+</div>
+<div class="relative h-4 flex items-center">
+<div class="w-full h-[1px] bg-outline-variant"></div>
+<div class="absolute left-0 h-[1px] bg-primary w-[75%]"></div>
+<div class="absolute left-[75%] -translate-x-1/2 w-[2px] h-3 bg-on-surface border-[0.5px] border-black"></div>
+</div>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="grid grid-cols-2 gap-3 pt-2">
+<button class="border-[0.5px] border-outline text-[10px] font-mono py-2 hover:bg-surface-container-highest active:scale-95 transition-all tracking-widest">RESET</button>
+<button class="border-[0.5px] border-primary text-[10px] font-mono py-2 text-primary hover:bg-primary/10 active:scale-95 transition-all tracking-widest flex items-center justify-center gap-2">
+<div class="w-1 h-1 bg-primary rounded-full"></div>
+                        SAVE_CFG
+                    </button>
+</div>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 h-20 border-t-[0.5px] border-zinc-800 flex justify-around items-center w-full px-4 pb-safe bg-black">
+<!-- Tab: LIBRARY -->
+<a class="flex flex-col items-center justify-center gap-1 text-zinc-600 hover:bg-zinc-900/50 active:bg-zinc-900 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="grid_view">grid_view</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-widest">LIBRARY</span>
+</a>
+<!-- Tab: ENGINE (ACTIVE) -->
+<a class="flex flex-col items-center justify-center gap-1 text-[#00FF41] relative after:content-[''] after:absolute after:top-0 after:w-8 after:h-[2px] after:bg-[#00FF41] active:bg-zinc-900 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="memory">memory</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-widest">ENGINE</span>
+</a>
+<!-- Tab: INPUT -->
+<a class="flex flex-col items-center justify-center gap-1 text-zinc-600 hover:bg-zinc-900/50 active:bg-zinc-900 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="videogame_asset">videogame_asset</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-widest">INPUT</span>
+</a>
+<!-- Tab: SYSTEM -->
+<a class="flex flex-col items-center justify-center gap-1 text-zinc-600 hover:bg-zinc-900/50 active:bg-zinc-900 transition-all duration-200" href="#">
+<span class="material-symbols-outlined" data-icon="tune">tune</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-widest">SYSTEM</span>
+</a>
+</nav>
+</body></html>

@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EMU_OS // 游戏库 (终极进化版)</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#000000",
+              "secondary": "#9d9e9e",
+              "outline": "#757575",
+              "on-primary-container": "#00f13d",
+              "on-primary": "#004c0c",
+              "secondary-fixed": "#e2e2e2",
+              "surface-container-highest": "#1a1a1a",
+              "surface-bright": "#222222",
+              "on-tertiary-fixed-variant": "#626267",
+              "secondary-dim": "#9d9e9e",
+              "primary-container": "#00530e",
+              "tertiary": "#faf9fe",
+              "outline-variant": "#333333",
+              "on-error-container": "#ff9b82",
+              "primary-fixed": "#72ff70",
+              "secondary-container": "#1a1c1c",
+              "inverse-surface": "#f9f9f9",
+              "inverse-on-surface": "#555555",
+              "surface-container-low": "#0a0a0a",
+              "on-tertiary": "#5e5f63",
+              "on-primary-fixed": "#004b0c",
+              "on-secondary-fixed": "#3e4040",
+              "background": "#000000",
+              "on-tertiary-container": "#56565b",
+              "surface-container-high": "#141414",
+              "primary-fixed-dim": "#00f63e",
+              "on-secondary-container": "#bfbfbf",
+              "error-dim": "#ba573f",
+              "surface-container-lowest": "#000000",
+              "tertiary-fixed": "#eeedf3",
+              "surface": "#000000",
+              "inverse-primary": "#006f16",
+              "error": "#ed7f64",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "on-background": "#e5e5e5",
+              "tertiary-dim": "#e0dfe4",
+              "surface-container": "#0f0f0f",
+              "on-primary-fixed-variant": "#006b15",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "error-container": "#7e2b17",
+              "surface-tint": "#00e639",
+              "secondary-fixed-dim": "#d4d4d4",
+              "on-surface-variant": "#ababab",
+              "tertiary-container": "#ebeaf0",
+              "primary": "#00FF41",
+              "on-error": "#450900",
+              "on-secondary": "#1e2021",
+              "on-tertiary-fixed": "#45464a",
+              "surface-variant": "#1a1a1a",
+              "primary-dim": "#00d635",
+              "on-surface": "#e5e5e5"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk"],
+              "body": ["Space Grotesk"],
+              "label": ["Space Grotesk"],
+              "mono": ["ui-monospace", "SFMono-Regular", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New", "monospace"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      body { background-color: #000000; color: #e5e5e5; font-family: 'Space Grotesk', sans-serif; -webkit-font-smoothing: antialiased; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; display: inline-block; line-height: 1; text-transform: none; letter-spacing: normal; word-wrap: normal; white-space: nowrap; direction: ltr; }
+      .ghost-border { outline: 0.5px solid rgba(117, 117, 117, 0.4); }
+      
+      .game-card-active { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; position: relative; }
+      
+      @keyframes kenburns {
+        0% { transform: scale(1) translate(0, 0); }
+        50% { transform: scale(1.05) translate(-1%, -0.5%); }
+        100% { transform: scale(1) translate(0, 0); }
+      }
+      .ken-burns { animation: kenburns 20s ease-in-out infinite; }
+      
+      @keyframes scan-line {
+        0% { top: -100%; opacity: 0; }
+        50% { opacity: 0.8; }
+        100% { top: 200%; opacity: 0; }
+      }
+      .scanner-line {
+        position: absolute;
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #00FF41, transparent);
+        box-shadow: 0 0 15px #00FF41;
+        animation: scan-line 3s linear infinite;
+        pointer-events: none;
+        z-index: 20;
+      }
+
+      @keyframes particle-scan {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      .telemetry-bar-overlay::after {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.2), transparent);
+        animation: particle-scan 2s infinite;
+      }
+
+      @keyframes spin-custom {
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin-fast { animation: spin-custom 0.8s linear infinite; }
+
+      .blurred-overlay {
+        backdrop-filter: blur(12px) brightness(0.3);
+        -webkit-backdrop-filter: blur(12px) brightness(0.3);
+      }
+      
+      .custom-glow {
+        box-shadow: 0 0 20px -2px rgba(0, 255, 65, 0.4);
+      }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen pb-28 bg-black overflow-hidden">
+<!-- CONTEXT MENU OVERLAY (Visible by default for this merge state) -->
+<div class="fixed inset-0 z-[100]" id="context-menu-container">
+<!-- Backdrop -->
+<div class="absolute inset-0 blurred-overlay"></div>
+<!-- Centered Menu positioned over Metroid card reference -->
+<div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[240px]">
+<div class="bg-surface-container-high/90 backdrop-blur-2xl border border-white/10 rounded-xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden flex flex-col p-1.5">
+<!-- Launch Game -->
+<button class="flex items-center justify-between px-5 py-4 hover:bg-primary group transition-all duration-200 rounded-lg mb-1">
+<span class="text-[13px] font-bold tracking-wider uppercase group-hover:text-black">启动游戏</span>
+<span class="material-symbols-outlined text-[20px] group-hover:text-black" data-icon="play_arrow">play_arrow</span>
+</button>
+<div class="h-[1px] bg-white/5 mx-3 mb-1"></div>
+<!-- Details -->
+<button class="flex items-center justify-between px-5 py-3.5 hover:bg-white/5 transition-all duration-200 rounded-lg">
+<span class="text-[13px] font-medium tracking-wide text-on-surface uppercase">查看详情</span>
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant" data-icon="info">info</span>
+</button>
+<!-- Edit Cover -->
+<button class="flex items-center justify-between px-5 py-3.5 hover:bg-white/5 transition-all duration-200 rounded-lg">
+<span class="text-[13px] font-medium tracking-wide text-on-surface uppercase">修改封面</span>
+<span class="material-symbols-outlined text-[20px] text-on-surface-variant" data-icon="image_edit">image_edit_auto</span>
+</button>
+<div class="h-[1px] bg-white/5 mx-3 mt-1 mb-1"></div>
+<!-- Delete -->
+<button class="flex items-center justify-between px-5 py-3.5 hover:bg-error/10 group transition-all duration-200 rounded-lg">
+<span class="text-[13px] font-bold tracking-wide text-error uppercase">删除存档</span>
+<span class="material-symbols-outlined text-[20px] text-error" data-icon="delete_forever">delete_forever</span>
+</button>
+</div>
+<!-- Cancel button below the menu -->
+<button class="w-full mt-4 bg-surface-container-highest/80 backdrop-blur-xl border border-white/10 rounded-xl py-4 font-bold text-sm text-on-surface-variant tracking-widest uppercase" onclick="document.getElementById('context-menu-container').style.display='none'; document.body.style.overflow='auto'">
+            取消 CANCEL
+        </button>
+</div>
+</div>
+<!-- TopAppBar -->
+<header class="bg-black/80 backdrop-blur-md text-primary font-['Space Grotesk'] tracking-tighter uppercase text-xs font-semibold border-b border-zinc-900/50 flex justify-between items-center w-full px-6 py-4 sticky top-0 z-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">terminal</span>
+<span class="font-mono tracking-widest text-sm">EMU_OS // 0.1</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined cursor-pointer hover:bg-zinc-900 transition-colors p-1 rounded active:scale-95">settings_input_component</span>
+</div>
+</header>
+<main class="flex-1 w-full max-w-md mx-auto px-4 pt-6 space-y-8">
+<!-- Search Section -->
+<section class="space-y-4 relative">
+<div class="relative group">
+<div class="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-on-surface-variant text-lg">search</span>
+</div>
+<input class="w-full bg-surface-container-low border-none focus:ring-1 focus:ring-primary/30 text-on-surface placeholder-on-surface-variant/50 py-3 pl-12 pr-12 rounded-lg ghost-border text-sm transition-all focus:bg-surface-container" id="search-input" placeholder="搜索游戏库" type="text"/>
+</div>
+<!-- Telemetry Module -->
+<div class="bg-surface-container-lowest border border-outline-variant/30 p-3 rounded-lg flex justify-between items-center overflow-hidden relative">
+<div class="flex items-center gap-4 relative z-10">
+<div class="flex flex-col">
+<span class="text-[9px] text-on-surface-variant uppercase tracking-widest leading-none mb-1">CPU Load</span>
+<div class="flex items-center gap-2">
+<div class="w-1 h-1 bg-primary rounded-full animate-pulse"></div>
+<span class="font-mono text-[11px] text-on-surface">12.4%</span>
+</div>
+</div>
+<div class="flex flex-col border-l border-outline-variant/30 pl-4">
+<span class="text-[9px] text-on-surface-variant uppercase tracking-widest leading-none mb-1">FPS</span>
+<div class="flex items-center gap-2">
+<div class="w-1 h-1 bg-primary rounded-full animate-pulse"></div>
+<span class="font-mono text-[11px] text-on-surface">60.0</span>
+</div>
+</div>
+<div class="flex flex-col border-l border-outline-variant/30 pl-4">
+<span class="text-[9px] text-on-surface-variant uppercase tracking-widest leading-none mb-1">Memory</span>
+<div class="flex items-center gap-2">
+<div class="w-1 h-1 bg-primary rounded-full animate-pulse"></div>
+<span class="font-mono text-[11px] text-on-surface">1.2GB</span>
+</div>
+</div>
+</div>
+<div class="h-6 w-12 flex items-end gap-[1px] relative overflow-hidden telemetry-bar-overlay opacity-60">
+<div class="bg-primary/20 w-full h-[20%]"></div>
+<div class="bg-primary/40 w-full h-[40%]"></div>
+<div class="bg-primary/30 w-full h-[35%]"></div>
+<div class="bg-primary/60 w-full h-[70%]"></div>
+</div>
+</div>
+<!-- Quick Filter Tags -->
+<div class="flex gap-2 overflow-x-auto no-scrollbar py-1">
+<button class="flex-none px-6 py-1.5 bg-primary text-black text-[11px] font-bold rounded-full transition-all">NES</button>
+<button class="flex-none px-6 py-1.5 bg-surface-container-high text-on-surface-variant text-[11px] font-bold rounded-full ghost-border transition-all">GBA</button>
+<button class="flex-none px-6 py-1.5 bg-surface-container-high text-on-surface-variant text-[11px] font-bold rounded-full ghost-border transition-all">SNES</button>
+<button class="flex-none px-6 py-1.5 bg-surface-container-high text-on-surface-variant text-[11px] font-bold rounded-full ghost-border transition-all">MD</button>
+</div>
+</section>
+<!-- Recently Played -->
+<section class="space-y-4">
+<div class="flex justify-between items-end">
+<h2 class="text-sm font-medium text-on-surface tracking-tight">最近运行</h2>
+<span class="text-[10px] text-primary uppercase tracking-widest font-mono">History_Log</span>
+</div>
+<div class="flex gap-4 overflow-x-auto no-scrollbar -mx-4 px-4">
+<!-- Card 1: Metroid (Active Trigger Point) -->
+<div class="flex-none w-44 group game-card-active relative z-30">
+<div class="aspect-[3/4] bg-surface-container-lowest rounded-xl overflow-hidden custom-glow border-2 border-primary mb-2 relative">
+<div class="w-full h-full overflow-hidden">
+<img alt="Metroid Fusion" class="w-full h-full object-cover grayscale-0 opacity-100 transition-all duration-700" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsKVOi6tSKAA6b8bAo07mtjn61NuynE3wfGQSAio687W1vL-26K4bXmDfg7GwMQ_CiwBQvTgRanhmtbAsT1eJZOBwND0p-viV58UH1y11Zyv3b8ahw8HfqcrCAjLn2WGXjAloxRRkijv2Q_q9OJ-IdgYs8R1mMw24JHdCGKrP423rWR1tYZeJd4NE3SuM-PNmEoKACR3IcH2MhUz6UDL0et7pEmQz7f1pmNwD9LxSm8zbmK67HGVG7QIONavb_1UDPmWz_3FS6Jw"/>
+</div>
+<div class="scanner-line"></div>
+<div class="absolute top-2 right-2 bg-black/80 px-1.5 py-0.5 rounded-sm border border-outline-variant/50 z-30">
+<span class="text-[9px] font-mono text-primary font-bold">GBA</span>
+</div>
+</div>
+<p class="text-[11px] font-bold text-primary truncate">银河战士 融合</p>
+<p class="text-[9px] text-on-surface-variant font-mono uppercase">METROID FUSION</p>
+</div>
+<!-- Card 2: Zelda -->
+<div class="flex-none w-44 group game-card-active opacity-40">
+<div class="aspect-[3/4] bg-surface-container-high rounded-xl overflow-hidden ghost-border mb-2 relative">
+<div class="w-full h-full overflow-hidden">
+<img alt="Zelda" class="w-full h-full object-cover grayscale" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBT_GLqK6KETkdcrTtfxiAOpPF2iQw3nOVTFzplHJA0V-3r6gPJxYjMfIFxYL232qESjLvYmFdCd6w5QlUuC2OJw4m-kjS0lkNs3Bh7kMcPyN4c9NutZ9yAbTFQCTYP7dxgdZzCzTVsTVGtOEj1glyAcgMoJnd1LCNGDKq6woyOMbGYITqpAU4OPr2lU81Sfh0k7iCxE7bZAoy2Y5aL5XQ3DW1WiSyW1Z_jON8FG81La33Uc-mhCEQJhkHI88nbaLVedzDVrT5s8Q"/>
+</div>
+<div class="absolute top-2 right-2 bg-black/80 px-1.5 py-0.5 rounded-sm border border-outline-variant/50 z-30">
+<span class="text-[9px] font-mono text-primary font-bold">SNES</span>
+</div>
+</div>
+<p class="text-[11px] font-medium text-on-surface truncate">塞尔达传说：众神三角</p>
+<p class="text-[9px] text-on-surface-variant font-mono uppercase">THE LEGEND OF ZELDA</p>
+</div>
+</div>
+</section>
+<!-- Full Library -->
+<section class="space-y-4">
+<div class="flex justify-between items-end">
+<h2 class="text-sm font-medium text-on-surface tracking-tight">全部游戏</h2>
+<div class="flex items-center gap-2">
+<span class="text-[10px] text-on-surface-variant uppercase tracking-widest font-mono">Sort: Name</span>
+<span class="material-symbols-outlined text-sm text-on-surface-variant">filter_list</span>
+</div>
+</div>
+<div class="space-y-4 opacity-40 pointer-events-none">
+<!-- Game Row 1 -->
+<div class="flex items-center gap-4 p-2 rounded-lg group">
+<div class="w-[28%] aspect-[4/3] bg-surface-container-high rounded-lg overflow-hidden ghost-border relative">
+<img alt="Aria of Sorrow" class="w-full h-full object-cover grayscale" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAsKVOi6tSKAA6b8bAo07mtjn61NuynE3wfGQSAio687W1vL-26K4bXmDfg7GwMQ_CiwBQvTgRanhmtbAsT1eJZOBwND0p-viV58UH1y11Zyv3b8ahw8HfqcrCAjLn2WGXjAloxRRkijv2Q_q9OJ-IdgYs8R1mMw24JHdCGKrP423rWR1tYZeJd4NE3SuM-PNmEoKACR3IcH2MhUz6UDL0et7pEmQz7f1pmNwD9LxSm8zbmK67HGVG7QIONavb_1UDPmWz_3FS6Jw"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold text-on-surface truncate">恶魔城：晓月圆舞曲</p>
+<p class="text-[10px] text-on-surface-variant font-mono truncate">Castlevania: Aria of Sorrow</p>
+</div>
+<span class="text-[10px] text-primary font-bold font-mono px-2">GBA</span>
+</div>
+<!-- Game Row 2 -->
+<div class="flex items-center gap-4 p-2 rounded-lg group">
+<div class="w-[28%] aspect-[4/3] bg-surface-container-high rounded-lg overflow-hidden ghost-border relative">
+<img alt="Chrono Trigger" class="w-full h-full object-cover grayscale" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBT_GLqK6KETkdcrTtfxiAOpPF2iQw3nOVTFzplHJA0V-3r6gPJxYjMfIFxYL232qESjLvYmFdCd6w5QlUuC2OJw4m-kjS0lkNs3Bh7kMcPyN4c9NutZ9yAbTFQCTYP7dxgdZzCzTVsTVGtOEj1glyAcgMoJnd1LCNGDKq6woyOMbGYITqpAU4OPr2lU81Sfh0k7iCxE7bZAoy2Y5aL5XQ3DW1WiSyW1Z_jON8FG81La33Uc-mhCEQJhkHI88nbaLVedzDVrT5s8Q"/>
+</div>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-bold text-on-surface truncate">时空之轮</p>
+<p class="text-[10px] text-on-surface-variant font-mono truncate">Chrono Trigger</p>
+</div>
+<span class="text-[10px] text-primary font-bold font-mono px-2">SNES</span>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 bg-black/95 backdrop-blur-xl border-t border-zinc-900/50 h-24">
+<a class="flex flex-col items-center justify-center text-white border-t-2 border-primary -mt-[1px] pt-3 pb-5 transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-3xl mb-1">grid_view</span>
+<span class="font-['Space Grotesk'] text-[10px] font-bold tracking-[0.05em] uppercase">游戏库 LIBRARY</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-600 pt-3 pb-5 hover:text-primary transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-3xl mb-1">explore</span>
+<span class="font-['Space Grotesk'] text-[10px] font-bold tracking-[0.05em] uppercase">发现 EXPLORE</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-600 pt-3 pb-5 hover:text-primary transition-all duration-300" href="#">
+<span class="material-symbols-outlined text-3xl mb-1">tune</span>
+<span class="font-['Space Grotesk'] text-[10px] font-bold tracking-[0.05em] uppercase">设置 SYSTEM</span>
+</a>
+</nav>
+</body></html>

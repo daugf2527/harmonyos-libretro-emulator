@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container": "#191919",
+              "surface-container-high": "#1f1f1f",
+              "surface-dim": "#0e0e0e",
+              "error-dim": "#ba573f",
+              "on-secondary-fixed": "#3e4040",
+              "secondary": "#9d9e9e",
+              "error": "#ed7f64",
+              "outline-variant": "#484848",
+              "primary-dim": "#00d635",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "error-container": "#7e2b17",
+              "on-tertiary-fixed-variant": "#626267",
+              "on-surface": "#e5e5e5",
+              "secondary-container": "#3a3c3c",
+              "on-tertiary-fixed": "#45464a",
+              "inverse-surface": "#f9f9f9",
+              "on-secondary-container": "#bfbfbf",
+              "tertiary": "#faf9fe",
+              "on-error-container": "#ff9b82",
+              "on-background": "#e5e5e5",
+              "surface-bright": "#2c2c2c",
+              "background": "#0e0e0e",
+              "on-primary-fixed-variant": "#006b15",
+              "on-primary-container": "#00f13d",
+              "tertiary-fixed": "#eeedf3",
+              "surface-variant": "#262626",
+              "surface-tint": "#00e639",
+              "on-secondary": "#1e2021",
+              "surface-container-lowest": "#000000",
+              "on-error": "#450900",
+              "secondary-fixed-dim": "#d4d4d4",
+              "tertiary-dim": "#e0dfe4",
+              "primary": "#00e639",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "primary-fixed-dim": "#00f63e",
+              "secondary-fixed": "#e2e2e2",
+              "on-surface-variant": "#ababab",
+              "surface-container-low": "#131313",
+              "on-primary-fixed": "#004b0c",
+              "tertiary-container": "#ebeaf0",
+              "outline": "#757575",
+              "inverse-primary": "#006f16",
+              "surface-container-highest": "#262626",
+              "surface": "#0e0e0e",
+              "on-primary": "#004c0c",
+              "on-tertiary-container": "#56565b",
+              "on-tertiary": "#5e5f63",
+              "primary-container": "#00530e",
+              "primary-fixed": "#72ff70",
+              "secondary-dim": "#9d9e9e",
+              "inverse-on-surface": "#555555"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .thin-border { border-bottom: 0.5px solid #262626; }
+        
+        @keyframes spring-swipe {
+            0% { transform: translateX(0); }
+            70% { transform: translateX(-140px); }
+            100% { transform: translateX(-128px); }
+        }
+        .animate-spring-swipe {
+            animation: spring-swipe 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+
+        @keyframes thumbnail-pulse {
+            0%, 100% { filter: brightness(1) grayscale(0.2); }
+            50% { filter: brightness(1.4) grayscale(0); }
+        }
+        .animate-thumbnail-pulse {
+            animation: thumbnail-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes soft-pulse {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 0.8; transform: scale(1.1); }
+        }
+        .animate-soft-pulse {
+            animation: soft-pulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes slide-up {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .animate-slide-up {
+            animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        @keyframes pop-in {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .animate-pop-in {
+            animation: pop-in 0.2s ease-out forwards;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        .animate-blink {
+            animation: blink 1.5s infinite;
+        }
+    </style>
+</head>
+<body class="bg-surface-container-lowest text-on-surface font-body selection:bg-primary selection:text-on-primary">
+<!-- TopAppBar Shell -->
+<header class="bg-black/85 backdrop-blur-xl text-[#00FF41] fixed top-0 w-full z-50 border-b border-zinc-800/40 flex justify-between items-center px-6 h-14">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00FF41]" data-icon="memory">memory</span>
+<span class="text-[#00FF41] font-mono text-sm tracking-[0.2em]">EMU_CORE_v1.0</span>
+</div>
+<h1 class="font-['Inter'] tracking-tighter uppercase text-xs font-semibold text-white">存档管理</h1>
+<div class="flex items-center gap-4">
+<button class="active:scale-90 active:rotate-12 transition-all duration-200 hover:text-[#00FF41]">
+<span class="material-symbols-outlined" data-icon="add_box" style="font-variation-settings: 'FILL' 1;">add_box</span>
+</button>
+<button class="active:scale-95 transition-transform hover:text-[#00FF41]">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+</button>
+</div>
+</header>
+<main class="pt-14 pb-24 min-h-screen">
+<!-- Telemetry Data Strip -->
+<div class="px-6 py-3 flex justify-between items-center bg-surface-dim thin-border">
+<div class="flex gap-4">
+<div class="flex items-center gap-2">
+<div class="w-1 h-1 bg-primary rounded-full"></div>
+<span class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest">Storage: 42.8GB Free</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-1 h-1 bg-primary rounded-full"></div>
+<span class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest">Slots: 14/99</span>
+</div>
+</div>
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 bg-primary rounded-full animate-blink"></span>
+<span class="text-[10px] font-mono text-primary uppercase tracking-tighter">正在同步至云端...</span>
+</div>
+</div>
+<!-- Archive List Container -->
+<div class="flex flex-col">
+<!-- Entry 1: Swipe State Demo -->
+<div class="relative overflow-hidden group h-24 thin-border">
+<!-- Action Buttons (Visible on Swipe) -->
+<div class="absolute inset-0 flex justify-end">
+<button class="bg-primary text-on-primary px-8 flex flex-col items-center justify-center gap-1 active:brightness-90 transition-all">
+<span class="material-symbols-outlined text-xl" data-icon="upload_file">upload_file</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase">读档</span>
+</button>
+<button class="bg-error text-on-error px-8 flex flex-col items-center justify-center gap-1 active:brightness-90 transition-all" onclick="document.getElementById('delete-modal').classList.remove('hidden')">
+<span class="material-symbols-outlined text-xl" data-icon="delete_forever">delete_forever</span>
+<span class="text-[10px] font-bold tracking-tighter uppercase">删除</span>
+</button>
+</div>
+<!-- Swiped Content -->
+<div class="absolute inset-0 bg-surface-container-lowest flex items-center px-6 animate-spring-swipe">
+<div class="flex items-center gap-4 w-full">
+<div class="w-20 h-14 bg-surface-container-high rounded-sm overflow-hidden flex-shrink-0 border border-outline-variant/30">
+<img alt="Screenshot" class="w-full h-full object-cover animate-thumbnail-pulse" data-alt="Retro pixel art game screenshot showing a fantasy landscape with vibrant colors and 16-bit sprites" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB8XDOnk95Fd7vZBdkKWf-F_wfMexysFhufsfPAGvzAWzPih8_pprxm_HQOSNCvNF8lijgNpExI-k_-quW4ieKaLjXcCGJDubBcN_bobZcI2bHHkKJaD7X4NUkehJ7gnx_2lHUWESF5nYHcyswyKzSyO6iFzOUREmKr7haGCeF4A8-KQQTfU0AA5zy7W1xer0KnzWOL1CirLUNCfhjJ1BR1IeWS3VafbSEM8Gnu2FFSwGYAAyQbwyh_ctKeD29BbeX8lGGRt3RYog"/>
+</div>
+<div class="flex-grow">
+<h3 class="text-on-surface font-medium text-sm tracking-tight">Chrono Trigger</h3>
+<p class="text-[10px] font-mono text-on-surface-variant mt-1">SLOT_001 | 2024-05-22 14:00</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="text-[9px] px-1.5 py-0.5 border border-primary text-primary rounded-sm font-mono">ACTIVE</span>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="chevron_left">chevron_left</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Entry 2: Normal State -->
+<div class="relative bg-surface-container-lowest hover:bg-surface-container-low transition-colors h-24 thin-border flex items-center px-6">
+<div class="flex items-center gap-4 w-full">
+<div class="w-20 h-14 bg-surface-container-high rounded-sm overflow-hidden flex-shrink-0 border border-outline-variant/30">
+<img alt="Screenshot" class="w-full h-full object-cover grayscale-[0.2]" data-alt="Classic video game world map with low poly 3D graphics and deep blue ocean textures" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWpd0lSV83JW-ZwpyHC-SQtJHI3JAqxCw7MmtByCKZg5ZCHEKJzZc3IDJMxg_uRUVBlw0ZsgndEkxNZ6qHN-GUKJ8rqem1m1UaACUbFuzfriiHAwAlwbGBd1gEhYKj_WonZeGisnS8-jjYGTsSTv4vVErBh9VR8LPB3jVjYXj_YKrXbroC5wrAq1-ctPCRJGYrap4DzocKa5fZQgSDb_ZyjeJfjv970OUuA6taqr6v-ZJX4eoetG4oFeiibG-Qh5u3OVfy3f1-Fw"/>
+</div>
+<div class="flex-grow">
+<h3 class="text-on-surface font-medium text-sm tracking-tight">Final Fantasy VI</h3>
+<p class="text-[10px] font-mono text-on-surface-variant mt-1">SLOT_002 | 2024-05-21 23:45</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="text-[10px] font-mono text-on-surface-variant">42:15:08</span>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="drag_handle">drag_handle</span>
+</div>
+</div>
+</div>
+<!-- Entry 3: Normal State -->
+<div class="relative bg-surface-container-lowest hover:bg-surface-container-low transition-colors h-24 thin-border flex items-center px-6">
+<div class="flex items-center gap-4 w-full">
+<div class="w-20 h-14 bg-surface-container-high rounded-sm overflow-hidden flex-shrink-0 border border-outline-variant/30">
+<img alt="Screenshot" class="w-full h-full object-cover grayscale-[0.2]" data-alt="Cinematic close-up of a futuristic cockpit display with neon green scanning lines and technical readouts" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDa-n2gC40xsm0VFTEVzIckAMWV3f5U7n3yI9s8zPtpx387z87HAPYYZFca9KF6qpKNw7huCT45e38_rucphpZeT4rko63E5LJMI63Ppn94OXtc7KepYgHOLLWvoLFLIZvBvNds0dTkv6WtjIOO1aPwhhpot7ZJwuW7N4lpn_TjhEFz1rzdTd-C0cFAwL-sQHAW2zfJwZVvnshmR1yYxFtMn5PB4-e2yfs9HsgwCdMx49fM9Wk-tARGr7pQveRgrOc0iby0oEcf5A"/>
+</div>
+<div class="flex-grow">
+<h3 class="text-on-surface font-medium text-sm tracking-tight">Metroid Fusion</h3>
+<p class="text-[10px] font-mono text-on-surface-variant mt-1">SLOT_003 | 2024-05-20 09:12</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="text-[10px] font-mono text-on-surface-variant">08:22:11</span>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="drag_handle">drag_handle</span>
+</div>
+</div>
+</div>
+<!-- Entry 4: Normal State -->
+<div class="relative bg-surface-container-lowest hover:bg-surface-container-low transition-colors h-24 thin-border flex items-center px-6">
+<div class="flex items-center gap-4 w-full">
+<div class="w-20 h-14 bg-surface-container-high rounded-sm overflow-hidden flex-shrink-0 border border-outline-variant/30">
+<img alt="Screenshot" class="w-full h-full object-cover grayscale-[0.2]" data-alt="Dark aesthetic electronic circuits with glowing green pathways in a high-tech laboratory setting" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDfE3UJ7XOar9hj-wu4enuiDlhDh9DlSBrN9gsO2X0O2y_NNyGo87s8RnNaQCWimP5Cx4CmZVAer8560R19vuoVM-FT4ZgW6NMtkEoipBq7w7UTXUiNxWPQTVbo9oBNov_QET3pqhqxB4CetHiWkOCtE3HzRGls2Ty7DQqNjsoEWWStU7xqqMK4bpmySW2PREqG1386xBpf8ChwaDXkTJItjIKUq5WCSiUe1gDo-80ua2E7IGpM9_fzHABjhbfnwic9b-wa8SaQ3g"/>
+</div>
+<div class="flex-grow">
+<h3 class="text-on-surface font-medium text-sm tracking-tight">The Legend of Zelda</h3>
+<p class="text-[10px] font-mono text-on-surface-variant mt-1">SLOT_004 | 2024-05-18 16:30</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<span class="text-[10px] font-mono text-on-surface-variant">12:00:55</span>
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="drag_handle">drag_handle</span>
+</div>
+</div>
+</div>
+</div>
+<!-- System Empty State Placeholder -->
+<div class="mt-12 px-6">
+<div class="border border-dashed border-outline-variant p-8 rounded-lg flex flex-col items-center justify-center gap-4">
+<span class="material-symbols-outlined text-4xl animate-soft-pulse" data-icon="sd_card">sd_card</span>
+<p class="text-xs font-mono uppercase tracking-[0.2em] opacity-40">End of Archive Stream</p>
+</div>
+</div>
+</main>
+<!-- Success Feedback Bubble (Hidden by default) -->
+<div class="hidden fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] animate-pop-in" id="success-bubble">
+<div class="bg-[#00FF41] text-black px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(0,255,65,0.4)]">
+<span class="material-symbols-outlined text-sm font-bold" data-icon="check_circle">check_circle</span>
+<span class="text-[10px] font-bold tracking-widest uppercase">Archive Deleted Successfully</span>
+</div>
+</div>
+<!-- Center-aligned Delete Confirmation Modal -->
+<div class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4" id="delete-modal">
+<div class="absolute inset-0 bg-black/90 backdrop-blur-sm" onclick="document.getElementById('delete-modal').classList.add('hidden')"></div>
+<div class="relative w-full max-w-[280px] bg-[#0c0c0c] border border-outline-variant/30 rounded-xl overflow-hidden shadow-2xl animate-pop-in">
+<div class="p-6 text-center">
+<div class="w-12 h-12 bg-error/10 rounded-full flex items-center justify-center mx-auto mb-4">
+<span class="material-symbols-outlined text-error" data-icon="warning">warning</span>
+</div>
+<h2 class="text-on-surface text-sm font-semibold mb-2">确定要删除此存档吗？</h2>
+<p class="text-[10px] text-on-surface-variant font-mono uppercase tracking-wider mb-6 opacity-60">此操作不可恢复</p>
+<div class="flex flex-col gap-2">
+<button class="w-full bg-error hover:bg-error/90 active:scale-[0.98] transition-all text-on-error py-3 rounded-lg flex items-center justify-center gap-2" onclick="
+                    document.getElementById('delete-modal').classList.add('hidden');
+                    document.getElementById('success-bubble').classList.remove('hidden');
+                    setTimeout(() =&gt; document.getElementById('success-bubble').classList.add('hidden'), 3000);
+                ">
+<span class="text-xs font-bold uppercase tracking-widest">确定删除</span>
+</button>
+<button class="w-full bg-zinc-800/50 hover:bg-zinc-800 transition-all text-on-surface-variant py-3 rounded-lg flex items-center justify-center gap-2" onclick="document.getElementById('delete-modal').classList.add('hidden')">
+<span class="text-xs font-medium uppercase tracking-widest">取消</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- BottomNavBar Shell -->
+<nav class="bg-black text-[#00FF41] fixed bottom-0 w-full z-50 border-t border-zinc-900 flex justify-around items-center h-20 pb-safe px-4">
+<div class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-1 group-active:scale-90" data-icon="grid_view">grid_view</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-widest uppercase">LIBRARY</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-1 group-active:scale-90" data-icon="terminal">terminal</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-widest uppercase">ENGINE</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-1 group-active:scale-90" data-icon="sports_esports">sports_esports</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-widest uppercase">INPUT</span>
+</div>
+<div class="flex flex-col items-center justify-center text-[#00FF41] relative after:content-[''] after:absolute after:top-0 after:w-1 after:h-1 after:bg-[#00FF41] after:rounded-full cursor-pointer group">
+<span class="material-symbols-outlined mb-1 group-active:scale-90" data-icon="tune" style="font-variation-settings: 'FILL' 1;">tune</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-widest uppercase">SYSTEM</span>
+</div>
+</nav>
+</body></html>

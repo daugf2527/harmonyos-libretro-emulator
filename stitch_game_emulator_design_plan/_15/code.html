@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EMU_CORE | 引导启动</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container": "#191919",
+              "surface-container-high": "#1f1f1f",
+              "surface-dim": "#0e0e0e",
+              "error-dim": "#ba573f",
+              "on-secondary-fixed": "#3e4040",
+              "secondary": "#9d9e9e",
+              "error": "#ed7f64",
+              "outline-variant": "#484848",
+              "primary-dim": "#00d635",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "error-container": "#7e2b17",
+              "on-tertiary-fixed-variant": "#626267",
+              "on-surface": "#e5e5e5",
+              "secondary-container": "#3a3c3c",
+              "on-tertiary-fixed": "#45464a",
+              "inverse-surface": "#f9f9f9",
+              "on-secondary-container": "#bfbfbf",
+              "tertiary": "#faf9fe",
+              "on-error-container": "#ff9b82",
+              "on-background": "#e5e5e5",
+              "surface-bright": "#2c2c2c",
+              "background": "#0e0e0e",
+              "on-primary-fixed-variant": "#006b15",
+              "on-primary-container": "#00f13d",
+              "tertiary-fixed": "#eeedf3",
+              "surface-variant": "#262626",
+              "surface-tint": "#00e639",
+              "on-secondary": "#1e2021",
+              "surface-container-lowest": "#000000",
+              "on-error": "#450900",
+              "secondary-fixed-dim": "#d4d4d4",
+              "tertiary-dim": "#e0dfe4",
+              "primary": "#00FF41",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "primary-fixed-dim": "#00f63e",
+              "secondary-fixed": "#e2e2e2",
+              "on-surface-variant": "#ababab",
+              "surface-container-low": "#131313",
+              "on-primary-fixed": "#004b0c",
+              "tertiary-container": "#ebeaf0",
+              "outline": "#757575",
+              "inverse-primary": "#006f16",
+              "surface-container-highest": "#262626",
+              "surface": "#0e0e0e",
+              "on-primary": "#004c0c",
+              "on-tertiary-container": "#56565b",
+              "on-tertiary": "#5e5f63",
+              "primary-container": "#00530e",
+              "primary-fixed": "#72ff70",
+              "secondary-dim": "#9d9e9e",
+              "inverse-on-surface": "#555555"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        background-color: #000000;
+        color: #e5e5e5;
+        font-family: 'Inter', sans-serif;
+        min-height: max(884px, 100dvh);
+      }
+      .ghost-border {
+        border: 0.5px solid rgba(72, 72, 72, 0.4);
+      }
+      .transition-page {
+        transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .hidden-step {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(20px);
+        position: absolute;
+      }
+      .active-step {
+        opacity: 1;
+        pointer-events: auto;
+        transform: translateY(0);
+        position: relative;
+      }
+      .scan-line {
+        animation: scan 3s linear infinite;
+      }
+      @keyframes scan {
+        0% { top: 0; }
+        100% { top: 100%; }
+      }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen selection:bg-primary selection:text-black overflow-hidden">
+<!-- Top Navigation Shell -->
+<header class="fixed top-0 w-full z-50 bg-black/85 backdrop-blur-xl border-b border-zinc-800/40 flex justify-between items-center px-6 h-14">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-[#00FF41] text-sm" data-icon="memory">memory</span>
+<span class="text-[#00FF41] font-mono text-sm tracking-[0.2em]">EMU_CORE_v1.0</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-zinc-500 font-['Inter'] tracking-tighter uppercase text-xs font-semibold" id="step-indicator">BOOT_SEQUENCE: 01</span>
+<span class="material-symbols-outlined text-[#00FF41] text-xs" data-icon="settings_input_component">settings_input_component</span>
+</div>
+</header>
+<main class="flex-grow flex flex-col items-center justify-center px-8 relative">
+<!-- Background Precision Grid -->
+<div class="absolute inset-0 z-0 opacity-10 pointer-events-none" style="background-image: linear-gradient(#484848 0.5px, transparent 0.5px), linear-gradient(90deg, #484848 0.5px, transparent 0.5px); background-size: 40px 40px;">
+</div>
+<!-- Step 1: Welcome -->
+<div class="z-10 transition-page active-step flex flex-col items-center text-center max-w-md w-full" id="step-1">
+<div class="mb-12 relative group">
+<div class="w-24 h-24 bg-surface-container flex items-center justify-center rounded-lg ghost-border">
+<span class="material-symbols-outlined text-[#00FF41] text-5xl" data-icon="sports_esports" style="font-variation-settings: 'FILL' 1;">sports_esports</span>
+</div>
+<div class="absolute -top-1 -right-1 flex gap-1">
+<div class="w-1.5 h-1.5 bg-[#00FF41] rounded-full"></div>
+</div>
+</div>
+<div class="space-y-4 mb-16">
+<h1 class="text-3xl font-medium tracking-tight text-on-surface">一键找回你的童年游戏</h1>
+<p class="text-on-surface-variant font-['Inter'] text-sm leading-relaxed max-w-xs mx-auto">
+                    系统已准备就绪。自动扫描本地存储、云端库及映射驱动器。
+                </p>
+</div>
+<button class="group relative flex items-center justify-center px-10 py-3.5 bg-transparent border border-outline hover:bg-surface-container-highest transition-colors duration-150 rounded-md" onclick="goToStep2()">
+<span class="flex items-center gap-3">
+<div class="w-1.5 h-1.5 bg-[#00FF41] rounded-full"></div>
+<span class="text-[#00FF41] font-medium tracking-widest text-sm uppercase">立即开启</span>
+</span>
+<div class="absolute top-0 left-0 w-1 h-1 border-t border-l border-primary"></div>
+<div class="absolute bottom-0 right-0 w-1 h-1 border-b border-r border-primary"></div>
+</button>
+<div class="mt-24 grid grid-cols-3 gap-8 w-full">
+<div class="flex flex-col items-start">
+<span class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Status</span>
+<span class="text-[10px] font-mono text-zinc-400">READY_STABLE</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Module</span>
+<span class="text-[10px] font-mono text-zinc-400">CORE_INT_V1</span>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] text-zinc-600 uppercase tracking-widest mb-1">Latency</span>
+<span class="text-[10px] font-mono text-[#00FF41]">0.02ms</span>
+</div>
+</div>
+</div>
+<!-- Step 2: Authorization -->
+<div class="z-10 transition-page hidden-step flex flex-col items-center text-center max-w-md w-full" id="step-2">
+<div class="w-full text-left space-y-4 mb-12">
+<div class="flex items-center gap-2">
+<div class="w-1 h-4 bg-primary"></div>
+<span class="text-xs font-mono tracking-widest text-primary uppercase">Authorization Required</span>
+</div>
+<h1 class="text-2xl font-medium tracking-tight leading-tight text-on-surface">
+                    允许访问文件，才能导入你手机里的游戏
+                </h1>
+<p class="text-on-surface-variant text-sm font-light leading-relaxed">
+                    EMU_CORE 需要读取存储权限以检索 ROM 镜像并管理着色器缓存数据。
+                </p>
+</div>
+<div class="relative flex items-center justify-center py-8 w-full">
+<div class="absolute inset-0 bg-primary/5 blur-3xl rounded-full scale-75"></div>
+<div class="relative w-48 h-48 border-[0.5px] border-outline-variant/40 rounded-lg flex items-center justify-center overflow-hidden bg-surface-container-low">
+<div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: linear-gradient(#484848 0.5px, transparent 0.5px), linear-gradient(90deg, #484848 0.5px, transparent 0.5px); background-size: 20px 20px;"></div>
+<div class="relative flex flex-col items-center">
+<span class="material-symbols-outlined text-primary text-7xl" data-icon="folder_open" style="font-variation-settings: 'wght' 100;">folder_open</span>
+<div class="mt-4 flex gap-1">
+<div class="w-1 h-1 bg-primary"></div>
+<div class="w-1 h-1 bg-outline-variant"></div>
+<div class="w-1 h-1 bg-outline-variant"></div>
+</div>
+</div>
+<div class="absolute top-0 left-0 w-full h-[1px] bg-primary/20 shadow-[0_0_15px_#00FF41] scan-line"></div>
+</div>
+<div class="absolute top-4 left-4 w-4 h-4 border-t border-l border-primary-dim/30"></div>
+<div class="absolute bottom-4 right-4 w-4 h-4 border-b border-r border-primary-dim/30"></div>
+</div>
+<div class="w-full mt-12 mb-12 bg-surface-container-low p-4 rounded border-[0.5px] border-outline-variant/20 text-left">
+<div class="flex justify-between items-center mb-3">
+<span class="text-[10px] font-mono text-zinc-500 uppercase tracking-tighter">System Access Protocol</span>
+<span class="text-[10px] font-mono text-primary uppercase tracking-tighter">Verified</span>
+</div>
+<div class="space-y-2">
+<div class="flex items-center gap-3">
+<div class="w-1.5 h-1.5 rounded-full bg-primary"></div>
+<span class="text-xs font-mono text-on-surface-variant">DIRECTORY_READ: GRANTED</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="w-1.5 h-1.5 rounded-full bg-outline-variant"></div>
+<span class="text-xs font-mono text-on-surface-variant">MEDIA_METADATA: PENDING...</span>
+</div>
+</div>
+</div>
+<div class="w-full space-y-6">
+<button class="w-full h-14 border border-outline hover:bg-surface-container-highest active:scale-[0.98] transition-all flex items-center justify-center gap-3 group">
+<span class="text-on-surface font-medium tracking-widest text-sm uppercase">授权</span>
+<span class="material-symbols-outlined text-primary group-hover:translate-x-1 transition-transform" data-icon="chevron_right">chevron_right</span>
+</button>
+<button class="text-zinc-600 text-[10px] tracking-[0.2em] hover:text-on-surface-variant transition-colors uppercase font-medium block mx-auto">
+                    暂不授权，稍后在设置中手动开启
+                </button>
+</div>
+</div>
+</main>
+<footer class="h-12 flex items-center justify-center px-8 text-zinc-600 border-t border-zinc-900/50">
+<span class="text-[9px] font-mono tracking-widest uppercase opacity-40">Kinetic Obsidian Protocol • Build 2405.01</span>
+</footer>
+<script>
+        function goToStep2() {
+            const step1 = document.getElementById('step-1');
+            const step2 = document.getElementById('step-2');
+            const indicator = document.getElementById('step-indicator');
+
+            // Start transition
+            step1.classList.remove('active-step');
+            step1.classList.add('hidden-step');
+            
+            setTimeout(() => {
+                step1.style.display = 'none';
+                step2.style.display = 'flex';
+                // Trigger reflow
+                step2.offsetHeight;
+                step2.classList.remove('hidden-step');
+                step2.classList.add('active-step');
+                indicator.innerText = 'STEP 02';
+            }, 500);
+        }
+    </script>
+</body></html>

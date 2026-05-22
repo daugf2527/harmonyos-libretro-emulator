@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container": "#191919",
+              "surface-container-high": "#1f1f1f",
+              "surface-dim": "#0e0e0e",
+              "error-dim": "#ba573f",
+              "on-secondary-fixed": "#3e4040",
+              "secondary": "#9d9e9e",
+              "error": "#ed7f64",
+              "outline-variant": "#484848",
+              "primary-dim": "#00d635",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "error-container": "#7e2b17",
+              "on-tertiary-fixed-variant": "#626267",
+              "on-surface": "#e5e5e5",
+              "secondary-container": "#3a3c3c",
+              "on-tertiary-fixed": "#45464a",
+              "inverse-surface": "#f9f9f9",
+              "on-secondary-container": "#bfbfbf",
+              "tertiary": "#faf9fe",
+              "on-error-container": "#ff9b82",
+              "on-background": "#e5e5e5",
+              "surface-bright": "#2c2c2c",
+              "background": "#0e0e0e",
+              "on-primary-fixed-variant": "#006b15",
+              "on-primary-container": "#00f13d",
+              "tertiary-fixed": "#eeedf3",
+              "surface-variant": "#262626",
+              "surface-tint": "#00e639",
+              "on-secondary": "#1e2021",
+              "surface-container-lowest": "#000000",
+              "on-error": "#450900",
+              "secondary-fixed-dim": "#d4d4d4",
+              "tertiary-dim": "#e0dfe4",
+              "primary": "#00e639",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "primary-fixed-dim": "#00f63e",
+              "secondary-fixed": "#e2e2e2",
+              "on-surface-variant": "#ababab",
+              "surface-container-low": "#131313",
+              "on-primary-fixed": "#004b0c",
+              "tertiary-container": "#ebeaf0",
+              "outline": "#757575",
+              "inverse-primary": "#006f16",
+              "surface-container-highest": "#262626",
+              "surface": "#0e0e0e",
+              "on-primary": "#004c0c",
+              "on-tertiary-container": "#56565b",
+              "on-tertiary": "#5e5f63",
+              "primary-container": "#00530e",
+              "primary-fixed": "#72ff70",
+              "secondary-dim": "#9d9e9e",
+              "inverse-on-surface": "#555555"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body {
+            background-color: #000000;
+            color: #e5e5e5;
+        }
+        /* Custom pixel-art style for the empty slot */
+        .pixel-slot {
+            width: 120px;
+            height: 140px;
+            border: 2px solid #262626;
+            position: relative;
+            background: linear-gradient(135deg, #0e0e0e 0%, #000000 100%);
+        }
+        .pixel-slot::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 40px;
+            border: 1px dashed #484848;
+        }
+        .progress-line {
+            height: 2px;
+            background: #1a1a1a;
+            width: 100%;
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-fill {
+            position: absolute;
+            height: 100%;
+            background: #00e639;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Particle Background Effects */
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+    </style>
+</head>
+<body class="font-body selection:bg-primary-container selection:text-on-primary-container overflow-hidden">
+<canvas id="particle-canvas"></canvas>
+<!-- TopAppBar -->
+<header class="bg-black/85 backdrop-blur-xl text-[#00FF41] font-['Inter'] tracking-tighter uppercase text-xs font-semibold fixed top-0 w-full z-50 border-b border-zinc-800/40 flex justify-between items-center px-6 h-14">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-sm">memory</span>
+<span class="text-[#00FF41] font-mono text-sm tracking-[0.2em]">EMU_CORE_v1.0</span>
+</div>
+<div class="flex items-center gap-6">
+<span class="text-zinc-500 hover:text-[#00FF41] transition-colors duration-150 cursor-pointer active:scale-95 transition-transform">NETWORK: ONLINE</span>
+<span class="material-symbols-outlined cursor-pointer hover:text-[#00FF41] transition-colors duration-150 active:scale-95 transition-transform">settings_input_component</span>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="relative h-screen flex flex-col items-center justify-center px-6 z-10">
+<!-- Background Telemetry Grids -->
+<div class="absolute inset-0 pointer-events-none opacity-5 overflow-hidden">
+<div class="grid grid-cols-12 h-full w-full">
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+<div class="border-r border-outline-variant h-full"></div>
+</div>
+</div>
+<!-- Empty State Container -->
+<div class="z-10 flex flex-col items-center max-w-md w-full animate-in fade-in zoom-in duration-500" id="empty-state">
+<!-- Pixel Illustration -->
+<div class="relative mb-12">
+<div class="pixel-slot rounded-sm flex items-center justify-center">
+<span class="material-symbols-outlined text-outline-variant text-4xl" style="font-variation-settings: 'wght' 200;">eject</span>
+</div>
+<div class="absolute -top-2 -right-2 w-1.5 h-1.5 bg-primary rounded-full animate-pulse"></div>
+<div class="absolute -bottom-1 -left-1 w-1 h-1 bg-outline-variant rounded-full"></div>
+</div>
+<!-- Copy -->
+<h1 class="text-on-surface font-headline text-2xl font-medium tracking-tight mb-3 text-center">
+            一键导入游戏，重温经典
+        </h1>
+<p class="text-on-surface-variant font-body text-sm text-center mb-10 leading-relaxed max-w-xs">
+            系统未检测到可用镜像。请选择本地 ROM 或 ISO 文件开始模拟。
+        </p>
+<!-- Inline Scan Progress (Visible after click) -->
+<div class="hidden w-full max-w-[280px] mb-4 animate-in fade-in slide-in-from-bottom-2 duration-300" id="inline-scan-progress">
+<div class="flex justify-between items-center mb-1.5">
+<span class="text-primary font-label text-[10px] tracking-widest uppercase" id="scan-status-text">正在扫描本地文件...</span>
+<span class="text-primary font-mono text-[10px]" id="scan-percentage">0%</span>
+</div>
+<div class="progress-line rounded-full">
+<div class="progress-fill rounded-full" id="scan-bar-fill"></div>
+</div>
+</div>
+<!-- Primary Action -->
+<button class="group relative flex items-center justify-center gap-3 px-8 h-12 border border-outline hover:bg-surface-container-highest active:scale-95 transition-all duration-200 rounded-sm" id="import-button" onclick="startImport()">
+<div class="w-2 h-2 bg-primary rounded-full"></div>
+<span class="text-on-surface text-sm font-label tracking-widest uppercase">选择游戏文件导入</span>
+<span class="material-symbols-outlined text-sm">add_circle</span>
+</button>
+<p class="mt-12 text-zinc-600 font-label text-[10px] tracking-[0.1em] uppercase">
+            仅支持你合法拥有的游戏
+        </p>
+</div>
+<!-- Telemetry Module -->
+<div class="absolute bottom-32 left-8 hidden lg:flex flex-col gap-2">
+<div class="bg-surface-container-high px-3 py-1.5 rounded-sm flex items-center gap-4">
+<span class="text-on-surface-variant font-label text-[10px] tracking-widest uppercase">CPU_STATUS</span>
+<span class="text-primary font-mono text-[10px]" id="cpu-status">IDLE 0.04%</span>
+</div>
+<div class="bg-surface-container-high px-3 py-1.5 rounded-sm flex items-center gap-4">
+<span class="text-on-surface-variant font-label text-[10px] tracking-widest uppercase">MEM_READY</span>
+<span class="text-primary font-mono text-[10px]">32768MB</span>
+</div>
+</div>
+</main>
+<!-- BottomNavBar -->
+<nav class="bg-black text-[#00FF41] font-['Inter'] text-[10px] font-medium tracking-widest uppercase fixed bottom-0 w-full z-50 border-t border-zinc-900 flex justify-around items-center h-20 pb-safe px-4">
+<a class="flex flex-col items-center justify-center text-[#00FF41] relative after:content-[''] after:absolute after:top-0 after:w-1 after:h-1 after:bg-[#00FF41] after:rounded-full group" href="#">
+<span class="material-symbols-outlined mb-1 group-active:scale-95 transition-transform" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span>LIBRARY</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors group" href="#">
+<span class="material-symbols-outlined mb-1 group-active:scale-95 transition-transform" data-icon="terminal">terminal</span>
+<span>ENGINE</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors group" href="#">
+<span class="material-symbols-outlined mb-1 group-active:scale-95 transition-transform" data-icon="sports_esports">sports_esports</span>
+<span>INPUT</span>
+</a>
+<a class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors group" href="#">
+<span class="material-symbols-outlined mb-1 group-active:scale-95 transition-transform" data-icon="tune">tune</span>
+<span>SYSTEM</span>
+</a>
+</nav>
+<!-- Visual Polish: Vignette Overlay -->
+<div class="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)] z-20"></div>
+<script>
+    // Particle System
+    const canvas = document.getElementById('particle-canvas');
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    let particleSpeedMultiplier = 1;
+
+    function initParticles() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        particles = [];
+        for (let i = 0; i < 50; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 2 + 1,
+                speedX: (Math.random() - 0.5) * 0.5,
+                speedY: (Math.random() - 0.5) * 0.5,
+                opacity: Math.random() * 0.5
+            });
+        }
+    }
+
+    function animateParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+            p.x += p.speedX * particleSpeedMultiplier;
+            p.y += p.speedY * particleSpeedMultiplier;
+
+            if (p.x < 0) p.x = canvas.width;
+            if (p.x > canvas.width) p.x = 0;
+            if (p.y < 0) p.y = canvas.height;
+            if (p.y > canvas.height) p.y = 0;
+
+            ctx.fillStyle = `rgba(0, 230, 57, ${p.opacity})`;
+            // Pixelated square particles
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+        });
+        requestAnimationFrame(animateParticles);
+    }
+
+    window.addEventListener('resize', initParticles);
+    initParticles();
+    animateParticles();
+
+    function startImport() {
+        const progressContainer = document.getElementById('inline-scan-progress');
+        const bar = document.getElementById('scan-bar-fill');
+        const text = document.getElementById('scan-percentage');
+        const button = document.getElementById('import-button');
+        const cpuText = document.getElementById('cpu-status');
+
+        progressContainer.classList.remove('hidden');
+        button.classList.add('opacity-50', 'pointer-events-none');
+        
+        // Increase "launch" feel
+        particleSpeedMultiplier = 5;
+        
+        let width = 0;
+        const interval = setInterval(() => {
+            if (width >= 100) {
+                clearInterval(interval);
+                document.getElementById('scan-status-text').innerText = "扫描完成";
+                setTimeout(() => {
+                    particleSpeedMultiplier = 1;
+                    // Reset or transition to next screen logic
+                }, 1000);
+            } else {
+                width += Math.random() * 3;
+                if (width > 100) width = 100;
+                bar.style.width = width + '%';
+                text.innerText = Math.floor(width) + '%';
+                
+                // Telemetry update
+                if (cpuText) {
+                    cpuText.innerText = `BUSY ${(10 + Math.random() * 40).toFixed(2)}%`;
+                }
+            }
+        }, 80);
+    }
+</script>
+</body></html>

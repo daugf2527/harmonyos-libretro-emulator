@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-dim": "#0e0e0e",
+              "secondary": "#9d9e9e",
+              "outline": "#757575",
+              "on-primary-container": "#00f13d",
+              "on-primary": "#004c0c",
+              "secondary-fixed": "#e2e2e2",
+              "surface-container-highest": "#262626",
+              "surface-bright": "#2c2c2c",
+              "on-tertiary-fixed-variant": "#626267",
+              "secondary-dim": "#9d9e9e",
+              "primary-container": "#00530e",
+              "tertiary": "#faf9fe",
+              "outline-variant": "#484848",
+              "on-error-container": "#ff9b82",
+              "primary-fixed": "#72ff70",
+              "secondary-container": "#3a3c3c",
+              "inverse-surface": "#f9f9f9",
+              "inverse-on-surface": "#555555",
+              "surface-container-low": "#131313",
+              "on-tertiary": "#5e5f63",
+              "on-primary-fixed": "#004b0c",
+              "on-secondary-fixed": "#3e4040",
+              "background": "#0e0e0e",
+              "on-tertiary-container": "#56565b",
+              "surface-container-high": "#1f1f1f",
+              "primary-fixed-dim": "#00f63e",
+              "on-secondary-container": "#bfbfbf",
+              "error-dim": "#ba573f",
+              "surface-container-lowest": "#000000",
+              "tertiary-fixed": "#eeedf3",
+              "surface": "#0e0e0e",
+              "inverse-primary": "#006f16",
+              "error": "#ed7f64",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "on-background": "#e5e5e5",
+              "tertiary-dim": "#e0dfe4",
+              "surface-container": "#191919",
+              "on-primary-fixed-variant": "#006b15",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "error-container": "#7e2b17",
+              "surface-tint": "#00e639",
+              "secondary-fixed-dim": "#d4d4d4",
+              "on-surface-variant": "#ababab",
+              "tertiary-container": "#ebeaf0",
+              "primary": "#00e639",
+              "on-error": "#450900",
+              "on-secondary": "#1e2021",
+              "on-tertiary-fixed": "#45464a",
+              "surface-variant": "#262626",
+              "primary-dim": "#00d635",
+              "on-surface": "#e5e5e5"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+            animation: {
+              'pulse-glow': 'pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'slow-zoom': 'slow-zoom 20s ease-in-out infinite alternate',
+              'fade-in-up': 'fade-in-up 0.6s ease-out forwards',
+              'precision-spin': 'precision-spin 1s linear infinite',
+              'glitch-shift': 'glitch-shift 0.4s cubic-bezier(.25,.46,.45,.94) infinite',
+              'slide-toast': 'slide-toast 4s ease-in-out forwards',
+            },
+            keyframes: {
+              'pulse-glow': {
+                '0%, 100%': { opacity: 1, boxShadow: '0 0 15px rgba(0, 255, 65, 0.4)' },
+                '50%': { opacity: 0.7, boxShadow: '0 0 25px rgba(0, 255, 65, 0.7)' },
+              },
+              'slow-zoom': {
+                '0%': { transform: 'scale(1.0)' },
+                '100%': { transform: 'scale(1.15)' },
+              },
+              'fade-in-up': {
+                '0%': { opacity: 0, transform: 'translateY(10px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              },
+              'precision-spin': {
+                'from': { transform: 'rotate(0deg)' },
+                'to': { transform: 'rotate(360deg)' },
+              },
+              'glitch-shift': {
+                '0%': { transform: 'translate(0)' },
+                '20%': { transform: 'translate(-2px, 2px)' },
+                '40%': { transform: 'translate(-2px, -2px)' },
+                '60%': { transform: 'translate(2px, 2px)' },
+                '80%': { transform: 'translate(2px, -2px)' },
+                '100%': { transform: 'translate(0)' },
+              },
+              'slide-toast': {
+                '0%': { transform: 'translateY(-100%)', opacity: 0 },
+                '10%': { transform: 'translateY(20px)', opacity: 1 },
+                '90%': { transform: 'translateY(20px)', opacity: 1 },
+                '100%': { transform: 'translateY(-100%)', opacity: 0 },
+              }
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 20px;
+        }
+        body {
+            background-color: #000000;
+            color: #e5e5e5;
+            -webkit-font-smoothing: antialiased;
+        }
+        .telemetry-grid {
+            background-image: radial-gradient(#1f1f1f 1px, transparent 1px);
+            background-size: 16px 16px;
+        }
+        .machined-border {
+            position: relative;
+        }
+        .machined-border::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            pointer-events: none;
+        }
+        .graph-line {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 0;
+            transition: d 0.5s ease-in-out;
+        }
+        @keyframes scanline {
+            0% { transform: translateY(-100%); }
+            100% { transform: translateY(600%); }
+        }
+        .loading-overlay-pattern {
+            background-image: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1) 0px, rgba(0, 0, 0, 0.1) 1px, transparent 1px, transparent 2px);
+            background-size: 100% 2px;
+        }
+    </style>
+</head>
+<body class="font-body selection:bg-primary selection:text-black min-h-[884px] relative overflow-x-hidden">
+<!-- Cloud Sync Toast -->
+<div class="fixed top-0 left-1/2 -translate-x-1/2 z-[60] hidden" id="sync-toast">
+<div class="bg-primary/90 text-black px-4 py-2 rounded-full flex items-center gap-2 shadow-[0_0_20px_rgba(0,255,65,0.3)] animate-slide-toast">
+<span class="material-symbols-outlined text-sm" data-icon="cloud_done">cloud_done</span>
+<span class="text-[10px] font-bold tracking-wider uppercase">同步云存档成功</span>
+</div>
+</div>
+<!-- Advanced Loading Overlay (SCREEN_25 Design) -->
+<div class="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl hidden flex-col items-center justify-center p-8 overflow-hidden" id="loading-screen">
+<div class="loading-overlay-pattern absolute inset-0 pointer-events-none opacity-20"></div>
+<!-- Top System Indicators -->
+<div class="absolute top-0 left-0 w-full px-6 py-4 flex justify-between items-center border-b border-zinc-900/50">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary text-sm animate-pulse" data-icon="terminal">terminal</span>
+<span class="text-primary font-mono tracking-widest text-xs">EMU_OS // KERNEL.LOAD</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-2 px-2 py-1 bg-surface-container rounded-sm border border-outline-variant/30">
+<div class="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+<span class="text-[9px] font-mono text-primary" id="loader-cpu">CPU: 12%</span>
+</div>
+<div class="flex items-center gap-2 px-2 py-1 bg-surface-container rounded-sm border border-outline-variant/30">
+<span class="material-symbols-outlined text-[10px] text-primary" data-icon="wifi">wifi</span>
+<span class="text-[9px] font-mono text-primary">STABLE</span>
+</div>
+</div>
+</div>
+<!-- Center Content -->
+<div class="flex flex-col items-center max-w-sm w-full relative z-10">
+<!-- Game Cover Container -->
+<div class="relative group mb-12">
+<!-- Precision Frame -->
+<div class="absolute -inset-4 border border-primary/20 rounded-xl pointer-events-none"></div>
+<div class="absolute -top-4 -left-4 w-8 h-8 border-t-2 border-l-2 border-primary animate-pulse"></div>
+<div class="absolute -bottom-4 -right-4 w-8 h-8 border-b-2 border-r-2 border-primary animate-pulse"></div>
+<!-- The Cover Art -->
+<div class="relative w-64 h-80 rounded-sm overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)] ring-1 ring-white/10">
+<img alt="Chrono Trigger" class="w-full h-full object-cover grayscale-[0.3] brightness-75 scale-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-QV8rtZgEkXpfGbJyRGiN-ou6anwG1PzR-j6mxVM8ZmeooA-5jB9hb9OdEylZ_gZ5NhR45PaiMIF1U-B70dWFOwXgpBPQNFaAW16xIart2XFP0e54tEXg1HTmZshl7eRopxtefyVNEUeAX4vAOlmBhk8KqNwlHPipxLkwtedgLgJJwTi0afQW9PN3m8K6praHPwjFZ6J6FlW0bH0jYOO8ZXc0YJBhYWLkpvbPXJK_OmZWbzFzVNBT4HJosLqjLziTcJTkLfHiCw"/>
+<!-- Overlay Spinner -->
+<div class="absolute inset-0 flex flex-col items-center justify-center bg-black/20">
+<div class="relative">
+<!-- Outer Ring -->
+<div class="w-20 h-20 rounded-full border-2 border-primary/10"></div>
+<!-- Spinning Precision Track -->
+<div class="absolute inset-0 w-20 h-20 rounded-full border-t-2 border-primary animate-precision-spin"></div>
+<!-- Center Dot -->
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-1.5 h-1.5 bg-primary rounded-full shadow-[0_0_8px_#00FF41]"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Telemetry & Status Text -->
+<div class="text-center space-y-5 w-full">
+<div class="inline-flex items-center gap-3 px-3 py-1 bg-surface-container-high border border-outline-variant/40 rounded-sm">
+<span class="text-[9px] font-mono text-on-surface-variant uppercase tracking-[0.2em]">System Status</span>
+<span class="w-[1px] h-3 bg-primary/40"></span>
+<span class="text-[9px] font-mono text-primary uppercase font-bold tracking-[0.1em]" id="loader-status">Initializing</span>
+</div>
+<h2 class="text-on-surface text-2xl font-medium tracking-tight">正在加载你的童年</h2>
+<!-- Progress Bar -->
+<div class="space-y-3 px-4">
+<div class="w-full h-[1px] bg-zinc-800 relative overflow-hidden">
+<div class="absolute inset-y-0 left-0 bg-primary shadow-[0_0_10px_rgba(0,255,65,0.6)] transition-all duration-300 ease-out" id="progress-bar" style="width: 0%"></div>
+</div>
+<div class="flex justify-between items-center font-mono">
+<span class="text-[9px] text-zinc-500 tracking-wider uppercase">CHRONO_TRIGGER.ISO</span>
+<span class="text-[10px] text-primary font-bold" id="progress-percent">0%</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Bottom Tagline -->
+<div class="absolute bottom-12 text-center">
+<p class="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.4em]">Kinetic Obsidian // Virtual_Core_v0.1</p>
+</div>
+</div>
+<!-- Top Navigation Bar -->
+<header class="bg-black/90 backdrop-blur-md text-[#00FF41] font-['Inter'] tracking-tighter uppercase text-xs font-semibold docked full-width top-0 border-b border-zinc-800/50 flex justify-between items-center w-full px-6 py-4 fixed z-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm animate-pulse" data-icon="terminal">terminal</span>
+<span class="text-[#00FF41] font-mono tracking-widest text-sm">EMU_OS // 0.1</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined hover:bg-zinc-900 transition-colors cursor-pointer p-1 rounded active:scale-95" data-icon="settings_input_component">settings_input_component</span>
+</div>
+</header>
+<main class="pt-14 pb-24 px-6 max-w-md mx-auto">
+<!-- Hero Box Art Section -->
+<section class="mt-8 mb-8 relative group">
+<div class="aspect-[3/4] w-full bg-surface-container-low rounded-lg overflow-hidden border border-outline-variant/30 relative">
+<img alt="Chrono Trigger Box Art" class="w-full h-full object-cover animate-slow-zoom" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC-QV8rtZgEkXpfGbJyRGiN-ou6anwG1PzR-j6mxVM8ZmeooA-5jB9hb9OdEylZ_gZ5NhR45PaiMIF1U-B70dWFOwXgpBPQNFaAW16xIart2XFP0e54tEXg1HTmZshl7eRopxtefyVNEUeAX4vAOlmBhk8KqNwlHPipxLkwtedgLgJJwTi0afQW9PN3m8K6praHPwjFZ6J6FlW0bH0jYOO8ZXc0YJBhYWLkpvbPXJK_OmZWbzFzVNBT4HJosLqjLziTcJTkLfHiCw"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none"></div>
+</div>
+<div class="mt-6 space-y-1">
+<h1 class="text-3xl font-headline font-medium tracking-tight text-on-surface uppercase">Chrono Trigger</h1>
+<p class="text-on-surface-variant font-label text-sm font-semibold tracking-widest uppercase opacity-80">超时空之轮</p>
+</div>
+</section>
+<!-- Primary Actions -->
+<section class="mb-10 space-y-3">
+<button class="w-full py-6 border-2 border-primary/60 bg-primary/20 flex flex-col items-center justify-center gap-0.5 active:scale-95 duration-100 group transition-all animate-pulse-glow hover:border-primary hover:bg-primary/25 rounded-sm relative" id="launch-button">
+<div class="flex flex-col items-center" id="btn-content-ready">
+<span class="font-headline font-bold tracking-widest text-primary text-2xl">启动游戏</span>
+<span class="font-label font-bold tracking-[0.2em] text-primary/80 uppercase text-[10px]">LAUNCH GAME</span>
+</div>
+</button>
+<!-- Integrated Shortcuts -->
+<div class="grid grid-cols-2 gap-3">
+<button class="flex items-center justify-center gap-2 py-3 bg-surface-container-high border border-outline-variant/30 hover:bg-surface-bright active:scale-95 transition-all text-on-surface text-xs font-medium tracking-wide rounded-sm group">
+<span class="material-symbols-outlined text-base group-hover:text-primary" data-icon="videogame_asset">videogame_asset</span>
+                按键布局
+            </button>
+<button class="flex items-center justify-center gap-2 py-3 bg-surface-container-high border border-outline-variant/30 hover:bg-surface-bright active:scale-95 transition-all text-on-surface text-xs font-medium tracking-wide rounded-sm group">
+<span class="material-symbols-outlined text-base group-hover:text-primary" data-icon="palette">palette</span>
+                画面风格
+            </button>
+</div>
+</section>
+<!-- Metadata Bento Grid -->
+<section class="mb-10">
+<div class="grid grid-cols-3 gap-px bg-outline-variant/20 border border-outline-variant/20 rounded-sm overflow-hidden mb-1">
+<div class="bg-surface-container-low p-3 space-y-1 machined-border">
+<span class="text-[9px] text-on-secondary-fixed-variant uppercase font-bold tracking-widest block opacity-70">CN Name</span>
+<span class="text-xs font-semibold text-on-surface truncate">超时空之轮</span>
+</div>
+<div class="bg-surface-container-low p-3 space-y-1 machined-border">
+<span class="text-[9px] text-on-secondary-fixed-variant uppercase font-bold tracking-widest block opacity-70">Year</span>
+<span class="text-xs font-semibold text-on-surface">1995</span>
+</div>
+<div class="bg-surface-container-low p-3 space-y-1 machined-border">
+<span class="text-[9px] text-on-secondary-fixed-variant uppercase font-bold tracking-widest block opacity-70">Console</span>
+<span class="text-xs font-semibold text-on-surface">SFC</span>
+</div>
+</div>
+<div class="flex justify-end">
+<button class="flex items-center gap-1 text-[10px] font-bold text-primary/70 hover:text-primary active:scale-95 transition-all py-1 px-2 uppercase tracking-widest" onclick="const details = document.getElementById('extended-metadata'); details.classList.toggle('hidden');">
+<span>详情 (Details)</span>
+<span class="material-symbols-outlined !text-[14px]" data-icon="keyboard_arrow_down">keyboard_arrow_down</span>
+</button>
+</div>
+<div class="hidden grid grid-cols-2 gap-px bg-outline-variant/20 border border-outline-variant/20 rounded-sm overflow-hidden mt-1 animate-fade-in-up" id="extended-metadata">
+<div class="bg-surface-container-low p-4 space-y-1 machined-border">
+<span class="text-[10px] text-on-secondary-fixed-variant uppercase font-bold tracking-widest block opacity-70">Publisher</span>
+<span class="text-sm font-semibold text-on-surface">Square Enix</span>
+</div>
+<div class="bg-surface-container-low p-4 space-y-1 machined-border">
+<span class="text-[10px] text-on-secondary-fixed-variant uppercase font-bold tracking-widest block opacity-70">Playtime</span>
+<span class="text-sm font-semibold text-on-surface">25h 40m</span>
+</div>
+<div class="bg-surface-container-low p-4 space-y-1 machined-border">
+<span class="text-[10px] text-on-secondary-fixed-variant uppercase font-bold tracking-widest block opacity-70">Engine</span>
+<span class="text-sm font-semibold text-on-surface">Custom C/ASM</span>
+</div>
+<div class="bg-surface-container-low p-4 space-y-1 machined-border">
+<span class="text-[10px] text-on-secondary-fixed-variant uppercase font-bold tracking-widest block opacity-70">Region</span>
+<span class="text-sm font-semibold text-on-surface">JP / NTSC</span>
+</div>
+</div>
+</section>
+<!-- Telemetry Module -->
+<section class="mb-10">
+<div class="flex justify-between items-end mb-3">
+<h3 class="text-[11px] font-bold text-on-surface-variant tracking-[0.15em] uppercase">System Telemetry</h3>
+<span class="text-[9px] font-mono text-primary uppercase flex items-center gap-1.5">
+<span class="w-1 h-1 rounded-full bg-primary animate-ping"></span>
+<span id="fps-counter">60.0</span> FPS // STABLE
+            </span>
+</div>
+<div class="h-24 bg-surface-container-lowest border border-outline-variant/20 relative telemetry-grid overflow-hidden group">
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none">
+<path class="graph-line" d="M0 80 L40 75 L80 78 L120 40 L160 45 L200 42 L240 70 L280 65 L320 68 L360 30 L400 35 L440 38 L480 32" fill="none" id="telemetry-path" stroke="#00FF41" stroke-linecap="square" stroke-width="1.5"></path>
+<path d="M0 80 L40 75 L80 78 L120 40 L160 45 L200 42 L240 70 L280 65 L320 68 L360 30 L400 35 V100 H0 Z" fill="#00FF41" fill-opacity="0.05" id="telemetry-fill"></path>
+</svg>
+<div class="absolute top-2 left-2 flex gap-4">
+<div class="flex flex-col">
+<span class="text-[8px] text-secondary font-mono">CPU</span>
+<span class="text-[10px] text-on-surface font-mono" id="cpu-load">14%</span>
+</div>
+<div class="flex flex-col">
+<span class="text-[8px] text-secondary font-mono">GPU</span>
+<span class="text-[10px] text-on-surface font-mono" id="gpu-load">28%</span>
+</div>
+</div>
+<div class="absolute inset-0 bg-gradient-to-b from-transparent via-primary/5 to-transparent h-4 w-full animate-[scanline_4s_linear_infinite] opacity-30 pointer-events-none"></div>
+</div>
+</section>
+<!-- Description Section -->
+<section class="mb-10 space-y-4">
+<h3 class="text-[11px] font-bold text-on-surface-variant tracking-[0.15em] uppercase">Overview</h3>
+<div class="bg-surface-container p-5 border-l border-primary/40 relative">
+<div class="absolute top-0 right-0 w-8 h-8 opacity-10 pointer-events-none">
+<svg class="fill-on-surface" viewbox="0 0 100 100"><path d="M0 0 L100 0 L100 100 Z"></path></svg>
+</div>
+<p class="text-sm leading-relaxed text-on-surface/90 font-light">
+                《超时空之轮》（Chrono Trigger）是Square公司于1995年发行的角色扮演游戏。游戏以时间旅行为核心，通过其创新的战斗系统、多重结局以及深刻的剧情，被公认为史上最伟大的电子游戏之一。玩家将跨越从原始时代到遥远未来的不同时空，为了拯救行将破灭的世界而战。
+            </p>
+</div>
+</section>
+<!-- Tech Specs Section -->
+<section class="mb-12">
+<h3 class="text-[11px] font-bold text-on-surface-variant tracking-[0.15em] uppercase mb-4">Core Specifications</h3>
+<div class="space-y-3">
+<div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
+<span class="text-xs text-on-surface-variant">ROM Version</span>
+<span class="text-xs font-mono text-on-surface">SFC_v1.0.JP_CRC32</span>
+</div>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
+<span class="text-xs text-on-surface-variant">Processor Cluster</span>
+<span class="text-xs font-mono text-on-surface">EMU_CORE_04</span>
+</div>
+<div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
+<span class="text-xs text-on-surface-variant">Memory Mode</span>
+<span class="text-xs font-mono text-on-surface uppercase">Direct_Mapping_L2</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="bg-black text-[#00FF41] fixed bottom-0 w-full z-50 border-t border-zinc-900 flex justify-around items-center h-20 pb-safe px-4">
+<div class="flex flex-col items-center justify-center text-[#00FF41] relative after:content-[''] after:absolute after:top-0 after:w-1 after:h-1 after:bg-[#00FF41] after:rounded-full cursor-pointer group">
+<span class="material-symbols-outlined mb-1 group-active:scale-90" data-icon="grid_view" style="font-variation-settings: 'FILL' 1;">grid_view</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-widest uppercase">LIBRARY</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-1 group-active:scale-90" data-icon="terminal">terminal</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-widest uppercase">ENGINE</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-1 group-active:scale-90" data-icon="sports_esports">sports_esports</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-widest uppercase">INPUT</span>
+</div>
+<div class="flex flex-col items-center justify-center text-zinc-600 hover:text-zinc-300 transition-colors cursor-pointer group">
+<span class="material-symbols-outlined mb-1 group-active:scale-90" data-icon="tune">tune</span>
+<span class="font-['Inter'] text-[10px] font-medium tracking-widest uppercase">SYSTEM</span>
+</div>
+</nav>
+<script>
+    const launchBtn = document.getElementById('launch-button');
+    const loadingScreen = document.getElementById('loading-screen');
+    const progressBar = document.getElementById('progress-bar');
+    const progressPercent = document.getElementById('progress-percent');
+    const loaderStatus = document.getElementById('loader-status');
+    const syncToast = document.getElementById('sync-toast');
+    const loaderCpu = document.getElementById('loader-cpu');
+
+    // Toast Logic
+    function showToast() {
+        syncToast.classList.remove('hidden');
+        setTimeout(() => {
+            syncToast.classList.add('hidden');
+        }, 4000);
+    }
+    
+    setTimeout(showToast, 2000);
+    setInterval(showToast, 15000);
+
+    // Telemetry Update Logic
+    const telemetryPath = document.getElementById('telemetry-path');
+    const telemetryFill = document.getElementById('telemetry-fill');
+    const fpsCounter = document.getElementById('fps-counter');
+    const cpuLoad = document.getElementById('cpu-load');
+    const gpuLoad = document.getElementById('gpu-load');
+
+    function updateTelemetry() {
+        const points = [];
+        for (let i = 0; i <= 12; i++) {
+            const x = i * 40;
+            const y = 30 + Math.random() * 50;
+            points.push(`${x} ${y}`);
+        }
+        
+        const pathData = `M${points.join(' L')}`;
+        const fillData = `${pathData} V100 H0 Z`;
+        
+        if(telemetryPath) telemetryPath.setAttribute('d', pathData);
+        if(telemetryFill) telemetryFill.setAttribute('d', fillData);
+        
+        const cpuVal = Math.floor(10 + Math.random() * 15);
+        if(fpsCounter) fpsCounter.innerText = (59.5 + Math.random()).toFixed(1);
+        if(cpuLoad) cpuLoad.innerText = cpuVal + '%';
+        if(gpuLoad) gpuLoad.innerText = Math.floor(25 + Math.random() * 10) + '%';
+        if(loaderCpu) loaderCpu.innerText = `CPU: ${cpuVal}%`;
+    }
+
+    setInterval(updateTelemetry, 2000);
+
+    // Loading Sequence
+    const statusSteps = [
+        { progress: 0, text: "INITIALIZING" },
+        { progress: 20, text: "MOUNTING_FS" },
+        { progress: 45, text: "EXECUTING" },
+        { progress: 75, text: "V_SYNC_START" },
+        { progress: 95, text: "JUMPING_TO_ENTRY" }
+    ];
+
+    launchBtn.addEventListener('click', () => {
+        loadingScreen.classList.remove('hidden');
+        loadingScreen.classList.add('flex');
+        
+        let startTime = null;
+        const duration = 3000;
+
+        function animateProgress(timestamp) {
+            if (!startTime) startTime = timestamp;
+            const elapsed = timestamp - startTime;
+            const rawProgress = Math.min(elapsed / duration, 1);
+            
+            // Easing
+            const progress = 1 - Math.pow(1 - rawProgress, 2.5);
+            const percent = Math.floor(progress * 100);
+            
+            progressBar.style.width = percent + '%';
+            progressPercent.innerText = percent + '%';
+
+            const step = statusSteps.findLast(s => percent >= s.progress);
+            if (step) loaderStatus.innerText = step.text;
+
+            if (rawProgress < 1) {
+                requestAnimationFrame(animateProgress);
+            } else {
+                setTimeout(() => {
+                    loadingScreen.classList.add('hidden');
+                    alert("System Call: BOOT_SFC_MODULE // SUCCESS");
+                }, 500);
+            }
+        }
+        requestAnimationFrame(animateProgress);
+    });
+</script>
+</body></html>
