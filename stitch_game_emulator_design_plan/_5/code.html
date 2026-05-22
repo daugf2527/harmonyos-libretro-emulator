@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>EMU_CORE | 关于与帮助</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Space+Grotesk:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container": "#191919",
+              "surface-container-high": "#1f1f1f",
+              "surface-dim": "#0e0e0e",
+              "error-dim": "#ba573f",
+              "on-secondary-fixed": "#3e4040",
+              "secondary": "#9d9e9e",
+              "error": "#ed7f64",
+              "outline-variant": "#484848",
+              "primary-dim": "#00d635",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "error-container": "#7e2b17",
+              "on-tertiary-fixed-variant": "#626267",
+              "on-surface": "#e5e5e5",
+              "secondary-container": "#3a3c3c",
+              "on-tertiary-fixed": "#45464a",
+              "inverse-surface": "#f9f9f9",
+              "on-secondary-container": "#bfbfbf",
+              "tertiary": "#faf9fe",
+              "on-error-container": "#ff9b82",
+              "on-background": "#e5e5e5",
+              "surface-bright": "#2c2c2c",
+              "background": "#0e0e0e",
+              "on-primary-fixed-variant": "#006b15",
+              "on-primary-container": "#00f13d",
+              "tertiary-fixed": "#eeedf3",
+              "surface-variant": "#262626",
+              "surface-tint": "#00e639",
+              "on-secondary": "#1e2021",
+              "surface-container-lowest": "#000000",
+              "on-error": "#450900",
+              "secondary-fixed-dim": "#d4d4d4",
+              "tertiary-dim": "#e0dfe4",
+              "primary": "#00e639",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "primary-fixed-dim": "#00f63e",
+              "secondary-fixed": "#e2e2e2",
+              "on-surface-variant": "#ababab",
+              "surface-container-low": "#131313",
+              "on-primary-fixed": "#004b0c",
+              "tertiary-container": "#ebeaf0",
+              "outline": "#757575",
+              "inverse-primary": "#006f16",
+              "surface-container-highest": "#262626",
+              "surface": "#0e0e0e",
+              "on-primary": "#004c0c",
+              "on-tertiary-container": "#56565b",
+              "on-tertiary": "#5e5f63",
+              "primary-container": "#00530e",
+              "primary-fixed": "#72ff70",
+              "secondary-dim": "#9d9e9e",
+              "inverse-on-surface": "#555555"
+            },
+            fontFamily: {
+              "headline": ["Space Grotesk", "sans-serif"],
+              "body": ["Inter", "sans-serif"],
+              "label": ["Inter", "sans-serif"],
+              "mono": ["JetBrains Mono", "monospace"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            background-color: #000000;
+            color: #e5e5e5;
+            -webkit-font-smoothing: antialiased;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 200, 'GRAD' 0, 'opsz' 24;
+        }
+        .thin-arrow {
+            font-variation-settings: 'wght' 100;
+            font-size: 1.25rem;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="font-body selection:bg-primary-container selection:text-on-primary-container">
+<!-- TopAppBar -->
+<header class="bg-black/85 backdrop-blur-xl text-[#00FF41] font-['Inter'] tracking-tighter uppercase text-xs font-semibold fixed top-0 w-full z-50 border-b border-zinc-800/40 flex justify-between items-center px-6 h-14 w-full">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-sm">memory</span>
+<span class="text-[#00FF41] font-mono text-sm tracking-[0.2em]">EMU_CORE_v1.0</span>
+</div>
+<div class="flex items-center gap-6">
+<nav class="hidden md:flex gap-8 items-center">
+<a class="text-zinc-500 hover:text-[#00FF41] transition-colors duration-150 active:scale-95 transition-transform" href="#">LIBRARY</a>
+<a class="text-zinc-500 hover:text-[#00FF41] transition-colors duration-150 active:scale-95 transition-transform" href="#">ENGINE</a>
+<a class="text-zinc-500 hover:text-[#00FF41] transition-colors duration-150 active:scale-95 transition-transform" href="#">INPUT</a>
+<a class="text-white hover:text-[#00FF41] transition-colors duration-150 active:scale-95 transition-transform" href="#">SYSTEM</a>
+</nav>
+<span class="material-symbols-outlined cursor-pointer hover:text-[#00FF41] transition-colors active:scale-95">settings_input_component</span>
+</div>
+</header>
+<main class="pt-24 pb-32 px-6 max-w-2xl mx-auto min-h-screen">
+<!-- System Header -->
+<section class="mb-12">
+<div class="flex items-center gap-2 mb-2">
+<div class="w-1 h-1 bg-primary"></div>
+<span class="text-[10px] font-mono tracking-[0.3em] text-on-surface-variant uppercase">Status: Operational</span>
+</div>
+<h1 class="font-headline text-4xl font-light tracking-tighter text-on-surface">关于 &amp; 帮助</h1>
+<p class="text-on-surface-variant mt-4 text-sm font-light leading-relaxed max-w-md">
+                EMU_CORE 是一个高精度的底层模拟架构，旨在提供工业级的游戏运行环境与延迟控制。
+            </p>
+</section>
+<!-- Technical Telemetry Module -->
+<div class="mb-12 p-4 bg-surface-container-low border border-outline-variant/20 rounded-lg flex flex-col gap-4">
+<div class="flex justify-between items-end">
+<div>
+<div class="text-[10px] font-mono text-secondary mb-1 uppercase tracking-widest">Core Version</div>
+<div class="font-headline text-2xl font-medium">v1.0.2 <span class="text-primary text-xs ml-2">STABLE</span></div>
+</div>
+<div class="text-right">
+<div class="text-[10px] font-mono text-secondary mb-1 uppercase tracking-widest">Up Time</div>
+<div class="font-mono text-sm text-on-surface-variant">04:21:55:12</div>
+</div>
+</div>
+<div class="grid grid-cols-12 gap-1 h-1">
+<div class="bg-primary col-span-3"></div>
+<div class="bg-primary col-span-2 opacity-50"></div>
+<div class="bg-outline-variant col-span-7"></div>
+</div>
+</div>
+<!-- Help List -->
+<section class="space-y-1">
+<div class="text-[10px] font-mono text-secondary mb-4 uppercase tracking-[0.2em] px-2">Documentation &amp; Legal</div>
+<!-- List Items -->
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest hover:bg-surface-container-low transition-colors cursor-pointer active:scale-[0.99] transition-transform duration-150">
+<div class="flex flex-col">
+<span class="font-headline text-lg font-light tracking-tight text-on-surface group-hover:text-primary transition-colors">怎么导入游戏？</span>
+<span class="text-[10px] font-mono text-on-surface-variant/60 uppercase mt-1">Procedure / Storage / Pathing</span>
+</div>
+<span class="material-symbols-outlined text-outline thin-arrow">arrow_forward_ios</span>
+</div>
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest hover:bg-surface-container-low transition-colors cursor-pointer active:scale-[0.99] transition-transform duration-150">
+<div class="flex flex-col">
+<span class="font-headline text-lg font-light tracking-tight text-on-surface group-hover:text-primary transition-colors">按键没反应怎么办？</span>
+<span class="text-[10px] font-mono text-on-surface-variant/60 uppercase mt-1">Input / Mapping / Calibration</span>
+</div>
+<span class="material-symbols-outlined text-outline thin-arrow">arrow_forward_ios</span>
+</div>
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest hover:bg-surface-container-low transition-colors cursor-pointer active:scale-[0.99] transition-transform duration-150">
+<div class="flex flex-col">
+<span class="font-headline text-lg font-light tracking-tight text-on-surface group-hover:text-primary transition-colors">合规声明</span>
+<span class="text-[10px] font-mono text-on-surface-variant/60 uppercase mt-1">Compliance / Licensing / EULA</span>
+</div>
+<span class="material-symbols-outlined text-outline thin-arrow">arrow_forward_ios</span>
+</div>
+<div class="group flex items-center justify-between p-4 bg-surface-container-lowest hover:bg-surface-container-low transition-colors cursor-pointer active:scale-[0.99] transition-transform duration-150">
+<div class="flex flex-col">
+<span class="font-headline text-lg font-light tracking-tight text-on-surface group-hover:text-primary transition-colors">当前版本</span>
+<span class="text-[10px] font-mono text-on-surface-variant/60 uppercase mt-1">System Architecture / Build Info</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-sm font-mono text-primary-dim opacity-80">v1.0.2</span>
+<span class="material-symbols-outlined text-outline thin-arrow">arrow_forward_ios</span>
+</div>
+</div>
+</section>
+<!-- Aesthetic Branding Section -->
+<section class="mt-20 border-t border-outline-variant/10 pt-10">
+<div class="grid grid-cols-2 gap-8">
+<div class="space-y-4">
+<div class="w-12 h-[1px] bg-primary"></div>
+<div class="font-headline text-xs tracking-widest text-on-surface-variant leading-relaxed">
+                        DESIGNED BY KINETIC OBSIDIAN LABS.<br/>
+                        TOKYO // SHANGHAI // BERLIN
+                    </div>
+</div>
+<div class="flex justify-end grayscale opacity-20">
+<img alt="Logo Abstract" class="w-12 h-12" data-alt="minimalist geometric logo of an atom or nucleus in a clinical tech style, white on black background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCDOdLe6rMsYJxRu1xjiTkPctUIR534tR7eTaEaoE_ZIOVQkLZLj_Wwjue_cD0xbIDzadutt0XAfyk4Pczk52ih9-FOR_K4YzYc1jTkJ2aN0_8LOYCfiCOeymRYQYLHw6b-62K8IshupGMA_5t_9N9ngKfCNepHONOqbRAEc5V1g2Z9SBwFcOGzZY2ve02xyKYYM-TITAXolNziUPd_bNIH8td60CCJTCl912hBIm-dplD13DiE04SRcgS8lPE4st-N5_G_lFdjpA"/>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="md:hidden bg-black text-zinc-600 font-['Inter'] text-[10px] font-medium tracking-widest uppercase fixed bottom-0 w-full z-50 border-t border-zinc-900 flex justify-around items-center h-20 pb-safe px-4">
+<a class="flex flex-col items-center justify-center hover:text-zinc-300 transition-colors linear transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1">grid_view</span>
+<span>LIBRARY</span>
+</a>
+<a class="flex flex-col items-center justify-center hover:text-zinc-300 transition-colors linear transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1">terminal</span>
+<span>ENGINE</span>
+</a>
+<a class="flex flex-col items-center justify-center hover:text-zinc-300 transition-colors linear transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1">sports_esports</span>
+<span>INPUT</span>
+</a>
+<a class="flex flex-col items-center justify-center text-[#00FF41] relative after:content-[''] after:absolute after:top-0 after:w-1 after:h-1 after:bg-[#00FF41] after:rounded-full linear transition-all duration-200" href="#">
+<span class="material-symbols-outlined mb-1">tune</span>
+<span>SYSTEM</span>
+</a>
+</nav>
+</body></html>

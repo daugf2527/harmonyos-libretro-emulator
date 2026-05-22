@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "background": "#0e0e0e",
+              "on-primary": "#004c0c",
+              "error-container": "#7e2b17",
+              "secondary": "#9d9e9e",
+              "on-tertiary-container": "#56565b",
+              "tertiary-container": "#ebeaf0",
+              "on-secondary-container": "#bfbfbf",
+              "primary-fixed": "#72ff70",
+              "on-tertiary-fixed-variant": "#626267",
+              "secondary-container": "#3a3c3c",
+              "secondary-fixed": "#e2e2e2",
+              "surface-container": "#191919",
+              "surface": "#0e0e0e",
+              "on-primary-container": "#00f13d",
+              "tertiary-fixed": "#eeedf3",
+              "secondary-dim": "#9d9e9e",
+              "outline-variant": "#484848",
+              "tertiary-dim": "#e0dfe4",
+              "primary-container": "#00530e",
+              "surface-bright": "#2c2c2c",
+              "on-tertiary-fixed": "#45464a",
+              "on-primary-fixed-variant": "#006b15",
+              "on-surface-variant": "#ababab",
+              "surface-variant": "#262626",
+              "secondary-fixed-dim": "#d4d4d4",
+              "surface-container-lowest": "#000000",
+              "primary-dim": "#00d635",
+              "tertiary": "#faf9fe",
+              "error": "#ed7f64",
+              "surface-container-highest": "#262626",
+              "surface-container-high": "#1f1f1f",
+              "on-secondary": "#1e2021",
+              "error-dim": "#ba573f",
+              "primary-fixed-dim": "#00f63e",
+              "outline": "#757575",
+              "on-background": "#e5e5e5",
+              "surface-container-low": "#131313",
+              "inverse-surface": "#f9f9f9",
+              "on-error-container": "#ff9b82",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "on-surface": "#e5e5e5",
+              "surface-tint": "#00e639",
+              "on-secondary-fixed": "#3e4040",
+              "on-tertiary": "#5e5f63",
+              "on-error": "#450900",
+              "inverse-on-surface": "#555555",
+              "inverse-primary": "#006f16",
+              "primary": "#00e639",
+              "on-primary-fixed": "#004b0c",
+              "surface-dim": "#0e0e0e"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .waveform-bg {
+            background-image: linear-gradient(90deg, transparent 0%, transparent 49%, rgba(0, 255, 65, 0.1) 50%, transparent 51%, transparent 100%),
+                              linear-gradient(0deg, transparent 0%, transparent 49%, rgba(0, 255, 65, 0.1) 50%, transparent 51%, transparent 100%);
+            background-size: 20px 20px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container-lowest font-body text-on-surface select-none overflow-hidden h-screen w-screen">
+<!-- Game Background Layer -->
+<div class="fixed inset-0 z-0">
+<img class="w-full h-full object-cover blur-3xl scale-110 opacity-40" data-alt="16-bit pixel art style JRPG game scene with vibrant greens and blues, highly blurred into a soft abstract texture" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD1_QVG9X6rf-PKrg56X3lvNNsb59TOfnFBgP9CNk8iGa2ggHsN8Q1GqhlsXZxuDU0KjzR6z94xy5xY13QrjzZ8gC0Q9ZcMqUQI8spTvC2LKs4dq6o_Z3CFSRCWVzfZP_RHwOGfqOQH1g-G3ucWz1lL36tkrlZhEqPHvw4jUSNLFzhxoQeXuPYT0uv9Hd0P134yR7JJQqwwkp9dsBsQAXUPSXwW0VGSEhZsvZ-s1PzXFilhB3i1WW-MHVE80_Fu17TRmmQgOxoSgw"/>
+<div class="absolute inset-0 bg-black/70 backdrop-brightness-50"></div>
+</div>
+<!-- Top Navigation Anchor (Shared Component) -->
+<header class="fixed top-0 w-full bg-black/85 backdrop-blur-xl text-[#00FF41] font-['Inter'] tracking-tighter text-[10px] font-semibold uppercase border-b-[0.5px] border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.4)] flex justify-between items-center px-6 h-12 z-50">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm" data-icon="memory">memory</span>
+<span class="text-[#00FF41] font-mono font-bold tracking-widest">TELEMETRY_v1.0.4</span>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-on-surface-variant font-mono">60 FPS | CPU 14% | GPU 22%</span>
+</div>
+</header>
+<!-- Side Drawer (Shared Component) -->
+<aside class="fixed left-0 top-0 h-full w-72 bg-[#0e0e0e]/95 backdrop-blur-md border-r-[0.5px] border-white/5 divide-y divide-white/5 flex flex-col pt-16 z-40 hidden md:flex">
+<div class="px-6 py-4">
+<span class="text-[#00FF41] text-xs font-black tracking-widest">SYSTEM_PAUSE</span>
+</div>
+<nav class="flex-1 flex flex-col py-2">
+<a class="px-6 py-3 flex items-center gap-4 text-white bg-white/5 border-l-2 border-[#00FF41] duration-200 linear" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="play_arrow">play_arrow</span>
+<span class="font-['Inter'] text-sm font-medium tracking-tight">RESUME</span>
+</a>
+<a class="px-6 py-3 flex items-center gap-4 text-gray-400 hover:bg-white/5 hover:text-white duration-200 linear" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="save">save</span>
+<span class="font-['Inter'] text-sm font-medium tracking-tight">SAVE STATE</span>
+</a>
+<a class="px-6 py-3 flex items-center gap-4 text-gray-400 hover:bg-white/5 hover:text-white duration-200 linear" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="folder_open">folder_open</span>
+<span class="font-['Inter'] text-sm font-medium tracking-tight">LOAD STATE</span>
+</a>
+<a class="px-6 py-3 flex items-center gap-4 text-gray-400 hover:bg-white/5 hover:text-white duration-200 linear" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="keyboard">keyboard</span>
+<span class="font-['Inter'] text-sm font-medium tracking-tight">INPUT MAPPING</span>
+</a>
+<a class="px-6 py-3 flex items-center gap-4 text-gray-400 hover:bg-white/5 hover:text-white duration-200 linear" href="#">
+<span class="material-symbols-outlined text-sm" data-icon="layers">layers</span>
+<span class="font-['Inter'] text-sm font-medium tracking-tight">SHADERS</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Canvas -->
+<main class="relative z-10 pt-20 pb-24 px-6 max-w-lg mx-auto md:ml-80 lg:mx-auto md:max-w-xl h-full flex flex-col">
+<!-- Header Identification -->
+<div class="mb-8 border-l-2 border-[#00FF41] pl-4">
+<h1 class="text-2xl font-semibold tracking-tight text-white">EMU_CORE 系统暂停</h1>
+<p class="text-xs text-on-surface-variant font-mono mt-1 opacity-70 uppercase tracking-widest">Process: CHRONO_TRIGGER_USA_SNES</p>
+</div>
+<!-- Vertical Action List (Bento-lite) -->
+<div class="flex flex-col gap-3">
+<!-- Primary Action -->
+<button class="group relative flex items-center justify-between p-5 bg-primary/10 border-[0.5px] border-[#00FF41] rounded-lg transition-all duration-150 active:scale-95 text-left">
+<div class="flex items-center gap-4">
+<div class="w-2 h-2 rounded-full bg-[#00FF41] shadow-[0_0_8px_rgba(0,255,65,0.6)]"></div>
+<div>
+<div class="text-xs font-mono text-[#00FF41] opacity-60 leading-none mb-1">EXECUTION_READY</div>
+<div class="text-lg font-bold text-white tracking-tight">继续游戏 RESUME_EXECUTION</div>
+</div>
+</div>
+<span class="material-symbols-outlined text-white opacity-40 group-hover:opacity-100 group-hover:translate-x-1 transition-all" data-icon="chevron_right">chevron_right</span>
+</button>
+<!-- Grid of Secondary Actions -->
+<div class="grid grid-cols-2 gap-3">
+<button class="flex flex-col gap-4 p-4 bg-surface-container-low border-[0.5px] border-outline-variant/30 rounded-lg hover:bg-surface-container transition-colors text-left group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-white transition-colors" data-icon="save">save</span>
+<div class="text-sm font-medium text-on-surface">快速存档 QUICK_SAVE</div>
+</button>
+<button class="flex flex-col gap-4 p-4 bg-surface-container-low border-[0.5px] border-outline-variant/30 rounded-lg hover:bg-surface-container transition-colors text-left group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-white transition-colors" data-icon="folder_special">folder_special</span>
+<div class="text-sm font-medium text-on-surface">快速读档 QUICK_LOAD</div>
+</button>
+<button class="flex flex-col gap-4 p-4 bg-surface-container-low border-[0.5px] border-outline-variant/30 rounded-lg hover:bg-surface-container transition-colors text-left group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-white transition-colors" data-icon="settings_input_component">settings_input_component</span>
+<div class="text-sm font-medium text-on-surface">按键映射 INPUT_MAPPING</div>
+</button>
+<button class="flex flex-col gap-4 p-4 bg-surface-container-low border-[0.5px] border-outline-variant/30 rounded-lg hover:bg-surface-container transition-colors text-left group">
+<span class="material-symbols-outlined text-on-surface-variant group-hover:text-white transition-colors" data-icon="auto_awesome_motion">auto_awesome_motion</span>
+<div class="text-sm font-medium text-on-surface">画面风格 VISUAL_FILTERS</div>
+</button>
+</div>
+<!-- Danger Zone -->
+<button class="flex items-center justify-between p-4 bg-error-container/10 border-[0.5px] border-error/20 rounded-lg hover:bg-error-container/20 transition-all group">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-error" data-icon="power_settings_new">power_settings_new</span>
+<span class="text-sm font-medium text-error/80 group-hover:text-error transition-colors">结束运行 TERMINATE_SESSION</span>
+</div>
+<span class="text-[10px] font-mono text-error/40 font-bold">ERR_HALT</span>
+</button>
+</div>
+<!-- Telemetry Card (The Precision Module) -->
+<section class="mt-8 flex-1">
+<div class="bg-surface-container-lowest border-[0.5px] border-outline-variant/20 rounded-lg overflow-hidden flex flex-col h-full max-h-48">
+<div class="px-4 py-2 bg-surface-container-high flex justify-between items-center">
+<span class="text-[10px] font-bold text-on-surface-variant tracking-[0.2em]">SUBSYSTEM_TELEMETRY</span>
+<span class="w-1.5 h-1.5 rounded-full bg-[#00FF41] animate-pulse"></span>
+</div>
+<div class="p-4 grid grid-cols-2 gap-4 flex-none">
+<div class="flex flex-col">
+<span class="text-[9px] text-on-surface-variant font-bold uppercase tracking-tighter">CPU LOAD</span>
+<span class="text-xl font-mono font-bold text-white">12.4<span class="text-xs text-on-surface-variant ml-1">%</span></span>
+</div>
+<div class="flex flex-col">
+<span class="text-[9px] text-on-surface-variant font-bold uppercase tracking-tighter">FRAME RATE</span>
+<span class="text-xl font-mono font-bold text-[#00FF41]">60.0<span class="text-xs text-on-surface-variant ml-1">FPS</span></span>
+</div>
+</div>
+<!-- Waveform Graph -->
+<div class="flex-1 relative bg-black overflow-hidden waveform-bg">
+<svg class="absolute inset-0 w-full h-full" preserveaspectratio="none">
+<path class="opacity-60" d="M 0 40 Q 20 10, 40 40 T 80 40 T 120 40 T 160 40 T 200 40 T 240 40 T 280 40 T 320 40 T 360 40 T 400 40 T 440 40 T 480 40 T 520 40" fill="none" stroke="#00FF41" stroke-width="1.5"></path>
+<path d="M 0 40 Q 20 25, 40 40 T 80 40 T 120 30 T 160 40 T 200 35 T 240 40 T 280 40 T 320 30 T 360 40 T 400 45 T 440 40 T 480 40 T 520 40" fill="none" stroke="#00FF41" stroke-width="2"></path>
+</svg>
+<!-- Floating Data Pips -->
+<div class="absolute right-4 top-2 text-[8px] font-mono text-[#00FF41]/40 flex flex-col items-end">
+<span>CORE_0: STABLE</span>
+<span>BUS_CLK: 1.2GHZ</span>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar (Shared Component) -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-black/90 backdrop-blur-2xl border-t-[0.5px] border-white/10 h-16 md:hidden">
+<button class="flex flex-col items-center justify-center text-gray-500 hover:text-gray-200 transition-all duration-200 linear">
+<span class="material-symbols-outlined text-lg" data-icon="grid_view">grid_view</span>
+<span class="font-['Inter'] text-[9px] font-bold tracking-[0.1em] uppercase mt-1">LIBRARY</span>
+</button>
+<button class="flex flex-col items-center justify-center text-[#00FF41] relative after:content-[''] after:absolute after:bottom-1 after:w-1 after:h-1 after:bg-[#00FF41] after:rounded-full transition-all duration-200 linear">
+<span class="material-symbols-outlined text-lg" data-icon="settings_input_component">settings_input_component</span>
+<span class="font-['Inter'] text-[9px] font-bold tracking-[0.1em] uppercase mt-1">ENGINE</span>
+</button>
+<button class="flex flex-col items-center justify-center text-gray-500 hover:text-gray-200 transition-all duration-200 linear">
+<span class="material-symbols-outlined text-lg" data-icon="videogame_asset">videogame_asset</span>
+<span class="font-['Inter'] text-[9px] font-bold tracking-[0.1em] uppercase mt-1">INPUT</span>
+</button>
+<button class="flex flex-col items-center justify-center text-gray-500 hover:text-gray-200 transition-all duration-200 linear">
+<span class="material-symbols-outlined text-lg" data-icon="terminal">terminal</span>
+<span class="font-['Inter'] text-[9px] font-bold tracking-[0.1em] uppercase mt-1">SYSTEM</span>
+</button>
+</nav>
+<!-- Visual Artifacts -->
+<div class="fixed top-12 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#00FF41]/20 to-transparent z-50"></div>
+<div class="fixed bottom-16 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[#00FF41]/20 to-transparent z-50 md:hidden"></div>
+</body></html>

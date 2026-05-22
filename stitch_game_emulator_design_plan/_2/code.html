@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "secondary-dim": "#9d9e9e",
+                        "tertiary-fixed": "#eeedf3",
+                        "on-background": "#e5e5e5",
+                        "surface-container-high": "#1f1f1f",
+                        "secondary-container": "#3a3c3c",
+                        "primary-fixed-dim": "#00f63e",
+                        "on-secondary-fixed-variant": "#5a5c5c",
+                        "on-secondary": "#1e2021",
+                        "on-error": "#450900",
+                        "surface-container-low": "#131313",
+                        "surface-variant": "#262626",
+                        "error-dim": "#ba573f",
+                        "surface-container-highest": "#262626",
+                        "on-tertiary-container": "#56565b",
+                        "on-tertiary": "#5e5f63",
+                        "surface-tint": "#00e639",
+                        "primary-fixed": "#72ff70",
+                        "inverse-primary": "#006f16",
+                        "tertiary-container": "#ebeaf0",
+                        "error": "#ed7f64",
+                        "secondary-fixed-dim": "#d4d4d4",
+                        "on-surface": "#e5e5e5",
+                        "tertiary-fixed-dim": "#e0dfe4",
+                        "on-primary-fixed": "#004b0c",
+                        "surface-container": "#191919",
+                        "on-surface-variant": "#ababab",
+                        "primary": "#00e639",
+                        "outline-variant": "#484848",
+                        "inverse-on-surface": "#555555",
+                        "on-primary": "#004c0c",
+                        "on-error-container": "#ff9b82",
+                        "background": "#0e0e0e",
+                        "on-secondary-container": "#bfbfbf",
+                        "surface-bright": "#2c2c2c",
+                        "on-tertiary-fixed-variant": "#626267",
+                        "surface": "#0e0e0e",
+                        "on-primary-container": "#00f13d",
+                        "on-secondary-fixed": "#3e4040",
+                        "surface-dim": "#0e0e0e",
+                        "tertiary": "#faf9fe",
+                        "secondary": "#9d9e9e",
+                        "on-tertiary-fixed": "#45464a",
+                        "error-container": "#7e2b17",
+                        "outline": "#757575",
+                        "secondary-fixed": "#e2e2e2",
+                        "surface-container-lowest": "#000000",
+                        "primary-dim": "#00d635",
+                        "tertiary-dim": "#e0dfe4",
+                        "primary-container": "#00530e",
+                        "on-primary-fixed-variant": "#006b15",
+                        "inverse-surface": "#f9f9f9"
+                    },
+                    fontFamily: {
+                        "headline": ["Inter"],
+                        "body": ["Inter"],
+                        "label": ["Inter"],
+                        "mono": ["JetBrains Mono"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 20px;
+        }
+        .bg-grid {
+            background-image: linear-gradient(to right, #1a1a1a 1px, transparent 1px),
+                              linear-gradient(to bottom, #1a1a1a 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container-lowest text-on-surface font-body selection:bg-primary selection:text-black">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 border-b-[0.5px] border-zinc-800 bg-black flex justify-between items-center px-6 h-14">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00FF41]">terminal</span>
+<h1 class="font-['Inter'] font-semibold tracking-tighter text-xs uppercase text-[#00FF41]">OS_EMU_v2.4.1</h1>
+</div>
+<div class="text-[#00FF41] font-mono text-sm tracking-[0.2em]">输入映射与联机中心</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-zinc-500 hover:text-[#00FF41] transition-colors cursor-pointer active:scale-95 duration-100">settings_input_component</span>
+</div>
+</header>
+<main class="pt-14 pb-20 min-h-screen bg-black overflow-x-hidden">
+<!-- Telemetry HUD -->
+<section class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+<!-- DualSense Controller -->
+<div class="bg-surface-container border-[0.5px] border-outline-variant p-4 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="font-mono text-[10px] tracking-widest text-on-surface-variant uppercase">Controller 01</span>
+</div>
+<span class="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5">CONNECTED</span>
+</div>
+<div class="flex items-end justify-between">
+<div>
+<h2 class="text-xl font-medium tracking-tight">DualSense Edge</h2>
+<p class="text-[10px] text-zinc-500 font-mono">ID: PS5_BT_4892</p>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] font-mono text-zinc-400">84%</span>
+<div class="w-16 h-1 bg-zinc-800 mt-1">
+<div class="h-full bg-primary w-[84%]"></div>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-2 mt-2">
+<div class="bg-surface-container-lowest p-2 border-[0.5px] border-outline-variant/30">
+<p class="text-[8px] text-zinc-500 uppercase tracking-tighter">Polling Rate</p>
+<p class="text-sm font-mono text-on-surface">1000Hz</p>
+</div>
+<div class="bg-surface-container-lowest p-2 border-[0.5px] border-outline-variant/30">
+<p class="text-[8px] text-zinc-500 uppercase tracking-tighter">Latency</p>
+<p class="text-sm font-mono text-primary">1.2ms</p>
+</div>
+<div class="bg-surface-container-lowest p-2 border-[0.5px] border-outline-variant/30">
+<p class="text-[8px] text-zinc-500 uppercase tracking-tighter">Protocol</p>
+<p class="text-sm font-mono text-on-surface">HID/BT</p>
+</div>
+</div>
+</div>
+<!-- Xbox Controller -->
+<div class="bg-surface-container border-[0.5px] border-outline-variant p-4 flex flex-col gap-4">
+<div class="flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="w-1.5 h-1.5 rounded-full bg-primary"></span>
+<span class="font-mono text-[10px] tracking-widest text-on-surface-variant uppercase">Controller 02</span>
+</div>
+<span class="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5">CONNECTED</span>
+</div>
+<div class="flex items-end justify-between">
+<div>
+<h2 class="text-xl font-medium tracking-tight">Xbox Elite S2</h2>
+<p class="text-[10px] text-zinc-500 font-mono">ID: XBX_RF_1120</p>
+</div>
+<div class="flex flex-col items-end">
+<span class="text-[10px] font-mono text-zinc-400">AC POWER</span>
+<span class="material-symbols-outlined text-primary text-xs" style="font-variation-settings: 'FILL' 1;">bolt</span>
+</div>
+</div>
+<div class="grid grid-cols-3 gap-2 mt-2">
+<div class="bg-surface-container-lowest p-2 border-[0.5px] border-outline-variant/30">
+<p class="text-[8px] text-zinc-500 uppercase tracking-tighter">Polling Rate</p>
+<p class="text-sm font-mono text-on-surface">250Hz</p>
+</div>
+<div class="bg-surface-container-lowest p-2 border-[0.5px] border-outline-variant/30">
+<p class="text-[8px] text-zinc-500 uppercase tracking-tighter">Latency</p>
+<p class="text-sm font-mono text-on-surface">4.8ms</p>
+</div>
+<div class="bg-surface-container-lowest p-2 border-[0.5px] border-outline-variant/30">
+<p class="text-[8px] text-zinc-500 uppercase tracking-tighter">Protocol</p>
+<p class="text-sm font-mono text-on-surface">XInput</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Netplay Lobby Section -->
+<section class="px-6 mb-6">
+<div class="flex items-center justify-between mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-zinc-500">public</span>
+<h3 class="text-xs font-medium tracking-[0.2em] text-on-surface uppercase">Netplay Lobby</h3>
+</div>
+<div class="flex items-center gap-4">
+<span class="text-[10px] font-mono text-zinc-500">Servers: 12 Online</span>
+<button class="border border-outline px-3 py-1 text-[10px] uppercase tracking-widest hover:bg-surface-container-highest transition-colors active:scale-95">Create Room</button>
+</div>
+</div>
+<div class="space-y-[0.5px] bg-zinc-800 border-[0.5px] border-zinc-800">
+<!-- Room 1 -->
+<div class="bg-black p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center gap-6">
+<div class="relative w-12 h-12 bg-surface-container overflow-hidden">
+<img alt="Room Thumbnail" class="w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all" data-alt="Abstract vibrant digital art with synthwave color palette purple and blue geometric patterns" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzGyNPb38x_iE6ClikB2pmVMLEiHdKmkd3Fyda9zMZNK7eakbKFllaTQ1-qAc-m5nDPxElI44R6eohXQZiB124b8DkUyeg_Up0S9LFYKyWlSRdNoR8LYA6_MkYs58rqSW3ee-4HKrusbqzqviyQnVn0EsPCpX4rVQJUMJQ5DiLiC5wW5iK295LU1JAzxmc71Uj_BIMaVetItpNdnakX6qPEdyb8DOqvBpN1Ie_5STeqJHWCXDalP8YqBY9hYZr541JCpk4Jvav2A"/>
+<div class="absolute inset-0 border border-primary/20"></div>
+</div>
+<div>
+<h4 class="text-sm font-medium">Chrono Room</h4>
+<p class="text-[10px] text-zinc-500 font-mono">Game: Chrono Trigger (SNES)</p>
+</div>
+</div>
+<div class="flex items-center gap-12">
+<div class="text-right">
+<p class="text-[10px] text-zinc-500 uppercase tracking-tighter">Latency</p>
+<p class="text-xs font-mono text-primary">24ms</p>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-zinc-500 uppercase tracking-tighter">Players</p>
+<p class="text-xs font-mono">2 / 4</p>
+</div>
+<span class="material-symbols-outlined text-zinc-700 group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+</div>
+<!-- Room 2 -->
+<div class="bg-black p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center gap-6">
+<div class="relative w-12 h-12 bg-surface-container overflow-hidden">
+<img alt="Room Thumbnail" class="w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all" data-alt="Retro game console close up with wires and high tech metallic details overhead lighting dark mood" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCf0gkf-hmWkWItK41_v3HN2BtM2BxzCYFElkx6hF7Wab1ZuQaXFLk1oe4BbwStvoSCAwVp_p3J_9eEJ-4SfahZJ5YdfwF5MfQ5jR_ja2cocamZyje64LJ8dpJS3N6OMAe2kEDBsQqr7RrF9G2yvbj8103ygPSSm42OO1VMyPcNOBjsgL8IJyR9EHds2hElEqa7c5xy1bG2L6dt_oOCU92L3ZbEOtKSV2oM1_3-OH_MivHuln7woZ4pnS4KyFjsIodoXssg_9bPxw"/>
+<div class="absolute inset-0 border border-primary/20"></div>
+</div>
+<div>
+<h4 class="text-sm font-medium">Speedrun Central</h4>
+<p class="text-[10px] text-zinc-500 font-mono">Game: Super Metroid (SNES)</p>
+</div>
+</div>
+<div class="flex items-center gap-12">
+<div class="text-right">
+<p class="text-[10px] text-zinc-500 uppercase tracking-tighter">Latency</p>
+<p class="text-xs font-mono text-on-surface">56ms</p>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-zinc-500 uppercase tracking-tighter">Players</p>
+<p class="text-xs font-mono">1 / 2</p>
+</div>
+<span class="material-symbols-outlined text-zinc-700 group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+</div>
+<!-- Room 3 -->
+<div class="bg-black p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors group cursor-pointer">
+<div class="flex items-center gap-6">
+<div class="relative w-12 h-12 bg-surface-container overflow-hidden">
+<img alt="Room Thumbnail" class="w-full h-full object-cover opacity-60 grayscale hover:grayscale-0 transition-all" data-alt="Modern high performance gaming motherboard with green glowing leds and copper heat pipes" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA9cdlZxt9ebUyeqD3Nb5SoGNhiFeisTwVaw-jJ8pGZE_nq7s8UdRlSolzXjj9sIE2Wfr-cn0ZfVusCx3cKlZiBy5XjGM6gKFYidPLGAJbFYzrU8aBSDaziI0UKq6UqiDXzfVpr1vQx9QFXh5GlaTIMYkq2X8A2lOrq6hAfsS4oaDG8HVJZo-ykNnwSRKLRoxqsEe5JGK-tHm1VK3IjTg0QZW9f_zRbIQDEZ1Q_Ohdp--8a7Xrh-B-kc-iTelUIpw6Hf9_c8DBhqw"/>
+<div class="absolute inset-0 border border-primary/20"></div>
+</div>
+<div>
+<h4 class="text-sm font-medium">Fighting Hub EU</h4>
+<p class="text-[10px] text-zinc-500 font-mono">Game: Street Fighter II (ARCADE)</p>
+</div>
+</div>
+<div class="flex items-center gap-12">
+<div class="text-right">
+<p class="text-[10px] text-zinc-500 uppercase tracking-tighter">Latency</p>
+<p class="text-xs font-mono text-error">128ms</p>
+</div>
+<div class="text-right">
+<p class="text-[10px] text-zinc-500 uppercase tracking-tighter">Players</p>
+<p class="text-xs font-mono">8 / 16</p>
+</div>
+<span class="material-symbols-outlined text-zinc-700 group-hover:text-primary transition-colors">chevron_right</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Input Telemetry & Buffer Jitter -->
+<section class="px-6 pb-6">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+<!-- Buffer Jitter Graph -->
+<div class="lg:col-span-2 bg-surface-container border-[0.5px] border-outline-variant p-4">
+<div class="flex justify-between items-center mb-4">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-sm">analytics</span>
+<h4 class="text-[10px] font-mono uppercase tracking-widest">Buffer Jitter Telemetry</h4>
+</div>
+<div class="flex gap-2">
+<span class="text-[8px] bg-primary/10 text-primary px-1.5 py-0.5 border border-primary/20">REAL-TIME</span>
+<span class="text-[8px] text-zinc-500 font-mono">INTERVAL: 16.6ms</span>
+</div>
+</div>
+<div class="h-32 bg-surface-container-lowest relative border-[0.5px] border-outline-variant/30 flex items-end px-2 overflow-hidden bg-grid">
+<!-- Simulated Waveform -->
+<div class="flex-1 flex items-end gap-[1px] h-full">
+<div class="w-2 bg-zinc-800 h-[20%]"></div>
+<div class="w-2 bg-zinc-800 h-[25%]"></div>
+<div class="w-2 bg-primary/40 h-[15%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[18%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[22%] border-t border-primary"></div>
+<div class="w-2 bg-zinc-800 h-[40%]"></div>
+<div class="w-2 bg-primary/40 h-[12%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[15%] border-t border-primary"></div>
+<div class="w-2 bg-zinc-800 h-[30%]"></div>
+<div class="w-2 bg-primary/40 h-[10%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[14%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[16%] border-t border-primary"></div>
+<div class="w-2 bg-zinc-800 h-[22%]"></div>
+<div class="w-2 bg-primary/40 h-[19%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[13%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[15%] border-t border-primary"></div>
+<div class="w-2 bg-zinc-800 h-[20%]"></div>
+<div class="w-2 bg-primary/40 h-[18%] border-t border-primary"></div>
+<div class="w-2 bg-zinc-800 h-[25%]"></div>
+<div class="w-2 bg-primary/40 h-[12%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[10%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[16%] border-t border-primary"></div>
+<div class="w-2 bg-zinc-800 h-[35%]"></div>
+<div class="w-2 bg-primary/40 h-[14%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[19%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[15%] border-t border-primary"></div>
+<div class="w-2 bg-zinc-800 h-[22%]"></div>
+<div class="w-2 bg-primary/40 h-[11%] border-t border-primary"></div>
+<div class="w-2 bg-primary/40 h-[13%] border-t border-primary"></div>
+<div class="w-2 bg-zinc-800 h-[20%]"></div>
+</div>
+<div class="absolute left-0 top-1/2 w-full h-[0.5px] bg-primary/20"></div>
+<div class="absolute left-2 top-2">
+<span class="text-[8px] font-mono text-zinc-600 uppercase">Jitter Variance: 0.04ms</span>
+</div>
+</div>
+</div>
+<!-- Input Logging -->
+<div class="bg-surface-container border-[0.5px] border-outline-variant p-4">
+<h4 class="text-[10px] font-mono uppercase tracking-widest mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-zinc-500 text-sm">history</span>
+                        Input Log
+                    </h4>
+<div class="space-y-1 h-32 overflow-y-auto no-scrollbar font-mono text-[10px]">
+<div class="flex justify-between text-zinc-500">
+<span>[00:48:12] P1_BTN_A</span>
+<span class="text-primary">PRESS</span>
+</div>
+<div class="flex justify-between text-zinc-500">
+<span>[00:48:12] P1_DIR_RT</span>
+<span>HOLD</span>
+</div>
+<div class="flex justify-between text-zinc-500">
+<span>[00:48:13] P1_BTN_A</span>
+<span class="text-zinc-600">RELEASE</span>
+</div>
+<div class="flex justify-between text-zinc-500">
+<span>[00:48:14] P2_BTN_ST</span>
+<span class="text-primary">PRESS</span>
+</div>
+<div class="flex justify-between text-zinc-500">
+<span>[00:48:14] P1_DIR_UP</span>
+<span class="text-primary">PRESS</span>
+</div>
+<div class="flex justify-between text-zinc-500">
+<span>[00:48:15] P1_BTN_B</span>
+<span class="text-primary">PRESS</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 h-20 border-t-[0.5px] border-zinc-800 bg-black flex justify-around items-center px-4 pb-safe">
+<div class="flex flex-col items-center justify-center gap-1 text-zinc-600 hover:bg-zinc-900/50 transition-all duration-200 cursor-pointer w-full h-full">
+<span class="material-symbols-outlined">grid_view</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-widest uppercase">LIBRARY</span>
+</div>
+<div class="flex flex-col items-center justify-center gap-1 text-zinc-600 hover:bg-zinc-900/50 transition-all duration-200 cursor-pointer w-full h-full">
+<span class="material-symbols-outlined">memory</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-widest uppercase">ENGINE</span>
+</div>
+<div class="flex flex-col items-center justify-center gap-1 text-[#00FF41] relative after:content-[''] after:absolute after:top-0 after:w-8 after:h-[2px] after:bg-[#00FF41] w-full h-full">
+<span class="material-symbols-outlined">videogame_asset</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-widest uppercase">INPUT</span>
+</div>
+<div class="flex flex-col items-center justify-center gap-1 text-zinc-600 hover:bg-zinc-900/50 transition-all duration-200 cursor-pointer w-full h-full">
+<span class="material-symbols-outlined">tune</span>
+<span class="font-['Inter'] font-medium text-[10px] tracking-widest uppercase">SYSTEM</span>
+</div>
+</nav>
+</body></html>

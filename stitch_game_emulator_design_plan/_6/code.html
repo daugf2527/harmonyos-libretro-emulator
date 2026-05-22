@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="zh-CN"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "surface-container": "#191919",
+              "surface-container-high": "#1f1f1f",
+              "surface-dim": "#0e0e0e",
+              "error-dim": "#ba573f",
+              "on-secondary-fixed": "#3e4040",
+              "secondary": "#9d9e9e",
+              "error": "#ed7f64",
+              "outline-variant": "#484848",
+              "primary-dim": "#00d635",
+              "on-secondary-fixed-variant": "#5a5c5c",
+              "error-container": "#7e2b17",
+              "on-tertiary-fixed-variant": "#626267",
+              "on-surface": "#e5e5e5",
+              "secondary-container": "#3a3c3c",
+              "on-tertiary-fixed": "#45464a",
+              "inverse-surface": "#f9f9f9",
+              "on-secondary-container": "#bfbfbf",
+              "tertiary": "#faf9fe",
+              "on-error-container": "#ff9b82",
+              "on-background": "#e5e5e5",
+              "surface-bright": "#2c2c2c",
+              "background": "#0e0e0e",
+              "on-primary-fixed-variant": "#006b15",
+              "on-primary-container": "#00f13d",
+              "tertiary-fixed": "#eeedf3",
+              "surface-variant": "#262626",
+              "surface-tint": "#00e639",
+              "on-secondary": "#1e2021",
+              "surface-container-lowest": "#000000",
+              "on-error": "#450900",
+              "secondary-fixed-dim": "#d4d4d4",
+              "tertiary-dim": "#e0dfe4",
+              "primary": "#00e639",
+              "tertiary-fixed-dim": "#e0dfe4",
+              "primary-fixed-dim": "#00f63e",
+              "secondary-fixed": "#e2e2e2",
+              "on-surface-variant": "#ababab",
+              "surface-container-low": "#131313",
+              "on-primary-fixed": "#004b0c",
+              "tertiary-container": "#ebeaf0",
+              "outline": "#757575",
+              "inverse-primary": "#006f16",
+              "surface-container-highest": "#262626",
+              "surface": "#0e0e0e",
+              "on-primary": "#004c0c",
+              "on-tertiary-container": "#56565b",
+              "on-tertiary": "#5e5f63",
+              "primary-container": "#00530e",
+              "primary-fixed": "#72ff70",
+              "secondary-dim": "#9d9e9e",
+              "inverse-on-surface": "#555555"
+            },
+            fontFamily: {
+              "headline": ["Inter"],
+              "body": ["Inter"],
+              "label": ["Inter"]
+            },
+            borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .dpad-grid {
+            display: grid;
+            grid-template-areas: 
+                ". up ."
+                "left center right"
+                ". down .";
+        }
+        .bg-game-blur {
+            filter: blur(12px) brightness(0.4);
+            transform: scale(1.1);
+        }
+        .edit-border {
+            outline: 1px dashed #00FF41;
+            outline-offset: 4px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-surface-container-lowest font-body text-on-surface overflow-hidden h-screen w-screen flex flex-col">
+<!-- Top Navigation Bar (Shared Component Style) -->
+<header class="bg-black/85 backdrop-blur-xl border-b border-zinc-800/40 fixed top-0 w-full z-50 flex justify-between items-center px-6 h-14">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-[#00FF41]" data-icon="memory">memory</span>
+<span class="text-[#00FF41] font-mono text-sm tracking-[0.2em]">EMU_CORE_v1.0</span>
+</div>
+<div class="flex flex-col items-center">
+<span class="text-white font-['Inter'] tracking-tighter uppercase text-xs font-semibold">正在编辑布局...</span>
+<span class="text-[8px] text-[#00FF41] font-mono tracking-widest">CALIBRATION MODE</span>
+</div>
+<button class="text-zinc-500 hover:text-[#00FF41] transition-colors duration-150 active:scale-95">
+<span class="material-symbols-outlined" data-icon="settings_input_component">settings_input_component</span>
+</button>
+</header>
+<!-- Main Canvas Area -->
+<main class="relative flex-1 w-full overflow-hidden bg-black">
+<!-- Blurred Background Game Image -->
+<div class="absolute inset-0 z-0 bg-game-blur">
+<img alt="Retro gaming console and screen" class="w-full h-full object-cover" data-alt="Blurred nostalgic background of a classic 8-bit platformer game with pixelated platforms and blue sky" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBRlLxxY9bcXnh2Mh6fp4ecevQ92oZYMNfpo6eX8P8t_mhp1XjFM3HoA7kf8B3Gn2GILTkTyZxQtHpSWjodMmI8xFZUTqm9wbJMwoCq5uK5a391KdUJC49x8_igkswN5BNPEzM939hok4XFISkRSl-k2WvflipEtbTHVgry_XFWm7nQKGQssmA6XJzZfnw0rN_u7NEaF9RMDYtMBrs9xwYVcMP4LtHBB8BEx4_rBp9cWeMcvzoHZuxFzWMR3Si8b0bfiGOq1xYdLQ"/>
+</div>
+<!-- Telemetry Data Overlay (Instrumental Feel) -->
+<div class="absolute top-20 left-6 z-10 pointer-events-none">
+<div class="bg-black/40 backdrop-blur-md p-3 border-l-2 border-[#00FF41] space-y-2">
+<div class="flex items-center justify-between gap-8">
+<span class="text-[10px] text-on-surface-variant font-mono uppercase">Resolution</span>
+<span class="text-[10px] text-white font-mono">1920 X 1080</span>
+</div>
+<div class="flex items-center justify-between gap-8">
+<span class="text-[10px] text-on-surface-variant font-mono uppercase">Latency</span>
+<span class="text-[10px] text-primary font-mono">1.2ms</span>
+</div>
+<div class="flex items-center justify-between gap-8">
+<span class="text-[10px] text-on-surface-variant font-mono uppercase">Input Poll</span>
+<span class="text-[10px] text-white font-mono">1000Hz</span>
+</div>
+</div>
+</div>
+<!-- Virtual Controls Layer -->
+<div class="absolute inset-0 z-20 p-8 flex items-end justify-between pointer-events-none">
+<!-- Left Controls: D-Pad -->
+<div class="relative pointer-events-auto cursor-move">
+<div class="edit-border p-2">
+<div class="dpad-grid gap-1">
+<div class="w-12 h-12 bg-white/10 backdrop-blur-md flex items-center justify-center rounded-sm" style="grid-area: center;"></div>
+<div class="w-12 h-12 bg-white/20 backdrop-blur-md flex items-center justify-center rounded-sm hover:bg-white/30 transition-colors" style="grid-area: up;">
+<span class="material-symbols-outlined text-white" data-icon="keyboard_arrow_up">keyboard_arrow_up</span>
+</div>
+<div class="w-12 h-12 bg-white/20 backdrop-blur-md flex items-center justify-center rounded-sm hover:bg-white/30 transition-colors" style="grid-area: down;">
+<span class="material-symbols-outlined text-white" data-icon="keyboard_arrow_down">keyboard_arrow_down</span>
+</div>
+<div class="w-12 h-12 bg-white/20 backdrop-blur-md flex items-center justify-center rounded-sm hover:bg-white/30 transition-colors" style="grid-area: left;">
+<span class="material-symbols-outlined text-white" data-icon="keyboard_arrow_left">keyboard_arrow_left</span>
+</div>
+<div class="w-12 h-12 bg-white/20 backdrop-blur-md flex items-center justify-center rounded-sm hover:bg-white/30 transition-colors" style="grid-area: right;">
+<span class="material-symbols-outlined text-white" data-icon="keyboard_arrow_right">keyboard_arrow_right</span>
+</div>
+</div>
+<div class="absolute -top-6 left-0 text-[10px] font-mono text-[#00FF41] bg-black px-1 uppercase tracking-tighter">Directional_Input</div>
+</div>
+</div>
+<!-- Top Shoulder Buttons -->
+<div class="absolute top-24 left-1/2 -translate-x-1/2 flex gap-32 pointer-events-none">
+<div class="edit-border p-1 pointer-events-auto cursor-move relative">
+<div class="w-24 h-8 bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 rounded-sm">
+<span class="text-xs font-bold text-white tracking-widest">L</span>
+</div>
+</div>
+<div class="edit-border p-1 pointer-events-auto cursor-move relative">
+<div class="w-24 h-8 bg-white/10 backdrop-blur-md flex items-center justify-center border border-white/20 rounded-sm">
+<span class="text-xs font-bold text-white tracking-widest">R</span>
+</div>
+</div>
+</div>
+<!-- Right Controls: Action Buttons -->
+<div class="relative pointer-events-auto cursor-move flex gap-8 mb-12 mr-12">
+<div class="edit-border p-2 relative">
+<div class="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-white/30 transition-colors">
+<span class="text-lg font-bold text-white">B</span>
+</div>
+<div class="absolute -top-6 left-0 text-[10px] font-mono text-[#00FF41] bg-black px-1 uppercase tracking-tighter">Secondary</div>
+</div>
+<div class="edit-border p-2 relative mt-[-24px]">
+<div class="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 hover:bg-white/30 transition-colors">
+<span class="text-lg font-bold text-white">A</span>
+</div>
+<div class="absolute -top-6 left-0 text-[10px] font-mono text-[#00FF41] bg-black px-1 uppercase tracking-tighter">Primary</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Floating Bottom Control Bar -->
+<footer class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50">
+<div class="bg-surface-container/90 backdrop-blur-2xl px-6 py-4 flex items-center gap-6 rounded-lg shadow-2xl ring-1 ring-outline-variant/30 min-w-[400px]">
+<div class="flex items-center gap-2 pr-6 border-r border-outline-variant/40">
+<div class="w-2 h-2 rounded-full bg-[#00FF41] animate-pulse"></div>
+<span class="text-[10px] font-mono text-on-surface-variant uppercase tracking-widest">Editor Active</span>
+</div>
+<div class="flex flex-1 items-center justify-center gap-4">
+<button class="px-5 py-2 text-xs font-semibold tracking-widest uppercase text-on-surface-variant hover:text-white hover:bg-surface-container-highest transition-all duration-200 border border-transparent active:scale-95">
+                    重置
+                </button>
+<button class="px-8 py-2 text-xs font-semibold tracking-widest uppercase text-black bg-[#00FF41] hover:bg-primary-dim transition-all duration-200 active:scale-95 shadow-[0_0_15px_rgba(0,255,65,0.2)]">
+                    保存
+                </button>
+</div>
+<div class="flex items-center gap-4 pl-6 border-l border-outline-variant/40">
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="grid_view">grid_view</span>
+</button>
+<button class="text-on-surface-variant hover:text-white transition-colors">
+<span class="material-symbols-outlined text-lg" data-icon="tune">tune</span>
+</button>
+</div>
+</div>
+</footer>
+<!-- Side Calibration Markers (Purely Aesthetic) -->
+<div class="fixed right-0 top-1/2 -translate-y-1/2 flex flex-col gap-1 pr-2 opacity-50">
+<div class="w-1 h-8 bg-zinc-800"></div>
+<div class="w-3 h-[1px] bg-[#00FF41]"></div>
+<div class="w-1 h-4 bg-zinc-800"></div>
+<div class="w-1 h-4 bg-zinc-800"></div>
+<div class="w-3 h-[1px] bg-[#00FF41]"></div>
+<div class="w-1 h-8 bg-zinc-800"></div>
+</div>
+</body></html>
