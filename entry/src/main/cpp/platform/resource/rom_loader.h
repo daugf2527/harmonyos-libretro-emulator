@@ -52,10 +52,21 @@ public:
                                        NativeResourceManager *resource_manager);
 
   /**
-   * 创建 retro_game_info 结构体
-   * @param result ROM 加载结果
+   * 创建 retro_game_info 结构体。
+   *
+   * **重要 - 生命周期契约**:
+   * 返回的 retro_game_info 内 `.path` / `.data` 是指向 `result` 内部缓冲区的
+   * **裸指针**,本函数不持有所有权。调用方 **必须保证 `result` 在 retro_load_game
+   * 返回前持续存活**,否则核心将访问悬空内存。
+   *
+   * 典型正确用法:
+   *   ROMLoadResult result = ... ;        // 调用方栈/堆变量
+   *   auto info = ROMLoader::CreateGameInfo(result, need_fullpath);
+   *   bool ok = core.retro_load_game(&info);   // result 仍在作用域内
+   *
+   * @param result ROM 加载结果(必须比返回值存活更久)
    * @param need_fullpath 核心是否需要完整路径
-   * @return retro_game_info 结构体
+   * @return retro_game_info 结构体(含指向 result 内部数据的裸指针)
    */
   static retro_game_info CreateGameInfo(const ROMLoadResult &result,
                                         bool need_fullpath);
