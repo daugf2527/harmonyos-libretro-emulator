@@ -1,5 +1,6 @@
 .worktrees/
 .DS_Store
+.codex
 .codex/
 .codex_tmp/
 .sanshu-memory/
@@ -11,6 +12,17 @@ entry/.cxx/
 entry/build/
 *.hap
 oh_modules/
+
+# Personal AI tooling caches and helper scripts
+.appanalyzer/
+.claude/
+.firecrawl/
+codex
+codex-full-auto.cmd
+codex-full-auto.ps1
+codex-yolo.cmd
+codex-yolo.ps1
+nul
 
 # Certificate / key materials
 *.csr
