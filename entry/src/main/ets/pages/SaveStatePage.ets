@@ -12,6 +12,7 @@ import {
 } from '../common/SaveStateRepository'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
+import { runtimeSessionController } from '../common/RuntimeSessionController'
 
 interface SaveStateNapi {
   refactoredSaveState(): ArrayBuffer | null
@@ -246,7 +247,7 @@ struct SaveStatePage {
       return
     }
     try {
-      const stateData = nativeApi.refactoredSaveState()
+      const stateData = await runtimeSessionController.saveStateAsync()
       if (!stateData || stateData.byteLength <= 0) {
         this.showToastMessage('SAVE_STATE_UNAVAILABLE')
         return

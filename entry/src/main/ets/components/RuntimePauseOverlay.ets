@@ -1,4 +1,5 @@
 import { EmuColors } from '../common/EmuUiTokens'
+import { GridBackground } from './EmuAppShell'
 
 interface RuntimePauseAction {
   title: string
@@ -301,27 +302,11 @@ export struct RuntimePauseOverlay {
   @Builder
   private WaveformGrid() {
     Stack() {
-      Row({ space: 19 }) {
-        ForEach(this.waveformVerticalIndexes, (item: number) => {
-          Column()
-            .width(1)
-            .height('100%')
-            .backgroundColor('#1600FF41')
-        }, (item: number) => `v-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-
-      Column({ space: 19 }) {
-        ForEach(this.waveformHorizontalIndexes, (item: number) => {
-          Row()
-            .width('100%')
-            .height(1)
-            .backgroundColor('#1600FF41')
-        }, (item: number) => `h-${item}`)
-      }
-      .width('100%')
-      .height('100%')
+      GridBackground({
+        gridSize: 40,
+        lineColor: '#1600FF41',
+        lineWidth: 1
+      })
     }
     .width('100%')
     .height('100%')

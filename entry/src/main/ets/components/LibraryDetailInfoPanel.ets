@@ -1,4 +1,5 @@
 import { createIndexRange, EmuColors } from '../common/EmuUiTokens'
+import { GridBackground } from './EmuAppShell'
 
 interface TelemetryPoint {
   x: number
@@ -166,29 +167,11 @@ export struct LibraryDetailInfoPanel {
       .justifyContent(FlexAlign.SpaceBetween)
 
       Stack() {
-        Row({ space: 23 }) {
-          ForEach(this.telemetryVerticalLines, (_: number) => {
-            Column()
-              .width(1)
-              .height('100%')
-              .backgroundColor('#112C2C2C')
-          }, (index: number) => `v-${index}`)
-        }
-        .width('100%')
-        .height('100%')
-
-        Column({ space: 16 }) {
-          ForEach(this.telemetryHorizontalLines, (_: number) => {
-            Row()
-              .width('100%')
-              .height(1)
-              .backgroundColor('#142C2C2C')
-          }, (index: number) => index.toString())
-        }
-        .width('100%')
-        .height('100%')
-        .padding({ top: 16, bottom: 16 })
-        .justifyContent(FlexAlign.SpaceBetween)
+        GridBackground({
+          gridSize: 40,
+          lineColor: '#142C2C2C',
+          lineWidth: 1
+        })
 
         Path({
           width: 440,
