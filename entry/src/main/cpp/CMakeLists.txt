@@ -1,5 +1,6 @@
 # the minimum version of CMake.
 cmake_minimum_required(VERSION 3.5.0)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 project(zmw)
 
 set(CMAKE_CXX_STANDARD 14)
