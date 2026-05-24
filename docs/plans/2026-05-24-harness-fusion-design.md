@@ -184,9 +184,9 @@ harmony skills 远远落后 carbon（1 vs 6），但**不该盲目补齐到 6**�
 | 阶段 | cwd | 预算 | 范围 | 验收 |
 |---|---|---|---|---|
 | **S1（本会话）** | harmony | ≈3 h | 产出本设计文档 + 写入 `feedback_setup_harness_first_before_coding` memory | 设计文档 commit + MEMORY.md 多一行 |
-| **S2** | harmony | 1.5 h | **P0 harmony 侧**：H1 + H2 + B1.harmony | 各按 P0 验收口径手动跑一遍 → 提 PR 到 harmony |
-| **S3** | carbon | 1.5 h | **P0 carbon 侧**：C1 + C2 + B1.carbon **+ CT1 + CT2**（拆分 CLAUDE.md / .claudeignore；详见附录 A） | settings.json 改完 + CLAUDE.md 拆分完成 + 提 PR |
-| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 / CT3 / CT5 / FB1 **+ AG1**（详见附录 A、B、C），每会话挑 1-2 项 | - |
+| **S2** | harmony | 2 h | **P0 harmony 侧**：H1 + H2 + B1.harmony **+ WIN1.harmony**（CLAUDE.md 加 Windows 注意事项一节，详见附录 L） | 各按 P0 验收口径手动跑一遍 → 提 PR 到 harmony |
+| **S3** | carbon | 2 h | **P0 carbon 侧**：C1 + C2 + B1.carbon + CT1 + CT2 **+ WIN1.carbon**（详见附录 A、L） | settings.json 改完 + CLAUDE.md 拆分完成 + Windows 段添加 + 提 PR |
+| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 / CT3 / CT5 / FB1 / AG1 **+ SE1 / SE3 / PM1 / PM2 / SA1 / SC1 / SC2 / WT1 / NT1 / PG1 / OS1**（详见附录 A-L），每会话挑 1-2 项 | - |
 | **S7+** | 视情况 | - | **P2 探索**：观察 P0/P1 跑 2-4 周效果后决策 | - |
 
 ---
@@ -341,10 +341,284 @@ harmony skills 远远落后 carbon（1 vs 6），但**不该盲目补齐到 6**�
 
 ---
 
-## 附录 E — 相关 memory（背景上下文）
+## 附录 E — 维度 7：Settings 深度配置（深度版）
+
+业界字段（[Claude Code Docs settings](https://code.claude.com/docs/en/settings) / [llmx.tech setup](https://llmx.tech/blog/definitive-guide-to-claude-code-setup-claude-md-mcps-skills/)）：除 `permissions` + `defaultMode` 外，还有 `env` / `model` / `outputStyle` / `additionalDirectories` / `apiKeyHelper` / `statusLine` / `cleanupPeriodDays` / `disableNonEssentialModelCalls`。
+
+### Gap 矩阵
+
+| 字段 | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| `permissions.deny` / `defaultMode` | ❌/❌ | ✅/✅ | 已纳入 C1+C2 |
+| `env` 项目级注入 | ❌ | ❌ | **两边都不补** —— memory `feedback_dont_inject_path_to_claude_settings` 警告 PATH 注入有副作用 |
+| `model` 项目级默认 | ❌ | ❌ | **两边都补**（P1 / SE1，验证当前版本字段支持后实施） |
+| `outputStyle` | ❌ | ❌ | 个人偏好，**两边都不补** |
+| `additionalDirectories` | ❌ | ❌ | **harmony 探索**（P2 / SE2，如要让 Claude 读 `D:/hongmeng/sdks/` NDK 头文件） |
+| `apiKeyHelper` | ❌ | ❌ | OAuth 自动管理，**不需要** |
+| `statusLine` 项目级 | ❌（用全局） | ❌（用全局） | **两边都补**（P1 / SE3，详见附录 K） |
+| `cleanupPeriodDays` | ❌ | ❌ | 默认 30 天 OK |
+| `disableNonEssentialModelCalls` | ❌ | ❌ | 个人项目少调用，不需要 |
+
+### P0 / P1 / P2
+
+**P0**：无（C1+C2 已纳入）
+
+**P1**：
+- **SE1**（两边）：settings.json 加 `"model": "sonnet"` 项目级默认。理由：sonnet 在结构化监督任务足够，opus 浪费 token。**实施前先验证当前 Claude Code 版本是否支持该字段**（如不支持降级为各 SKILL/agent frontmatter 显式声明）。注意 memory `feedback_subagent_model`：Agent 工具仍要显式传 model。
+- **SE3**（两边）：补 `statusLine` 项目级配置（详见附录 K）。
+
+**P2 / 探索**：
+- **SE2**（harmony）：`additionalDirectories` 加 HarmonyOS NDK 头文件目录，让 Claude 能读 vendored header。验证后再决定。
+
+**P2 / 不做**：`env` / `outputStyle` / `apiKeyHelper` / `cleanupPeriodDays` / `disableNonEssentialModelCalls`。
+
+---
+
+## 附录 F — 维度 8：Plan mode（深度版）
+
+业界共识（[code.claude.com permission-modes](https://code.claude.com/docs/en/permission-modes) / [codewithmukesh plan-mode](https://codewithmukesh.com/blog/plan-mode-claude-code/) / [blink plan-mode](https://blink.new/blog/claude-code-plan-mode-guide) / [vibecodingacademy plan-mode](https://www.vibecodingacademy.ai/blog/claude-code-plan-mode-complete-guide)）：进入方式 ① **Shift+Tab × 2 cycle**（default → acceptEdits → plan）② `/plan` 命令（2026-01）③ CLI `--permission-mode plan`；plan 保存到 `~/.claude/plans/<random-name>.md`（跨 session 持久 + 抗 /clear）；`Ctrl+G` 编辑器改 plan；`/ultraplan`（2026-04）深度规划；Boris Cherny 推 **Explore → Plan → Implement → Commit** 工作流；适用：跨 ≥3 文件 / schema 改动 / security-sensitive；不适：单文件 / trivial fix。
+
+⚠️ **Windows 特定坑**：Shift+Tab 在部分 Windows 终端 skip plan mode；用 **Alt+M** 替代。详见附录 L / W6。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **plan mode 主动使用习惯** | ⚠️ closed-loop 4 mandatory checkpoint 替代 plan 的"批准后执行"语义 | ❌ | 个人项目让用户主动 /plan（P2） |
+| **CLAUDE.md 提到 plan mode 时机** | ❌ | ❌ | **两边都补**（P1 / PM1） |
+| **destructive ops 拒绝** | ❌ | ✅ permissions.deny | 已纳入 C1 |
+| **commit 前强制 checkpoint** | ✅ closed-loop CHECKPOINT D | ❌ auto-commit-cicd 全自动 | **harmony 补**（P1 / SA1） |
+| **Windows Shift+Tab → Alt+M 注记** | N/A | ❌ | **harmony 补**（P1 / PM2） |
+| `/ultraplan` 适用场景 | ❌ | ❌ | 业界新（2026-04），观察后再决策（P2） |
+
+### P0 / P1 / P2
+
+**P0**：无（destructive ops 已被 C1 + Stop hook 覆盖）
+
+**P1**：
+- **PM1**（两边）：CLAUDE.md 加"复杂任务先 /plan"指引（≤3 文件 / schema / security 触发）。验收：root CLAUDE.md 第二阶段后多 3-5 行注释。
+- **PM2**（两边）：CLAUDE.md "环境"段注明 Windows 用户 `Alt+M` 替代 `Shift+Tab` 进入 plan mode（与 WIN1 合并交付）。
+- **SA1**（harmony）：`auto-commit-cicd.md` 在 Step 3 → 4 之间插入"显示 commit message 草稿 + 等用户 go/edit/abort" checkpoint（参考 carbon `closed-loop` CHECKPOINT D）。验收：手动 `/auto-commit-cicd`，commit 前必须看到草稿和提示符。
+
+**P2 / 探索**：`/ultraplan` 用法 / plan mode 自动触发条件。
+
+---
+
+## 附录 G — 维度 9：Slash commands（深度版）
+
+业界共识（[code.claude.com slash-commands](https://code.claude.com/docs/en/slash-commands) / [stevekinney commands](https://stevekinney.com/courses/ai-development/claude-code-commands) / [claudedirectory slash-commands](https://www.claudedirectory.org/blog/claude-code-slash-commands-guide)）：**v2.1.101（2026-04-11）slash commands 合并入 skills** —— `.claude/commands/deploy.md` 和 `.claude/skills/deploy/SKILL.md` 都创建 `/deploy`，同名时 **skill 优先**。frontmatter 字段：`allowed-tools` / `argument-hint` / `description` / `model`。`$ARGUMENTS` 全字符串占位；`$0` `$1` 索引参数；`!cmd`（需 `allowed-tools`）内嵌 Bash 输出；`@<path>` 内嵌文件内容；命名空间 `.claude/commands/release/notes.md` → `/release:notes`。
+
+**重大修正**：前面把 slash commands 列为 "non-gap (与 skill 重叠 90%)" 是**部分错误**——v2.1.101 后 slash command 就是 skill，但 **frontmatter 的 `allowed-tools` / `model` / `argument-hint` 字段两边的 skill 都没用**，是真实 gap。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **独立 `.claude/commands/`** | ❌ | ❌ | **两边都不补**（v2.1.101 后与 skill 等价） |
+| **skill frontmatter `allowed-tools` 限定** | ❌ | ❌ | **两边都补**（P1 / SC1） |
+| **skill frontmatter `model` pin** | ❌ | ❌ | **两边都补**（P1 / SC2，副作用 skill pin sonnet） |
+| **skill frontmatter `argument-hint`** | ❌ | ❌ | **harmony 补**（P2 / SC3） |
+| **Bash 内嵌 `!cmd`** | ❌（skill 体描述"运行 X"） | ❌（同） | **两边都改进**（P2 / SC4） |
+| **`@file` 文件内嵌** | ❌ | ❌ | **两边都改进**（P2 / SC5） |
+| **命名空间 `topic:sub`** | ❌ | ❌ | skill 太少，**不补**（P2） |
+
+### 糟粕识别（明确不抄）
+
+- 长 `/review then /compact then /continue` 链式 —— 业界明确反模式
+- `/model` mid-session 切换 —— 造成 context inconsistency
+
+### P0 / P1 / P2
+
+**P0**：无
+
+**P1**：
+- **SC1**（两边）：副作用类 skill 加 `allowed-tools` 限定。例：`auto-commit-cicd.md` frontmatter 加 `allowed-tools: Bash(git*), Bash(gh*), Bash(bash scripts/ci/*)`。验收：跑 skill 时即使 Claude 想 `rm -rf` 也被拒。
+- **SC2**（两边）：副作用 skill frontmatter 加 `model: sonnet`（与 SE1 协同；实施时验证字段名）。
+
+**P2 / 探索**：SC3 / SC4 / SC5（把 skill 体的 inline 调用现代化）。
+
+---
+
+## 附录 H — 维度 10：Worktree 集成
+
+业界共识（[code.claude.com worktrees](https://code.claude.com/docs/en/worktrees) / [thepromptshelf worktree](https://thepromptshelf.dev/blog/claude-code-git-worktree-guide/) / [Dan Does Code parallel](https://www.dandoescode.com/blog/parallel-vibe-coding-with-git-worktrees)）：v2.1.50+ `--worktree` CLI flag；v2.1.72+ `EnterWorktree` / `ExitWorktree` 工具；`.claude/worktrees/<name>/` 自动放；**subagent frontmatter `isolation: worktree`** 自动隔离；`worktree.baseRef` = `fresh`（默认 origin/main）或 `head`；**首次需 workspace trust dialog**；`.gitignore` 加 `.claude/worktrees/`；**副作用：不隔离 DB/env/服务**（需手动 .env override）；`/permissions deny EnterWorktree` 可禁用。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **`.gitignore` 加 `.claude/worktrees/`** | ❌（已有 worktrees/ 子目录） | ❌ | **两边都补**（P1 / WT1） |
+| **subagent `isolation: worktree`** | ❌ | ❌ | **两边重新评估**（P2 / WT2，见下文 memory 更新） |
+| **`worktree.baseRef` 设置** | N/A | N/A | 默认 fresh OK |
+| **`/permissions deny EnterWorktree`** | ❌ | ❌ | 保留可用，**不主动 deny** |
+| **PR review isolation 工作流** | ❌ | ❌ | 推荐但非配置（P2） |
+
+### Memory 更新建议
+
+memory `feedback_agent_worktree_isolation`（"worktree 隔离不可靠"）是基于 ≤v2.1.50 早期版本。**业界 v2.1.72+ 后 EnterWorktree/ExitWorktree 工具显著稳定**。S4-S6 实施时重新验证：如新版稳定，更新 memory 为 "v2.1.72+ 已稳定，可重新启用 isolation: worktree"。
+
+### P0 / P1 / P2
+
+**P0**：无
+
+**P1**：
+- **WT1**（两边）：`.gitignore` 加 `.claude/worktrees/`。验收：`git status` 不再把 `.claude/worktrees/` 列为 untracked。
+
+**P2**：
+- **WT2**（两边）：评估 subagent `isolation: worktree` 在 v2.1.72+ 是否稳定，必要时启用 + 更新 memory。
+
+---
+
+## 附录 I — 维度 11：PushNotification / 通知机制
+
+业界共识（[claudcod push](https://claudcod.com/blog/claude-code-push-notifications/) / [alexop notification-hooks](https://alexop.dev/posts/claude-code-notification-hooks/) / [motlin phone](https://motlin.com/blog/claude-code-phone-notifications) / [Joe Njenga mobile](https://medium.com/@joe.njenga/how-im-using-new-claude-code-mobile-push-notifications-for-hands-off-coding-79fa924709ae)）：**v2.1.110（2026-04-16）PushNotification 工具** + 手机 push（via Remote Control + Claude mobile app）；**Notification hook event**：本地 desktop notification（Windows 用 `New-BurntToastNotification` PowerShell module / `msg` 命令；macOS `osascript`；Linux `notify-send`）；场景：长 build / 多 round loop / 后台 CI 监控 / Claude 等用户决策；iOS Focus mode 可能 suppress；未来 Chyros（unshipped 24/7 后台 agent）。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **手机 PushNotification** | ❌ | ❌ | 依赖 Remote Control + Claude mobile app；个人项目可选（P2） |
+| **桌面 Notification hook（Windows）** | ❌ | ❌ | **两边都补**（P1 / NT1） |
+| **CLAUDE.md 指引 Claude 何时调 PushNotification** | ❌ | ❌ | **harmony 加注**（P2 / NT2） |
+
+### P0 / P1 / P2
+
+**P0**：无
+
+**P1**：
+- **NT1**（两边）：加 `Notification` hook event。Windows 命令：`powershell -Command "New-BurntToastNotification -Text 'Claude Code', '$CLAUDE_NOTIFICATION_TYPE'"`（需先 `Install-Module BurntToast`）或 fallback `msg $env:USERNAME` 命令。验收：长任务结束 / Claude 等输入时 Windows 桌面右下角弹通知。
+
+**P2**：
+- **NT2**（harmony）：CLAUDE.md 加注 "长任务（hvigorw assembleHap / 多分钟 CI 监控）超 60s 时调 PushNotification"。
+- 手机 push 整套（依赖 Claude mobile app）。
+
+---
+
+## 附录 J — 维度 12：Plugins / Marketplace
+
+业界共识（[code.claude.com plugin-marketplaces](https://code.claude.com/docs/en/plugin-marketplaces) / [knightli plugins-official](https://knightli.com/en/2026/05/23/claude-plugins-official-claude-code-plugin-directory/) / [claudemarketplaces](https://claudemarketplaces.com/) / [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official)）：**9000+ plugins**（2026-02）；官方 marketplace `claude-plugins-official` **自动可用**；命令：`/plugin marketplace add owner/repo` + `/plugin install <name>` + `/reload-plugins`；结构：`.claude-plugin/plugin.json` manifest + skills/ + agents/ + hooks/ + .mcp.json；plugin 名 = 命令前缀（`my-tool` → `/my-tool:review`）；`${CLAUDE_PLUGIN_DATA}`（v2.1.78+）持久数据目录；安全：plugins 跑代码，**只装可信源**。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **audit 官方 marketplace** | ❌ | ❌ | **两边都补**（P1 / PG1，跑 `/plugin marketplace browse` 看是否有替代当前 hook/skill 的现成 plugin） |
+| **创建项目 plugin** | ❌ | ❌ | **不做**（个人项目无分发需求） |
+| **第三方 marketplace 添加** | ❌ | ❌ | 不主动加（安全风险） |
+| **`${CLAUDE_PLUGIN_DATA}` 持久存储** | N/A | N/A | 不补 |
+
+### 糟粕识别（明确不抄）
+
+- ToxicSkills 风险 plugin —— [Snyk 36% 测试 skill 有 prompt injection](https://snyk.io/articles/top-claude-skills-developers/)
+- 自建 plugin 用于 1-2 项目 —— 过度抽象，直接用 skill / agent 即可
+
+### P0 / P1 / P2
+
+**P0**：无
+
+**P1**：
+- **PG1**（两边）：跑一次 `/plugin marketplace browse` 看是否有现成 plugin 能替代：① carbon 的 typecheck hook / statusline ② harmony 的 cclsp.json LSP / codelinter post-edit。如有合适的 install + 删自维护对应件；如无，记一笔继续自维护。验收：审完官方 marketplace + 决策记录在 design.md 这条 P1 下。
+
+**P2 / 不做**：自建项目 plugin / 第三方 marketplace。
+
+---
+
+## 附录 K — 维度 13：Output styles / Statusline
+
+业界共识（[code.claude.com statusline](https://code.claude.com/docs/en/statusline) / [ccstatusline](https://github.com/sirmalloc/ccstatusline) / [b-open-io statusline](https://github.com/b-open-io/statusline) / [felipeelias claude-statusline](https://felipeelias.github.io/2026/03/17/claude-statusline.html)）：`/statusline` 命令自然语言生成 + 写 settings；`settings.json` `statusLine.type: command` + `command: <script>`；v2.1.97+ `statusLine.refreshInterval`（1-60s）；**项目级 settings.json 可覆盖 user-level**（最 underused 特性）；builtin styles `detailed` with `showCost` / `showTokens` / `showModel` / `showLatency`；`statusline-setup` Anthropic 内置 skill；社区工具：ccstatusline / claude-statusline / claude-powerline / CCometixLine / claude-code-usage-bar；ENV 控色：`CLAUDE_CODE_COLOR_PRIMARY` 等。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **项目级 `statusLine` 配置** | ❌（用全局） | ❌（用全局） | **两边都补**（P1 / OS1） |
+| **builtin "detailed" style 评估** | ❌（自定义 script） | ❌ | **两边都探索**（P2 / OS2） |
+| **`status.json` + reset hook 进度可视化** | ✅ `reset-status.mjs` | ❌ | 已纳入 B3 |
+| **`outputStyle` 字段** | ❌ | ❌ | 个人偏好，**不补** |
+| **`refreshInterval` 设置** | N/A | N/A | 默认 |
+
+### P0 / P1 / P2
+
+**P0**：无
+
+**P1**：
+- **OS1**（两边）：项目级 `.claude/settings.json` 加 `statusLine` 配置，覆盖全局。carbon 显示：当前 worktree + npm run analyze 8 gates 状态 + git dirty；harmony 显示：git 分支 + quick_signals 上次结果 + idle 时间 + dirty 标记。验收：两个项目 cwd 下 statusline 显示项目特定信息。
+
+**P2 / 探索**：
+- **OS2**（两边）：评估用 builtin "detailed" + showCost/showTokens 替代自定义 script，简化维护。
+
+---
+
+## 附录 L — 维度 14：Windows 平台特定（最重要新增）
+
+业界 + memory 已踩坑（[dev.to xujfcn windows-guide](https://dev.to/xujfcn/claude-code-installation-guide-for-windows-git-path-environment-variables-powershell-wsl-and-1lag) / [automatelab MCP-windows-setup](https://automatelab.tech/claude-code-mcp-windows-setup/) / [llmx.tech setup](https://llmx.tech/blog/definitive-guide-to-claude-code-setup-claude-md-mcps-skills/) / [smartscope windows-install](https://smartscope.blog/en/generative-ai/claude/claude-code-windows-native-installation/) / [zenn windows-troubleshoot](https://zenn.dev/sora_biz/articles/claude-code-windows-troubleshoot?locale=en)）：
+
+### Windows 坑速查表
+
+| # | 坑 | memory 沉淀 | 进 CLAUDE.md？ |
+|---|---|---|---|
+| **W1** | **`cmd /c` 包装 stdio MCP**（npx → npx.cmd batch script，Node spawn 不直接调） | ✅ `feedback_mcp_path_style` | ✅ **必须**（新机器重踩成本高） |
+| **W2** | `CLAUDE_CODE_GIT_BASH_PATH` 环境变量（Git Bash 不在 PATH 时） | ❌ | ✅ |
+| **W3** | PowerShell `claude` not recognized（PATH 未自动设；`[Environment]::SetEnvironmentVariable("PATH", "$env:USERPROFILE\.local\bin;...", "User")`） | ❌ | ✅ |
+| **W4** | `%USERPROFILE%` vs `~`（PowerShell `~` 工作；CMD 用 `%USERPROFILE%`） | 部分（`reference_tool_paths`） | ⚠️ 加注 |
+| **W5** | PowerShell UTF-8 / `chcp 65001`（中文/emoji 编码：`[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`） | ❌ | ✅ |
+| **W6** | Plan mode Shift+Tab skip → **Alt+M** | ❌ | ✅（与 PM2 合并） |
+| **W7** | `MCP_TIMEOUT=10000` OAuth 后启动 | ❌ | ✅ |
+| **W8** | WSL vs PowerShell env 隔离 | ❌ | 跳过（不用 WSL） |
+| **W9** | `/doctor` 诊断命令 | ❌ | ✅ |
+| **W10** | PowerShell 语法（`$null` / 反引号 line continuation） | ✅ system prompt 提示 | ⚠️ |
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **CLAUDE.md "Windows 注意事项"段** | ❌ | ⚠️ root CLAUDE.md 提了 PATH 但散在多处，没集中段 | **两边都补**（P0 / WIN1） |
+| **memory `feedback_windows_pitfalls`**（W2-W7/W9） | ❌ | ❌ | **本会话补**（P0 / WIN2） |
+| **`/doctor` 嵌入 Stop hook** | ❌ | ❌ | **harmony 探索**（P2 / WIN3） |
+| **W1 `cmd /c` 包装** | N/A（无项目 MCP） | N/A（无项目 MCP） | 当前 OK，但加项目级 MCP 时必踩 |
+
+### P0 / P1 / P2
+
+**P0**：
+- **WIN1**（两边）：CLAUDE.md 加一节 "**Windows 注意事项**"，列 W1/W2/W3/W4/W5/W6/W7/W9 = 8 条要点 + 一句话应对。来源：本附录 + harmony memory。**理由**：onboard 新机器 / 升级 Claude Code / 加新 MCP 时必撞，每次重踩成本高。验收：两个项目的 root CLAUDE.md 各多一节 "Windows 注意事项"，每条 ≤2 行。
+- **WIN2**（本会话）：写入新 memory `feedback_windows_pitfalls.md`，覆盖 W2/W3/W5/W7/W9 = 5 条新踩的坑 + W1/W4/W6 引用既有 memory。**理由**：跨项目通用。
+
+**P2 / 探索**：
+- **WIN3**（harmony）：把 `/doctor` 自动跑嵌入 Stop hook，长会话结束时 audit Claude Code 健康。
+
+---
+
+## 附录 M — 剩余 non-gap 一览（不再深挖）
+
+经全维度审视后，**仅以下条目真正属于 non-gap / 个人项目不适用**：
+
+| 维度 | 结论 | 理由 |
+|---|---|---|
+| `CLAUDE.local.md` | non-gap | 个人项目无团队 override 需求 |
+| `outputStyle` / `apiKeyHelper` / `cleanupPeriodDays` / `disableNonEssentialModelCalls` | non-gap | 企业字段或个人偏好层 |
+| `env` 项目级注入 | non-gap | memory 警告 PATH 注入副作用 |
+| 第三方 plugin marketplace | non-gap | 安全风险 |
+| 自建项目 plugin | non-gap | 无分发需求 |
+| Skills 2.0 eval / A-B 测试 | non-gap | skill 量不够 |
+| chained-skills 多 skill 串联 | non-gap | 个人项目复用度低 |
+| Agentic pre-commit（Claude SDK） | non-gap | API token 成本 |
+| HTTP hooks / async hooks | non-gap | 无远程验证服务 |
+| Enterprise CLAUDE.md 三层 | non-gap | 个人项目无组织层 |
+| WSL 环境 | non-gap | 走 Git Bash |
+| GitHub branch protection | 跨边界 | 不属 harness |
+
+**深挖修正**：之前对话里把 Slash commands / Worktree / PushNotification / Plugins / Output styles 都列为 non-gap 是**误判**——深挖后这 5 个维度都有实质 P1/P2 改进项（SC1-5 / WT1-2 / NT1-2 / PG1 / OS1-2），写入附录 G-K。**教训：深挖前不下 "non-gap" 结论**。
+
+---
+
+## 附录 N — 相关 memory（背景上下文）
 
 - `feedback_individual_project_workflow` —— 个人项目砍团队回路
-- `feedback_agent_worktree_isolation` —— cwd 切换风险
-- `feedback_force_converge_signal` —— input 预算硬刹车
+- `feedback_agent_worktree_isolation` —— 早期版本警告；v2.1.72+ 待验证（见附录 H/WT2）
+- `feedback_force_converge_signal` —— input 预算硬刹车（本会话被 Stop hook 反驳过用过头）
 - `feedback_claude_hook_command` —— hook command 自动加 `bash ` 前缀
-- `feedback_setup_harness_first_before_coding` —— 本会话新增：外围搭齐再开工
+- `feedback_setup_harness_first_before_coding` —— 外围搭齐再开工
+- `feedback_mcp_path_style` —— MCP cmd /c 包装坑（W1）
+- `feedback_dont_inject_path_to_claude_settings` —— env.PATH 注入副作用
+- `feedback_subagent_model` —— Agent 工具必须显式传 model（与 SE1 协同）
+- `feedback_windows_pitfalls` —— 本会话新增 / WIN2 —— Windows 平台 W2/W3/W5/W7/W9 坑
