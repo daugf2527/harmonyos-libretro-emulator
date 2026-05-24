@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 
 interface RuntimePauseAction {
   title: string
@@ -10,7 +10,7 @@ interface RuntimePauseAction {
 @Component
 export struct RuntimePauseOverlay {
   @Prop processText: string = ''
-  @Prop saveStatusText: string = 'SAVE_IDLE'
+  @Prop saveStatusText: string = '存档就绪'
   @Prop fpsText: string = '--.-'
   @Prop cpuLoadText: string = '12.4%'
   onResume?: () => void
@@ -18,10 +18,10 @@ export struct RuntimePauseOverlay {
   onAction?: (actionCode: string) => void
 
   private readonly actions: RuntimePauseAction[] = [
-    { title: '快速存档', code: 'QUICK_SAVE', iconText: '▣', actionCode: 'quick_save' },
-    { title: '快速读档', code: 'QUICK_LOAD', iconText: '◫', actionCode: 'quick_load' },
-    { title: '按键映射', code: 'INPUT_MAPPING', iconText: '▥', actionCode: 'input_mapping' },
-    { title: '画面风格', code: 'VISUAL_FILTERS', iconText: '▧', actionCode: 'visual_filters' }
+    { title: '快速存档', code: '当前进度落盘', iconText: '▣', actionCode: 'quick_save' },
+    { title: '快速读档', code: '加载上次存档', iconText: '◫', actionCode: 'quick_load' },
+    { title: '按键映射', code: '自定义虚拟按键', iconText: '▥', actionCode: 'input_mapping' },
+    { title: '画面风格', code: '切换滤镜与配色', iconText: '▧', actionCode: 'visual_filters' }
   ]
   private readonly waveformVerticalIndexes: number[] = [0, 1, 2, 3, 4, 5, 6, 7]
   private readonly waveformHorizontalIndexes: number[] = [0, 1, 2, 3, 4]
@@ -29,22 +29,22 @@ export struct RuntimePauseOverlay {
   @Builder
   private TopTelemetryBar() {
     Row() {
-      Row({ space: 12 }) {
+      Row({ space: 10 }) {
         Text('▣')
-          .fontSize(17)
+          .fontSize(EmuTypography.md)
           .fontColor(EmuColors.primary)
 
-        Text('TELEMETRY_v1.0.4')
-          .fontSize(15)
+        Text('碳影 / Carbon Shade')
+          .fontSize(EmuTypography.sm)
           .fontWeight(FontWeight.Bold)
           .fontFamily('monospace')
           .fontColor(EmuColors.primary)
-          .letterSpacing(3)
+          .letterSpacing(1.6)
       }
       .alignItems(VerticalAlign.Center)
 
-      Text(`${this.fpsText} FPS | CPU ${this.cpuLoadText} | GPU --`)
-        .fontSize(13)
+      Text(`${this.fpsText} FPS | CPU ${this.cpuLoadText}`)
+        .fontSize(EmuTypography.xs)
         .fontWeight(FontWeight.Bold)
         .fontFamily('monospace')
         .fontColor('#B3ABABAB')
@@ -52,8 +52,8 @@ export struct RuntimePauseOverlay {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .width('100%')
-    .height(56)
-    .padding({ left: 38, right: 38 })
+    .height(44)
+    .padding({ left: 24, right: 24 })
     .justifyContent(FlexAlign.SpaceBetween)
     .alignItems(VerticalAlign.Center)
     .backgroundColor('#E6000000')
@@ -69,26 +69,26 @@ export struct RuntimePauseOverlay {
   @Builder
   private ResumeAction() {
     Row() {
-      Column({ space: 6 }) {
-        Text('EXECUTION_READY')
-          .fontSize(14)
+      Column({ space: 4 }) {
+        Text('准备就绪')
+          .fontSize(11)
           .fontFamily('monospace')
           .fontColor(EmuColors.primary)
-          .letterSpacing(1.4)
+          .letterSpacing(1.2)
 
         Row({ space: 8 }) {
           Row()
-            .width(10)
-            .height(10)
-            .borderRadius(5)
+            .width(8)
+            .height(8)
+            .borderRadius(4)
             .backgroundColor(EmuColors.primary)
-            .shadow({ radius: 16, color: '#8800FF41', offsetX: 0, offsetY: 0 })
+            .shadow({ radius: 12, color: '#8800FF41', offsetX: 0, offsetY: 0 })
 
-          Text('继续游戏 RESUME_EXECUTION')
-            .fontSize(25)
+          Text('继续游戏')
+            .fontSize(EmuTypography.lg)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.onSurface)
-            .maxLines(2)
+            .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
         }
         .alignItems(VerticalAlign.Center)
@@ -97,15 +97,15 @@ export struct RuntimePauseOverlay {
       .layoutWeight(1)
 
       Text('›')
-        .fontSize(40)
+        .fontSize(EmuTypography.display)
         .fontColor('#88757575')
     }
     .width('100%')
-    .height(140)
-    .padding({ left: 30, right: 28 })
+    .height(72)
+    .padding({ left: 20, right: 18 })
     .backgroundColor('#2200FF41')
-    .border({ width: 1.2, color: EmuColors.primary, style: BorderStyle.Solid })
-    .borderRadius(6)
+    .border({ width: 1, color: EmuColors.primary, style: BorderStyle.Solid })
+    .borderRadius(8)
     .alignItems(VerticalAlign.Center)
     .onClick(() => {
       this.onResume?.()
@@ -114,34 +114,36 @@ export struct RuntimePauseOverlay {
 
   @Builder
   private PauseTile(item: RuntimePauseAction) {
-    Column() {
+    Column({ space: 6 }) {
       Text(item.iconText)
-        .fontSize(34)
+        .fontSize(EmuTypography.xxl)
         .fontColor('#B3E5E5E5')
         .fontWeight(FontWeight.Bold)
-        .margin({ bottom: 32 })
+        .margin({ bottom: 6 })
 
       Text(item.title)
-        .fontSize(21)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(EmuColors.onSurface)
-
-      Text(item.code)
-        .fontSize(22)
+        .fontSize(EmuTypography.md)
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.onSurface)
-        .letterSpacing(0.8)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+      Text(item.code)
+        .fontSize(EmuTypography.xs)
+        .fontFamily('monospace')
+        .fontColor('#99ABABAB')
+        .letterSpacing(0.4)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .layoutWeight(1)
-    .height(186)
-    .padding({ left: 28, right: 22, top: 28, bottom: 26 })
+    .height(96)
+    .padding({ left: 14, right: 12, top: 14, bottom: 12 })
     .alignItems(HorizontalAlign.Start)
     .justifyContent(FlexAlign.Center)
     .backgroundColor('#F0161616')
     .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-    .borderRadius(6)
+    .borderRadius(8)
     .onClick(() => {
       this.onAction?.(item.actionCode)
     })
@@ -149,13 +151,13 @@ export struct RuntimePauseOverlay {
 
   @Builder
   private ActionGrid() {
-    Column({ space: 20 }) {
-      Row({ space: 20 }) {
+    Column({ space: 12 }) {
+      Row({ space: 12 }) {
         this.PauseTile(this.actions[0])
         this.PauseTile(this.actions[1])
       }
 
-      Row({ space: 20 }) {
+      Row({ space: 12 }) {
         this.PauseTile(this.actions[2])
         this.PauseTile(this.actions[3])
       }
@@ -167,27 +169,28 @@ export struct RuntimePauseOverlay {
   private TerminateAction() {
     Row() {
       Text('⏻')
-        .fontSize(32)
+        .fontSize(EmuTypography.xxl)
         .fontColor(EmuColors.error)
 
-      Text('结束运行 TERMINATE_SESSION')
-        .fontSize(20)
+      Text('结束运行')
+        .fontSize(EmuTypography.md)
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.error)
         .layoutWeight(1)
+        .margin({ left: 10 })
 
-      Text('ERR_HALT')
-        .fontSize(11)
+      Text('终止会话')
+        .fontSize(EmuTypography.xs)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
         .fontColor('#AAED7F64')
     }
     .width('100%')
-    .height(96)
-    .padding({ left: 28, right: 24 })
+    .height(56)
+    .padding({ left: 20, right: 18 })
     .backgroundColor('#1AED7F64')
     .border({ width: 0.5, color: '#66ED7F64', style: BorderStyle.Solid })
-    .borderRadius(6)
+    .borderRadius(8)
     .alignItems(VerticalAlign.Center)
     .onClick(() => {
       this.onTerminate?.()
@@ -196,47 +199,47 @@ export struct RuntimePauseOverlay {
 
   @Builder
   private PauseTelemetry() {
-    Column({ space: 18 }) {
+    Column({ space: 12 }) {
       Row() {
-        Text('SUBSYSTEM_TELEMETRY')
-          .fontSize(13)
+        Text('实时遥测')
+          .fontSize(11)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
           .fontColor('#CCABABAB')
-          .letterSpacing(2)
+          .letterSpacing(1.6)
 
         Row()
-          .width(8)
-          .height(8)
-          .borderRadius(4)
+          .width(6)
+          .height(6)
+          .borderRadius(3)
           .backgroundColor(EmuColors.primary)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
-      .height(50)
-      .padding({ left: 28, right: 28 })
+      .height(36)
+      .padding({ left: 18, right: 18 })
       .backgroundColor(EmuColors.surfaceContainerHigh)
 
       Row() {
-        Column({ space: 6 }) {
-          Text('CPU LOAD')
-            .fontSize(11)
+        Column({ space: 4 }) {
+          Text('CPU 负载')
+            .fontSize(EmuTypography.xs)
             .fontWeight(FontWeight.Bold)
             .fontColor('#B3ABABAB')
           Text(this.cpuLoadText)
-            .fontSize(26)
+            .fontSize(EmuTypography.lg)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.onSurface)
         }
         .alignItems(HorizontalAlign.Start)
 
-        Column({ space: 6 }) {
-          Text('FRAMERATE')
-            .fontSize(11)
+        Column({ space: 4 }) {
+          Text('帧率')
+            .fontSize(EmuTypography.xs)
             .fontWeight(FontWeight.Bold)
             .fontColor('#B3ABABAB')
           Text(`${this.fpsText} FPS`)
-            .fontSize(26)
+            .fontSize(EmuTypography.lg)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.primary)
@@ -244,58 +247,31 @@ export struct RuntimePauseOverlay {
         .alignItems(HorizontalAlign.Start)
       }
       .width('100%')
+      .padding({ left: 18, right: 18 })
       .justifyContent(FlexAlign.SpaceBetween)
 
       Stack() {
         this.WaveformGrid()
 
-        Row()
-          .width('100%')
-          .height(1)
-          .backgroundColor('#3300FF41')
-          .align(Alignment.Center)
-        Row()
-          .width('82%')
-          .height(2)
-          .backgroundColor(EmuColors.primary)
-          .borderRadius(1)
-          .align(Alignment.Bottom)
-          .margin({ bottom: 24 })
-        Row()
-          .width('58%')
-          .height(2)
-          .backgroundColor('#9900FF41')
-          .borderRadius(1)
-          .align(Alignment.BottomEnd)
-          .margin({ bottom: 10 })
-
         Path({
-          width: 520,
-          height: 110,
-          commands: 'M0 70 Q36 28 72 70 T144 70 T216 70 T288 70 T360 70 T432 70 T520 70'
+          width: 320,
+          height: 64,
+          commands: 'M0 40 Q20 16 40 40 T80 40 T120 40 T160 40 T200 40 T240 40 T320 40'
         })
           .fillOpacity(0)
           .stroke(EmuColors.primary)
-          .strokeWidth(2)
+          .strokeWidth(1.6)
           .strokeOpacity(0.72)
-
-        Path({
-          width: 520,
-          height: 110,
-          commands: 'M0 78 Q44 48 88 78 T176 78 T264 64 T352 78 T440 54 T520 76'
-        })
-          .fillOpacity(0)
-          .stroke(EmuColors.primary)
-          .strokeWidth(2.4)
       }
       .width('100%')
-      .height(116)
+      .height(68)
+      .padding({ left: 18, right: 18 })
     }
     .width('100%')
-    .padding({ left: 0, right: 0, top: 0, bottom: 28 })
+    .padding({ top: 0, bottom: 18 })
     .backgroundColor('#CC050505')
     .border({ width: 0.5, color: '#26333333', style: BorderStyle.Solid })
-    .borderRadius(4)
+    .borderRadius(8)
   }
 
   @Builder
@@ -351,31 +327,31 @@ export struct RuntimePauseOverlay {
 
       Scroll() {
         Row() {
-          Column({ space: 20 }) {
-            Column({ space: 8 }) {
-              Text('EMU_CORE 系统暂停')
-                .fontSize(30)
+          Column({ space: 14 }) {
+            Column({ space: 4 }) {
+              Text('碳影 已暂停')
+                .fontSize(EmuTypography.xl)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(EmuColors.onSurface)
 
-              Text(`PROCESS: ${this.processText}`)
-                .fontSize(13)
+              Text(`进程：${this.processText}`)
+                .fontSize(EmuTypography.xs)
                 .fontFamily('monospace')
                 .fontColor('#B3ABABAB')
-                .letterSpacing(2)
+                .letterSpacing(1.4)
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
             }
             .width('100%')
-            .padding({ left: 24 })
-            .border({ width: { left: 4 }, color: EmuColors.primary, style: BorderStyle.Solid })
+            .padding({ left: 16 })
+            .border({ width: { left: 3 }, color: EmuColors.primary, style: BorderStyle.Solid })
             .alignItems(HorizontalAlign.Start)
 
             this.ResumeAction()
             this.ActionGrid()
 
             Text(this.saveStatusText)
-              .fontSize(12)
+              .fontSize(EmuTypography.xs)
               .fontFamily('monospace')
               .fontWeight(FontWeight.Bold)
               .fontColor('#99ABABAB')
@@ -387,8 +363,8 @@ export struct RuntimePauseOverlay {
             this.PauseTelemetry()
           }
           .width('100%')
-          .constraintSize({ maxWidth: 620 })
-          .padding({ left: 40, right: 40, top: 132, bottom: 92 })
+          .constraintSize({ maxWidth: 460 })
+          .padding({ left: 24, right: 24, top: 76, bottom: 56 })
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)

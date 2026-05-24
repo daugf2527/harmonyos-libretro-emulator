@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { LibraryRecord } from '../common/LibraryRepository'
 import { EmuIcon } from './EmuIcon'
 import { GameCard } from './GameCard'
@@ -112,13 +112,13 @@ export struct LibraryGameSections {
   private AllGamesHeader() {
     Row() {
       Text('全部游戏')
-        .fontSize(18)
+        .fontSize(EmuTypography.xl)
         .fontWeight(FontWeight.Medium)
         .fontColor(EmuColors.onSurface)
 
       Row({ space: 12 }) {
         Text('排序：名称')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.2)
@@ -159,18 +159,38 @@ export struct LibraryGameSections {
 
   @Builder
   private BottomLoader() {
-    Column({ space: 10 }) {
-      this.Spinner(30, 2, EmuColors.primary, '#2F484848')
+    if (this.bottomLoaderActive) {
+      Column({ space: 10 }) {
+        this.Spinner(30, 2, EmuColors.primary, '#2F484848')
 
-      Text(this.bottomLoaderActive ? '继续加载游戏...' : '正在读取游戏库')
-        .fontSize(9)
-        .fontFamily('monospace')
-        .fontColor(this.bottomLoaderActive ? EmuColors.primary : EmuColors.onSurfaceVariant)
-        .letterSpacing(1.6)
+        Text('继续加载游戏...')
+          .fontSize(9)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.primary)
+          .letterSpacing(1.6)
+      }
+      .width('100%')
+      .padding({ top: 26, bottom: 12 })
+      .alignItems(HorizontalAlign.Center)
+    } else if (this.games.length === 0 && this.recentGames.length === 0) {
+      Column({ space: 12 }) {
+        Text('📁')
+          .fontSize(36)
+          .opacity(0.6)
+        Text('游戏库为空')
+          .fontSize(EmuTypography.md)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurface)
+        Text('下拉刷新，或从"导入"按钮添加 ROM')
+          .fontSize(EmuTypography.xs)
+          .fontFamily('monospace')
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(0.6)
+      }
+      .width('100%')
+      .padding({ top: 36, bottom: 24 })
+      .alignItems(HorizontalAlign.Center)
     }
-    .width('100%')
-    .padding({ top: 26, bottom: 12 })
-    .alignItems(HorizontalAlign.Center)
   }
 
   @Builder

@@ -78,6 +78,7 @@ echo "==== quick_signals starting ===="
 
 run_check regression bash scripts/ci/check_regression_guards.sh
 run_check hygiene    bash scripts/ci/check_repo_hygiene.sh
+run_check ui-fixes   bash scripts/test/verify_ui_fixes.sh
 
 if [[ -f "${CXX_BUILD_DIR}/build.ninja" ]]; then
   if cmake_bin="$(find_cmake)"; then

@@ -1,323 +1,300 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuMotion, EmuStateColors } from '../common/EmuUiTokens'
 import { InputLayoutButton } from '../common/InputLayoutRepository'
-import { ScanlineBackground } from './EmuAppShell'
+
+// Independent button component so each press maintains its own visual state
+// (pressed -> brighter background / scale-down / stronger glow). Lifting this
+// out of @Builder is required because @Builder cannot own @State.
+//
+// State precedence (high → low): disabled > pressed > primary > default.
+// Disabled wins over pressed: cannot show "pressed" feedback while disabled.
+@Component
+struct RuntimeKeyButton {
+  @Prop button: InputLayoutButton
+  @Prop isPrimary: boolean = false
+  @Prop buttonWidth: number = 48
+  @Prop buttonHeight: number = 48
+  @Prop cornerRadius: number = 3
+  @Prop labelFontSize: number = 16
+  @Prop disabled: boolean = false
+  @State private pressed: boolean = false
+  onPressChange?: (pressed: boolean) => void
+
+  private resolveBackground(): string {
+    if (this.disabled) {
+      return EmuStateColors.disabledBackground
+    }
+    if (this.pressed) {
+      return EmuColors.primary
+    }
+    return this.isPrimary ? '#1F00FF41' : '#D9000000'
+  }
+
+  private resolveBorderColor(): string {
+    if (this.disabled) {
+      return EmuStateColors.disabledBorder
+    }
+    if (this.pressed) {
+      return EmuColors.primary
+    }
+    return this.isPrimary ? EmuColors.primary : '#66484848'
+  }
+
+  private resolveFontColor(): string {
+    if (this.disabled) {
+      return EmuStateColors.disabledText
+    }
+    if (this.pressed) {
+      return EmuStateColors.onPrimary
+    }
+    return this.isPrimary ? EmuColors.primary : EmuColors.onSurface
+  }
+
+  build() {
+    Button({ type: ButtonType.Normal }) {
+      Text(this.button.label)
+        .fontSize(this.labelFontSize)
+        .fontWeight(FontWeight.Bold)
+        .fontFamily('monospace')
+        .fontColor(this.resolveFontColor())
+        .letterSpacing(this.button.shape === 'function' ? 0.4 : 0)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width(this.buttonWidth)
+    .height(this.buttonHeight)
+    .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+    .backgroundColor(this.resolveBackground())
+    .border({
+      width: this.pressed && !this.disabled ? 2 : (this.isPrimary ? 1.2 : 0.5),
+      color: this.resolveBorderColor(),
+      style: BorderStyle.Solid
+    })
+    .borderRadius(this.cornerRadius)
+    .shadow({
+      radius: this.disabled ? 0 : (this.pressed ? 24 : (this.isPrimary ? 18 : 10)),
+      color: this.disabled
+        ? '#00000000'
+        : (this.pressed ? '#AA00FF41' : (this.isPrimary ? '#4400FF41' : '#99000000')),
+      offsetX: 0,
+      offsetY: this.pressed ? 1 : 4
+    })
+    .scale(this.pressed && !this.disabled ? { x: 0.92, y: 0.92 } : { x: 1, y: 1 })
+    .opacity(this.disabled ? 0.5 : 1)
+    .animation({
+      duration: EmuMotion.stateChangeMs,
+      curve: Curve.EaseInOut
+    })
+    .position({ x: this.button.x, y: this.button.y })
+    .enabled(!this.disabled)
+    .onTouch((event: TouchEvent) => {
+      if (this.disabled) {
+        return
+      }
+      if (event.type === TouchType.Down) {
+        this.pressed = true
+        this.onPressChange?.(true)
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.pressed = false
+        this.onPressChange?.(false)
+      }
+    })
+  }
+}
 
 @Component
 export struct RuntimeVirtualControllerLayer {
   @Prop buttons: InputLayoutButton[] = []
-  @Prop layoutWidth: number = 720
-  @Prop layoutHeight: number = 360
+  @Prop layoutWidth: number = 440
+  @Prop layoutHeight: number = 340
   onButtonChange?: (keyId: number, pressed: boolean) => void
   onAnalogChange?: (index: number, x: number, y: number) => void
-  onQuickSave?: () => void
-
-  private readonly quickSaveLetters: string[] = ['Q', 'U', 'I', 'C', 'K', 'S', 'A', 'V', 'E']
 
   build() {
-    Stack() {
+    // No more full-screen gradient/scanline shroud — this Component is now
+    // hosted inside a bottom-half container in LibretroGamePage, so a thin
+    // top border and the buttons themselves are enough. Keeps the game frame
+    // crisp (no gray cast) and gives the controller area a clear separation.
+    Stack({ alignContent: Alignment.Bottom }) {
       Column()
         .width('100%')
         .height('100%')
-        .linearGradient({
-          angle: 180,
-          colors: [[0x00131313, 0.0], [0x66131313, 0.62], [0xCC000000, 1.0]]
-        })
+        .backgroundColor('#F2050505')
+        .border({ width: { top: 1 }, color: '#3300FF41', style: BorderStyle.Solid })
         .hitTestBehavior(HitTestMode.None)
 
-      ScanlineBackground({ lineColor: '#1000FF41', lineSpacing: 1, alternateColor: '#10000000' })
-        .width('100%')
-        .height('100%')
-        .opacity(0.32)
-      .hitTestBehavior(HitTestMode.None)
+      this.buildLayoutCanvas()
 
-      this.buildControllerDeck()
-      this.buildQuickSaveRail()
-      this.buildSystemTriggers()
+      // 浮层：select/start 贴 controller 顶部居中，不挤压主按键 layout 空间
+      this.buildFloatingFunctionButtons()
     }
     .width('100%')
     .height('100%')
   }
 
   @Builder
-  private buildControllerDeck() {
-    Row({ space: 0 }) {
-      this.buildMovementPanel()
-      this.buildActionPanel()
-    }
-    .width('100%')
-    .height('100%')
-    .padding({ left: 28, right: 28, top: 48, bottom: 96 })
-    .justifyContent(FlexAlign.Center)
-    .alignItems(VerticalAlign.Center)
-  }
-
-  @Builder
-  private buildMovementPanel() {
-    Column({ space: 13 }) {
-      Column({ space: 1 }) {
-        Row() {
-          Blank()
-            .layoutWeight(1)
-          this.RuntimeInputButtonById('up', '▲', '', 24, 24, 3)
-          Blank()
-            .layoutWeight(1)
+  private buildLayoutCanvas() {
+    Stack({ alignContent: Alignment.TopStart }) {
+      ForEach(this.buttons, (button: InputLayoutButton) => {
+        if (!this.isFloatingFunctionButton(button.id)) {
+          RuntimeKeyButton({
+            button: button,
+            isPrimary: this.isPrimaryRuntimeButton(button.id),
+            buttonWidth: this.getButtonWidth(button),
+            buttonHeight: this.getButtonHeight(button),
+            cornerRadius: this.getBorderRadius(button),
+            labelFontSize: this.getLabelFontSize(button),
+            onPressChange: (pressed: boolean) => {
+              const keyId = this.getRetroButtonId(button)
+              if (keyId < 0 || !this.onButtonChange) {
+                return
+              }
+              this.onButtonChange(keyId, pressed)
+            }
+          })
         }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
+      }, (button: InputLayoutButton) => button.id)
+    }
+    .width(this.layoutWidth)
+    .height(this.layoutHeight)
+    .margin({ bottom: 16, left: 16, right: 16, top: 8 })
+    .hitTestBehavior(HitTestMode.Transparent)
+  }
 
-        Row({ space: 0 }) {
-          this.RuntimeInputButtonById('left', '◀', '', 24, 24, 3)
-          Stack() {
-            Row()
-              .width(43)
-              .height(43)
-              .backgroundColor('#66131313')
-              .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-              .borderRadius(2)
-
-            Row()
-              .width(7)
-              .height(7)
-              .borderRadius(4)
-              .backgroundColor('#CC00FF41')
-              .shadow({ radius: 7, color: '#6600FF41', offsetX: 0, offsetY: 0 })
+  @Builder
+  private buildFloatingFunctionButtons() {
+    Stack({ alignContent: Alignment.Top }) {
+      Row({ space: 14 }) {
+        ForEach(this.buttons, (button: InputLayoutButton) => {
+          if (this.isFloatingFunctionButton(button.id)) {
+            Button({ type: ButtonType.Normal }) {
+              Text(button.label)
+                .fontSize(11)
+                .fontWeight(FontWeight.Bold)
+                .fontFamily('monospace')
+                .fontColor(EmuColors.primary)
+                .letterSpacing(0.4)
+            }
+            .height(26)
+            .padding({ left: 14, right: 14, top: 2, bottom: 2 })
+            .backgroundColor('#1F00FF41')
+            .border({ width: 1.2, color: EmuColors.primary, style: BorderStyle.Solid })
+            .borderRadius(13)
+            .shadow({ radius: 8, color: '#4400FF41', offsetX: 0, offsetY: 2 })
+            .onTouch((event: TouchEvent) => {
+              const keyId = this.getRetroButtonId(button)
+              if (keyId < 0 || !this.onButtonChange) {
+                return
+              }
+              if (event.type === TouchType.Down) {
+                this.onButtonChange(keyId, true)
+              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+                this.onButtonChange(keyId, false)
+              }
+            })
           }
-          .width(43)
-          .height(43)
-          this.RuntimeInputButtonById('right', '▶', '', 24, 24, 3)
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-
-        Row() {
-          Blank()
-            .layoutWeight(1)
-          this.RuntimeInputButtonById('down', '▼', '', 24, 24, 3)
-          Blank()
-            .layoutWeight(1)
-        }
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
+        }, (button: InputLayoutButton) => button.id)
       }
-      .width('100%')
-
-      Text('方向键')
-        .fontSize(9)
-        .fontFamily('monospace')
-        .fontColor('#88757575')
-        .maxLines(1)
+      .padding({ top: 6 })
     }
-    .width('34%')
-    .constraintSize({ minWidth: 100, maxWidth: 118 })
-    .height(176)
-    .padding({ left: 14, right: 14, top: 24, bottom: 24 })
-    .justifyContent(FlexAlign.Center)
-    .alignItems(HorizontalAlign.Center)
-    .backgroundColor('#E8000000')
-    .backdropBlur(24)
-    .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-    .borderRadius(8)
-    .shadow({ radius: 16, color: '#99000000', offsetX: 0, offsetY: 8 })
+    .width('100%')
+    .height('100%')
+    .hitTestBehavior(HitTestMode.Transparent)
   }
 
-  @Builder
-  private buildActionPanel() {
-    Stack() {
-      Column({ space: 11 }) {
-        Row() {
-          Blank()
-            .layoutWeight(1)
-          this.RuntimeInputButtonById('y', 'Y', '', 44, 44, 22)
-          Blank()
-            .layoutWeight(1)
-        }
-        .width('100%')
-
-        Row() {
-          this.RuntimeInputButtonById('x', 'X', '', 44, 44, 22)
-          Blank()
-            .layoutWeight(1)
-          this.RuntimeInputButtonById('b', 'B', '返回', 58, 44, 22)
-        }
-        .width('100%')
-
-        Row() {
-          Blank()
-            .layoutWeight(1)
-          this.RuntimeInputButtonById('a', 'A', '确认', 112, 34, 8)
-          Blank()
-            .layoutWeight(1)
-        }
-        .width('100%')
-      }
-      .width('100%')
-      .height('100%')
-      .padding({ left: 29, right: 29, top: 27, bottom: 27 })
-      .justifyContent(FlexAlign.Center)
-    }
-    .width('58%')
-    .constraintSize({ minWidth: 190, maxWidth: 214 })
-    .height(204)
-    .margin({ left: 0 })
-    .backgroundColor('#E8000000')
-    .backdropBlur(24)
-    .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-    .borderRadius(8)
-    .shadow({ radius: 18, color: '#99000000', offsetX: 0, offsetY: 8 })
+  private isFloatingFunctionButton(id: string): boolean {
+    return id === 'select' || id === 'start'
   }
 
-  @Builder
-  private buildQuickSaveRail() {
-    Button({ type: ButtonType.Normal }) {
-      Column({ space: 8 }) {
-        Text('▣')
-          .fontSize(22)
-          .fontColor(EmuColors.primary)
-
-        Column({ space: 1 }) {
-          ForEach(this.quickSaveLetters, (letter: string) => {
-            Text(letter)
-              .fontSize(8)
-              .fontFamily('monospace')
-              .fontWeight(FontWeight.Bold)
-              .fontColor(EmuColors.primary)
-              .maxLines(1)
-          }, (letter: string) => letter)
-        }
-      }
-      .justifyContent(FlexAlign.Center)
-      .alignItems(HorizontalAlign.Center)
+  private getButtonWidth(button: InputLayoutButton): number {
+    if (button.shape === 'shoulder') {
+      return 86
     }
-    .width(57)
-    .height(157)
-    .fontColor(EmuColors.primary)
-    .backgroundColor('#E8000000')
-    .backdropBlur(24)
-    .border({ width: 1, color: EmuColors.primary, style: BorderStyle.Solid })
-    .borderRadius(16)
-    .shadow({ radius: 14, color: '#5500FF41', offsetX: 0, offsetY: 0 })
-    .align(Alignment.End)
-    .margin({ right: 22 })
-    .onClick(() => {
-      this.onQuickSave?.()
-    })
+    if (button.shape === 'function') {
+      return 64
+    }
+    return button.size
   }
 
-  @Builder
-  private buildSystemTriggers() {
-    Row({ space: 14 }) {
-      this.RuntimeInputButtonById('select', 'SELECT', '', 77, 30, 6)
-      this.RuntimeInputButtonById('start', 'START', '', 72, 30, 6)
+  private getButtonHeight(button: InputLayoutButton): number {
+    if (button.shape === 'shoulder') {
+      return 34
     }
-    .align(Alignment.Bottom)
-    .margin({ bottom: 100 })
+    if (button.shape === 'function') {
+      return 28
+    }
+    return button.size
   }
 
-  @Builder
-  private RuntimeInputButtonById(
-    buttonId: string,
-    labelText: string,
-    captionText: string,
-    buttonWidth: number,
-    buttonHeight: number,
-    radius: number
-  ) {
-    Button({ type: ButtonType.Normal }) {
-      if (captionText.length > 0) {
-        Row({ space: 6 }) {
-          Text(labelText)
-            .fontSize(buttonId === 'a' ? 20 : 18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(buttonId === 'a' ? EmuColors.primary : EmuColors.onSurface)
-            .fontFamily('monospace')
-            .maxLines(1)
-
-          Text(captionText)
-            .fontSize(8)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(buttonId === 'a' ? EmuColors.primary : '#AAED7F64')
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .justifyContent(FlexAlign.Center)
-        .alignItems(VerticalAlign.Center)
-      } else {
-        Text(labelText)
-          .fontSize(buttonId === 'select' || buttonId === 'start' ? 10 : 16)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.isPrimaryRuntimeButton(buttonId) ? EmuColors.primary : EmuColors.onSurface)
-          .fontFamily('monospace')
-          .letterSpacing(buttonId === 'select' || buttonId === 'start' ? 0.8 : 0)
-          .maxLines(1)
-      }
+  private getBorderRadius(button: InputLayoutButton): number {
+    if (button.shape === 'circle') {
+      return button.size / 2
     }
-    .width(buttonWidth)
-    .height(buttonHeight)
-    .backgroundColor('#D9000000')
-    .border({
-      width: this.isPrimaryRuntimeButton(buttonId) ? 1.2 : 0.5,
-      color: this.isPrimaryRuntimeButton(buttonId) ? EmuColors.primary : '#66484848',
-      style: BorderStyle.Solid
-    })
-    .borderRadius(radius)
-    .shadow({
-      radius: this.isPrimaryRuntimeButton(buttonId) ? 18 : 10,
-      color: this.isPrimaryRuntimeButton(buttonId) ? '#4400FF41' : '#99000000',
-      offsetX: 0,
-      offsetY: 4
-    })
-    .onTouch((event) => {
-      const keyId = this.getRetroButtonId(buttonId)
-      if (keyId < 0 || !this.onButtonChange) {
-        return
-      }
-      if (event.type === TouchType.Down) {
-        this.onButtonChange(keyId, true)
-      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-        this.onButtonChange(keyId, false)
-      }
-    })
+    if (button.shape === 'function') {
+      return 8
+    }
+    if (button.shape === 'shoulder') {
+      return 4
+    }
+    return 3
+  }
+
+  private getLabelFontSize(button: InputLayoutButton): number {
+    if (button.shape === 'circle') {
+      return button.id === 'a' ? 22 : 18
+    }
+    if (button.shape === 'function') {
+      return 10
+    }
+    if (button.shape === 'shoulder') {
+      return 14
+    }
+    return 16
   }
 
   private isPrimaryRuntimeButton(buttonId: string): boolean {
-    return buttonId === 'a' || buttonId === 'quick_save'
+    // 所有按钮统一使用 primary 样式（半透绿底 + 1.2px 绿边框 + 阴影），
+    // 否则非 primary 的 0.5px/#66484848 边框在黑底上几乎不可见。
+    return true
   }
 
-  private getRetroButtonId(buttonId: string): number {
-    if (buttonId === 'b') {
+  private getRetroButtonId(button: InputLayoutButton): number {
+    if (Number.isFinite(button.retroButtonId) && button.retroButtonId >= 0 && button.retroButtonId <= 15) {
+      return button.retroButtonId
+    }
+    if (button.id === 'b') {
       return 0
     }
-    if (buttonId === 'x') {
+    if (button.id === 'x') {
       return 1
     }
-    if (buttonId === 'select') {
+    if (button.id === 'select') {
       return 2
     }
-    if (buttonId === 'start') {
+    if (button.id === 'start') {
       return 3
     }
-    if (buttonId === 'up') {
+    if (button.id === 'up') {
       return 4
     }
-    if (buttonId === 'down') {
+    if (button.id === 'down') {
       return 5
     }
-    if (buttonId === 'left') {
+    if (button.id === 'left') {
       return 6
     }
-    if (buttonId === 'right') {
+    if (button.id === 'right') {
       return 7
     }
-    if (buttonId === 'a') {
+    if (button.id === 'a') {
       return 8
     }
-    if (buttonId === 'y') {
+    if (button.id === 'y') {
       return 9
     }
-    if (buttonId === 'l') {
+    if (button.id === 'l') {
       return 10
     }
-    if (buttonId === 'r') {
+    if (button.id === 'r') {
       return 11
     }
     return -1

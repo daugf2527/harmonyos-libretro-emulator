@@ -11,8 +11,7 @@ import { LibraryLaunchOverlay } from '../components/LibraryLaunchOverlay'
 import { KeyValueSpecItem, KeyValueSpecList } from '../components/KeyValueSpecList'
 import {
   EmuColors,
-  EmuMetrics
-} from '../common/EmuUiTokens'
+  EmuMetrics, EmuTypography } from '../common/EmuUiTokens'
 import { consumePendingLibraryDetailRequest } from '../common/LibraryDetailBridge'
 import { setPendingLibraryLaunchRequest } from '../common/LibraryLaunchBridge'
 import {
@@ -550,7 +549,7 @@ struct LibraryDetailPage {
         .backgroundColor('#FF0E0E0E')
 
       Text(this.getLocalStatusText())
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontWeight(FontWeight.Bold)
         .fontColor('#FF0E0E0E')
         .maxLines(1)
@@ -676,12 +675,12 @@ struct LibraryDetailPage {
         .fontColor(EmuColors.onSurface)
 
       Text('请从游戏库条目的“查看详情”进入。')
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontColor('#CCABABAB')
 
       Row() {
         Text('返回游戏库')
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
       }

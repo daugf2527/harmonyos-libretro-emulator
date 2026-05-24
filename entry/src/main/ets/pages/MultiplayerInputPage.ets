@@ -1,7 +1,7 @@
 import { BarChartBackground, BarChartItem, EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import { InputDeviceInfo } from '../common/InputPortRouting'
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
@@ -195,14 +195,14 @@ struct MultiplayerInputPage {
             .backgroundColor(item.isActive ? EmuColors.primary : EmuColors.outline)
 
           Text(item.label)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(1.4)
         }
         .alignItems(VerticalAlign.Center)
 
         Text(item.status)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(item.isActive ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .backgroundColor(item.isActive ? '#1800FF41' : EmuColors.surfaceContainerHigh)
@@ -220,7 +220,7 @@ struct MultiplayerInputPage {
             .textOverflow({ overflow: TextOverflow.Ellipsis })
 
           Text(`ID: ${item.deviceId}`)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#666666')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -230,7 +230,7 @@ struct MultiplayerInputPage {
 
         Column({ space: 4 }) {
           Text(item.powerText)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurfaceVariant)
 
           Row()
@@ -266,7 +266,7 @@ struct MultiplayerInputPage {
         .maxLines(1)
 
       Text(value)
-        .fontSize(12)
+        .fontSize(EmuTypography.sm)
                 .fontColor(highlight ? EmuColors.primary : EmuColors.onSurface)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -285,7 +285,7 @@ struct MultiplayerInputPage {
         Row({ space: 8 }) {
           EmuIcon({ name: 'explore', tone: 'muted', iconSize: 18 })
           Text('NETPLAY\n联机')
-            .fontSize(12)
+            .fontSize(EmuTypography.sm)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
             .letterSpacing(2)
@@ -295,12 +295,12 @@ struct MultiplayerInputPage {
 
         Row({ space: 12 }) {
           Text('中继：未配置')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#777777')
 
           Button('创建\n房间')
             .height(44)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurface)
             .backgroundColor(Color.Transparent)
             .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
@@ -348,13 +348,13 @@ struct MultiplayerInputPage {
 
       Column({ space: 4 }) {
         Text(room.title)
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontWeight(FontWeight.Medium)
           .fontColor(EmuColors.onSurface)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
         Text(room.game)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor('#666666')
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -367,7 +367,7 @@ struct MultiplayerInputPage {
           .fontSize(9)
           .fontColor('#666666')
         Text(room.latency)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
                     .fontColor(room.color)
       }
       .alignItems(HorizontalAlign.End)
@@ -377,7 +377,7 @@ struct MultiplayerInputPage {
           .fontSize(9)
           .fontColor('#666666')
         Text(room.players)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
                     .fontColor(EmuColors.onSurface)
       }
       .alignItems(HorizontalAlign.End)
@@ -486,12 +486,12 @@ struct MultiplayerInputPage {
       .alignItems(VerticalAlign.Center)
 
       Text(this.inputLogTitleText)
-        .fontSize(12)
+        .fontSize(EmuTypography.sm)
         .fontColor(EmuColors.onSurface)
         .width('100%')
 
       Text(this.inputLogDetailText)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
         .width('100%')
 
@@ -499,14 +499,14 @@ struct MultiplayerInputPage {
         ForEach(this.inputLogs, (item: InputLogItem) => {
           Row() {
             Text(`${item.time} ${item.eventName}`)
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
                             .fontColor('#777777')
               .layoutWeight(1)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
 
             Text(item.state)
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
                             .fontColor(item.isPrimary ? EmuColors.primary : EmuColors.onSurfaceVariant)
           }
           .width('100%')

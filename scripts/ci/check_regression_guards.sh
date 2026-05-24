@@ -23,13 +23,13 @@ if ! command -v rg >/dev/null 2>&1; then
   exit 1
 fi
 
-mmap_hits="$(rg -n '\bmmap\s*\(|\bmunmap\s*\(' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" || true)"
+mmap_hits="$(rg -n '\bmmap\s*\(|\bmunmap\s*\(' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" -g '!*.md' || true)"
 if [[ -n "${mmap_hits}" ]]; then
   report_fail "Direct mmap/munmap usage is forbidden for NativeWindow pixel access."
   echo "${mmap_hits}" >&2
 fi
 
-request_buffer_files="$(rg -l 'OH_NativeWindow_RequestBuffer' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" || true)"
+request_buffer_files="$(rg -l 'OH_NativeWindow_RequestBuffer' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" -g '!*.md' || true)"
 if [[ -n "${request_buffer_files}" ]]; then
   while IFS= read -r file; do
     [[ -z "${file}" ]] && continue
@@ -39,7 +39,7 @@ if [[ -n "${request_buffer_files}" ]]; then
   done <<< "${request_buffer_files}"
 fi
 
-map_files="$(rg -l 'OH_NativeBuffer_Map' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" || true)"
+map_files="$(rg -l 'OH_NativeBuffer_Map' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" -g '!*.md' || true)"
 if [[ -n "${map_files}" ]]; then
   while IFS= read -r file; do
     [[ -z "${file}" ]] && continue
@@ -49,19 +49,19 @@ if [[ -n "${map_files}" ]]; then
   done <<< "${map_files}"
 fi
 
-timeout_hits="$(rg -n 'SET_TIMEOUT[^\n]*(=|,)[[:space:]]*5\b' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" || true)"
+timeout_hits="$(rg -n 'SET_TIMEOUT[^\n]*(=|,)[[:space:]]*5\b' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" -g '!*.md' || true)"
 if [[ -n "${timeout_hits}" ]]; then
   report_fail "Hard-coded SET_TIMEOUT=5 is forbidden."
   echo "${timeout_hits}" >&2
 fi
 
-todo_hits="$(rg -n '\b(TODO|FIXME|HACK|XXX)\b' "${FIRST_PARTY_CPP_DIR}" "${FIRST_PARTY_ETS_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" || true)"
+todo_hits="$(rg -n '\b(TODO|FIXME|HACK|XXX)\b' "${FIRST_PARTY_CPP_DIR}" "${FIRST_PARTY_ETS_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" -g '!*.md' || true)"
 if [[ -n "${todo_hits}" ]]; then
   report_fail "TODO/FIXME/HACK/XXX markers are not allowed in first-party source."
   echo "${todo_hits}" >&2
 fi
 
-log_domain_files="$(rg -l '^[[:space:]]*#define[[:space:]]+LOG_DOMAIN[[:space:]]+' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" || true)"
+log_domain_files="$(rg -l '^[[:space:]]*#define[[:space:]]+LOG_DOMAIN[[:space:]]+' "${FIRST_PARTY_CPP_DIR}" -S -g "${LIBRETRO_VENDOR_GLOB}" -g '!*.md' || true)"
 if [[ -n "${log_domain_files}" ]]; then
   while IFS= read -r file; do
     [[ -z "${file}" ]] && continue

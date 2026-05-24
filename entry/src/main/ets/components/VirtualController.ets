@@ -6,6 +6,7 @@
 
 import { vibrator } from '@kit.SensorServiceKit';
 import LogHelper from '../common/LogHelper';
+import { EmuTypography } from '../common/EmuUiTokens'
 
 // 按键 ID 定义 (Libretro 标准)
 export const RETRO_DEVICE_ID_JOYPAD_B = 0;
@@ -83,7 +84,7 @@ export struct DPadControl {
   DirectionButton(icon: string, keyId: number) {
     Button() {
       Text(icon)
-        .fontSize(28)
+        .fontSize(EmuTypography.display)
         .fontColor(this.isTransparent ? Color.White : this.iconColor)
     }
     .width(this.buttonSize)
@@ -308,7 +309,7 @@ export struct StartSelectControl {
     Button(label)
       .width(this.buttonWidth)
       .height(this.buttonHeight)
-      .fontSize(16)
+      .fontSize(EmuTypography.lg)
       .fontWeight(FontWeight.Bold)
       .backgroundColor(color)
       .borderRadius(this.buttonHeight / 2)
@@ -340,7 +341,7 @@ export struct SystemControl {
         Button('停止')
           .width(this.buttonWidth)
           .height(this.buttonHeight)
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .backgroundColor('#95a5a6')
           .borderRadius(this.buttonHeight / 2)
           .onClick(() => {
@@ -352,7 +353,7 @@ export struct SystemControl {
       Button('重置')
         .width(this.buttonWidth)
         .height(this.buttonHeight)
-        .fontSize(16)
+        .fontSize(EmuTypography.lg)
         .backgroundColor('#3498db')
         .borderRadius(this.buttonHeight / 2)
         .onClick(() => {

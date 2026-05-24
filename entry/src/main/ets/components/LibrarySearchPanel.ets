@@ -1,8 +1,7 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { LibraryRecord } from '../common/LibraryRepository'
 import { EmuIcon } from './EmuIcon'
 import {
-  EmuTelemetryBarItem,
   EmuTelemetryCellItem,
   EmuTelemetryPanel
 } from './EmuTelemetryPanel'
@@ -17,7 +16,6 @@ export struct LibrarySearchPanel {
   @Prop spinnerAngle: number = 0
   @Prop searchResults: LibraryRecord[] = []
   @Prop telemetryCells: EmuTelemetryCellItem[] = []
-  @Prop telemetryBars: EmuTelemetryBarItem[] = []
   @Prop platforms: string[] = ['ALL']
   onKeywordChange?: (value: string) => void
   onSearchResultLaunch?: (item: LibraryRecord) => void
@@ -70,8 +68,7 @@ export struct LibrarySearchPanel {
       }
 
       EmuTelemetryPanel({
-        cells: this.telemetryCells,
-        bars: this.telemetryBars
+        cells: this.telemetryCells
       })
 
       PlatformChipBar({
@@ -91,7 +88,7 @@ export struct LibrarySearchPanel {
         ForEach(this.searchResults, (item: LibraryRecord) => {
           Row() {
             Text(item.title)
-              .fontSize(14)
+              .fontSize(EmuTypography.md)
               .fontWeight(FontWeight.Medium)
               .fontColor(EmuColors.onSurface)
               .layoutWeight(1)
@@ -99,7 +96,7 @@ export struct LibrarySearchPanel {
               .textOverflow({ overflow: TextOverflow.Ellipsis })
 
             Text(item.platform)
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
               .fontColor('#A000FF41')
               .fontFamily('monospace')
               .padding({ left: 6, right: 6, top: 3, bottom: 3 })
@@ -116,7 +113,7 @@ export struct LibrarySearchPanel {
         }, (item: LibraryRecord) => item.id)
       } else {
         Text('无匹配结果')
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontColor(EmuColors.onSurfaceVariant)
           .fontStyle(FontStyle.Italic)
           .width('100%')

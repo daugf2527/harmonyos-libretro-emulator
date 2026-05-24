@@ -3,41 +3,60 @@ import { EmuColors } from '../common/EmuUiTokens'
 export interface EmuTelemetryCellItem {
   label: string
   value: string
-}
-
-export interface EmuTelemetryBarItem {
-  id: string
-  height: number
-  color: string
+  progress: number
+  progressColor: string
 }
 
 @Component
 export struct EmuTelemetryPanel {
   @Prop cells: EmuTelemetryCellItem[] = []
-  @Prop bars: EmuTelemetryBarItem[] = []
+
+  private clampProgress(value: number): number {
+    if (!Number.isFinite(value) || value < 0) {
+      return 0
+    }
+    if (value > 100) {
+      return 100
+    }
+    return value
+  }
 
   @Builder
   private TelemetryCell(item: EmuTelemetryCellItem) {
     Column({ space: 6 }) {
-      Text(item.label)
-        .fontSize(9)
-        .fontColor(EmuColors.onSurfaceVariant)
-        .fontFamily('monospace')
-        .letterSpacing(1.2)
-
-      Row({ space: 8 }) {
-        Row()
-          .width(5)
-          .height(5)
-          .borderRadius(2.5)
-          .backgroundColor(EmuColors.primary)
+      Row() {
+        Text(item.label)
+          .fontSize(9)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .fontFamily('monospace')
+          .letterSpacing(1.2)
+          .layoutWeight(1)
 
         Text(item.value)
           .fontSize(11)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurface)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
+      .width('100%')
       .alignItems(VerticalAlign.Center)
+
+      Stack({ alignContent: Alignment.Start }) {
+        Row()
+          .width('100%')
+          .height(3)
+          .backgroundColor('#22484848')
+          .borderRadius(2)
+
+        Row()
+          .width(`${this.clampProgress(item.progress)}%`)
+          .height(3)
+          .backgroundColor(item.progressColor)
+          .borderRadius(2)
+      }
+      .width('100%')
+      .height(3)
     }
     .layoutWeight(1)
     .alignItems(HorizontalAlign.Start)
@@ -49,7 +68,7 @@ export struct EmuTelemetryPanel {
       .width(1)
       .height(34)
       .backgroundColor('#26484848')
-      .margin({ left: 10, right: 10 })
+      .margin({ left: 12, right: 12 })
   }
 
   build() {
@@ -60,20 +79,6 @@ export struct EmuTelemetryPanel {
         }
         this.TelemetryCell(item)
       }, (item: EmuTelemetryCellItem) => item.label)
-
-      Column({ space: 3 }) {
-        Row({ space: 2 }) {
-          ForEach(this.bars, (item: EmuTelemetryBarItem) => {
-            Row()
-              .width(10)
-              .height(item.height)
-              .backgroundColor(item.color)
-          }, (item: EmuTelemetryBarItem) => item.id)
-        }
-        .alignItems(VerticalAlign.Bottom)
-      }
-      .padding({ left: 18 })
-      .margin({ left: 14 })
     }
     .width('100%')
     .padding({ left: 14, right: 14, top: 12, bottom: 12 })

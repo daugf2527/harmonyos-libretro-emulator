@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuCoverArt } from './EmuCoverArt'
 import { EmuIcon } from './EmuIcon'
 
@@ -66,7 +66,7 @@ export struct LibraryDetailHeroPanel {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Text(this.localizedTitle)
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontWeight(FontWeight.Medium)
           .fontColor('#CCABABAB')
           .letterSpacing(1.4)
@@ -88,7 +88,7 @@ export struct LibraryDetailHeroPanel {
           .letterSpacing(1.2)
 
         Text('LAUNCH GAME')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontWeight(FontWeight.Bold)
           .fontColor('#CC00FF41')
           .fontFamily('monospace')

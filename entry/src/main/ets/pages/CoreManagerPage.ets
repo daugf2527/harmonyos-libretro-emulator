@@ -9,7 +9,7 @@ import {
   formatCoreFirmwarePathList,
   loadSystemFirmwareEntries
 } from '../common/CoreFirmwareRepository'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { CoreConfig, LIBRETRO_CORE_CATALOG } from '../common/LibretroCoreCatalog'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
@@ -254,7 +254,7 @@ struct CoreManagerPage {
 
       Column({ space: 6 }) {
         Text(item.status)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontWeight(FontWeight.Bold)
           .fontColor(item.installed ? EmuColors.primary : EmuColors.error)
           .padding({ left: 8, right: 8, top: 5, bottom: 5 })
@@ -281,23 +281,23 @@ struct CoreManagerPage {
   private KernelLog() {
     Column({ space: 6 }) {
       Text('运行日志')
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.onSurfaceVariant)
         .letterSpacing(2)
       Text('[SCAN] 仅扫描 bundleCodeDir/libs 下已打包的 core 文件')
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.onSurfaceVariant)
       Text(`[FW] 本地固件目录: ${this.firmwareDirectoryText}`)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
       Text(`[FW] ${this.firmwareSummaryText}`)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.onSurfaceVariant)
       Text(`[FW] ${this.firmwareFilesText}`)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
       Text(`[NET] ${this.remoteUpdateText}，在线更新与固件库下载入口当前不可用`)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.primary)
     }
     .width('100%')
@@ -322,11 +322,11 @@ struct CoreManagerPage {
         Column({ space: 24 }) {
           Row() {
             Text('内存占用')
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
                             .fontColor(EmuColors.onSurfaceVariant)
               .letterSpacing(2)
             Text(this.statusText)
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
                             .fontColor(EmuColors.primary)
           }
           .width('100%')
@@ -335,13 +335,13 @@ struct CoreManagerPage {
           this.MemoryFootprint()
 
           Text('已识别核心')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(2)
             .width('100%')
 
           Text('本页只展示本地已打包 core 与 filesDir/system 下的固件依赖状态；远端更新、在线固件库当前未接入。')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
             .fontColor(EmuColors.onSurfaceVariant)
             .width('100%')
 
@@ -355,7 +355,7 @@ struct CoreManagerPage {
 
           if (this.selectedCoreId.length > 0) {
             Text(this.buildSelectedCoreFirmwareText())
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
               .fontColor(EmuColors.onSurfaceVariant)
               .width('100%')
           }

@@ -1,0 +1,49 @@
+# Build outputs & cache (no source signal)
+.hvigor/
+entry/build/
+entry/.cxx/
+entry/.preview/
+entry/.appanalyzer/
+oh_modules/
+.idea/
+.pipeline/
+
+# Deprecated / legacy code (excluded from mainline)
+deprecated/
+
+# Personal AI tooling caches & helper scripts
+.codex/
+.codex_tmp/
+.windsurf/
+.firecrawl/
+.appanalyzer/
+.sanshu-memory/
+.cursorrules
+codex-yolo.cmd
+codex-yolo.ps1
+codex-full-auto.cmd
+codex-full-auto.ps1
+
+# Binaries / certificates (no value in source search)
+*.hap
+*.har
+*.hap.unsigned
+*.png
+*.jpg
+*.jpeg
+*.csr
+*.pem
+*.key
+*.p12
+
+# Screenshots, oversized logs, design assets
+img.png
+日志.txt
+截图验证/
+stitch_game_emulator_design_plan/
+
+# Stale top-level analysis docs (superseded by docs/plans/)
+RetroArch视频子系统技术分析*.md
+RetroArch音频子系统*.md
+hardcore_docs_roast.md
+docs_critique_report.md

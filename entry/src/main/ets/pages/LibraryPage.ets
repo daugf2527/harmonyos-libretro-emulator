@@ -28,7 +28,6 @@ import {
   buildLibraryRecordsFromSources
 } from '../common/LibraryRecordFactory'
 import {
-  getLibraryTelemetryBars,
   getLibraryTelemetryCells
 } from '../common/LibraryRuntimeTelemetryPresenter'
 import {
@@ -715,7 +714,6 @@ struct LibraryPage {
       showSearchResults: this.showSearchResults,
       searchResults: this.searchResults,
       telemetryCells: getLibraryTelemetryCells(this.allGames),
-      telemetryBars: getLibraryTelemetryBars(this.allGames),
       platforms: this.getDisplayPlatformFilters(),
       selectedPlatform: this.selectedPlatform,
       onKeywordChange: (value: string) => {

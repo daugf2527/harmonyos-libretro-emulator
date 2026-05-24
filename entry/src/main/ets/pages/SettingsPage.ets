@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
+import { EmuButton, EmuButtonKind, EmuButtonSize, EmuButtonShape } from '../components/EmuButton'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { BarChartBackground, BarChartItem, EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
@@ -32,6 +33,67 @@ interface SettingOptionItem {
 interface SoftwareResolutionPreset {
   width: number
   height: number
+}
+
+@Component
+struct LinearSettingRow {
+  @Prop label: string = ''
+  @Prop code: string = ''
+  @Prop value: number = 0
+  @Prop min: number = 0
+  @Prop max: number = 100
+  onChange?: (value: number) => void
+
+  build() {
+    Column({ space: 14 }) {
+      Row() {
+        Row({ space: 4 }) {
+          Text(this.label)
+            .fontSize(13)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#C8ABABAB')
+
+          Text(this.code)
+            .fontSize(9)
+            .fontColor('#77666666')
+        }
+        .alignItems(VerticalAlign.Bottom)
+
+        Text(`${this.value}%`)
+          .fontSize(EmuTypography.sm)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.primary)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Column({ space: 6 }) {
+        Slider({
+          value: this.value,
+          min: this.min,
+          max: this.max,
+          step: 1
+        })
+          .width('100%')
+          .blockColor(EmuColors.onSurface)
+          .trackColor('#66757575')
+          .selectedColor(EmuColors.primary)
+          .showSteps(false)
+          .showTips(false)
+          .onChange((next: number) => {
+            const clamped = Math.max(this.min, Math.min(this.max, Math.round(next)))
+            this.onChange?.(clamped)
+          })
+
+        Row()
+          .width('100%')
+          .height(1)
+          .backgroundColor('#26333333')
+      }
+      .width('100%')
+    }
+    .width('100%')
+  }
 }
 
 @Entry
@@ -376,12 +438,12 @@ struct SettingsPage {
     Stack() {
       Column({ space: 6 }) {
         Text(title)
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontWeight(FontWeight.Bold)
           .fontColor(this.activeTab === key ? EmuColors.onSurface : '#88757575')
 
         Text(code)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontWeight(FontWeight.Bold)
           .fontColor(this.activeTab === key ? '#B3ABABAB' : '#666666')
           .letterSpacing(1.8)
@@ -452,6 +514,23 @@ struct SettingsPage {
   }
 
   @Builder
+  private LinearSettingBlock(
+    label: string,
+    code: string,
+    value: number,
+    onChange: (value: number) => void
+  ) {
+    LinearSettingRow({
+      label: label,
+      code: code,
+      value: value,
+      min: 0,
+      max: 100,
+      onChange: onChange
+    })
+  }
+
+  @Builder
   private LinearSetting(
     label: string,
     code: string,
@@ -473,7 +552,7 @@ struct SettingsPage {
         .alignItems(VerticalAlign.Bottom)
 
         Text(`${value}%`)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
                     .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
       }
@@ -511,18 +590,18 @@ struct SettingsPage {
       Row() {
         Column({ space: 6 }) {
           Text('本地触控手柄')
-            .fontSize(16)
+            .fontSize(EmuTypography.lg)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.onSurface)
 
           Text(this.inputLayoutSummaryText)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#B3ABABAB')
         }
         .alignItems(HorizontalAlign.Start)
 
         Text(this.inputDeviceStatus)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
           .padding({ left: 10, right: 10, top: 6, bottom: 6 })
@@ -543,11 +622,11 @@ struct SettingsPage {
             .backgroundColor(EmuColors.primary)
 
           Text('L: 左肩键')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#B3ABABAB')
 
           Text('R: 右肩键')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#B3ABABAB')
         }
         .align(Alignment.TopStart)
@@ -566,7 +645,7 @@ struct SettingsPage {
       .clip(true)
 
       Text(this.inputLayoutDetailText)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor('#88757575')
         .width('100%')
         .textAlign(TextAlign.Center)
@@ -593,7 +672,7 @@ struct SettingsPage {
       Row() {
         Column({ space: 8 }) {
           Text(this.telemetryPrimaryLabel)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#B3ABABAB')
           Text(this.telemetryPrimaryValue)
             .fontSize(24)
@@ -603,10 +682,10 @@ struct SettingsPage {
 
         Column({ space: 8 }) {
           Text(this.telemetrySecondaryLabel)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#B3ABABAB')
           Text(this.telemetrySecondaryValue)
-            .fontSize(22)
+            .fontSize(EmuTypography.xxl)
                         .fontColor(EmuColors.onSurface)
         }
         .alignItems(HorizontalAlign.Start)
@@ -642,16 +721,14 @@ struct SettingsPage {
 
   @Builder
   private AdvancedActionButton(label: string, onClick: () => void) {
-    Button(label)
-      .fontSize(12)
-      .height(38)
-      .type(ButtonType.Normal)
-      .borderRadius(19)
-      .backgroundColor(EmuColors.surfaceContainerHighest)
-      .fontColor(EmuColors.primary)
-      .onClick(() => {
-        onClick()
-      })
+    EmuButton({
+      label: label,
+      kind: EmuButtonKind.SECONDARY,
+      buttonSize: EmuButtonSize.MD,
+      shape: EmuButtonShape.PILL,
+      accent: 'primary',
+      onTap: () => { onClick() }
+    })
   }
 
   @Builder
@@ -681,7 +758,7 @@ struct SettingsPage {
       .width('100%')
 
       Text('当前页会把 GPU Backend、缩放/呈现模式与软件分辨率上限写入运行时；Audio Buffer 为运行期只读摘要，滤镜预览不会写入 shader preset。')
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
         .width('100%')
     }
@@ -701,10 +778,10 @@ struct SettingsPage {
     Row({ space: 12 }) {
       Column({ space: 4 }) {
         Text(label)
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontColor(EmuColors.onSurface)
         Text(value)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontColor(EmuColors.onSurfaceVariant)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -713,19 +790,17 @@ struct SettingsPage {
       .alignItems(HorizontalAlign.Start)
 
       if (actionLabel && onClick) {
-        Button(actionLabel)
-          .fontSize(11)
-          .height(34)
-          .type(ButtonType.Normal)
-          .borderRadius(17)
-          .backgroundColor(EmuColors.surfaceContainerHighest)
-          .fontColor(EmuColors.primary)
-          .onClick(() => {
-            onClick()
-          })
+        EmuButton({
+          label: actionLabel,
+          kind: EmuButtonKind.SECONDARY,
+          buttonSize: EmuButtonSize.SM,
+          shape: EmuButtonShape.PILL,
+          accent: 'primary',
+          onTap: () => { onClick() }
+        })
       } else {
         Text('只读')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontColor(EmuColors.primary)
       }
     }
@@ -742,14 +817,14 @@ struct SettingsPage {
 
         Column({ space: 12 }) {
           Text('画面比例 aspect_ratio')
-            .fontSize(12)
+            .fontSize(EmuTypography.sm)
             .fontWeight(FontWeight.Bold)
             .fontColor('#9AABABAB')
           this.SegmentedAspectControl()
         }
         .width('100%')
 
-        this.LinearSetting('CRT 复古扫描线强度', 'scanline_intensity', this.scanlineIntensity, this.onScanlineIntensityChange)
+        this.LinearSettingBlock('CRT 复古扫描线强度', 'scanline_intensity', this.scanlineIntensity, this.onScanlineIntensityChange)
       }
       .width('100%')
 
@@ -761,7 +836,7 @@ struct SettingsPage {
 
       Column({ space: 18 }) {
         this.SectionTitle('音频音量', 'AUDIO_VOLUME')
-        this.LinearSetting('主音量', 'master_volume', this.masterVolume, this.onMasterVolumeChange)
+        this.LinearSettingBlock('主音量', 'master_volume', this.masterVolume, this.onMasterVolumeChange)
       }
       .width('100%')
 
@@ -828,7 +903,7 @@ struct SettingsPage {
     Row() {
       Column({ space: 4 }) {
         Text(label)
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontColor(EmuColors.onSurface)
         Text(value)
           .fontSize(9)
@@ -839,7 +914,7 @@ struct SettingsPage {
       .alignItems(HorizontalAlign.Start)
 
       Text('›')
-        .fontSize(22)
+        .fontSize(EmuTypography.xxl)
         .fontColor(EmuColors.primary)
     }
     .width('100%')

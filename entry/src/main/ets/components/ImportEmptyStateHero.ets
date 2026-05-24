@@ -1,4 +1,4 @@
-import { EmuColors, EmuRadius, EmuSpacing } from '../common/EmuUiTokens'
+import { EmuColors, EmuRadius, EmuSpacing, EmuTypography } from '../common/EmuUiTokens'
 import { EmuIcon } from './EmuIcon'
 
 @Component
@@ -78,7 +78,7 @@ export struct ImportEmptyStateHero {
         .margin({ bottom: 18 })
 
       Text('系统未检测到可用镜像。请选择本地 ROM 或 ISO 文件开始模拟。')
-        .fontSize(16)
+        .fontSize(EmuTypography.lg)
         .lineHeight(28)
         .fontColor('#CCABABAB')
         .textAlign(TextAlign.Center)
@@ -89,13 +89,13 @@ export struct ImportEmptyStateHero {
         Column({ space: 8 }) {
           Row() {
             Text(this.scanStatusText)
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
               .fontColor(EmuColors.primary)
               .fontFamily('monospace')
               .letterSpacing(1.2)
 
             Text(`${Math.floor(this.scanProgress)}%`)
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
               .fontColor(EmuColors.primary)
               .fontFamily('monospace')
           }
@@ -131,7 +131,7 @@ export struct ImportEmptyStateHero {
             .backgroundColor(EmuColors.primary)
 
           Text('选择游戏文件导入')
-            .fontSize(14)
+            .fontSize(EmuTypography.md)
             .fontColor(EmuColors.onSurface)
             .letterSpacing(2)
 
@@ -166,7 +166,7 @@ export struct ImportEmptyStateHero {
       })
 
       Text('仅支持你合法拥有的游戏')
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontColor('#555555')
         .letterSpacing(1.2)
         .margin({ top: 48 })

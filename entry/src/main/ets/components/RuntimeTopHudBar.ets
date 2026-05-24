@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 
 export interface RuntimeHudMetric {
   label: string
@@ -58,7 +58,7 @@ export struct RuntimeTopHudBar {
           .backgroundColor('#33484848')
 
         Text('◥')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontColor(EmuColors.primary)
       }
       .alignItems(VerticalAlign.Center)

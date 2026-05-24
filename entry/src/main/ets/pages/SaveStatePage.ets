@@ -2,7 +2,7 @@ import testNapi from 'libentry.so'
 import { common } from '@kit.AbilityKit'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import {
   deleteSaveStateItem,
   listSaveStateItems,
@@ -310,7 +310,7 @@ struct SaveStatePage {
         })
 
         Text('碳影 / Carbon Shade')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
                     .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
           .letterSpacing(1.6)
@@ -321,7 +321,7 @@ struct SaveStatePage {
       .alignItems(VerticalAlign.Center)
 
       Text('存档管理')
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.onSurface)
         .letterSpacing(0.8)
@@ -329,7 +329,7 @@ struct SaveStatePage {
       Row({ space: 16 }) {
         Row() {
           Text('+')
-            .fontSize(28)
+            .fontSize(EmuTypography.display)
             .fontWeight(FontWeight.Bold)
             .fontColor('#004C0C')
         }
@@ -394,13 +394,13 @@ struct SaveStatePage {
 
       Column({ space: 6 }) {
         Text(label.toUpperCase())
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(2.4)
 
         Text(value)
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
                     .fontColor(label === 'Archive' ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .letterSpacing(1.6)
           .maxLines(2)
@@ -449,14 +449,14 @@ struct SaveStatePage {
 
         Column({ space: 4 }) {
           Text(this.normalizeTitle(item.fileName))
-            .fontSize(14)
+            .fontSize(EmuTypography.md)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
 
           Text(`${item.slotLabel} | ${item.detail}`)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurfaceVariant)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -468,7 +468,7 @@ struct SaveStatePage {
           this.DurationBadge(item)
 
           Text('≡')
-            .fontSize(14)
+            .fontSize(EmuTypography.md)
             .fontColor(EmuColors.onSurfaceVariant)
         }
         .alignItems(HorizontalAlign.End)
@@ -498,7 +498,7 @@ struct SaveStatePage {
         .border({ width: 0.5, color: EmuColors.primary, style: BorderStyle.Solid })
     } else {
       Text(item.durationLabel)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.onSurfaceVariant)
     }
   }
@@ -507,7 +507,7 @@ struct SaveStatePage {
   private SwipeAction(label: string, color: string, fileName: string) {
     Row() {
       Text(label)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontWeight(FontWeight.Bold)
         .fontColor(label === '读档' ? '#004C0C' : '#450900')
         .letterSpacing(1)
@@ -545,7 +545,7 @@ struct SaveStatePage {
           .opacity(0.48)
 
         Text('END OF ARCHIVE STREAM')
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(4)
           .opacity(0.48)
@@ -592,14 +592,14 @@ struct SaveStatePage {
           .fontColor(EmuColors.onSurface)
 
         Text('此操作不可恢复')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.2)
 
         Button('确定删除')
           .width('100%')
           .height(42)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontWeight(FontWeight.Bold)
           .fontColor('#450900')
           .backgroundColor(EmuColors.error)
@@ -610,7 +610,7 @@ struct SaveStatePage {
         Button('取消')
           .width('100%')
           .height(40)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontColor(EmuColors.onSurfaceVariant)
           .backgroundColor(EmuColors.surfaceContainerHigh)
           .onClick(() => {
@@ -637,7 +637,7 @@ struct SaveStatePage {
         iconSize: 14
       })
       Text(this.toastMessage)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontWeight(FontWeight.Bold)
         .fontColor('#004C0C')
         .letterSpacing(1)

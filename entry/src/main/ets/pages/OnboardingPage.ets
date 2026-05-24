@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit'
 import { fileIo as fs, picker } from '@kit.CoreFileKit'
 import { EmuIcon } from '../components/EmuIcon'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { GridBackground } from '../components/EmuAppShell'
 import { PageLifecycleGuard } from '../common/PageLifecycleGuard'
 
@@ -297,7 +297,7 @@ struct OnboardingPage {
           iconSize: 14
         })
         Text('碳影 / Carbon Shade')
-                    .fontSize(14)
+                    .fontSize(EmuTypography.md)
           .fontColor(Colors.primary)
           .letterSpacing(1.6)
       }
@@ -305,7 +305,7 @@ struct OnboardingPage {
       Row({ space: 16 }) {
         Text(this.currentStep === 1 ? '初始设置 01' : '文件授权 02')
           .fontFamily('Inter')
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontColor(Colors.secondary)
           .fontWeight(FontWeight.Medium)
           .letterSpacing(0)
@@ -375,7 +375,7 @@ struct OnboardingPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Text('为本地 ROM / ISO 建立游戏库，保留 Core、Shader、存档等模拟器工作流。')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontColor('#CCABABAB')
           .lineHeight(28)
           .textAlign(TextAlign.Center)
@@ -397,7 +397,7 @@ struct OnboardingPage {
               .backgroundColor(Colors.primary)
 
             Text('立即开启')
-              .fontSize(14)
+              .fontSize(EmuTypography.md)
               .fontWeight(FontWeight.Medium)
               .fontColor(Colors.primary)
               .letterSpacing(4)
@@ -434,20 +434,20 @@ struct OnboardingPage {
       // Status bar
       Row() {
         Column({ space: 4 }) {
-          Text('状态').fontSize(10).fontColor('#FF666666').letterSpacing(2)
-          Text('本地就绪').fontSize(10).fontColor('#FF9D9E9E')
+          Text('状态').fontSize(EmuTypography.xs).fontColor('#FF666666').letterSpacing(2)
+          Text('本地就绪').fontSize(EmuTypography.xs).fontColor('#FF9D9E9E')
         }
         .alignItems(HorizontalAlign.Start)
 
         Column({ space: 4 }) {
-          Text('核心').fontSize(10).fontColor('#FF666666').letterSpacing(2)
-          Text('Core 已启用').fontSize(10).fontColor('#FF9D9E9E')
+          Text('核心').fontSize(EmuTypography.xs).fontColor('#FF666666').letterSpacing(2)
+          Text('Core 已启用').fontSize(EmuTypography.xs).fontColor('#FF9D9E9E')
         }
         .alignItems(HorizontalAlign.Center)
 
         Column({ space: 4 }) {
-          Text('延迟').fontSize(10).fontColor('#FF666666').letterSpacing(2)
-          Text('0.02ms').fontSize(10).fontColor(Colors.primary)
+          Text('延迟').fontSize(EmuTypography.xs).fontColor('#FF666666').letterSpacing(2)
+          Text('0.02ms').fontSize(EmuTypography.xs).fontColor(Colors.primary)
         }
         .alignItems(HorizontalAlign.End)
       }
@@ -472,7 +472,7 @@ struct OnboardingPage {
             .backgroundColor(Colors.primary)
 
           Text('需要文件访问权限')
-            .fontSize(12)
+            .fontSize(EmuTypography.sm)
                         .fontColor(Colors.primary)
             .letterSpacing(3)
         }
@@ -486,7 +486,7 @@ struct OnboardingPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Text('碳影使用系统文件选择器获取一次性文件 URI，并把 ROM 复制到应用沙箱。')
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontColor(Colors.onSurfaceVariant)
           .lineHeight(22)
           .maxLines(3)
@@ -559,12 +559,12 @@ struct OnboardingPage {
       Column({ space: 0 }) {
         Row() {
           Text('文件访问状态')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#FF666666')
             .letterSpacing(1)
 
           Text(this.protocolStatus)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(this.getProtocolColor())
             .letterSpacing(1)
         }
@@ -581,7 +581,7 @@ struct OnboardingPage {
               .backgroundColor(this.getPermissionDotColor(item))
 
             Text(this.getPermissionStatusText(item))
-              .fontSize(12)
+              .fontSize(EmuTypography.sm)
                             .fontColor(Colors.onSurfaceVariant)
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -591,7 +591,7 @@ struct OnboardingPage {
           .margin({ bottom: 8 })
 
           Text(item.detail)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
             .fontColor('#FF777777')
             .margin({ left: 18, bottom: 8 })
             .width('100%')
@@ -600,7 +600,7 @@ struct OnboardingPage {
         }, (item: PermissionItem) => item.key)
 
         Text(this.protocolDetailText)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontColor(Colors.onSurfaceVariant)
           .width('100%')
           .margin({ top: 4 })
@@ -618,7 +618,7 @@ struct OnboardingPage {
         Button({ type: ButtonType.Normal }) {
           Row({ space: 8 }) {
             Text('打开导入器')
-              .fontSize(14)
+              .fontSize(EmuTypography.md)
               .fontWeight(FontWeight.Medium)
               .fontColor(Colors.onSurface)
               .letterSpacing(4)
@@ -641,7 +641,7 @@ struct OnboardingPage {
         .onClick(() => this.openImportEntry())
 
         Text('稍后导入，先进入游戏库')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontColor('#FF666666')
           .letterSpacing(2)
           .onClick(() => this.openLibraryPage())

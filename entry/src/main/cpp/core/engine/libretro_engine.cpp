@@ -7,6 +7,7 @@
 #include <cmath>
 #include <chrono>
 #include <cstring>
+#include <thread>
 #if defined(__has_include) &&                                                  \
     __has_include("../../platform/resource/rom_loader.h")
 #include "../../platform/resource/rom_loader.h"
@@ -1142,8 +1143,28 @@ void LibretroEngine::GameLoop() {
           TransitionTo(EngineState::STOPPING);
           break;
         }
+        const auto frameStart = std::chrono::steady_clock::now();
         ProcessFrame();
         frameCount_++;
+
+        // 节拍器：若 retro_run 内部未走视频管线节拍（如 loading、菜单态、
+        // hwrender 早退路径），这里兜底 sleep 到目标帧时间，避免 frameCount
+        // 飙升到 1000+ FPS。VideoPipeline 内部仍有自己的节拍，本节拍仅作上限。
+        const double safeTargetFps = (targetFps_ > 0.0) ? targetFps_ : 60.0;
+        const int64_t targetFrameUs =
+            static_cast<int64_t>(1000000.0 / safeTargetFps);
+        const auto frameEnd = std::chrono::steady_clock::now();
+        const int64_t elapsedUs =
+            std::chrono::duration_cast<std::chrono::microseconds>(
+                frameEnd - frameStart)
+                .count();
+        if (elapsedUs < targetFrameUs) {
+          const int64_t remainingUs = targetFrameUs - elapsedUs;
+          if (remainingUs > 200) {
+            std::this_thread::sleep_for(
+                std::chrono::microseconds(remainingUs - 100));
+          }
+        }
 
         // 3. 上报 FPS
         auto now = std::chrono::steady_clock::now();
