@@ -185,8 +185,8 @@ harmony skills 远远落后 carbon（1 vs 6），但**不该盲目补齐到 6**�
 |---|---|---|---|---|
 | **S1（本会话）** | harmony | ≈3 h | 产出本设计文档 + 写入 `feedback_setup_harness_first_before_coding` memory | 设计文档 commit + MEMORY.md 多一行 |
 | **S2** | harmony | 1.5 h | **P0 harmony 侧**：H1 + H2 + B1.harmony | 各按 P0 验收口径手动跑一遍 → 提 PR 到 harmony |
-| **S3** | carbon | 0.5 h | **P0 carbon 侧**：C1 + C2 + B1.carbon | settings.json 改完 + 提 PR 到 carbon |
-| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2，每会话挑 1-2 项 | - |
+| **S3** | carbon | 1.5 h | **P0 carbon 侧**：C1 + C2 + B1.carbon **+ CT1 + CT2**（拆分 CLAUDE.md / .claudeignore；详见附录 A） | settings.json 改完 + CLAUDE.md 拆分完成 + 提 PR |
+| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 **+ CT3 / CT5 / FB1**（详见附录 A、B），每会话挑 1-2 项 | - |
 | **S7+** | 视情况 | - | **P2 探索**：观察 P0/P1 跑 2-4 周效果后决策 | - |
 
 ---
@@ -211,7 +211,88 @@ harmony skills 远远落后 carbon（1 vs 6），但**不该盲目补齐到 6**�
 
 ---
 
-## 附录 — 相关 memory（背景上下文）
+## 附录 A — 维度 3：上下文治理（速通版）
+
+业界共识（2026）：CLAUDE.md **80-120 行最优 / ≤200 行推荐 / ≤300 行上限**；MEMORY.md **超 200 行被截断**；CLAUDE.md 是 *advisory* 非 mandatory（~70% 遵守率，强制要 hooks）；新 facility：`@import` 语法（5 层递归）/ `.claude/rules/` 路径作用域 / `subagent memory`（v2.1.33+）。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **CLAUDE.md ≤200 行** | ❌ 单文件 ≈21K（超 4-6 倍） | ✅ root 已分层 / AGENTS.md 449 行偏厚 | **carbon 拆分**（P0 / CT1）+ **harmony AGENTS.md 处理**（P2 / CT4） |
+| **分层 / subdirectory CLAUDE.md** | ❌ | ✅ root + ets/ + cpp/ | **carbon ← harmony**（P0 顺带 CT1） |
+| **.claudeignore** | ❌ | ✅ | **carbon ← harmony**（P0 / CT2） |
+| **MEMORY.md ≤200 行** | ✅ 28 条 | ✅ 17 条 | 两边都安全 |
+| **`@import` 语法模块化** | ❌ | ❌ | 两边都补（P1 / CT3） |
+| **`subagent memory`（v2.1.33+）** | ❌ | ❌ | 两边都补（P1 / CT5，给 napi/combat reviewer 各配） |
+| **statusline + status.json** | ✅ | ❌ | **harmony ← carbon**（P2，与 B3 合并） |
+
+### 糟粕识别（明确不抄）
+
+- `CONTEXT.md` / `SKILLS.md` registry —— 业界新概念但**未沉淀**
+- `/compact 60%` 主动触发 —— 单会话技巧，跨会话设计无关
+- Enterprise 三层（org/service/local）—— 个人项目无组织层
+- `.claude/rules/` 路径作用域 —— CLAUDE.md 分层已够用
+
+### P0 / P1 / P2
+
+**P0**：
+- **CT1**（carbon）：拆分 CLAUDE.md `21K → root ≤200 行 + 子目录 CLAUDE.md`。来源：harmony 分层 + [orchestrator size limits](https://orchestrator.dev/blog/2026-04-06--claude-code-agent-memory-2026/) + [HumanLayer writing-a-good-claude-md](https://www.humanlayer.dev/blog/writing-a-good-claude-md)。验收：`wc -l` 每个文件 ≤200。
+- **CT2**（carbon）：抄 `.claudeignore`（屏蔽 dist/ node_modules/ .tmp/ verification/）。验收：carbon 内 Grep 不再扫到 dist/。
+
+**P1**：
+- **CT3**（两边）：引入 `@import` 串各 chunk。
+- **CT5**（两边）：每个现有 agent 配同目录 `*.memory.md`（subagent memory，v2.1.33+）。
+
+**P2 / 探索**：
+- **CT4**（harmony）：AGENTS.md 449 行 → 探索拆 3-5 个 `.claude/rules/arkui-*.md` 路径作用域文件。**降级理由**：ArkUI 业务复杂，硬拆可能让规则查找更费劲；先用 root CLAUDE.md `@import AGENTS.md` 引用即可，等 ArkUI 模块自然演化再拆。
+
+**P2 / 不做**：CONTEXT.md/SKILLS.md registry / /compact 60% / Enterprise 三层 / `.claude/rules/` 路径作用域。
+
+---
+
+## 附录 B — 维度 4：本地反馈 + CI 补齐（速通版）
+
+业界共识（[DEV husky/pre-commit](https://dev.to/myougatheaxo/git-hooks-with-claude-code-build-quality-gates-with-husky-and-pre-commit-27l0) / [Lefthook](https://liambx.com/blog/ai-agent-lint-enforcement-lefthook-claude-code) / [Agentic pre-commit](https://www.linkedin.com/posts/nicholasmoore_agent-sdk-overview-activity-7426695024094113792-x9LR) / [anthropic/claude-quickstarts](https://github.com/anthropics/claude-quickstarts/blob/main/.pre-commit-config.yaml)）：**5 层反馈塔** = ① PostToolUse hook（per-edit）② pre-commit（lint-staged）③ commit-msg ④ pre-push ⑤ CI；Tier 1 = local pre-commit + Tier 2 = CI；PostToolUse 是 2026 关键升级（"finally brings Claude Code up to parity with Cursor"）。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **① PostToolUse 自动 validate** | ✅ `post-typecheck.mjs` (tsc) | ✅ `post-edit-cpp.sh` (codelinter 单文件) | **已做**（hooks 维度已收）|
+| **② pre-commit git hook**（Husky / Lefthook / bash） | ❌ 靠手跑 `npm run analyze` | ❌ Stop hook 仅覆盖 Claude 路径；用户手动 `git commit` 裸奔 | **两边都补**（P1 / FB1）|
+| **③ commit-msg hook** | ❌ | ❌ | **P2**（skill 已按格式生成，hook 重复）|
+| **④ pre-push hook** | ❌ | ❌ | **P2**（CI 已覆盖）|
+| **⑤ CI** | ✅ build-dnf-extract.yml | ✅ harmonyos-pr-ci + release | 已做 |
+| **本地快反馈脚本（cursor 平价）** | ✅ npm run analyze (8 gates) | ✅ quick_signals.sh (~10s) | **已做** — 两边都不输业界 |
+| **Agentic pre-commit（Claude SDK）** | ❌ | ❌ | **两边跳过**（ROI 低）|
+
+### 糟粕识别（明确不抄）
+
+- **Agentic pre-commit** —— 业界热点但个人项目 ROI 低（每次 commit 吃 API token）
+- **5 层反馈塔全做** —— 个人项目 ①+②+⑤ 三层够，③④ 跳过
+- **Lefthook 迁移 Husky** —— 个人项目尺度速度差异不显著，不划算迁
+- **commit-msg 强制 Conventional Commits** —— 与 `auto-commit-cicd` skill 重复
+
+### P0 / P1 / P2
+
+**P0**：无（业界推 ② 缺位但不致命；cursor 平价快反馈 ①+⑤ 都做了）
+
+**P1**：
+- **FB1**（两边都补）：补 pre-commit git hook —— **保护"用户命令行手动 `git commit`"不经过 Claude 的路径**
+  - carbon：`.husky/pre-commit` 跑 `npm run analyze`（首选 lint-staged 风格只跑 staged 文件）
+  - harmony：`.git/hooks/pre-commit` 跑 `bash scripts/check/quick_signals.sh`（不用 Husky，HarmonyOS 工程非 Node）
+  - 验收：本地 `git commit` 失败时拒绝提交 + 错误信息可读
+
+**P2 / 不做**：commit-msg / pre-push / Agentic pre-commit / Lefthook 迁移 / 5 层全做。
+
+### 关键互补观察
+
+两边在维度 4 的现状**已经接近业界 best**——cursor 平价的本地快反馈 ①+⑤ 都做了。**唯一真实 gap 是 ②**（git pre-commit 层），且是因为"用户手动 commit 时不经过 Claude" 这条侧门才有意义。
+
+---
+
+## 附录 C — 相关 memory（背景上下文）
 
 - `feedback_individual_project_workflow` —— 个人项目砍团队回路
 - `feedback_agent_worktree_isolation` —— cwd 切换风险
