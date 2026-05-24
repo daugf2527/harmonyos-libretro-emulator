@@ -186,7 +186,7 @@ harmony skills 远远落后 carbon（1 vs 6），但**不该盲目补齐到 6**�
 | **S1（本会话）** | harmony | ≈3 h | 产出本设计文档 + 写入 `feedback_setup_harness_first_before_coding` memory | 设计文档 commit + MEMORY.md 多一行 |
 | **S2** | harmony | 1.5 h | **P0 harmony 侧**：H1 + H2 + B1.harmony | 各按 P0 验收口径手动跑一遍 → 提 PR 到 harmony |
 | **S3** | carbon | 1.5 h | **P0 carbon 侧**：C1 + C2 + B1.carbon **+ CT1 + CT2**（拆分 CLAUDE.md / .claudeignore；详见附录 A） | settings.json 改完 + CLAUDE.md 拆分完成 + 提 PR |
-| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 **+ CT3 / CT5 / FB1**（详见附录 A、B），每会话挑 1-2 项 | - |
+| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 / CT3 / CT5 / FB1 **+ AG1**（详见附录 A、B、C），每会话挑 1-2 项 | - |
 | **S7+** | 视情况 | - | **P2 探索**：观察 P0/P1 跑 2-4 周效果后决策 | - |
 
 ---
@@ -292,7 +292,56 @@ harmony skills 远远落后 carbon（1 vs 6），但**不该盲目补齐到 6**�
 
 ---
 
-## 附录 C — 相关 memory（背景上下文）
+## 附录 C — 维度 5：Agents（速通版）
+
+业界共识 2026：`.claude/agents/<name>.md` 用 frontmatter `model`（sonnet/opus）+ `tools` 受限（review-only 只给 Read/Grep/Glob）+ `description` 决定 Claude 主动派的精度；推 review-only 不推 fix-agent（trust 问题）；多 agent 协作 = split-and-merge / sequential / orchestrator；description 写"Use when X ... NOT for Y"格式提高触发精度。
+
+### Gap 矩阵
+
+| 业界 baseline | carbon | harmony | 双向结论 |
+|---|---|---|---|
+| **review-only agent**（tools 限 Read/Grep/Glob） | ✅ `combat-kernel-reviewer` 1.6K（被 closed-loop 调） | ✅ `napi-boundary-reviewer` 7.3K（但**孤儿，无 skill 调用**） | **harmony 接入 closed-loop**（H2 自带；P0 顺带）|
+| **model 档位 frontmatter** | ✅ sonnet | ✅ sonnet | 两边都做了 ✅ |
+| **tools 受限** | ✅ | ✅ Read/Grep/Glob/Bash | 两边都做了 ✅ |
+| **description "Use when X ... NOT for Y"** | ⚠️ 短描述 | ✅ napi-reviewer 明确写"NOT for general C++ review" | **carbon ← harmony**（P1 / AG1） |
+| **fix agent 反模式** | ✅ closed-loop 明确反对（main Claude 自修） | N/A | 两边都遵守 ✅ |
+| **多 agent 协作** | ⚠️ closed-loop 单 type 并行 dispatch（按 topic） | ❌ 单孤儿 | 个人项目 agent 少，不强推（P2） |
+
+### 糟粕识别（明确不抄）
+
+- **great_cto plugin 模式（7 个专业 agent 联动）** —— 个人项目过度
+- **fix-agent / agent 调 agent 递归** —— 业界明确反对（trust 失控）
+
+### P0 / P1 / P2
+
+**P0**：无（H2 自带把 napi-reviewer 接入 closed-loop；其他已对位）
+
+**P1**：
+- **AG1**（carbon）：`combat-kernel-reviewer.md` description 加"Use when ... NOT for ..."模式（参考 harmony `napi-boundary-reviewer.md:3`），提高 Claude 主动派精度。
+
+**P2 / 不做**：great_cto 多 agent 编排 / fix-agent / agent 递归调用。
+
+---
+
+## 附录 D — 维度 6：MCP servers（结论：non-gap）
+
+业界共识：项目级 `.mcp.json` 固化项目所需 MCP（serena / cclsp / sequential-thinking 等），优势是跨开发者/跨机器一致；劣势是与用户全局 MCP 冗余。**个人项目场景**：除非项目绑特殊 MCP（如 LSP），否则用全局即可。
+
+### Gap 矩阵 + 结论
+
+| 业界 baseline | carbon | harmony | 结论 |
+|---|---|---|---|
+| **项目级 `.mcp.json`** | ❌ | ❌ | **两边都不补** —— 个人项目用全局即可，避免与 `~/.claude/mcp.json` 冗余 |
+| **MCP 配置文件分离**（如 `.claude/cclsp.json`） | ❌（TS 用全局 typescript-lsp 够） | ✅ `.claude/cclsp.json` 绑 HarmonyOS NDK clangd | **carbon 不补**（无对应 LSP 特殊需求） |
+| **MCP PATH/env Windows 坑** | N/A | N/A | 已在 memory `feedback_mcp_path_style` 沉淀 |
+
+### 结论：维度 6 全部 P2 / 不做
+
+两边的 MCP 现状（靠全局 + harmony 的 `cclsp.json` LSP 例外）**实际是个人项目的 best practice** —— 补项目级 `.mcp.json` 增加同步心智成本，性价比低。维度 6 是 **non-gap**，主要价值是确认现状合理。
+
+---
+
+## 附录 E — 相关 memory（背景上下文）
 
 - `feedback_individual_project_workflow` —— 个人项目砍团队回路
 - `feedback_agent_worktree_isolation` —— cwd 切换风险
