@@ -16,7 +16,7 @@ interface CoreConfig {
 }
 
 interface CoreLoaderNapi {
-  testCoreLoader(corePath: string): string;
+  testCoreLoader(corePath: string): Promise<string>;
 }
 
 const nativeApi = testNapi as CoreLoaderNapi;
@@ -306,7 +306,7 @@ struct CoreLoaderTest {
         .fontSize(EmuTypography.xl)
         .enabled(!this.isLoading)
         .onClick(() => {
-          this.runTest();
+          void this.runTest();
         })
         .margin({ bottom: 30 })
 
@@ -352,7 +352,7 @@ struct CoreLoaderTest {
   /**
    * 运行 CoreLoader 测试
    */
-  private runTest() {
+  private async runTest() {
     console.info('[CoreLoaderTest] Starting test...');
     this.isLoading = true;
     this.testResult = '正在测试...\n请查看日志输出';
@@ -360,8 +360,8 @@ struct CoreLoaderTest {
     try {
       // 调用 Native 侧的测试函数 (传递沙箱路径)
       console.info(`[CoreLoaderTest] Calling testCoreLoader with path: ${this.corePath}`);
-      let result = nativeApi.testCoreLoader(this.corePath);
-      
+      let result = await nativeApi.testCoreLoader(this.corePath);
+
       console.info(`[CoreLoaderTest] Test result: ${result}`);
       this.testResult = result;
       

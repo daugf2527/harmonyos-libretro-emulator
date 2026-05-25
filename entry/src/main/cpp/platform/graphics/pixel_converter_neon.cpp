@@ -30,7 +30,7 @@
 
 #undef LOG_DOMAIN
 #undef LOG_TAG
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD00E
 #define LOG_TAG "PixelConverter"
 #undef LOG_FLOW
 #define LOG_FLOW "Video"

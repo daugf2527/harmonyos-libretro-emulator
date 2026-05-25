@@ -44,7 +44,7 @@ static napi_value WaitForEngineState(napi_env env, napi_callback_info info) {
 }
 
 struct WaitForStateAsyncContext {
-  napi_env env = nullptr;
+  // Audit T1-F3: removed unused napi_env env field (env lifetime unsafe to store in async ctx)
   napi_deferred deferred = nullptr;
   napi_async_work work = nullptr;
   libretro::EngineState target = libretro::EngineState::INIT;
@@ -66,9 +66,16 @@ static void CompleteWaitForState(napi_env env, napi_status status, void *data) {
     return;
   }
 
-  napi_value result;
-  napi_get_boolean(env, ctx->result, &result);
-  napi_resolve_deferred(env, ctx->deferred, result);
+  // Audit T1-F1: guard napi_cancelled — calling napi_get_boolean/napi_resolve_deferred on cancelled env is UB
+  if (status != napi_ok) {
+    napi_value reason;
+    napi_get_undefined(env, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
+  } else {
+    napi_value result;
+    napi_get_boolean(env, ctx->result, &result);
+    napi_resolve_deferred(env, ctx->deferred, result);
+  }
 
   napi_delete_async_work(env, ctx->work);
   delete ctx;
@@ -101,7 +108,7 @@ static napi_value WaitForEngineStateAsync(napi_env env,
   }
 
   auto *ctx = new WaitForStateAsyncContext();
-  ctx->env = env;
+  // Audit T1-F3: env field removed from ctx, no assignment needed
   ctx->target = static_cast<libretro::EngineState>(stateValue);
   ctx->timeoutMs = static_cast<uint32_t>(timeoutMs);
   ctx->work = nullptr;

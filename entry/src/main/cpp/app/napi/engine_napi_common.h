@@ -34,13 +34,23 @@ inline LibretroEngine *GetEngine() { return LibretroEngine::GetInstance(); }
     return defaultReturn; \
   }
 
+// Audit T1-F5: returns nullptr if a pending exception exists (set by GetArgs/type-getters),
+// so callers don't need per-site nullptr returns after helper failures.
 inline napi_value MakeBool(napi_env env, bool value) {
+  bool pending = false;
+  if (napi_is_exception_pending(env, &pending) == napi_ok && pending) {
+    return nullptr;
+  }
   napi_value result;
   napi_get_boolean(env, value, &result);
   return result;
 }
 
 inline napi_value MakeResolvedPromise(napi_env env, bool value) {
+  bool pending = false;
+  if (napi_is_exception_pending(env, &pending) == napi_ok && pending) {
+    return nullptr;
+  }
   napi_deferred deferred = nullptr;
   napi_value promise = nullptr;
   if (napi_create_promise(env, &deferred, &promise) != napi_ok || !deferred) {
@@ -62,6 +72,8 @@ inline bool GetArgs(napi_env env, napi_callback_info info, size_t minArgs,
     LOGF(LOG_ERROR,
                  "[NEW] %s requires at least %{public}zu argument(s)",
                  func, minArgs);
+    // Audit T1-F5: throw so ArkTS distinguishes contract violations from logical false
+    napi_throw_type_error(env, nullptr, "Wrong number of arguments");
     return false;
   }
   if (argcOut) {
@@ -84,6 +96,7 @@ inline bool GetStringArg(napi_env env, napi_value arg, char *out,
   if (status != napi_ok || size == 0) {
     LOGF(LOG_ERROR,
                  "[NEW] %s invalid string arg: %{public}s", func, argName);
+    napi_throw_type_error(env, nullptr, "Expected string argument"); // Audit T1-F5
     return false;
   }
   if (size >= outSize) {
@@ -95,6 +108,7 @@ inline bool GetStringArg(napi_env env, napi_value arg, char *out,
   if (status != napi_ok || size == 0) {
     LOGF(LOG_ERROR,
                  "[NEW] %s invalid string arg: %{public}s", func, argName);
+    napi_throw_type_error(env, nullptr, "Expected string argument"); // Audit T1-F5
     return false;
   }
   return true;
@@ -139,6 +153,7 @@ inline bool GetInt32Arg(napi_env env, napi_value arg, int32_t &out,
   if (status != napi_ok) {
     LOGF(LOG_ERROR,
                  "[NEW] %s invalid int32 arg: %{public}s", func, argName);
+    napi_throw_type_error(env, nullptr, "Expected number argument"); // Audit T1-F5
     return false;
   }
   return true;
@@ -150,6 +165,7 @@ inline bool GetBoolArg(napi_env env, napi_value arg, bool &out,
   if (status != napi_ok) {
     LOGF(LOG_ERROR,
                  "[NEW] %s invalid bool arg: %{public}s", func, argName);
+    napi_throw_type_error(env, nullptr, "Expected boolean argument"); // Audit T1-F5
     return false;
   }
   return true;
@@ -161,6 +177,7 @@ inline bool GetDoubleArg(napi_env env, napi_value arg, double &out,
   if (status != napi_ok) {
     LOGF(LOG_ERROR,
                  "[NEW] %s invalid double arg: %{public}s", func, argName);
+    napi_throw_type_error(env, nullptr, "Expected number argument"); // Audit T1-F5
     return false;
   }
   return true;
@@ -173,6 +190,7 @@ inline bool GetArrayBufferArg(napi_env env, napi_value arg, void **data,
   if (status != napi_ok || !data || !length || !*data || *length == 0) {
     LOGF(LOG_ERROR,
                  "[NEW] %s invalid arraybuffer arg: %{public}s", func, argName);
+    napi_throw_type_error(env, nullptr, "Expected ArrayBuffer argument"); // Audit T1-F5
     return false;
   }
   return true;

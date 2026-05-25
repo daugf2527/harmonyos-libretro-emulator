@@ -35,7 +35,7 @@ namespace libretro {
 // 设计警告:本项目同时存在 GetInstance() 的 Meyer's singleton (line ~282) 和
 // 此处的 g_engineInstance 全局指针,后者由构造函数 store(this)。两套生命周期:
 //   - GetInstance() 的静态局部 `instance` 在程序退出最末才析构
-//   - g_engineInstance 由构造函数写入,析构函数不写回 nullptr
+//   - g_engineInstance 由构造函数写入,析构函数写回 nullptr (line 324)
 // 当前默认只创建一个实例,无冲突;但若未来某处在单例外另建实例,
 // g_engineInstance 会被覆盖,且析构顺序可能不一致。修复方向:
 //   1) 彻底删除 g_engineInstance,所有回调改走 GetInstance(),或
@@ -254,7 +254,8 @@ bool IsValidTransition(EngineState from, EngineState to) {
   case EngineState::STOPPING:
     return to == EngineState::STOPPED;
   case EngineState::STOPPED:
-    return to == EngineState::STARTING || to == EngineState::INIT;
+    return to == EngineState::STARTING || to == EngineState::INIT ||
+           to == EngineState::LOADING; // Audit T2-F1: allow STOPPED→LOADING
   case EngineState::ERROR:
     return to == EngineState::STOPPING || to == EngineState::INIT ||
            to == EngineState::STARTING;
@@ -289,11 +290,11 @@ LibretroEngine::LibretroEngine() {
   diskController_ = std::make_unique<DiskController>();
   // HW Render framebuffer provider
   SetGlobalHwRenderFramebufferCallback([]() -> uintptr_t {
-    LibretroEngine *g_engineInstance = GetEngineInstanceSnapshot();
-    if (!g_engineInstance) {
+    LibretroEngine *engine = GetEngineInstanceSnapshot(); // Audit T2-F6: renamed from g_engineInstance to avoid shadowing global
+    if (!engine) {
       return 0;
     }
-    return g_engineInstance->GetHwRenderFramebuffer();
+    return engine->GetHwRenderFramebuffer();
   });
 
   lastTickTime_ = std::chrono::steady_clock::now();
@@ -440,7 +441,8 @@ bool LibretroEngine::Start() {
 }
 
 bool LibretroEngine::Stop() {
-  std::lock_guard<std::recursive_mutex> lock(controlMutex_);
+  // Audit T2-F4: unique_lock so we can release before blocking wait
+  std::unique_lock<std::recursive_mutex> ctrlLock(controlMutex_);
   if (stopInProgress_.exchange(true)) {
     LOGF(LOG_WARN, "[NEW] Stop ignored: stop already in progress");
     return false;
@@ -465,6 +467,7 @@ bool LibretroEngine::Stop() {
     return false;
   }
   messageQueue_.Close();
+  ctrlLock.unlock(); // Audit T2-F4: release controlMutex_ before 5s wait
 
   constexpr uint32_t STOP_TIMEOUT_MS = 5000;
   bool exited = false;
@@ -1998,51 +2001,51 @@ void LibretroEngine::ProcessFrame() {
 
 void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
                                     unsigned height, size_t pitch) {
-  LibretroEngine *g_engineInstance = GetEngineInstanceSnapshot();
-  if (!g_engineInstance)
+  LibretroEngine *engine = GetEngineInstanceSnapshot(); // Audit T2-F6: renamed from g_engineInstance to avoid shadowing global
+  if (!engine)
     return;
 
-  if (g_engineInstance->surface_state_.load() != SurfaceState::VALID) {
+  if (engine->surface_state_.load() != SurfaceState::VALID) {
     // Surface 未处于有效状态时直接丢帧。
     // 这比仅检查 window 指针更可靠，能覆盖 Created/Destroyed 等生命周期中间态。
-    g_engineInstance->surfaceInvalidDropLogCount_++;
-    if (g_engineInstance->surfaceInvalidDropLogCount_ <= 5 ||
-        (g_engineInstance->surfaceInvalidDropLogCount_ % 120) == 0) {
-      auto scopedWindowLog = g_engineInstance->windowGuard_.AcquireWindow();
+    engine->surfaceInvalidDropLogCount_++;
+    if (engine->surfaceInvalidDropLogCount_ <= 5 ||
+        (engine->surfaceInvalidDropLogCount_ % 120) == 0) {
+      auto scopedWindowLog = engine->windowGuard_.AcquireWindow();
       OHNativeWindow *windowSnapshot = scopedWindowLog.Get();
-      const int cachedW = g_engineInstance->last_window_width_.load();
-      const int cachedH = g_engineInstance->last_window_height_.load();
+      const int cachedW = engine->last_window_width_.load();
+      const int cachedH = engine->last_window_height_.load();
       LOGF(LOG_WARN,
            "[NEW] Drop frame: surface invalid (surface=%{public}d, "
            "window=%{public}p, cached=%{public}dx%{public}d, state=%{public}d)",
-           static_cast<int>(g_engineInstance->surface_state_.load()),
+           static_cast<int>(engine->surface_state_.load()),
            windowSnapshot, cachedW, cachedH,
-           static_cast<int>(g_engineInstance->state_.load()));
+           static_cast<int>(engine->state_.load()));
     }
     {
-      std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-      g_engineInstance->stats_.videoRefreshCalls++;
+      std::lock_guard<std::mutex> lock(engine->statsMutex_);
+      engine->stats_.videoRefreshCalls++;
       if (!data) {
-        g_engineInstance->stats_.videoNullFrames++;
+        engine->stats_.videoNullFrames++;
       }
-      g_engineInstance->stats_.videoDroppedFrames++;
+      engine->stats_.videoDroppedFrames++;
     }
     return;
   }
 
-  if (g_engineInstance->renderThread_) {
+  if (engine->renderThread_) {
     VideoFramePacket packet{};
     packet.frameId =
-        ++g_engineInstance->videoFrameSeq_;
+        ++engine->videoFrameSeq_;
     packet.surfaceGeneration =
-        g_engineInstance->surface_generation_.load(std::memory_order_acquire);
+        engine->surface_generation_.load(std::memory_order_acquire);
     packet.timestampUs = NowUs();
     packet.width = width;
     packet.height = height;
     packet.pitch = pitch;
-    packet.pixelFormat = g_engineInstance->videoPipeline_.GetPixelFormat();
+    packet.pixelFormat = engine->videoPipeline_.GetPixelFormat();
 
-    if (g_engineInstance->envState_.IsHwRenderEnabled()) {
+    if (engine->envState_.IsHwRenderEnabled()) {
       if (data == RETRO_HW_FRAME_BUFFER_VALID) {
         packet.kind = VideoFrameKind::HW_SWAP;
       } else if (!data) {
@@ -2056,11 +2059,11 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
     } else {
       packet.kind = VideoFrameKind::SOFTWARE;
       const size_t bytes = pitch * height;
-      auto storage = g_engineInstance->frameBufferPool_.Acquire(bytes);
+      auto storage = engine->frameBufferPool_.Acquire(bytes);
       if (!storage || storage->size() < bytes) {
-        std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-        g_engineInstance->stats_.videoRefreshCalls++;
-        g_engineInstance->stats_.videoDroppedFrames++;
+        std::lock_guard<std::mutex> lock(engine->statsMutex_);
+        engine->stats_.videoRefreshCalls++;
+        engine->stats_.videoDroppedFrames++;
         return;
       }
       if (bytes > 0 && data) {
@@ -2069,37 +2072,37 @@ void LibretroEngine::OnVideoRefresh(const void *data, unsigned width,
       packet.storage = std::move(storage);
     }
 
-    const bool enqueueOk = g_engineInstance->renderThread_->EnqueueFrame(
+    const bool enqueueOk = engine->renderThread_->EnqueueFrame(
         std::move(packet));
     {
-      std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-      g_engineInstance->stats_.videoRefreshCalls++;
+      std::lock_guard<std::mutex> lock(engine->statsMutex_);
+      engine->stats_.videoRefreshCalls++;
       if (!data) {
-        g_engineInstance->stats_.videoNullFrames++;
+        engine->stats_.videoNullFrames++;
       }
       if (!enqueueOk) {
-        g_engineInstance->stats_.videoDroppedFrames++;
+        engine->stats_.videoDroppedFrames++;
       }
     }
     return;
   }
 
-  g_engineInstance->skip_frame_counter_ = 0;
-  if (ShouldLog(g_engineInstance->videoRefreshLogCount_, 5, 120)) {
+  engine->skip_frame_counter_ = 0;
+  if (ShouldLog(engine->videoRefreshLogCount_, 5, 120)) {
     LOGF(LOG_ERROR,
          "Drop frame: render thread unavailable (state=%{public}d, "
          "hw=%{public}d, frame=%{public}ux%{public}u)",
-         static_cast<int>(g_engineInstance->state_.load()),
-         g_engineInstance->envState_.IsHwRenderEnabled() ? 1 : 0, width,
+         static_cast<int>(engine->state_.load()),
+         engine->envState_.IsHwRenderEnabled() ? 1 : 0, width,
          height);
   }
   {
-    std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-    g_engineInstance->stats_.videoRefreshCalls++;
+    std::lock_guard<std::mutex> lock(engine->statsMutex_);
+    engine->stats_.videoRefreshCalls++;
     if (!data) {
-      g_engineInstance->stats_.videoNullFrames++;
+      engine->stats_.videoNullFrames++;
     }
-    g_engineInstance->stats_.videoDroppedFrames++;
+    engine->stats_.videoDroppedFrames++;
   }
 }
 
@@ -2115,8 +2118,8 @@ void LibretroEngine::OnAudioSample(int16_t left, int16_t right) {
 }
 
 size_t LibretroEngine::OnAudioSampleBatch(const int16_t *data, size_t frames) {
-  LibretroEngine *g_engineInstance = GetEngineInstanceSnapshot();
-  if (!g_engineInstance)
+  LibretroEngine *engine = GetEngineInstanceSnapshot(); // Audit T2-F6: renamed from g_engineInstance to avoid shadowing global
+  if (!engine)
     return 0;
 
   // [Fix] Gambatte Quirk: Reports stereo samples as frames?
@@ -2130,10 +2133,10 @@ size_t LibretroEngine::OnAudioSampleBatch(const int16_t *data, size_t frames) {
   // 更新统计
   size_t batch_count = 0;
   {
-    std::lock_guard<std::mutex> lock(g_engineInstance->statsMutex_);
-    g_engineInstance->stats_.audioBatchCalls++;
-    g_engineInstance->stats_.audioFramesIn += actualFrames;
-    batch_count = g_engineInstance->stats_.audioBatchCalls;
+    std::lock_guard<std::mutex> lock(engine->statsMutex_);
+    engine->stats_.audioBatchCalls++;
+    engine->stats_.audioFramesIn += actualFrames;
+    batch_count = engine->stats_.audioBatchCalls;
   }
 
   static size_t audio_cb_diag_log_count = 0;
@@ -2169,16 +2172,16 @@ size_t LibretroEngine::OnAudioSampleBatch(const int16_t *data, size_t frames) {
          kAudioChainPrefix, frames, actualFrames, has_signal ? 1 : 0, data,
          bridge_running ? 1 : 0, bridge_playing ? 1 : 0, sync_mode);
     int32_t expected_frames = 0;
-    if (g_engineInstance->targetFps_ > 0.0) {
+    if (engine->targetFps_ > 0.0) {
       expected_frames = static_cast<int32_t>(
-          g_engineInstance->audioSampleRate_ / g_engineInstance->targetFps_);
+          engine->audioSampleRate_ / engine->targetFps_);
     }
     int32_t delta_frames =
         static_cast<int32_t>(actualFrames) - expected_frames;
     int32_t fps_x100 =
-        static_cast<int32_t>(g_engineInstance->targetFps_ * 100.0);
+        static_cast<int32_t>(engine->targetFps_ * 100.0);
     int32_t rate_i =
-        static_cast<int32_t>(g_engineInstance->audioSampleRate_);
+        static_cast<int32_t>(engine->audioSampleRate_);
     LOGF(LOG_INFO,
          "%{public}s %{public}s AudioCB exp: fps_x100=%{public}d, "
          "rate=%{public}d, expected=%{public}d, actual=%{public}d, "
@@ -2203,50 +2206,50 @@ size_t LibretroEngine::OnAudioSampleBatch(const int16_t *data, size_t frames) {
 }
 
 bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
-  LibretroEngine *g_engineInstance = GetEngineInstanceSnapshot();
-  if (!g_engineInstance) {
+  LibretroEngine *engine = GetEngineInstanceSnapshot(); // Audit T2-F6: renamed from g_engineInstance to avoid shadowing global
+  if (!engine) {
     return false;
   }
 
   // 调用 EnvDispatcher 处理完整的环境命令
   bool handled =
-      HandleEnvironmentCommand(g_engineInstance->envState_, cmd, data);
+      HandleEnvironmentCommand(engine->envState_, cmd, data);
 
   if (cmd == RETRO_ENVIRONMENT_SET_HW_RENDER && handled) {
-    g_engineInstance->hw_render_enabled_.store(
-        g_engineInstance->envState_.IsHwRenderEnabled());
+    engine->hw_render_enabled_.store(
+        engine->envState_.IsHwRenderEnabled());
     {
-      const auto &cb = g_engineInstance->envState_.GetHwRenderCallback();
+      const auto &cb = engine->envState_.GetHwRenderCallback();
       LOGF(LOG_INFO,
            "[NEW] HW render requested: enabled=%{public}d, ctx=%{public}d, "
            "cache=%{public}d",
-           g_engineInstance->hw_render_enabled_.load() ? 1 : 0,
+           engine->hw_render_enabled_.load() ? 1 : 0,
            static_cast<int>(cb.context_type), cb.cache_context ? 1 : 0);
     }
-    auto scopedWindowHw = g_engineInstance->windowGuard_.AcquireWindow();
+    auto scopedWindowHw = engine->windowGuard_.AcquireWindow();
     OHNativeWindow *windowSnapshot = scopedWindowHw.Get();
     uint64_t generation =
-        g_engineInstance->surface_generation_.load(std::memory_order_acquire);
+        engine->surface_generation_.load(std::memory_order_acquire);
     if (windowSnapshot) {
-      generation = g_engineInstance->surface_generation_.fetch_add(
+      generation = engine->surface_generation_.fetch_add(
                        1, std::memory_order_acq_rel) +
                    1;
-      g_engineInstance->surface_session_id_.fetch_add(1,
+      engine->surface_session_id_.fetch_add(1,
                                                       std::memory_order_acq_rel);
-      if (g_engineInstance->renderThread_) {
-        g_engineInstance->renderThread_->InvalidateFrameQueueForGeneration(
+      if (engine->renderThread_) {
+        engine->renderThread_->InvalidateFrameQueueForGeneration(
             generation);
       }
     }
     HwRenderRuntimeInfo runtime{};
-    runtime.video_width = g_engineInstance->videoWidth_;
-    runtime.video_height = g_engineInstance->videoHeight_;
-    runtime.video_max_width = g_engineInstance->videoMaxWidth_;
-    runtime.video_max_height = g_engineInstance->videoMaxHeight_;
-    if (g_engineInstance->renderThread_) {
+    runtime.video_width = engine->videoWidth_;
+    runtime.video_height = engine->videoHeight_;
+    runtime.video_max_width = engine->videoMaxWidth_;
+    runtime.video_max_height = engine->videoMaxHeight_;
+    if (engine->renderThread_) {
       // HW 渲染开关变更通过 generation 显式驱动窗口重绑，保持串行化。
-      g_engineInstance->renderThread_->SetWindow(windowSnapshot, generation);
-      g_engineInstance->renderThread_->SetHwRenderRuntimeInfo(runtime);
+      engine->renderThread_->SetWindow(windowSnapshot, generation);
+      engine->renderThread_->SetHwRenderRuntimeInfo(runtime);
     } else {
       LOGF(LOG_ERROR, "HW render update ignored: render thread unavailable");
     }
@@ -2254,33 +2257,33 @@ bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
 
   // 特殊处理：将像素格式同步到 VideoPipeline
   if (cmd == RETRO_ENVIRONMENT_SET_PIXEL_FORMAT && handled) {
-    retro_pixel_format format = g_engineInstance->envState_.GetPixelFormat();
-    g_engineInstance->videoPipeline_.SetPixelFormat(format);
+    retro_pixel_format format = engine->envState_.GetPixelFormat();
+    engine->videoPipeline_.SetPixelFormat(format);
     LOGF(LOG_INFO, "Pixel format set to: %{public}d", static_cast<int>(format));
     char payload[64];
     snprintf(payload, sizeof(payload), "{\"format\": %d}",
              static_cast<int>(format));
-    g_engineInstance->eventBridge_.Emit("pixel_format_update", payload, false);
+    engine->eventBridge_.Emit("pixel_format_update", payload, false);
   }
 
   if (cmd == RETRO_ENVIRONMENT_GET_CAN_DUPE && handled) {
-    bool can = g_engineInstance->envState_.CanDupe();
-    g_engineInstance->videoPipeline_.SetCanDupe(can);
+    bool can = engine->envState_.CanDupe();
+    engine->videoPipeline_.SetCanDupe(can);
   }
 
   if (cmd == RETRO_ENVIRONMENT_SET_GEOMETRY && handled) {
-    unsigned bw = g_engineInstance->envState_.GetGeometryBaseWidth();
-    unsigned bh = g_engineInstance->envState_.GetGeometryBaseHeight();
-    float aspect = g_engineInstance->envState_.GetGeometryAspectRatio();
-    g_engineInstance->videoPipeline_.SetGeometry(bw, bh, aspect);
-    if (g_engineInstance->hw_render_enabled_.load()) {
+    unsigned bw = engine->envState_.GetGeometryBaseWidth();
+    unsigned bh = engine->envState_.GetGeometryBaseHeight();
+    float aspect = engine->envState_.GetGeometryAspectRatio();
+    engine->videoPipeline_.SetGeometry(bw, bh, aspect);
+    if (engine->hw_render_enabled_.load()) {
       HwRenderRuntimeInfo runtime{};
-      runtime.video_width = g_engineInstance->videoWidth_;
-      runtime.video_height = g_engineInstance->videoHeight_;
-      runtime.video_max_width = g_engineInstance->videoMaxWidth_;
-      runtime.video_max_height = g_engineInstance->videoMaxHeight_;
-      if (g_engineInstance->renderThread_) {
-        g_engineInstance->renderThread_->SetHwRenderRuntimeInfo(runtime);
+      runtime.video_width = engine->videoWidth_;
+      runtime.video_height = engine->videoHeight_;
+      runtime.video_max_width = engine->videoMaxWidth_;
+      runtime.video_max_height = engine->videoMaxHeight_;
+      if (engine->renderThread_) {
+        engine->renderThread_->SetHwRenderRuntimeInfo(runtime);
       } else {
         LOGF(LOG_ERROR, "Geometry HW update ignored: render thread unavailable");
       }
@@ -2290,7 +2293,7 @@ bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
         payload, sizeof(payload),
         "{\"base_width\": %u, \"base_height\": %u, \"aspect_ratio\": %.6f}", bw,
         bh, aspect);
-    g_engineInstance->eventBridge_.Emit("geometry_update", payload, false);
+    engine->eventBridge_.Emit("geometry_update", payload, false);
   }
 
   if (cmd == RETRO_ENVIRONMENT_SET_MESSAGE && handled) {
@@ -2303,24 +2306,24 @@ bool LibretroEngine::OnEnvironment(unsigned cmd, void *data) {
     common::JsonEscape(mStr, mEsc);
     std::string payload = "{\"msg\": \"" + mEsc +
                           "\", \"frames\": " + std::to_string(frames) + "}";
-    g_engineInstance->eventBridge_.Emit("core_message", payload, false);
+    engine->eventBridge_.Emit("core_message", payload, false);
   }
 
   if (cmd == RETRO_ENVIRONMENT_SET_DISK_CONTROL_INTERFACE && handled) {
-    if (g_engineInstance->diskController_) {
-      g_engineInstance->diskController_->SetCallbacks(
+    if (engine->diskController_) {
+      engine->diskController_->SetCallbacks(
           (const struct retro_disk_control_callback *)data);
     }
-    g_engineInstance->eventBridge_.Emit("disk_control", "{\"type\": \"basic\"}",
+    engine->eventBridge_.Emit("disk_control", "{\"type\": \"basic\"}",
                                         false);
   }
 
   if (cmd == RETRO_ENVIRONMENT_SET_DISK_CONTROL_EXT_INTERFACE && handled) {
-    if (g_engineInstance->diskController_) {
-      g_engineInstance->diskController_->SetCallbacks(
+    if (engine->diskController_) {
+      engine->diskController_->SetCallbacks(
           (const struct retro_disk_control_ext_callback *)data);
     }
-    g_engineInstance->eventBridge_.Emit("disk_control", "{\"type\": \"ext\"}",
+    engine->eventBridge_.Emit("disk_control", "{\"type\": \"ext\"}",
                                         false);
   }
 
@@ -2478,7 +2481,10 @@ void LibretroEngine::TransitionTo(EngineState newState) {
     }
     // CAS 失败:oldState 已被更新为当前实际值,重试。
   }
-  stateCond_.notify_all();
+  {
+    std::lock_guard<std::mutex> lk(stateMutex_); // Audit T2-F2: hold stateMutex_ before notify_all to prevent notification loss
+    stateCond_.notify_all();
+  }
   LOGF(LOG_INFO, "State Transition: -> %{public}d",
        static_cast<int>(newState));
 
@@ -2523,10 +2529,10 @@ bool LibretroEngine::WaitForState(EngineState target, uint32_t timeoutMs) {
   if (state_.load() == target) {
     return true;
   }
-  std::unique_lock<std::mutex> lock(stateMutex_);
   if (timeoutMs == 0) {
-    return state_.load() == target;
+    return state_.load() == target; // Audit T2-F3: non-blocking poll, no mutex needed
   }
+  std::unique_lock<std::mutex> lock(stateMutex_);
   return stateCond_.wait_for(
       lock, std::chrono::milliseconds(timeoutMs),
       [this, target]() { return state_.load() == target; });

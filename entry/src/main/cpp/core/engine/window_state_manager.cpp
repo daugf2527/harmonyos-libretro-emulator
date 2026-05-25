@@ -96,10 +96,23 @@ WindowStateManager::ApplyResult WindowStateManager::Apply(
     }
   }
 
-  if (result.geometry_ok && result.usage_ok && result.swap_ok &&
-      result.source_ok && result.scaling_ok) {
-    last_state_ = state;
+  // Audit T4-F4: update each field independently so partial successes are persisted
+  if (result.geometry_ok) {
+    last_state_.width = state.width;
+    last_state_.height = state.height;
     has_state_ = true;
+  }
+  if (result.usage_ok) {
+    last_state_.usage = state.usage;
+  }
+  if (result.swap_ok) {
+    last_state_.swap_interval = state.swap_interval;
+  }
+  if (result.source_ok) {
+    last_state_.source_type = state.source_type;
+  }
+  if (result.scaling_ok) {
+    last_state_.scaling_mode = state.scaling_mode;
   }
 
   return result;

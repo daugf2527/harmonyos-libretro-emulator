@@ -39,7 +39,7 @@ interface LibretroNapi {
   ): Promise<boolean>;
   refactoredGetLastErrorInfo(): EngineErrorInfo;
   refactoredClearLastErrorInfo(): boolean;
-  testCoreLoader(path: string): string;
+  testCoreLoader(path: string): Promise<string>;
 }
 
 const nativeApi = testNapi as LibretroNapi;
@@ -458,7 +458,7 @@ struct TestGambatte {
         .backgroundColor(this.coreCheckRunning ? Color.Gray : '#546E7A')
         .enabled(!this.coreCheckRunning)
         .onClick(() => {
-          this.runCoreCheck();
+          void this.runCoreCheck();
         })
 
       // ROM 选择器
@@ -1240,7 +1240,7 @@ struct TestGambatte {
   }
 
   // 验证核心符号
-  runCoreCheck() {
+  async runCoreCheck() {
     if (this.coreCheckRunning) {
       return;
     }
@@ -1269,7 +1269,7 @@ struct TestGambatte {
       const corePath = `${bundleCodeDir}/libs/${abiPath}/${core.soFile}`;
 
       LogHelper.info('TestGambatte', 'Core', `验证核心: ${corePath}`);
-      const result = nativeApi.testCoreLoader(corePath);
+      const result = await nativeApi.testCoreLoader(corePath);
       this.testResult = result;
       if (result.startsWith('Success')) {
         this.testStatus = '核心验证通过';

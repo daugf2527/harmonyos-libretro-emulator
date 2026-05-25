@@ -190,15 +190,15 @@ private:
     
     // 日志节流计数器（从 static 移为成员变量，避免多线程数据竞争）
     mutable std::chrono::steady_clock::time_point callback_last_time_{};
-    mutable int callback_log_count_ = 0;
-    mutable int callback_jitter_log_count_ = 0;
-    mutable int callback_diag_log_count_ = 0;
-    mutable int callback_underrun_log_count_ = 0;
-    mutable int callback_cost_log_count_ = 0;
-    mutable int callback_invalid_log_count_ = 0;
-    mutable int legacy_log_count_ = 0;
-    mutable int legacy_cb11_log_count_ = 0;
-    mutable int legacy_diag_log_count_ = 0;
+    mutable std::atomic<int> callback_log_count_{0}; // Audit T3-F9: atomic for cross-thread log throttle
+    mutable std::atomic<int> callback_jitter_log_count_{0};
+    mutable std::atomic<int> callback_diag_log_count_{0};
+    mutable std::atomic<int> callback_underrun_log_count_{0};
+    mutable std::atomic<int> callback_cost_log_count_{0};
+    mutable std::atomic<int> callback_invalid_log_count_{0};
+    mutable std::atomic<int> legacy_log_count_{0};
+    mutable std::atomic<int> legacy_cb11_log_count_{0};
+    mutable std::atomic<int> legacy_diag_log_count_{0};
     
     // 禁止拷贝和赋值
     AudioPlayer(const AudioPlayer&) = delete;

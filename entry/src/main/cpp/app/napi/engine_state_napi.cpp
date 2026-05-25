@@ -172,7 +172,7 @@ static napi_value SetCoreOption(napi_env env, napi_callback_info info) {
 
 // --- SaveStateAsync (napi_async_work) ---
 struct SaveStateAsyncContext {
-  napi_env env = nullptr;
+  // Audit T1-F3: removed unused napi_env env field
   napi_deferred deferred = nullptr;
   napi_async_work work = nullptr;
   std::vector<uint8_t> data;
@@ -193,10 +193,15 @@ static void CompleteSaveStateAsync(napi_env env, napi_status status, void *data)
     return;
   }
 
-  if (status != napi_ok || !ctx->ok || ctx->data.empty()) {
-    napi_value result;
-    napi_get_null(env, &result);
-    napi_resolve_deferred(env, ctx->deferred, result);
+  // Audit T1-F2: cancel guard first; logical failures reject so ArkTS .catch() is reachable
+  if (status != napi_ok) {
+    napi_value reason;
+    napi_get_undefined(env, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
+  } else if (!ctx->ok || ctx->data.empty()) {
+    napi_value reason;
+    napi_create_string_utf8(env, "SaveState failed", NAPI_AUTO_LENGTH, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
   } else {
     void *bufferData = nullptr;
     napi_value arrayBuffer;
@@ -207,9 +212,9 @@ static void CompleteSaveStateAsync(napi_env env, napi_status status, void *data)
       napi_resolve_deferred(env, ctx->deferred, arrayBuffer);
     } else {
       LOGF(LOG_ERROR, "[NEW] SaveStateAsync failed to allocate ArrayBuffer");
-      napi_value result;
-      napi_get_null(env, &result);
-      napi_resolve_deferred(env, ctx->deferred, result);
+      napi_value reason;
+      napi_create_string_utf8(env, "SaveState ArrayBuffer alloc failed", NAPI_AUTO_LENGTH, &reason);
+      napi_reject_deferred(env, ctx->deferred, reason);
     }
   }
 
@@ -223,10 +228,13 @@ static void CompleteSaveStateAsync(napi_env env, napi_status status, void *data)
 static napi_value SaveStateAsync(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   auto *ctx = new SaveStateAsyncContext();
-  ctx->env = env;
+  // Audit T1-F3: env field removed from ctx
 
   napi_value promise;
-  napi_create_promise(env, &ctx->deferred, &promise);
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) { // Audit T1-F8: check create_promise
+    delete ctx;
+    return nullptr;
+  }
 
   napi_value resourceName;
   napi_create_string_utf8(env, "SaveStateAsync", NAPI_AUTO_LENGTH, &resourceName);
@@ -261,7 +269,7 @@ static napi_value SaveStateAsync(napi_env env, napi_callback_info info) {
 
 // --- LoadStateAsync (napi_async_work) ---
 struct LoadStateAsyncContext {
-  napi_env env = nullptr;
+  // Audit T1-F3: removed unused napi_env env field
   napi_deferred deferred = nullptr;
   napi_async_work work = nullptr;
   std::vector<uint8_t> stateData;
@@ -282,14 +290,19 @@ static void CompleteLoadStateAsync(napi_env env, napi_status status, void *data)
     return;
   }
 
-  if (status != napi_ok || !ctx->ok) {
-    LOGF(LOG_WARN, "[NEW] LoadStateAsync completed with failure: status=%{public}d ok=%{public}s",
-         static_cast<int>(status), ctx->ok ? "true" : "false");
+  // Audit T1-F2: guard against napi_cancelled; napi_get_boolean/napi_resolve_deferred on cancelled env is UB
+  if (status != napi_ok) {
+    napi_value reason;
+    napi_get_undefined(env, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
+  } else {
+    if (!ctx->ok) {
+      LOGF(LOG_WARN, "[NEW] LoadStateAsync completed with failure: ok=false");
+    }
+    napi_value result;
+    napi_get_boolean(env, ctx->ok, &result);
+    napi_resolve_deferred(env, ctx->deferred, result);
   }
-
-  napi_value result;
-  napi_get_boolean(env, ctx->ok && status == napi_ok, &result);
-  napi_resolve_deferred(env, ctx->deferred, result);
 
   if (ctx->work) {
     napi_delete_async_work(env, ctx->work);
@@ -313,12 +326,15 @@ static napi_value LoadStateAsync(napi_env env, napi_callback_info info) {
   }
 
   auto *ctx = new LoadStateAsyncContext();
-  ctx->env = env;
+  // Audit T1-F3: env field removed from ctx
   ctx->stateData.assign(static_cast<uint8_t *>(data),
                         static_cast<uint8_t *>(data) + length);
 
   napi_value promise;
-  napi_create_promise(env, &ctx->deferred, &promise);
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) { // Audit T1-F8: check create_promise
+    delete ctx;
+    return nullptr;
+  }
 
   napi_value resourceName;
   napi_create_string_utf8(env, "LoadStateAsync", NAPI_AUTO_LENGTH, &resourceName);

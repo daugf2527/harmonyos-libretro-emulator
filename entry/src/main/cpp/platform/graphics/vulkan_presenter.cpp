@@ -5,7 +5,7 @@
 #include <utility>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD00B
 #undef LOG_TAG
 #define LOG_TAG "VulkanPresenter"
 #undef LOG_FLOW

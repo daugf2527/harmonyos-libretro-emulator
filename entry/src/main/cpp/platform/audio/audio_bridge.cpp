@@ -296,7 +296,7 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
     // 重采样到输出采样率（固定 48k）
     // 注意：Resample 必须在锁内进行，因为它修改 resampler_ 状态，且 Reset() 可能会重置它
     const double ratio = resampler_.GetCurrentRatio();
-    size_t max_out_frames = static_cast<size_t>(std::ceil(frames * ratio)) + 8;
+    size_t max_out_frames = static_cast<size_t>(std::ceil(frames * ratio)) + 16; // Audit T3-F7: +16 margin (was +8)
     const size_t required_samples = max_out_frames * 2;
     if (resample_out_buf_.size() < required_samples) {
       resample_out_buf_.resize(required_samples);
@@ -330,6 +330,10 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
   }
   float usage_before = buffer_ref ? buffer_ref->GetUsage() : 0.0f;
 
+  // Audit T3-F3: capture buffer pointer and sample count before releasing lock
+  const int16_t* const out_buf_data = resample_out_buf_.data();
+  const size_t samples_to_write = out_frames * 2;
+
   // 在调用可能阻塞的 WriteWait 之前解锁
   lock.unlock();
 
@@ -338,20 +342,17 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
   // - AUDIO_BLOCKING: 阻塞等待空间 (正常游戏速度同步)
   // - NON_BLOCKING: 丢弃溢出数据 (Fast Forward)
   bool success = false;
-  
+
   // 如果正在缓冲(buffering_)，始终非阻塞以快速填满
   bool should_block =
       (sync_mode_.load() == SyncMode::AUDIO_BLOCKING && !buffering_snapshot);
-  
-  // 转换 Frames -> Samples (立体声)
-  size_t samples_to_write = out_frames * 2;
 
   if (buffer_ref) {
     auto write_start = std::chrono::steady_clock::now();
     if (should_block) {
-      success = buffer_ref->WriteWait(resample_out_buf_.data(), samples_to_write, running_);
+      success = buffer_ref->WriteWait(out_buf_data, samples_to_write, running_);
     } else {
-      success = buffer_ref->Write(resample_out_buf_.data(), samples_to_write);
+      success = buffer_ref->Write(out_buf_data, samples_to_write);
     }
     auto write_end = std::chrono::steady_clock::now();
     int32_t write_us = static_cast<int32_t>(
@@ -509,6 +510,15 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
     SetRunState(AudioRunState::INIT, "initialize_reuse");
     if (ring_buffer_) {
       ring_buffer_->Clear();
+    }
+    // Audit T3-F10: update core_sample_rate_ and reinit resampler if sample rate changed
+    const int32_t new_rate = (sample_rate > 0 ? sample_rate : 48000);
+    if (new_rate != core_sample_rate_) {
+      LOGF(LOG_INFO, "%{public}s AudioBridge reuse: sample rate changed %{public}d->%{public}d, reinit resampler",
+           kAudioChainPrefix, core_sample_rate_, new_rate);
+      core_sample_rate_ = new_rate;
+      resampler_.Init(core_sample_rate_, output_sample_rate_);
+      drc_skew_.store(1.0);
     }
     LOGF(LOG_INFO,
          "%{public}s AudioBridge reuse: running reset, "

@@ -156,6 +156,7 @@ static napi_value SetAudioSyncMode(napi_env env, napi_callback_info info) {
   if (audioBridge) {
     auto syncMode = (mode == 0) ? libretro::AudioBridge::SyncMode::NON_BLOCKING
                                 : libretro::AudioBridge::SyncMode::AUDIO_BLOCKING;
+    // Audit T1-F4: SetSyncMode is sync_mode_.store() (std::atomic) — safe to call from NAPI thread
     audioBridge->SetSyncMode(syncMode);
     LOGF(LOG_INFO, "[NEW] SetAudioSyncMode: %{public}d", mode);
   }
