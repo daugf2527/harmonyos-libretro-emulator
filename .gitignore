@@ -15,7 +15,15 @@ oh_modules/
 
 # Personal AI tooling caches and helper scripts
 .appanalyzer/
-.claude/
+# .claude/: keep shared harness (hooks/skills/agents/settings.json/cclsp.json/stop-hook.sh)
+# but exclude per-machine state and personal overrides.
+.claude/.last-activity-ts
+.claude/.last-quick-signals.txt
+.claude/settings.local.json
+.claude/settings.local.json.bak.*
+.claude/worktrees/
+# .serena/: Serena MCP project metadata + LSP cache (per-machine, never commit)
+.serena/
 .firecrawl/
 codex
 codex-full-auto.cmd

@@ -8,7 +8,7 @@
 #include <vector>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD007
 #undef LOG_TAG
 #define LOG_TAG "GLESRenderer"
 #undef LOG_FLOW
@@ -494,7 +494,7 @@ void GLESRenderer::SetDiagnosticsEnabled(bool enabled) {
 
 void GLESRenderer::Deinit() {
   std::lock_guard<std::recursive_mutex> lock(mutex_);
-  healthy_ = true;
+  healthy_ = false; // Audit T4-F3: renderer is unusable during and after Deinit
   last_egl_error_.store(static_cast<int>(EGL_SUCCESS),
                         std::memory_order_release);
   last_swap_failure_kind_.store(static_cast<int>(SwapFailureKind::NONE),

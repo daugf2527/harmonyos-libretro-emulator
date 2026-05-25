@@ -4,7 +4,7 @@
 #include <type_traits>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD00D
 #undef LOG_TAG
 #define LOG_TAG "VulkanLoader"
 #undef LOG_FLOW

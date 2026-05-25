@@ -38,6 +38,8 @@ export async function saveStateData(
   const createdAt = Date.now()
   const fileName = `state_${createdAt}.state`
   const targetPath = buildSaveFilePath(context.filesDir, fileName)
+  // T6-F4: .state written before manifest; crash here leaves an orphan .state (no romFile association).
+  // Mitigated by T6-F3 (both writes are atomic), but a process kill between the two steps is still possible.
   writeArrayBufferToFile(targetPath, data)
   const item: SaveStateManifestItem = {
     id: fileName,
@@ -175,39 +177,44 @@ async function saveManifest(
   document: SaveStateManifestDocument
 ): Promise<void> {
   await ensureDirExists(buildSaveDirPath(context.filesDir))
+  // Audit T6-F3: tmp+rename atomic write — crash during write leaves .tmp, not a corrupt manifest
+  const manifestPath = buildManifestPath(context.filesDir)
+  const tmpPath = manifestPath + '.tmp'
   let file: fs.File | undefined = undefined
   try {
-    file = await fs.open(buildManifestPath(context.filesDir), fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
+    file = await fs.open(tmpPath, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     await fs.write(file.fd, JSON.stringify(document, null, 2))
+    await fs.close(file.fd)
+    file = undefined
+    await fs.rename(tmpPath, manifestPath)
   } catch (err) {
-    throw err as Error
-  } finally {
     if (file) {
-      try {
-        await fs.close(file.fd)
-      } catch (_closeErr) {
-      }
+      try { await fs.close(file.fd) } catch (_) {}
     }
+    try { fs.unlinkSync(tmpPath) } catch (_) {}
+    throw err as Error
   }
 }
 
 function writeArrayBufferToFile(path: string, data: ArrayBuffer): void {
+  // Audit T6-F3: tmp+rename atomic write — crash during write leaves .tmp, not a corrupt .state
+  const tmpPath = path + '.tmp'
   let file: fs.File | undefined = undefined
   try {
-    file = fs.openSync(path, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
+    file = fs.openSync(tmpPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     const writeOptions: WriteOptions = {
       length: data.byteLength
     }
     fs.writeSync(file.fd, data, writeOptions)
+    fs.closeSync(file.fd)
+    file = undefined
+    fs.renameSync(tmpPath, path)
   } catch (err) {
-    throw err as Error
-  } finally {
     if (file) {
-      try {
-        fs.closeSync(file.fd)
-      } catch (_closeErr) {
-      }
+      try { fs.closeSync(file.fd) } catch (_) {}
     }
+    try { fs.unlinkSync(tmpPath) } catch (_) {}
+    throw err as Error
   }
 }
 

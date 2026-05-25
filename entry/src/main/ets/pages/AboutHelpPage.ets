@@ -1,7 +1,7 @@
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 
 interface HelpItem {
@@ -47,7 +47,7 @@ struct AboutHelpPage {
           .height(5)
           .backgroundColor(EmuColors.primary)
         Text('Status: LOCAL_ABOUT_READY')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(2)
       }
@@ -75,7 +75,7 @@ struct AboutHelpPage {
       Row() {
         Column({ space: 4 }) {
           Text('当前版本')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
           Row({ space: 8 }) {
@@ -84,7 +84,7 @@ struct AboutHelpPage {
               .fontWeight(FontWeight.Medium)
               .fontColor(EmuColors.onSurface)
             Text('STABLE')
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
                             .fontColor(EmuColors.primary)
           }
           .alignItems(VerticalAlign.Bottom)
@@ -93,7 +93,7 @@ struct AboutHelpPage {
 
         Column({ space: 4 }) {
           Text('数据来源')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
           Text('本地模式')
@@ -135,7 +135,7 @@ struct AboutHelpPage {
 
         if (this.selectedHelpId === item.id) {
           Text(item.value)
-            .fontSize(12)
+            .fontSize(EmuTypography.sm)
             .lineHeight(18)
             .fontColor(EmuColors.onSurfaceVariant)
             .maxLines(3)
@@ -147,7 +147,7 @@ struct AboutHelpPage {
       .alignItems(HorizontalAlign.Start)
 
       Text('›')
-        .fontSize(22)
+        .fontSize(EmuTypography.xxl)
         .fontColor(EmuColors.outline)
     }
     .width('100%')
@@ -163,7 +163,7 @@ struct AboutHelpPage {
   private HelpList() {
     Column({ space: 0 }) {
       Text('文档与说明')
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.secondary)
         .letterSpacing(2)
         .padding({ left: 2, bottom: 12 })

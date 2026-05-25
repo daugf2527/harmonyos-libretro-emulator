@@ -10,6 +10,7 @@ export interface InputLayoutButton {
   y: number
   size: number
   shape: string
+  retroButtonId: number
 }
 
 export interface InputLayoutProfile {
@@ -17,6 +18,56 @@ export interface InputLayoutProfile {
   mode: string
   updatedAt: number
   buttons: InputLayoutButton[]
+}
+
+export interface RetroButtonOption {
+  retroButtonId: number
+  label: string
+  caption: string
+}
+
+export const RETRO_BUTTON_OPTIONS: RetroButtonOption[] = [
+  { retroButtonId: 0, label: 'B', caption: 'B / Secondary' },
+  { retroButtonId: 1, label: 'X', caption: 'X' },
+  { retroButtonId: 2, label: 'SELECT', caption: 'Select' },
+  { retroButtonId: 3, label: 'START', caption: 'Start' },
+  { retroButtonId: 4, label: 'UP', caption: 'D-Pad Up' },
+  { retroButtonId: 5, label: 'DOWN', caption: 'D-Pad Down' },
+  { retroButtonId: 6, label: 'LEFT', caption: 'D-Pad Left' },
+  { retroButtonId: 7, label: 'RIGHT', caption: 'D-Pad Right' },
+  { retroButtonId: 8, label: 'A', caption: 'A / Primary' },
+  { retroButtonId: 9, label: 'Y', caption: 'Y' },
+  { retroButtonId: 10, label: 'L', caption: 'L Shoulder' },
+  { retroButtonId: 11, label: 'R', caption: 'R Shoulder' },
+  { retroButtonId: 12, label: 'L2', caption: 'L2 Trigger' },
+  { retroButtonId: 13, label: 'R2', caption: 'R2 Trigger' },
+  { retroButtonId: 14, label: 'L3', caption: 'L3 Stick' },
+  { retroButtonId: 15, label: 'R3', caption: 'R3 Stick' }
+]
+
+const DEFAULT_RETRO_ID_BUTTON_PAIRS: RetroButtonOption[] = [
+  { retroButtonId: 0, label: 'b', caption: 'b' },
+  { retroButtonId: 9, label: 'y', caption: 'y' },
+  { retroButtonId: 2, label: 'select', caption: 'select' },
+  { retroButtonId: 3, label: 'start', caption: 'start' },
+  { retroButtonId: 4, label: 'up', caption: 'up' },
+  { retroButtonId: 5, label: 'down', caption: 'down' },
+  { retroButtonId: 6, label: 'left', caption: 'left' },
+  { retroButtonId: 7, label: 'right', caption: 'right' },
+  { retroButtonId: 8, label: 'a', caption: 'a' },
+  { retroButtonId: 1, label: 'x', caption: 'x' },
+  { retroButtonId: 10, label: 'l', caption: 'l' },
+  { retroButtonId: 11, label: 'r', caption: 'r' }
+]
+
+export function getDefaultRetroButtonId(buttonId: string): number {
+  const found = DEFAULT_RETRO_ID_BUTTON_PAIRS.find((item: RetroButtonOption) => item.label === buttonId)
+  return found ? found.retroButtonId : -1
+}
+
+export function getRetroButtonOptionLabel(retroButtonId: number): string {
+  const found = RETRO_BUTTON_OPTIONS.find((item: RetroButtonOption) => item.retroButtonId === retroButtonId)
+  return found ? found.label : '未绑定'
 }
 
 const INPUT_LAYOUT_VERSION = 1
@@ -29,16 +80,16 @@ export function createDefaultInputLayoutProfile(): InputLayoutProfile {
     mode: 'RETRO_PAD_TOUCH',
     updatedAt: 0,
     buttons: [
-      { id: 'up', label: 'UP', caption: 'Directional_Up', x: 48, y: 136, size: 48, shape: 'square' },
-      { id: 'left', label: 'LEFT', caption: 'Directional_Left', x: 0, y: 184, size: 48, shape: 'square' },
-      { id: 'right', label: 'RIGHT', caption: 'Directional_Right', x: 96, y: 184, size: 48, shape: 'square' },
-      { id: 'down', label: 'DOWN', caption: 'Directional_Down', x: 48, y: 232, size: 48, shape: 'square' },
-      { id: 'select', label: 'SELECT', caption: 'Select', x: 154, y: 226, size: 54, shape: 'function' },
-      { id: 'start', label: 'START', caption: 'Start', x: 222, y: 226, size: 54, shape: 'function' },
-      { id: 'b', label: 'B', caption: 'Secondary', x: 252, y: 204, size: 62, shape: 'circle' },
-      { id: 'a', label: 'A', caption: 'Primary', x: 330, y: 180, size: 62, shape: 'circle' },
-      { id: 'l', label: 'L', caption: 'Left_Shoulder', x: 24, y: 78, size: 86, shape: 'shoulder' },
-      { id: 'r', label: 'R', caption: 'Right_Shoulder', x: 292, y: 78, size: 86, shape: 'shoulder' }
+      { id: 'up', label: '上', caption: 'Directional_Up', x: 80, y: 130, size: 60, shape: 'square', retroButtonId: 4 },
+      { id: 'left', label: '左', caption: 'Directional_Left', x: 20, y: 190, size: 60, shape: 'square', retroButtonId: 6 },
+      { id: 'right', label: '右', caption: 'Directional_Right', x: 140, y: 190, size: 60, shape: 'square', retroButtonId: 7 },
+      { id: 'down', label: '下', caption: 'Directional_Down', x: 80, y: 250, size: 60, shape: 'square', retroButtonId: 5 },
+      { id: 'select', label: '选择', caption: 'Select', x: 156, y: 100, size: 54, shape: 'function', retroButtonId: 2 },
+      { id: 'start', label: '开始', caption: 'Start', x: 228, y: 100, size: 54, shape: 'function', retroButtonId: 3 },
+      { id: 'b', label: 'B', caption: 'Secondary', x: 240, y: 200, size: 72, shape: 'circle', retroButtonId: 0 },
+      { id: 'a', label: 'A', caption: 'Primary', x: 332, y: 170, size: 72, shape: 'circle', retroButtonId: 8 },
+      { id: 'l', label: 'L', caption: 'Left_Shoulder', x: 36, y: 50, size: 86, shape: 'shoulder', retroButtonId: 10 },
+      { id: 'r', label: 'R', caption: 'Right_Shoulder', x: 318, y: 50, size: 86, shape: 'shoulder', retroButtonId: 11 }
     ]
   }
 }
@@ -114,15 +165,56 @@ function normalizeProfile(profile: InputLayoutProfile): InputLayoutProfile {
 }
 
 function normalizeButton(button: InputLayoutButton): InputLayoutButton {
+  const safeId = normalizeText(button.id, 'button')
+  const fallbackRetroId = getDefaultRetroButtonId(safeId)
   return {
-    id: normalizeText(button.id, 'button'),
-    label: normalizeText(button.label, 'BTN'),
+    id: safeId,
+    label: localizeButtonLabel(safeId, normalizeText(button.label, 'BTN')),
     caption: normalizeText(button.caption, 'Input_Button'),
     x: normalizeNumber(button.x),
     y: normalizeNumber(button.y),
     size: Math.max(32, Math.min(96, normalizeNumber(button.size))),
-    shape: normalizeText(button.shape, 'square')
+    shape: normalizeText(button.shape, 'square'),
+    retroButtonId: normalizeRetroButtonId(button.retroButtonId, fallbackRetroId)
   }
+}
+
+// Migrate older English labels (UP / DOWN / LEFT / RIGHT / SELECT / START) saved
+// in input_layout.json from previous builds. Single-character keys (A/B/L/R) and
+// already-Chinese labels are preserved as-is. This keeps existing saved layouts
+// readable on the narrow 48px D-pad cells without forcing the user to reset.
+function localizeButtonLabel(buttonId: string, rawLabel: string): string {
+  const upper = rawLabel.trim().toUpperCase()
+  if (buttonId === 'up' && (upper === 'UP' || upper === 'U')) {
+    return '上'
+  }
+  if (buttonId === 'down' && (upper === 'DOWN' || upper === 'D')) {
+    return '下'
+  }
+  if (buttonId === 'left' && (upper === 'LEFT')) {
+    return '左'
+  }
+  if (buttonId === 'right' && (upper === 'RIGHT')) {
+    return '右'
+  }
+  if (buttonId === 'select' && upper === 'SELECT') {
+    return '选择'
+  }
+  if (buttonId === 'start' && upper === 'START') {
+    return '开始'
+  }
+  return rawLabel
+}
+
+function normalizeRetroButtonId(value: number, fallback: number): number {
+  if (!Number.isFinite(value)) {
+    return fallback
+  }
+  const intValue = Math.floor(value)
+  if (intValue < -1 || intValue > 15) {
+    return fallback
+  }
+  return intValue
 }
 
 function normalizeText(value: string, fallback: string): string {

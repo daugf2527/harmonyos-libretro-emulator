@@ -3,7 +3,8 @@ import { EmuHeaderBar, GridBackground } from '../components/EmuAppShell'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { consumePendingImportUris } from '../common/ImportTaskBridge'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuStateColors, EmuTypography } from '../common/EmuUiTokens'
+import { EmuButton, EmuButtonKind, EmuButtonShape, EmuButtonSize } from '../components/EmuButton'
 import {
   importRomUris,
   inspectRomImportConflicts,
@@ -81,9 +82,6 @@ struct ImportTaskOverlayPage {
   @State private overlayOpacity: number = 1
   @State private overlayScale: number = 1
   @State private cancelPressed: boolean = false
-  @State private confirmPressed: boolean = false
-  @State private retryPressed: boolean = false
-  @State private overwritePressed: boolean = false
   @State private etaText: string = '剩余约 02:45'
   @State private sourceText: string = '来源：本地文件选择器'
   @State private transferRateText: string = '--'
@@ -190,39 +188,6 @@ struct ImportTaskOverlayPage {
     }
     if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
       this.cancelPressed = false
-    }
-  }
-
-  private onConfirmTouch(event: TouchEvent): void {
-    const eventType = Number(event.type)
-    if (eventType === TouchType.Down) {
-      this.confirmPressed = true
-      return
-    }
-    if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
-      this.confirmPressed = false
-    }
-  }
-
-  private onRetryTouch(event: TouchEvent): void {
-    const eventType = Number(event.type)
-    if (eventType === TouchType.Down) {
-      this.retryPressed = true
-      return
-    }
-    if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
-      this.retryPressed = false
-    }
-  }
-
-  private onOverwriteTouch(event: TouchEvent): void {
-    const eventType = Number(event.type)
-    if (eventType === TouchType.Down) {
-      this.overwritePressed = true
-      return
-    }
-    if (eventType === TouchType.Up || eventType === TouchType.Cancel) {
-      this.overwritePressed = false
     }
   }
 
@@ -546,7 +511,8 @@ struct ImportTaskOverlayPage {
     if (item.status === 'SKIPPED') {
       return Colors.onSurfaceVariant
     }
-    return '#ED7F64'
+    // FAILED 与 CANCELLED 当前统一为 danger 色；若需视觉区分两态，应在 EmuStateColors 加 cancelled token。
+    return EmuStateColors.dangerDefault
   }
 
   @Builder
@@ -558,7 +524,7 @@ struct ImportTaskOverlayPage {
             Column({ space: 4 }) {
               Text(item.fileName)
                 .width('100%')
-                .fontSize(12)
+                .fontSize(EmuTypography.sm)
                 .fontWeight(FontWeight.Medium)
                 .fontColor(Colors.onSurface)
                 .maxLines(1)
@@ -566,7 +532,7 @@ struct ImportTaskOverlayPage {
 
               Text(item.detail)
                 .width('100%')
-                .fontSize(10)
+                .fontSize(EmuTypography.xs)
                                 .fontColor(Colors.onSurfaceVariant)
                 .maxLines(2)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -711,7 +677,7 @@ struct ImportTaskOverlayPage {
         Column({ space: 16 }) {
           Row() {
             Text('System Load')
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
                             .fontColor(Colors.onSurfaceVariant)
               .letterSpacing(1.5)
           }
@@ -806,12 +772,12 @@ struct ImportTaskOverlayPage {
       Row() {
         Column({ space: 2 }) {
           Text('正在导入')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(Colors.primary)
             .letterSpacing(1.4)
 
           Text(this.currentProgressText)
-            .fontSize(22)
+            .fontSize(EmuTypography.xxl)
             .fontWeight(FontWeight.Medium)
             .fontColor(Colors.onSurface)
             .maxLines(1)
@@ -820,7 +786,7 @@ struct ImportTaskOverlayPage {
         .alignItems(HorizontalAlign.Start)
 
         Text(this.etaText)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(Colors.onSurfaceVariant)
       }
       .width('100%')
@@ -879,7 +845,7 @@ struct ImportTaskOverlayPage {
 
       Row() {
         Button('取消导入')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontWeight(FontWeight.Bold)
                     .fontColor(Colors.onSurfaceVariant)
           .height(48)
@@ -935,13 +901,13 @@ struct ImportTaskOverlayPage {
       .margin({ bottom: 16 })
 
       Text(this.conflictTitleText)
-        .fontSize(18)
+        .fontSize(EmuTypography.xl)
         .fontWeight(FontWeight.Medium)
         .fontColor(Colors.onSurface)
         .margin({ bottom: 4 })
 
       Text(this.conflictMessageText)
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontColor(Colors.onSurfaceVariant)
         .textAlign(TextAlign.Center)
         .margin({ bottom: 16 })
@@ -962,49 +928,36 @@ struct ImportTaskOverlayPage {
         .margin({ bottom: 20 })
       }
 
-      Button('全部跳过并继续')
+      EmuButton({
+        label: '全部跳过并继续',
+        kind: EmuButtonKind.SECONDARY,
+        buttonSize: EmuButtonSize.COMPACT,
+        shape: EmuButtonShape.PILL,
+        tinted: true,
+        onTap: () => { void this.startActualImport(this.currentImportUris, this.importTaskToken) }
+      })
         .width('100%')
-        .height(36)
-        .fontSize(10)
-        .fontWeight(FontWeight.Bold)
-                .fontColor(Colors.onSurface)
-        .backgroundColor(this.confirmPressed ? '#33FFFFFF' : '#1AFFFFFF')
-        .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
-        .scale({ x: this.confirmPressed ? 0.95 : 1, y: this.confirmPressed ? 0.95 : 1 })
-        .onTouch((event: TouchEvent) => this.onConfirmTouch(event))
-        .onClick(() => {
-          void this.startActualImport(this.currentImportUris, this.importTaskToken)
-        })
         .margin({ bottom: 12 })
 
-      Button('全部覆盖并继续')
+      EmuButton({
+        label: '全部覆盖并继续',
+        kind: EmuButtonKind.SECONDARY,
+        buttonSize: EmuButtonSize.COMPACT,
+        shape: EmuButtonShape.PILL,
+        tinted: true,
+        onTap: () => { void this.restartActualImportWithOverwrite() }
+      })
         .width('100%')
-        .height(36)
-        .fontSize(10)
-        .fontWeight(FontWeight.Bold)
-                .fontColor(Colors.onSurface)
-        .backgroundColor(this.overwritePressed ? '#33FFFFFF' : '#1AFFFFFF')
-        .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
-        .scale({ x: this.overwritePressed ? 0.95 : 1, y: this.overwritePressed ? 0.95 : 1 })
-        .onTouch((event: TouchEvent) => this.onOverwriteTouch(event))
-        .onClick(() => {
-          void this.restartActualImportWithOverwrite()
-        })
         .margin({ bottom: 12 })
 
-      Button('取消本次任务')
+      EmuButton({
+        label: '取消本次任务',
+        kind: EmuButtonKind.GHOST,
+        buttonSize: EmuButtonSize.COMPACT,
+        shape: EmuButtonShape.PILL,
+        onTap: () => { this.replaceUrl('pages/ImportEntryPage') }
+      })
         .width('100%')
-        .height(36)
-        .fontSize(10)
-        .fontWeight(FontWeight.Bold)
-                .fontColor(Colors.onSurfaceVariant)
-        .backgroundColor(this.cancelPressed ? Colors.surfaceContainerHighest : Color.Transparent)
-        .border({ width: 0.5, color: '#4D757575', style: BorderStyle.Solid })
-        .scale({ x: this.cancelPressed ? 0.95 : 1, y: this.cancelPressed ? 0.95 : 1 })
-        .onTouch((event: TouchEvent) => this.onCancelTouch(event))
-        .onClick(() => {
-          this.replaceUrl('pages/ImportEntryPage')
-        })
     }
     .width('100%')
     .padding(32)
@@ -1030,13 +983,13 @@ struct ImportTaskOverlayPage {
       .margin({ bottom: 16 })
 
       Text(this.resultTitleText)
-        .fontSize(18)
+        .fontSize(EmuTypography.xl)
         .fontWeight(FontWeight.Medium)
         .fontColor(Colors.onSurface)
         .margin({ bottom: 4 })
 
       Text(this.resultMessageText)
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontColor(Colors.onSurfaceVariant)
         .textAlign(TextAlign.Center)
         .margin({ bottom: 28 })
@@ -1066,35 +1019,27 @@ struct ImportTaskOverlayPage {
       }
 
       if (this.canOverwriteExisting()) {
-        Button('覆盖已存在')
+        EmuButton({
+          label: '覆盖已存在',
+          kind: EmuButtonKind.SECONDARY,
+          buttonSize: EmuButtonSize.COMPACT,
+          shape: EmuButtonShape.PILL,
+          tinted: true,
+          onTap: () => { void this.restartActualImportWithOverwrite() }
+        })
           .width('100%')
-          .height(36)
-          .fontSize(11)
-          .fontWeight(FontWeight.Bold)
-                    .fontColor(Colors.onSurface)
-          .backgroundColor(this.overwritePressed ? '#33FFFFFF' : '#1AFFFFFF')
-          .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
-          .scale({ x: this.overwritePressed ? 0.95 : 1, y: this.overwritePressed ? 0.95 : 1 })
-          .onTouch((event: TouchEvent) => this.onOverwriteTouch(event))
-          .onClick(() => {
-            void this.restartActualImportWithOverwrite()
-          })
           .margin({ bottom: 16 })
       }
 
-      Button('返回控制台')
+      EmuButton({
+        label: '返回控制台',
+        kind: EmuButtonKind.PRIMARY,
+        buttonSize: EmuButtonSize.COMPACT,
+        shape: EmuButtonShape.PILL,
+        tinted: true,
+        onTap: () => { this.replaceUrl('pages/LibraryPage') }
+      })
         .width('100%')
-        .height(36)
-        .fontSize(11)
-        .fontWeight(FontWeight.Bold)
-                .fontColor(Colors.primary)
-        .backgroundColor('#1A00FF41')
-        .border({ width: 0.5, color: '#4D00FF41', style: BorderStyle.Solid })
-        .scale({ x: this.confirmPressed ? 0.95 : 1, y: this.confirmPressed ? 0.95 : 1 })
-        .onTouch((event: TouchEvent) => this.onConfirmTouch(event))
-        .onClick(() => {
-          this.replaceUrl('pages/LibraryPage')
-        })
     }
     .width('100%')
     .padding(32)
@@ -1120,13 +1065,13 @@ struct ImportTaskOverlayPage {
       .margin({ bottom: 16 })
 
       Text(this.resultTitleText)
-        .fontSize(18)
+        .fontSize(EmuTypography.xl)
         .fontWeight(FontWeight.Medium)
         .fontColor(Colors.onSurface)
         .margin({ bottom: 4 })
 
       Text(this.resultMessageText)
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontColor(Colors.onSurfaceVariant)
         .textAlign(TextAlign.Center)
         .margin({ bottom: 24 })
@@ -1156,44 +1101,37 @@ struct ImportTaskOverlayPage {
       }
 
       Row({ space: 8 }) {
-        Button('取消')
+        EmuButton({
+          label: '取消',
+          kind: EmuButtonKind.GHOST,
+          buttonSize: EmuButtonSize.COMPACT,
+          shape: EmuButtonShape.PILL,
+          onTap: () => { this.handleRetryAction() }
+        })
           .layoutWeight(1)
-          .height(36)
-          .fontSize(10)
-          .fontWeight(FontWeight.Bold)
-                    .fontColor(Colors.onSurfaceVariant)
-          .backgroundColor(Color.Transparent)
-          .border({ width: 0.5, color: '#4D757575', style: BorderStyle.Solid })
-          .onClick(() => this.handleRetryAction())
 
-        Button('再试一次')
+        EmuButton({
+          label: '再试一次',
+          kind: EmuButtonKind.DANGER,
+          buttonSize: EmuButtonSize.COMPACT,
+          shape: EmuButtonShape.PILL,
+          tinted: true,
+          onTap: () => { this.handleRetryAction() }
+        })
           .layoutWeight(1)
-          .height(36)
-          .fontSize(10)
-          .fontWeight(FontWeight.Bold)
-                    .fontColor(Colors.error)
-          .backgroundColor(this.retryPressed ? '#3DED7F64' : '#1AED7F64')
-          .border({ width: 0.5, color: '#4DED7F64', style: BorderStyle.Solid })
-          .scale({ x: this.retryPressed ? 0.95 : 1, y: this.retryPressed ? 0.95 : 1 })
-          .onTouch((event: TouchEvent) => this.onRetryTouch(event))
-          .onClick(() => this.handleRetryAction())
       }
       .width('100%')
 
       if (this.canOverwriteExisting()) {
-        Button('覆盖已存在并重试')
+        EmuButton({
+          label: '覆盖已存在并重试',
+          kind: EmuButtonKind.SECONDARY,
+          buttonSize: EmuButtonSize.COMPACT,
+          shape: EmuButtonShape.PILL,
+          tinted: true,
+          onTap: () => { void this.restartActualImportWithOverwrite() }
+        })
           .width('100%')
-          .height(36)
-          .fontSize(10)
-          .fontWeight(FontWeight.Bold)
-                    .fontColor(Colors.onSurface)
-          .backgroundColor(this.overwritePressed ? '#33FFFFFF' : '#1AFFFFFF')
-          .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
-          .scale({ x: this.overwritePressed ? 0.95 : 1, y: this.overwritePressed ? 0.95 : 1 })
-          .onTouch((event: TouchEvent) => this.onOverwriteTouch(event))
-          .onClick(() => {
-            void this.restartActualImportWithOverwrite()
-          })
           .margin({ top: 12 })
       }
     }

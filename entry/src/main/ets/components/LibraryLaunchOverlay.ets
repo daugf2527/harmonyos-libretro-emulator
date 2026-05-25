@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuCoverArt } from './EmuCoverArt'
 import { EmuIcon } from './EmuIcon'
 import { ScanlineBackground } from './EmuAppShell'
@@ -28,7 +28,7 @@ export struct LibraryLaunchOverlay {
         this.Body()
 
         Text('Kinetic Obsidian // Virtual_Core_v0.1')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontColor('#666666')
           .fontFamily('monospace')
           .letterSpacing(3.6)
@@ -230,7 +230,7 @@ export struct LibraryLaunchOverlay {
           .layoutWeight(1)
 
         Text(`${this.normalizedProgress}%`)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
           .fontFamily('monospace')

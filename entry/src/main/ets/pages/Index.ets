@@ -12,6 +12,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+import { EmuTypography } from '../common/EmuUiTokens'
+
 @Entry
 @Component
 struct Index {
@@ -19,7 +21,7 @@ struct Index {
     Column() {
         Row() {
           Button('产品入口：导入主页')
-            .fontSize(18)
+            .fontSize(EmuTypography.xl)
             .width('80%')
             .height(60)
             .backgroundColor('#00FF41')
@@ -39,7 +41,7 @@ struct Index {
         // Onboarding 引导页按钮
         Row() {
           Button('Onboarding 引导页')
-            .fontSize(18)
+            .fontSize(EmuTypography.xl)
             .width('80%')
             .height(60)
             .backgroundColor('#00A651')
@@ -58,7 +60,7 @@ struct Index {
         // 导入任务反馈页（1:1 还原）
         Row() {
           Button('导入任务反馈页（1:1）')
-            .fontSize(18)
+            .fontSize(EmuTypography.xl)
             .width('80%')
             .height(60)
             .backgroundColor('#111111')
@@ -78,7 +80,7 @@ struct Index {
         // 通用 Libretro 游戏页面按钮
         Row() {
           Button('通用 Libretro 游戏')
-            .fontSize(18)
+            .fontSize(EmuTypography.xl)
             .width('80%')
             .height(60)
             .backgroundColor('#4CAF50')
@@ -96,7 +98,7 @@ struct Index {
 
         Row() {
           Button('产品入口：游戏库')
-            .fontSize(18)
+            .fontSize(EmuTypography.xl)
             .width('80%')
             .height(60)
             .backgroundColor('#0A0A0A')

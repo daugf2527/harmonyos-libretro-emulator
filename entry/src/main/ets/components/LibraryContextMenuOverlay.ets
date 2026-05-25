@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuIcon } from './EmuIcon'
 
 @Component
@@ -88,7 +88,7 @@ export struct LibraryContextMenuOverlay {
   ) {
     Row() {
       Text(label)
-        .fontSize(18)
+        .fontSize(EmuTypography.xl)
         .fontWeight(bold ? FontWeight.Bold : FontWeight.Medium)
         .fontColor(danger ? EmuColors.error : EmuColors.onSurface)
         .fontFamily('monospace')

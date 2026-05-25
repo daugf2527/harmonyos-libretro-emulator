@@ -5,13 +5,11 @@
 
 import LogHelper from '../common/LogHelper';
 import { common } from '@kit.AbilityKit';
-import { EmuColors } from '../common/EmuUiTokens';
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens';
 import { RuntimeControlPanel } from '../components/RuntimeControlPanel';
-import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav';
-import { RuntimeHudMetric, RuntimeTopHudBar } from '../components/RuntimeTopHudBar';
+import { RuntimeHudMetric } from '../components/RuntimeTopHudBar';
 import { RuntimePauseOverlay } from '../components/RuntimePauseOverlay';
 import { RuntimeVirtualControllerLayer } from '../components/RuntimeVirtualControllerLayer';
-import { getEmuBottomNavTargetRoute } from '../common/RouteHelper';
 import {
   buildInputSourceItems,
   createDefaultPortAssignments,
@@ -137,7 +135,10 @@ struct LibretroGamePage {
   @State softwareMaxPresetIndex: number = 1;
   @State hwRenderAllowed: boolean = true;
   @State hideVirtualController: boolean = false;
-  @State runtimeSaveStatusText: string = 'SAVE_IDLE';
+  // 游戏画面 aspect ratio：0 表示尚未收到 geometry_update（用 fallback 4/3）。
+  // handleGeometryUpdate 会写入真实值（如 2048 ≈ 0.81 竖屏、GBA 1.5 横屏）。
+  @State private gameAspectRatio: number = 0;
+  @State runtimeSaveStatusText: string = '存档就绪';
   private runtimeInputLayoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons;
   
   // 使用包含 "new_arch" 的 ID 以触发 C++ 侧的新引擎逻辑
@@ -169,8 +170,8 @@ struct LibretroGamePage {
   // HIGH fix: reuse HUD metrics array instead of allocating in build() every render
   private hudMetricsCache: RuntimeHudMetric[] = [
     { label: 'FPS', value: '--.-' },
-    { label: 'LAT', value: '4ms' },
-    { label: 'CORE', value: 'EMU_V26' }
+    { label: 'LAT', value: '--' },
+    { label: 'CORE', value: '--' }
   ];
   
   aboutToAppear() {
@@ -227,6 +228,18 @@ struct LibretroGamePage {
     this.stopGame();
     this.stopSoak();
     this.stopInputDebug();
+  }
+
+  onBackPress(): boolean {
+    if (this.gameRunning && this.gamePaused) {
+      this.resumeGame();
+      return true;
+    }
+    if (this.gameRunning && !this.gamePaused) {
+      this.pauseGame();
+      return true;
+    }
+    return false;
   }
 
   private isCurrentSwitchTask(token: number): boolean {
@@ -314,10 +327,21 @@ struct LibretroGamePage {
     }
     if (actionCode === 'input_mapping') {
       this.resumeGame();
-      this.showControls = true;
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/InputLayoutPage' }).catch((err: Error) => {
+        LogHelper.error('LibretroGame', 'Route', `跳转按键映射页失败: ${err.message}`);
+        this.runtimeSaveStatusText = '按键映射页面打开失败';
+      });
       return;
     }
-    this.runtimeSaveStatusText = '该操作暂未配置';
+    if (actionCode === 'visual_filters') {
+      this.resumeGame();
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/ShaderPreviewPage' }).catch((err: Error) => {
+        LogHelper.error('LibretroGame', 'Route', `跳转画面风格页失败: ${err.message}`);
+        this.runtimeSaveStatusText = '画面风格页面打开失败';
+      });
+      return;
+    }
+    this.runtimeSaveStatusText = `该操作暂未配置 (${actionCode})`;
   }
 
   handleEngineState(payload: EngineStatePayload) {
@@ -498,7 +522,8 @@ struct LibretroGamePage {
   handleFpsUpdate(payload: FpsUpdatePayload) {
     const fps = Number(payload.fps);
     if (!Number.isNaN(fps)) {
-      this.perfDisplay.coreFps = Math.round(fps);
+      const displayFps = this.normalizeFpsForDisplay(fps);
+      this.perfDisplay.coreFps = displayFps;
       this.refreshHudMetricsCache();
     }
 
@@ -511,6 +536,19 @@ struct LibretroGamePage {
     this.librarySessionTracker.updateFrameStats(fps, drops, dupes, nulls, underruns, overruns, buf);
 
     this.perfDisplay.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
+  }
+
+  // 限制 FPS 显示范围：> 240 视为没有 v-sync 限速的瞬时跑分值，
+  // 钳到目标帧率（通常 60），避免 UI 显示 "1000 FPS" 这种欺骗性数字。
+  private normalizeFpsForDisplay(rawFps: number): number {
+    if (!Number.isFinite(rawFps) || rawFps <= 0) {
+      return 0;
+    }
+    const ceiling = 240;
+    if (rawFps > ceiling) {
+      return 60;
+    }
+    return Math.round(rawFps);
   }
 
   handleAudioStatus(payload: AudioStatusPayload) {
@@ -530,6 +568,12 @@ struct LibretroGamePage {
     if (w > 0 && h > 0) {
       const aspectText = (a > 0) ? a.toFixed(3) : (w / h).toFixed(3);
       this.perfDisplay.geometryText = `Base:${w}x${h} AR:${aspectText}`;
+      // 让 ArkUI 容器按真实游戏画面比例渲染 XComponent，避免拉伸。
+      // 例如 2048 是 376×464（竖屏 ≈ 0.81），GBA 是 240×160（横屏 1.5）。
+      const ratio = (a > 0) ? a : (w / h);
+      if (Number.isFinite(ratio) && ratio > 0 && Math.abs(ratio - this.gameAspectRatio) > 0.005) {
+        this.gameAspectRatio = ratio;
+      }
     }
   }
 
@@ -693,21 +737,21 @@ struct LibretroGamePage {
     if (this.librarySessionTracker.audioBufferUsage > 0) {
       return `${Math.max(1, Math.round(this.librarySessionTracker.audioBufferUsage * 8))}ms`;
     }
-    return '4ms';
+    return '--';
   }
 
   private getRuntimeCoreText(): string {
     if (this.currentCore.length > 0) {
       return this.currentCore.replace('.so', '').toUpperCase();
     }
-    return 'EMU_V26';
+    return '--';
   }
 
   private getRuntimeProcessText(): string {
     if (this.currentRom.length > 0) {
       return getFileNameFromPath(this.currentRom).replace(/\.[^.]+$/, '').toUpperCase();
     }
-    return 'CHRONO_TRIGGER_USA_SNES';
+    return 'IDLE';
   }
 
   private refreshHudMetricsCache(): void {
@@ -801,109 +845,85 @@ struct LibretroGamePage {
     this.showControls = true;
   }
 
-  private onRuntimeBottomNavClick(key: string): void {
-    if (key === 'system') {
-      this.openRuntimeControlPanel();
-      return;
-    }
-    const route = getEmuBottomNavTargetRoute(key, 'engine');
-    if (route.length === 0) {
-      return;
-    }
-    if (key === 'library') {
-      this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[LibretroGamePage] replaceUrl ${route} failed: ${err.message}`);
-      });
-      return;
-    }
-    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[LibretroGamePage] pushUrl ${route} failed: ${err.message}`);
-    });
-  }
-  
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      // XComponent 游戏画面
-      XComponent({
-        id: this.xComponentId,
-        type: XComponentType.SURFACE,
-        libraryname: 'entry'
-      })
+      // 主体：上下分屏。游戏区在顶部，虚拟手柄在底部。
+      // 用 Column + layoutWeight 物理切分，避免虚拟手柄叠在游戏画面上造成
+      // 灰蒙感，也让 XComponent surface 高度直接对应游戏可视区，避免下半
+      // 被按键 shroud 浪费像素。
+      Column() {
+        // 游戏画面舞台 — 顶部 62%。Stack 提供黑边背景，XComponent 按
+        // gameAspectRatio 居中显示（2048 竖屏 ~0.81、GBA 横屏 1.5 等），
+        // 不再被强行拉成全屏比例。
+        Stack({ alignContent: Alignment.Center }) {
+          XComponent({
+            id: this.xComponentId,
+            type: XComponentType.SURFACE,
+            libraryname: 'entry'
+          })
+            .aspectRatio(this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3)
+            .constraintSize({ maxWidth: '100%', maxHeight: '100%' })
+            .focusable(true)
+            .focusOnTouch(true)
+            .onTouch((event) => {
+              this.inputDebugTracker.recordTouch(Number(event.type));
+            })
+            .onMouse((event) => {
+              this.inputDebugTracker.recordMouse(Number(event.action));
+            })
+            .onKeyEvent((event) => {
+              if (!event) {
+                return;
+              }
+              this.inputDebugTracker.recordKey(Number(event.type));
+            })
+            .onLoad(() => {
+              LogHelper.info(
+                'LibretroGame',
+                'UI',
+                `XComponent 加载完成 (New Arch) id=${this.xComponentId}`
+              );
+            })
+            .onDestroy(() => {
+              LogHelper.info(
+                'LibretroGame',
+                'UI',
+                `XComponent 销毁 (New Arch) id=${this.xComponentId}`
+              );
+            })
+        }
         .width('100%')
-        .height('100%')
-        .focusable(true)
-        .focusOnTouch(true)
-        .onTouch((event) => {
-          this.inputDebugTracker.recordTouch(Number(event.type));
-        })
-        .onMouse((event) => {
-          this.inputDebugTracker.recordMouse(Number(event.action));
-        })
-        .onKeyEvent((event) => {
-          if (!event) {
-            return;
+        .layoutWeight(this.gameRunning && !this.gamePaused && !this.hideVirtualController ? 72 : 100)
+        .backgroundColor(Color.Black)
+
+        // 虚拟按键区 — 底部 28%（仅运行时显示）
+        if (this.gameRunning && !this.gamePaused && !this.hideVirtualController) {
+          Column() {
+            RuntimeVirtualControllerLayer({
+              buttons: this.runtimeInputLayoutButtons,
+              layoutWidth: this.runtimeInputLayoutWidth,
+              layoutHeight: this.runtimeInputLayoutHeight,
+              onButtonChange: (keyId: number, pressed: boolean) => {
+                this.setButton(keyId, pressed);
+              },
+              onAnalogChange: (index: number, x: number, y: number) => {
+                this.setAnalog(index, x, y);
+              }
+            })
           }
-          this.inputDebugTracker.recordKey(Number(event.type));
-        })
-        .onLoad(() => {
-          LogHelper.info(
-            'LibretroGame',
-            'UI',
-            `XComponent 加载完成 (New Arch) id=${this.xComponentId}`
-          );
-          // 新架构：XComponent 会自动触发 OnSurfaceCreated，C++ 侧 LibretroEngine 会捕获 Window
-        })
-        .onDestroy(() => {
-          LogHelper.info(
-            'LibretroGame',
-            'UI',
-            `XComponent 销毁 (New Arch) id=${this.xComponentId}`
-          );
-        })
-
-      // 用户态顶部运行遥测
-      if (this.gameRunning) {
-        RuntimeTopHudBar({
-          metrics: this.getRuntimeHudMetrics()
-        })
+          .width('100%')
+          .layoutWeight(28)
+        }
       }
+      .width('100%')
+      .height('100%')
 
-      // 虚拟按键 (如果游戏运行中)
-      if (this.gameRunning && !this.gamePaused && !this.hideVirtualController) {
-        RuntimeVirtualControllerLayer({
-          buttons: this.runtimeInputLayoutButtons,
-            layoutWidth: this.runtimeInputLayoutWidth,
-            layoutHeight: this.runtimeInputLayoutHeight,
-          onButtonChange: (keyId: number, pressed: boolean) => {
-            this.setButton(keyId, pressed);
-          },
-          onAnalogChange: (index: number, x: number, y: number) => {
-            this.setAnalog(index, x, y);
-          },
-          onQuickSave: () => {
-            void this.quickSaveRuntimeState();
-          }
-        })
-      }
-
-      if (this.gameRunning) {
-        EmuBottomNav({
-          items: createEmuBottomNavItems('system'),
-          indicatorStyle: 'dot',
-          panelBackgroundColor: '#F8000000',
-          onItemClick: (key: string) => {
-            this.onRuntimeBottomNavClick(key);
-          }
-        })
-          .align(Alignment.Bottom)
-      }
-
-      // 左上角系统菜单按钮
+      // 左上角系统菜单按钮（仅未运行时显示，运行中靠系统返回键唤出暂停）
       if (!this.gameRunning) {
         Button('MENU')
           .width(46)
           .height(40)
-          .fontSize(18)
+          .fontSize(EmuTypography.xl)
           .fontColor(EmuColors.primary)
           .backgroundColor('#CC000000')
           .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
@@ -912,23 +932,6 @@ struct LibretroGamePage {
           .enabled(!this.switching)
           .onClick(() => {
             this.openRuntimeControlPanel();
-          })
-      }
-
-      if (this.gameRunning && !this.gamePaused) {
-        Button('PAUSE')
-          .width(78)
-          .height(40)
-          .fontSize(10)
-          .fontFamily('monospace')
-          .fontWeight(FontWeight.Bold)
-          .fontColor(EmuColors.primary)
-          .backgroundColor('#CC000000')
-          .border({ width: 0.5, color: '#6600FF41', style: BorderStyle.Solid })
-          .borderRadius(4)
-          .margin({ left: 88, top: 48 })
-          .onClick(() => {
-            this.pauseGame();
           })
       }
 

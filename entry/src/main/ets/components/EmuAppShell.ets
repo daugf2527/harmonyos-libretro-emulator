@@ -1,7 +1,6 @@
 import {
   EmuColors,
-  EmuMetrics
-} from '../common/EmuUiTokens'
+  EmuMetrics, EmuTypography } from '../common/EmuUiTokens'
 import { EmuIcon } from './EmuIcon'
 
 @Component
@@ -34,7 +33,7 @@ export struct EmuHeaderBar {
       Row({ space: 12 }) {
         if (this.rightLabel.length > 0) {
           Text(this.rightLabel)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
             .fontColor(this.mutedTextColor)
             .letterSpacing(0.8)
         }

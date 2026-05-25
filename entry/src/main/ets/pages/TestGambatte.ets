@@ -16,6 +16,7 @@ import LogHelper from '../common/LogHelper';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
 import { resourceManager } from '@kit.LocalizationKit';
+import { EmuStateColors, EmuTypography } from '../common/EmuUiTokens';
 
 // NAPI 接口定义 (遵循 AGENTS.md 规范)
 interface LibretroNapi {
@@ -38,7 +39,7 @@ interface LibretroNapi {
   ): Promise<boolean>;
   refactoredGetLastErrorInfo(): EngineErrorInfo;
   refactoredClearLastErrorInfo(): boolean;
-  testCoreLoader(path: string): string;
+  testCoreLoader(path: string): Promise<string>;
 }
 
 const nativeApi = testNapi as LibretroNapi;
@@ -413,14 +414,14 @@ struct TestGambatte {
         .margin({ top: 20, bottom: 10 })
 
       Text('通用 ROM 测试平台')
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontColor(Color.Gray)
         .margin({ bottom: 20 })
 
       // 核心选择器
       Column() {
         Text('选择核心')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontWeight(FontWeight.Medium)
           .alignSelf(ItemAlign.Start)
           .margin({ left: 20, bottom: 5 })
@@ -442,7 +443,7 @@ struct TestGambatte {
           })
 
         Text(this.currentCoreDescription)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontColor(Color.Gray)
           .margin({ top: 5 })
       }
@@ -450,20 +451,20 @@ struct TestGambatte {
       .margin({ bottom: 20 })
 
       Button(this.coreCheckRunning ? '核心验证中...' : '验证核心符号')
-        .fontSize(16)
+        .fontSize(EmuTypography.lg)
         .width('80%')
         .height(45)
         .margin({ bottom: 20 })
         .backgroundColor(this.coreCheckRunning ? Color.Gray : '#546E7A')
         .enabled(!this.coreCheckRunning)
         .onClick(() => {
-          this.runCoreCheck();
+          void this.runCoreCheck();
         })
 
       // ROM 选择器
       Column() {
         Text('选择 ROM')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontWeight(FontWeight.Medium)
           .alignSelf(ItemAlign.Start)
           .margin({ left: 20, bottom: 5 })
@@ -484,7 +485,7 @@ struct TestGambatte {
           })
 
         Text(this.currentRomDescription)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontColor(Color.Gray)
           .margin({ top: 5 })
       }
@@ -493,7 +494,7 @@ struct TestGambatte {
 
       // 测试按钮
       Button(this.testRunning ? '测试中...' : '开始测试')
-        .fontSize(18)
+        .fontSize(EmuTypography.xl)
         .width('80%')
         .height(50)
         .margin({ top: 10 })
@@ -505,7 +506,7 @@ struct TestGambatte {
 
       // 自动化测试按钮
       Button(this.autoTesting ? `自动测试中... ${this.autoTestCurrentInfo}` : '全自动生命周期测试')
-        .fontSize(16)
+        .fontSize(EmuTypography.lg)
         .width('80%')
         .height(50)
         .margin({ top: 10 })
@@ -517,12 +518,12 @@ struct TestGambatte {
 
       // 测试状态
       Text(this.testStatus)
-        .fontSize(16)
+        .fontSize(EmuTypography.lg)
         .fontColor(this.testStatus.includes('通过') ? '#4CAF50' :
                    (this.testStatus.includes('失败') ||
                     this.testStatus.includes('错误') ||
                     this.testStatus.includes('异常') ||
-                    this.testStatus.includes('无效')) ? '#F44336' : '#2196F3')
+                    this.testStatus.includes('无效')) ? EmuStateColors.dangerDefault : '#2196F3')
         .margin({ top: 20, bottom: 10 })
         .fontWeight(FontWeight.Medium)
 
@@ -536,7 +537,7 @@ struct TestGambatte {
         this.buildTestResultCard()
       } else if (!this.autoTesting && this.autoTestResults.length === 0) {
         Text(this.testResult)
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontColor(Color.Gray)
           .margin({ top: 10 })
           .padding(10)
@@ -547,7 +548,7 @@ struct TestGambatte {
 
       // 底部提示
       Text('提示：查看完整日志请使用 hdc shell hilog')
-        .fontSize(12)
+        .fontSize(EmuTypography.sm)
         .fontColor(Color.Gray)
         .margin({ bottom: 20 })
     }
@@ -561,7 +562,7 @@ struct TestGambatte {
   buildAutoTestResults() {
     Column() {
       Text('自动化测试报告')
-        .fontSize(16)
+        .fontSize(EmuTypography.lg)
         .fontWeight(FontWeight.Bold)
         .margin({ bottom: 10 })
 
@@ -570,7 +571,7 @@ struct TestGambatte {
         `SKIP ${this.countAutoTestByLevel(AutoTestLevel.SKIP)} | ` +
         `FAIL ${this.countAutoTestByLevel(AutoTestLevel.FAIL)}`
       )
-        .fontSize(12)
+        .fontSize(EmuTypography.sm)
         .fontColor(Color.Gray)
         .margin({ bottom: 8 })
 
@@ -580,10 +581,10 @@ struct TestGambatte {
             Row() {
               Column() {
                 Text(item.coreName)
-                  .fontSize(14)
+                  .fontSize(EmuTypography.md)
                   .fontWeight(FontWeight.Bold)
                 Text(item.romName)
-                  .fontSize(12)
+                  .fontSize(EmuTypography.sm)
                   .fontColor(Color.Gray)
               }
               .alignItems(HorizontalAlign.Start)
@@ -591,26 +592,26 @@ struct TestGambatte {
 
               Column() {
                 Text(item.level)
-                  .fontSize(14)
+                  .fontSize(EmuTypography.md)
                   .fontColor(
                     item.level === AutoTestLevel.PASS
                       ? '#4CAF50'
-                      : (item.level === AutoTestLevel.SKIP ? '#FB8C00' : '#F44336')
+                      : (item.level === AutoTestLevel.SKIP ? '#FB8C00' : EmuStateColors.dangerDefault)
                   )
                   .fontWeight(FontWeight.Bold)
                 Text(`${item.domain} · ${item.code}`)
-                  .fontSize(10)
+                  .fontSize(EmuTypography.xs)
                   .fontColor(Color.Gray)
                   .maxLines(1)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                 if (item.level === AutoTestLevel.PASS) {
                   Text(`FPS: ${item.fps.toFixed(1)}`)
-                    .fontSize(12)
+                    .fontSize(EmuTypography.sm)
                     .fontColor('#4CAF50')
                 } else {
                   Text(item.message)
-                    .fontSize(10)
-                    .fontColor(item.level === AutoTestLevel.SKIP ? '#FB8C00' : '#F44336')
+                    .fontSize(EmuTypography.xs)
+                    .fontColor(item.level === AutoTestLevel.SKIP ? '#FB8C00' : EmuStateColors.dangerDefault)
                     .maxLines(1)
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                 }
@@ -641,7 +642,7 @@ struct TestGambatte {
       if (this.lastTestResult?.success) {
         // 成功结果
         Text('测试通过')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontColor('#4CAF50')
           .fontWeight(FontWeight.Bold)
           .margin({ bottom: 10 })
@@ -667,14 +668,14 @@ struct TestGambatte {
       } else {
         // 失败结果
         Text('测试失败')
-          .fontSize(16)
-          .fontColor('#F44336')
+          .fontSize(EmuTypography.lg)
+          .fontColor(EmuStateColors.dangerDefault)
           .fontWeight(FontWeight.Bold)
           .margin({ bottom: 10 })
 
         Text(this.lastTestResult?.error || '未知错误')
-          .fontSize(14)
-          .fontColor('#F44336')
+          .fontSize(EmuTypography.md)
+          .fontColor(EmuStateColors.dangerDefault)
       }
     }
     .width('90%')
@@ -689,12 +690,12 @@ struct TestGambatte {
   buildResultRow(label: string, value: string) {
     Row() {
       Text(`${label}:`)
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontColor(Color.Gray)
         .width('40%')
 
       Text(value)
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontWeight(FontWeight.Medium)
         .width('60%')
     }
@@ -1239,7 +1240,7 @@ struct TestGambatte {
   }
 
   // 验证核心符号
-  runCoreCheck() {
+  async runCoreCheck() {
     if (this.coreCheckRunning) {
       return;
     }
@@ -1268,7 +1269,7 @@ struct TestGambatte {
       const corePath = `${bundleCodeDir}/libs/${abiPath}/${core.soFile}`;
 
       LogHelper.info('TestGambatte', 'Core', `验证核心: ${corePath}`);
-      const result = nativeApi.testCoreLoader(corePath);
+      const result = await nativeApi.testCoreLoader(corePath);
       this.testResult = result;
       if (result.startsWith('Success')) {
         this.testStatus = '核心验证通过';

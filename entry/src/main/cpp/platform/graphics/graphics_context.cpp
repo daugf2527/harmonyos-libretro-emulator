@@ -3,7 +3,7 @@
 #include <hilog/log.h>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD006
 #undef LOG_TAG
 #define LOG_TAG "GraphicsContext"
 #undef LOG_FLOW
@@ -53,6 +53,7 @@ bool GraphicsContext::Initialize(OHNativeWindow *window,
 
   // 3. Create Surface
   if (!CreateSurface(window)) {
+    Destroy(); // Audit T6-F1: release egl_context_ and egl_display_ to prevent leak
     return false;
   }
 

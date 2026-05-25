@@ -21,7 +21,7 @@
 #include <unistd.h>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD009
 #undef LOG_TAG
 #define LOG_TAG "VideoPipeline"
 #undef LOG_FLOW
@@ -1096,6 +1096,10 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
       m->nbFromWindowBufferFailures++;
     } else {
       m->nbMapFailures++;
+      if (ret == 0) {
+        // Audit T5-F1: Map succeeded (ret==0) but addr==nullptr; Unmap required per contract
+        OH_NativeBuffer_Unmap(nativeBuffer);
+      }
     }
     m->nwAbortBufferCalls++;
     OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);

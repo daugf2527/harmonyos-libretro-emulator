@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuCoverArt } from './EmuCoverArt'
 
 export type GameCardVariant = 'recent' | 'list'
@@ -70,7 +70,7 @@ export struct GameCard {
   private CoverBadge() {
     Row() {
       Text(this.platform)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.primary)
         .fontWeight(FontWeight.Bold)
         .fontFamily('monospace')
@@ -207,7 +207,7 @@ export struct GameCard {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Text(this.subtitle)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(0.3)
@@ -219,7 +219,7 @@ export struct GameCard {
       .justifyContent(FlexAlign.Center)
 
       Text(this.platform)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.primary)
         .fontFamily('monospace')

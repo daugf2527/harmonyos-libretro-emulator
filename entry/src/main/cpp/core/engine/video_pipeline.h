@@ -378,6 +378,7 @@ private:
   std::atomic<bool> xengine_enabled_{false};
   std::atomic<bool> xengine_dirty_{false};
 
+  // Audit T4-F5: Engine thread only — SetPixelFormat and Render() must both be called on Engine thread
   retro_pixel_format pixel_format_ = RETRO_PIXEL_FORMAT_0RGB1555;
 
   // 渲染统计

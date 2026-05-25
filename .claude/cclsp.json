@@ -1,0 +1,17 @@
+{
+  "servers": [
+    {
+      "extensions": ["c", "cc", "cpp", "cxx", "h", "hpp", "hxx"],
+      "command": [
+        "D:\\hongmeng\\command-line-tools\\sdk\\default\\openharmony\\native\\llvm\\bin\\clangd.exe",
+        "--background-index",
+        "--clang-tidy",
+        "--header-insertion=never",
+        "--completion-style=detailed",
+        "--query-driver=D:\\hongmeng\\command-line-tools\\sdk\\default\\openharmony\\native\\llvm\\bin\\clang*.exe",
+        "--compile-commands-dir=D:\\windsulf\\daugf2527-repos\\harmonyos-libretro-emulator\\entry\\.cxx\\default\\default\\debug\\arm64-v8a"
+      ],
+      "rootDir": "."
+    }
+  ]
+}

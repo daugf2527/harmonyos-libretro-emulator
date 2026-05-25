@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { EmuHeaderBar } from '../components/EmuAppShell'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import {
   GameMetadataRecord,
   getGameMetadataByRomFile,
@@ -155,7 +155,7 @@ struct MetadataEditPage {
   private Field(label: string, value: string, placeholder: string, fieldKey: string) {
     Column({ space: 8 }) {
       Text(label)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontFamily('monospace')
         .fontColor(EmuColors.onSurfaceVariant)
         .letterSpacing(1.4)
@@ -220,13 +220,13 @@ struct MetadataEditPage {
       Scroll() {
         Column({ space: 18 }) {
           Text('本地游戏资料')
-            .fontSize(28)
+            .fontSize(EmuTypography.display)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
             .width('100%')
 
           Text(this.romFile.length > 0 ? this.romFile : 'UNKNOWN_ROM')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor(EmuColors.primary)
             .letterSpacing(1.2)

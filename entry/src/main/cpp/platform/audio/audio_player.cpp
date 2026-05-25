@@ -157,11 +157,12 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
     LOGF(LOG_ERROR,
          "%{public}s Failed to set frame size in callback: %{public}d",
          kAudioChainPrefix, result);
-  } else {
-    LOGF(LOG_INFO,
-         "%{public}s Set frame size in callback: %{public}d frames (20ms)",
-         kAudioChainPrefix, frame_size);
+    Cleanup(); // Audit T3-F4: SetFrameSizeInCallback failure is fatal; cleanup before returning
+    return false;
   }
+  LOGF(LOG_INFO,
+       "%{public}s Set frame size in callback: %{public}d frames (20ms)",
+       kAudioChainPrefix, frame_size);
   const int32_t bytes_per_frame =
       static_cast<int32_t>(sizeof(int16_t)) * channel_count_;
   LOGF(LOG_INFO,
@@ -933,7 +934,8 @@ void AudioPlayer::Cleanup() {
 
   {
     std::unique_lock<std::mutex> lock(callback_mutex_);
-    callback_cond_.wait(lock, [this]() { return active_callbacks_ == 0; });
+    callback_cond_.wait_for(lock, std::chrono::seconds(2),
+                             [this]() { return active_callbacks_ == 0; }); // Audit T3-F5: bounded wait, avoid indefinite hang
   }
 
   {

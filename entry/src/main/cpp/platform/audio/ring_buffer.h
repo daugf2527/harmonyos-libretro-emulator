@@ -125,11 +125,11 @@ private:
   std::condition_variable cv_not_empty_;
   std::condition_variable cv_not_full_;
 
-  // 日志节流
-  mutable size_t write_wait_block_logs_ = 0;
-  mutable size_t write_wait_resume_logs_ = 0;
-  mutable size_t read_wait_block_logs_ = 0;
-  mutable size_t read_wait_resume_logs_ = 0;
+  // 日志节流 — Audit T3-F6: atomic to avoid UB from concurrent producer/consumer access
+  mutable std::atomic<size_t> write_wait_block_logs_{0};
+  mutable std::atomic<size_t> write_wait_resume_logs_{0};
+  mutable std::atomic<size_t> read_wait_block_logs_{0};
+  mutable std::atomic<size_t> read_wait_resume_logs_{0};
 
   RingBuffer(const RingBuffer &) = delete;
   RingBuffer &operator=(const RingBuffer &) = delete;

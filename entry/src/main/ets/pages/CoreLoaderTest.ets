@@ -6,6 +6,7 @@
 
 import testNapi from 'libentry.so';
 import { deviceInfo } from '@kit.BasicServicesKit';
+import { EmuTypography } from '../common/EmuUiTokens'
 
 interface CoreConfig {
   id: string;
@@ -15,7 +16,7 @@ interface CoreConfig {
 }
 
 interface CoreLoaderNapi {
-  testCoreLoader(corePath: string): string;
+  testCoreLoader(corePath: string): Promise<string>;
 }
 
 const nativeApi = testNapi as CoreLoaderNapi;
@@ -250,7 +251,7 @@ struct CoreLoaderTest {
 
       Column() {
         Text('选择核心')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontWeight(FontWeight.Bold)
           .alignSelf(ItemAlign.Start)
           .margin({ left: 20, bottom: 10 })
@@ -270,7 +271,7 @@ struct CoreLoaderTest {
           })
 
         Text(this.coreDescription)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontColor(Color.Gray)
           .margin({ top: 6, left: 20 })
       }
@@ -280,13 +281,13 @@ struct CoreLoaderTest {
       // 显示核心路径
       Column() {
         Text('核心路径:')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontWeight(FontWeight.Bold)
           .alignSelf(ItemAlign.Start)
           .margin({ left: 20, bottom: 10 })
         
         Text(this.corePath)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontColor(Color.Gray)
           .margin({ left: 20, right: 20, bottom: 20 })
           .maxLines(3)
@@ -302,24 +303,24 @@ struct CoreLoaderTest {
       Button('开始测试 CoreLoader')
         .width('80%')
         .height(50)
-        .fontSize(18)
+        .fontSize(EmuTypography.xl)
         .enabled(!this.isLoading)
         .onClick(() => {
-          this.runTest();
+          void this.runTest();
         })
         .margin({ bottom: 30 })
 
       // 测试结果显示区域
       Column() {
         Text('测试结果:')
-          .fontSize(16)
+          .fontSize(EmuTypography.lg)
           .fontWeight(FontWeight.Bold)
           .alignSelf(ItemAlign.Start)
           .margin({ bottom: 10 })
         
         Scroll() {
           Text(this.testResult)
-            .fontSize(14)
+            .fontSize(EmuTypography.md)
             .fontColor(this.testResult.startsWith('Success') ? Color.Green : 
                       this.testResult.startsWith('Failed') ? Color.Red : Color.Black)
             .width('100%')
@@ -338,7 +339,7 @@ struct CoreLoaderTest {
 
       // 说明文字
       Text('注意: 需要将 Libretro 核心 (.so) 文件放入 entry/libs/arm64/ 或 entry/libs/x86_64/ 目录')
-        .fontSize(12)
+        .fontSize(EmuTypography.sm)
         .fontColor(Color.Gray)
         .margin({ top: 20, left: 20, right: 20 })
         .textAlign(TextAlign.Center)
@@ -351,7 +352,7 @@ struct CoreLoaderTest {
   /**
    * 运行 CoreLoader 测试
    */
-  private runTest() {
+  private async runTest() {
     console.info('[CoreLoaderTest] Starting test...');
     this.isLoading = true;
     this.testResult = '正在测试...\n请查看日志输出';
@@ -359,8 +360,8 @@ struct CoreLoaderTest {
     try {
       // 调用 Native 侧的测试函数 (传递沙箱路径)
       console.info(`[CoreLoaderTest] Calling testCoreLoader with path: ${this.corePath}`);
-      let result = nativeApi.testCoreLoader(this.corePath);
-      
+      let result = await nativeApi.testCoreLoader(this.corePath);
+
       console.info(`[CoreLoaderTest] Test result: ${result}`);
       this.testResult = result;
       

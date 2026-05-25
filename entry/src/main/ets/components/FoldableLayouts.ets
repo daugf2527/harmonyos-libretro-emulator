@@ -6,6 +6,7 @@
 
 import LogHelper from '../common/LogHelper';
 import { DPadControl, ABXYControl, StartSelectControl, SystemControl } from './VirtualController';
+import { EmuTypography } from '../common/EmuUiTokens'
 
 // 单折态 UI (F态) - Phantom Overlay (幽灵悬浮)
 @Component
@@ -354,12 +355,12 @@ export struct TripleModeLayout {
   InfoPanel() {
     Column() {
       Text(`FPS: ${this.fps}`)
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontColor(Color.White)
         .margin({ bottom: 5 })
       
       Text(`CPU: ${this.cpuUsage}%`)
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontColor(Color.White)
     }
     .padding(15)

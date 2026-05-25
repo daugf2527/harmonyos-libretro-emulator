@@ -1,4 +1,4 @@
-import { createIndexRange, EmuColors } from '../common/EmuUiTokens'
+import { createIndexRange, EmuColors, EmuTypography } from '../common/EmuUiTokens'
 
 interface TelemetryPoint {
   x: number
@@ -67,14 +67,14 @@ export struct LibraryDetailInfoPanel {
   private DetailToggleRow() {
     Row({ space: 4 }) {
       Text('详情 (DETAILS)')
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontWeight(FontWeight.Bold)
         .fontColor('#B3B3B3')
         .fontFamily('monospace')
         .letterSpacing(1.6)
 
       Text(this.showExtendedDetails ? '˄' : '˅')
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.primary)
     }
@@ -128,7 +128,7 @@ export struct LibraryDetailInfoPanel {
         .fontFamily('monospace')
 
       Text(value)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurface)
         .fontFamily('monospace')
     }
@@ -154,7 +154,7 @@ export struct LibraryDetailInfoPanel {
             .backgroundColor(EmuColors.primary)
 
           Text(this.buildTelemetryStatusText())
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.primary)
             .fontFamily('monospace')
@@ -272,13 +272,13 @@ export struct LibraryDetailInfoPanel {
       Stack() {
         Column() {
           Text(this.overviewText)
-            .fontSize(14)
+            .fontSize(EmuTypography.md)
             .lineHeight(26)
             .fontColor('#E6E5E5E5')
 
           if (this.showExtendedDetails) {
             Text(this.runtimeSummaryText)
-              .fontSize(10)
+              .fontSize(EmuTypography.xs)
               .fontFamily('monospace')
               .lineHeight(18)
               .fontColor(EmuColors.onSurfaceVariant)
@@ -295,7 +295,7 @@ export struct LibraryDetailInfoPanel {
         })
 
         Text('◢')
-          .fontSize(18)
+          .fontSize(EmuTypography.xl)
           .fontColor('#22FFFFFF')
           .align(Alignment.TopEnd)
           .margin({ top: 8, right: 8 })

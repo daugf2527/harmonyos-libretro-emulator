@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 
 @Component
 export struct LibrarySection {
@@ -8,13 +8,13 @@ export struct LibrarySection {
   build() {
     Row() {
       Text(this.title)
-        .fontSize(18)
+        .fontSize(EmuTypography.xl)
         .fontWeight(FontWeight.Medium)
         .fontColor(EmuColors.onSurface)
 
       if (this.codeLabel.length > 0) {
         Text(this.codeLabel)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
           .fontColor(EmuColors.primary)
           .letterSpacing(1.4)

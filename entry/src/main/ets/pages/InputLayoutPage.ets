@@ -2,13 +2,17 @@ import { common } from '@kit.AbilityKit'
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
-import { EmuColors, EmuMetrics } from '../common/EmuUiTokens'
+import { EmuColors, EmuMetrics, EmuTypography } from '../common/EmuUiTokens'
 import {
   createDefaultInputLayoutProfile,
+  getDefaultRetroButtonId,
+  getRetroButtonOptionLabel,
   InputLayoutButton,
   InputLayoutProfile,
   loadInputLayoutProfile,
   resetInputLayoutProfile,
+  RETRO_BUTTON_OPTIONS,
+  RetroButtonOption,
   saveInputLayoutProfile
 } from '../common/InputLayoutRepository'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
@@ -50,6 +54,8 @@ struct InputLayoutPage {
   private savedToastTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0
+  private dragStartX: number = 0
+  private dragStartY: number = 0
   private readonly editorLayoutWidth: number = 440
   private readonly editorLayoutHeight: number = 340
   private readonly navItems: EmuBottomNavItem[] = [
@@ -137,6 +143,9 @@ struct InputLayoutPage {
   private applyLayoutProfile(profile: InputLayoutProfile, statusText: string): void {
     const nextButtons: InputLayoutButton[] = []
     profile.buttons.forEach((button: InputLayoutButton) => {
+      const fallback = getDefaultRetroButtonId(button.id)
+      const safeRetro = Number.isFinite(button.retroButtonId) ?
+        button.retroButtonId : fallback
       nextButtons.push({
         id: button.id,
         label: button.label,
@@ -144,7 +153,8 @@ struct InputLayoutPage {
         x: button.x,
         y: button.y,
         size: button.size,
-        shape: button.shape
+        shape: button.shape,
+        retroButtonId: safeRetro
       })
     })
     this.layoutButtons = nextButtons
@@ -231,10 +241,95 @@ struct InputLayoutPage {
       x: Math.max(0, Math.min(horizontalLimit, b.x + deltaX)),
       y: Math.max(0, Math.min(verticalLimit, b.y + deltaY)),
       size: b.size,
-      shape: b.shape
+      shape: b.shape,
+      retroButtonId: b.retroButtonId
     }
     this.layoutButtons = nextButtons
     this.layoutStatusText = 'LOCAL_LAYOUT_DIRTY'
+  }
+
+  private setSelectedButtonRetroId(retroButtonId: number): void {
+    const idx = this.layoutButtons.findIndex((b: InputLayoutButton) => b.id === this.selectedButtonId)
+    if (idx === -1) {
+      return
+    }
+    const b = this.layoutButtons[idx]
+    if (b.retroButtonId === retroButtonId) {
+      return
+    }
+    const nextButtons = [...this.layoutButtons]
+    nextButtons[idx] = {
+      id: b.id,
+      label: b.label,
+      caption: b.caption,
+      x: b.x,
+      y: b.y,
+      size: b.size,
+      shape: b.shape,
+      retroButtonId: retroButtonId
+    }
+    this.layoutButtons = nextButtons
+    this.layoutStatusText = 'LOCAL_LAYOUT_DIRTY'
+  }
+
+  private captureDragStart(button: InputLayoutButton): void {
+    this.dragStartX = button.x
+    this.dragStartY = button.y
+  }
+
+  private applyDragUpdate(buttonId: string, offsetX: number, offsetY: number): void {
+    const idx = this.layoutButtons.findIndex((b: InputLayoutButton) => b.id === buttonId)
+    if (idx === -1) {
+      return
+    }
+    const b = this.layoutButtons[idx]
+    const horizontalLimit = Math.max(0, this.editorLayoutWidth - this.getButtonVisualWidth(b))
+    const verticalLimit = Math.max(0, this.editorLayoutHeight - this.getButtonVisualHeight(b))
+    const nextX = Math.max(0, Math.min(horizontalLimit, this.dragStartX + offsetX))
+    const nextY = Math.max(0, Math.min(verticalLimit, this.dragStartY + offsetY))
+    if (nextX === b.x && nextY === b.y) {
+      return
+    }
+    const nextButtons = [...this.layoutButtons]
+    nextButtons[idx] = {
+      id: b.id,
+      label: b.label,
+      caption: b.caption,
+      x: nextX,
+      y: nextY,
+      size: b.size,
+      shape: b.shape,
+      retroButtonId: b.retroButtonId
+    }
+    this.layoutButtons = nextButtons
+  }
+
+  private getSelectedButton(): InputLayoutButton | undefined {
+    return this.layoutButtons.find((b: InputLayoutButton) => b.id === this.selectedButtonId)
+  }
+
+  private getSelectedRetroButtonId(): number {
+    const button = this.getSelectedButton()
+    if (button && Number.isFinite(button.retroButtonId)) {
+      return button.retroButtonId
+    }
+    return getDefaultRetroButtonId(this.selectedButtonId)
+  }
+
+  private getRetroOptionIndex(): number {
+    const current = this.getSelectedRetroButtonId()
+    const idx = RETRO_BUTTON_OPTIONS.findIndex((opt: RetroButtonOption) => opt.retroButtonId === current)
+    return idx >= 0 ? idx : 0
+  }
+
+  private getRetroSelectOptions(): SelectOption[] {
+    return RETRO_BUTTON_OPTIONS.map((opt: RetroButtonOption): SelectOption => {
+      return { value: `${opt.retroButtonId} · ${opt.caption}` }
+    })
+  }
+
+  private getCurrentRetroLabel(): string {
+    return getRetroButtonOptionLabel(this.getSelectedRetroButtonId())
   }
 
   private getButtonVisualWidth(button: InputLayoutButton): number {
@@ -295,14 +390,14 @@ struct InputLayoutPage {
             .backgroundColor(item.status === 'READY' ? EmuColors.primary : EmuColors.outline)
 
           Text(item.label)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(1.6)
         }
         .alignItems(VerticalAlign.Center)
 
         Text(item.status)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(item.status === 'READY' ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
           .backgroundColor(item.status === 'READY' ? '#1800FF41' : EmuColors.surfaceContainerHigh)
@@ -317,13 +412,13 @@ struct InputLayoutPage {
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
           Text(`ID: ${item.id.toUpperCase()}_INPUT_BUS`)
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor('#666666')
         }
         .alignItems(HorizontalAlign.Start)
 
         Text(item.power)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.onSurfaceVariant)
       }
       .width('100%')
@@ -351,7 +446,7 @@ struct InputLayoutPage {
         .fontColor('#777777')
         .letterSpacing(0.5)
       Text(metric.value)
-        .fontSize(12)
+        .fontSize(EmuTypography.sm)
                 .fontColor(metric.highlight ? EmuColors.primary : EmuColors.onSurface)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -369,7 +464,7 @@ struct InputLayoutPage {
       Row() {
         Row({ space: 8 }) {
           Text('◎')
-            .fontSize(16)
+            .fontSize(EmuTypography.lg)
             .fontColor(EmuColors.onSurfaceVariant)
           Text('Netplay 联机')
             .fontSize(13)
@@ -380,7 +475,7 @@ struct InputLayoutPage {
         .alignItems(VerticalAlign.Center)
 
         Text('中继：未配置')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor('#666666')
       }
       .width('100%')
@@ -409,11 +504,11 @@ struct InputLayoutPage {
 
       Column({ space: 4 }) {
         Text(room.name)
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontWeight(FontWeight.Medium)
           .fontColor(EmuColors.onSurface)
         Text(`Game: ${room.game}`)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor('#666666')
       }
       .layoutWeight(1)
@@ -424,7 +519,7 @@ struct InputLayoutPage {
           .fontSize(9)
           .fontColor('#666666')
         Text(room.latency)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
                     .fontColor(room.color)
       }
       .alignItems(HorizontalAlign.End)
@@ -434,7 +529,7 @@ struct InputLayoutPage {
           .fontSize(9)
           .fontColor('#666666')
         Text(room.players)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
                     .fontColor(EmuColors.onSurface)
       }
       .alignItems(HorizontalAlign.End)
@@ -477,6 +572,34 @@ struct InputLayoutPage {
       this.EditorMetric('Latency', 'INPUT_QUEUE')
       this.EditorMetric('Input Poll', this.layoutStatusText)
       this.EditorMetric('Selected', this.selectedButtonId.toUpperCase())
+
+      Row({ space: 6 }) {
+        Text('Mapped')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .layoutWeight(1)
+
+        Select(this.getRetroSelectOptions())
+          .selected(this.getRetroOptionIndex())
+          .value(`RETRO_${this.getCurrentRetroLabel()}`)
+          .font({ size: 10 })
+          .selectedOptionFont({ size: 10 })
+          .optionFont({ size: 10 })
+          .optionWidth(180)
+          .fontColor(EmuColors.onSurface)
+          .backgroundColor('#22484848')
+          .borderRadius(4)
+          .height(28)
+          .onSelect((index: number) => {
+            const opt = RETRO_BUTTON_OPTIONS[index]
+            if (opt) {
+              this.setSelectedButtonRetroId(opt.retroButtonId)
+            }
+          })
+      }
+      .width('100%')
+      .padding({ top: 2, bottom: 2 })
+      .alignItems(VerticalAlign.Center)
     }
     .padding({ left: 20, right: 20, top: 14, bottom: 14 })
     .backgroundColor('#82000000')
@@ -484,17 +607,17 @@ struct InputLayoutPage {
     .border({ width: { left: 2 }, color: EmuColors.primary, style: BorderStyle.Solid })
     .align(Alignment.TopStart)
     .margin({ left: 24, top: 44 })
-    .constraintSize({ maxWidth: 330 })
+    .constraintSize({ maxWidth: 280 })
   }
 
   @Builder
   private EditorMetric(label: string, value: string) {
     Row() {
       Text(label)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.onSurfaceVariant)
       Text(value)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(value === 'INPUT_QUEUE' || value === this.selectedButtonId.toUpperCase() ? EmuColors.primary : EmuColors.onSurface)
     }
     .width('100%')
@@ -529,7 +652,7 @@ struct InputLayoutPage {
         .height(1)
         .backgroundColor(EmuColors.primary)
       Text(label)
-        .fontSize(10)
+        .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.primary)
         .backgroundColor(EmuColors.background)
         .padding({ left: 4, right: 4 })
@@ -590,6 +713,19 @@ struct InputLayoutPage {
     .onClick(() => {
       this.selectedButtonId = button.id
     })
+    .gesture(
+      PanGesture({ fingers: 1, direction: PanDirection.All, distance: 1 })
+        .onActionStart(() => {
+          this.selectedButtonId = button.id
+          this.captureDragStart(button)
+        })
+        .onActionUpdate((event: GestureEvent) => {
+          this.applyDragUpdate(button.id, event.offsetX, event.offsetY)
+        })
+        .onActionEnd(() => {
+          this.layoutStatusText = 'LOCAL_LAYOUT_DIRTY'
+        })
+    )
   }
 
   @Builder
@@ -603,7 +739,7 @@ struct InputLayoutPage {
             .borderRadius(4)
             .backgroundColor(EmuColors.primary)
           Text('EDITOR\nACTIVE')
-            .fontSize(10)
+            .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(1.8)
             .lineHeight(18)
@@ -628,7 +764,7 @@ struct InputLayoutPage {
         Button('保存')
           .height(48)
           .padding({ left: 22, right: 22 })
-          .fontSize(18)
+          .fontSize(EmuTypography.xl)
           .fontWeight(FontWeight.Bold)
           .fontColor('#004C0C')
           .backgroundColor(EmuColors.primary)
@@ -671,7 +807,7 @@ struct InputLayoutPage {
         })
 
         Text('碳影 / Carbon Shade')
-                    .fontSize(18)
+                    .fontSize(EmuTypography.xl)
           .fontColor(EmuColors.primary)
           .letterSpacing(4)
       }
@@ -679,7 +815,7 @@ struct InputLayoutPage {
 
       Column({ space: 3 }) {
         Text('正在编辑布局...')
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurface)
           .maxLines(1)
@@ -793,7 +929,7 @@ struct InputLayoutPage {
 
       if (this.savedToastVisible) {
         Text('INPUT_LAYOUT_SAVED')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
           .fontWeight(FontWeight.Bold)
                     .fontColor('#004C0C')
           .letterSpacing(1.4)

@@ -1,3 +1,6 @@
+import { EmuMotion, EmuStateColors, EmuTypography } from '../common/EmuUiTokens'
+import { EmuLoadingSpinner } from './EmuLoadingSpinner'
+
 @Component
 export struct RuntimeControlPanel {
   @Prop selectedPortIndex: number = 0
@@ -18,7 +21,7 @@ export struct RuntimeControlPanel {
   @Prop hideVirtualController: boolean = false
   @Prop gameRunning: boolean = false
   @Prop gamePaused: boolean = false
-  @Prop runtimeSaveStatusText: string = 'SAVE_IDLE'
+  @Prop runtimeSaveStatusText: string = '存档就绪'
   @Prop soakRunning: boolean = false
   @Prop soakSecondsLeft: number = 0
   @Prop soakSummaryText: string = ''
@@ -77,7 +80,7 @@ export struct RuntimeControlPanel {
     ListItem() {
       Column({ space: 8 }) {
         Text(label)
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .fontColor('#AAAAAA')
 
         Select(options)
@@ -105,13 +108,27 @@ export struct RuntimeControlPanel {
   private CoreCheckBlock() {
     ListItem() {
       Column({ space: 8 }) {
-        Button(this.coreCheckRunning ? '验证中...' : '验证核心符号')
-          .fontSize(16)
+        Button() {
+          Row({ space: 8 }) {
+            if (this.coreCheckRunning) {
+              EmuLoadingSpinner({ dotSize: 16, color: '#FFFFFF', trackOpacity: 0.25 })
+            }
+            Text(this.coreCheckRunning ? '验证中...' : '验证核心符号')
+              .fontSize(EmuTypography.lg)
+              .fontColor(Color.White)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .alignItems(VerticalAlign.Center)
+          .justifyContent(FlexAlign.Center)
+        }
           .height(44)
           .width('100%')
           .type(ButtonType.Normal)
           .borderRadius(8)
           .backgroundColor(this.coreCheckRunning ? '#607D8B' : '#546E7A')
+          .opacity(this.coreCheckRunning || this.switching ? 0.75 : 1)
+          .animation({ duration: EmuMotion.stateChangeMs, curve: Curve.EaseInOut })
           .enabled(!this.coreCheckRunning && !this.switching)
           .onClick(() => {
             this.onCoreCheck?.()
@@ -119,7 +136,7 @@ export struct RuntimeControlPanel {
 
         if (this.coreCheckText) {
           Text(this.coreCheckText)
-            .fontSize(12)
+            .fontSize(EmuTypography.sm)
             .fontColor(Color.White)
             .padding(4)
         }
@@ -173,10 +190,10 @@ export struct RuntimeControlPanel {
         Row() {
           Column() {
             Text('允许 HW_RENDER')
-              .fontSize(16)
+              .fontSize(EmuTypography.lg)
               .fontColor(Color.White)
             Text('需核心支持，重启生效')
-              .fontSize(12)
+              .fontSize(EmuTypography.sm)
               .fontColor('#888888')
           }
           .layoutWeight(1)
@@ -193,7 +210,7 @@ export struct RuntimeControlPanel {
         Row() {
           Column() {
             Text('隐藏虚拟手柄')
-              .fontSize(16)
+              .fontSize(EmuTypography.lg)
               .fontColor(Color.White)
           }
           .layoutWeight(1)
@@ -217,7 +234,7 @@ export struct RuntimeControlPanel {
       Column({ space: 12 }) {
         if (!this.gameRunning) {
           Button('开始游戏')
-            .fontSize(18)
+            .fontSize(EmuTypography.xl)
             .height(50)
             .width('100%')
             .type(ButtonType.Normal)
@@ -271,8 +288,10 @@ export struct RuntimeControlPanel {
               .layoutWeight(1)
               .type(ButtonType.Normal)
               .borderRadius(8)
-              .backgroundColor('#F44336')
+              .backgroundColor(EmuStateColors.dangerDefault)
+              .fontColor(EmuStateColors.onDanger)
               .margin({ left: 10 })
+              .animation({ duration: EmuMotion.stateChangeMs, curve: Curve.EaseInOut })
               .onClick(() => {
                 this.onStopGame?.()
               })
@@ -281,7 +300,7 @@ export struct RuntimeControlPanel {
 
           Row({ space: 10 }) {
             Button('即时存档')
-              .fontSize(16)
+              .fontSize(EmuTypography.lg)
               .height(44)
               .layoutWeight(1)
               .type(ButtonType.Normal)
@@ -293,7 +312,7 @@ export struct RuntimeControlPanel {
               })
 
             Button('即时读档')
-              .fontSize(16)
+              .fontSize(EmuTypography.lg)
               .height(44)
               .layoutWeight(1)
               .type(ButtonType.Normal)
@@ -308,7 +327,7 @@ export struct RuntimeControlPanel {
         }
 
         Text(this.runtimeSaveStatusText)
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontColor('#AAAAAA')
           .fontFamily('monospace')
           .maxLines(1)
@@ -323,13 +342,27 @@ export struct RuntimeControlPanel {
   private SoakBlock() {
     ListItem() {
       Column({ space: 8 }) {
-        Button(this.soakRunning ? `压力测试中 ${this.soakSecondsLeft}s` : '压力测试 (10min)')
-          .fontSize(14)
+        Button() {
+          Row({ space: 8 }) {
+            if (this.soakRunning) {
+              EmuLoadingSpinner({ dotSize: 14, color: '#FFFFFF', trackOpacity: 0.25 })
+            }
+            Text(this.soakRunning ? `压力测试中 ${this.soakSecondsLeft}s` : '压力测试 (10min)')
+              .fontSize(EmuTypography.md)
+              .fontColor(Color.White)
+              .maxLines(1)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .alignItems(VerticalAlign.Center)
+          .justifyContent(FlexAlign.Center)
+        }
           .height(40)
           .width('100%')
           .type(ButtonType.Normal)
           .borderRadius(8)
           .backgroundColor(this.soakRunning ? '#607D8B' : '#455A64')
+          .opacity(this.switching ? 0.6 : 1)
+          .animation({ duration: EmuMotion.stateChangeMs, curve: Curve.EaseInOut })
           .enabled(!this.switching)
           .onClick(() => {
             this.onSoakToggle?.()
@@ -337,7 +370,7 @@ export struct RuntimeControlPanel {
 
         if (this.soakSummaryText) {
           Text(this.soakSummaryText)
-            .fontSize(12)
+            .fontSize(EmuTypography.sm)
             .fontColor('#CCCCCC')
             .width('100%')
         }
@@ -357,7 +390,7 @@ export struct RuntimeControlPanel {
         Blank()
 
         Button('关闭')
-          .fontSize(14)
+          .fontSize(EmuTypography.md)
           .height(32)
           .onClick(() => {
             this.onClose?.()
@@ -396,8 +429,8 @@ export struct RuntimeControlPanel {
         if (this.switchError) {
           ListItem() {
             Text(this.switchError)
-              .fontSize(12)
-              .fontColor('#FF5252')
+              .fontSize(EmuTypography.sm)
+              .fontColor(EmuStateColors.dangerDefault)
               .width('100%')
               .padding(8)
               .backgroundColor('#33FF0000')

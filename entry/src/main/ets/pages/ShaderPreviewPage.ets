@@ -1,7 +1,51 @@
 import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
+
+@Component
+struct ShaderSliderRow {
+  @Prop label: string = ''
+  @Prop value: number = 0
+  @Prop suffix: string = ''
+  @Prop min: number = 0
+  @Prop max: number = 100
+  onChange?: (value: number) => void
+
+  build() {
+    Column({ space: 8 }) {
+      Row() {
+        Text(this.label)
+          .fontSize(9)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(1.2)
+        Text(`${this.value}${this.suffix}`)
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurface)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Slider({
+        value: this.value,
+        min: this.min,
+        max: this.max,
+        step: 1
+      })
+        .width('100%')
+        .blockColor(EmuColors.onSurface)
+        .trackColor(EmuColors.outlineVariant)
+        .selectedColor(EmuColors.primary)
+        .showSteps(false)
+        .showTips(false)
+        .onChange((next: number) => {
+          const clamped = Math.max(this.min, Math.min(this.max, Math.round(next)))
+          this.onChange?.(clamped)
+        })
+    }
+    .width('100%')
+  }
+}
 
 @Entry
 @Component
@@ -103,7 +147,7 @@ struct ShaderPreviewPage {
           .padding({ left: 10, right: 10, top: 5, bottom: 5 })
           .backgroundColor(processed ? EmuColors.primary : '#CC000000')
         Text(processed ? `${mode} / 未应用到游戏` : mode)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(processed ? EmuColors.primary : EmuColors.onSurface)
       }
       .align(processed ? Alignment.TopEnd : Alignment.TopStart)
@@ -143,7 +187,7 @@ struct ShaderPreviewPage {
 
       Row() {
         Text('↕')
-          .fontSize(18)
+          .fontSize(EmuTypography.xl)
           .fontColor('#00131313')
           .width(28)
           .height(28)
@@ -166,7 +210,7 @@ struct ShaderPreviewPage {
     Column({ space: 18 }) {
       Row() {
         Text('实时视觉滤镜预览')
-          .fontSize(12)
+          .fontSize(EmuTypography.sm)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurface)
           .letterSpacing(1.4)
@@ -177,15 +221,36 @@ struct ShaderPreviewPage {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      this.SliderRow('扫描线强度', this.scanlineIntensity, '%', 0, 100, this.onScanlineIntensityChange)
-      this.SliderRow('CRT 曲率', this.curvature, '%', 0, 100, this.onCurvatureChange)
-      this.SliderRow('色彩饱和度', this.saturation, '%', 0, 200, this.onSaturationChange)
+      ShaderSliderRow({
+        label: '扫描线强度',
+        value: this.scanlineIntensity,
+        suffix: '%',
+        min: 0,
+        max: 100,
+        onChange: this.onScanlineIntensityChange
+      })
+      ShaderSliderRow({
+        label: 'CRT 曲率',
+        value: this.curvature,
+        suffix: '%',
+        min: 0,
+        max: 100,
+        onChange: this.onCurvatureChange
+      })
+      ShaderSliderRow({
+        label: '色彩饱和度',
+        value: this.saturation,
+        suffix: '%',
+        min: 0,
+        max: 200,
+        onChange: this.onSaturationChange
+      })
 
       Row({ space: 12 }) {
         Button('重置')
           .layoutWeight(1)
           .height(36)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.onSurfaceVariant)
           .backgroundColor(Color.Transparent)
           .border({ width: 0.5, color: EmuColors.outline, style: BorderStyle.Solid })
@@ -195,7 +260,7 @@ struct ShaderPreviewPage {
         Button('保存预设')
           .layoutWeight(1)
           .height(36)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
           .backgroundColor(Color.Transparent)
@@ -229,7 +294,7 @@ struct ShaderPreviewPage {
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.2)
         Text(`${value}${suffix}`)
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.onSurface)
       }
       .width('100%')
@@ -257,11 +322,11 @@ struct ShaderPreviewPage {
     Column({ space: 12 }) {
       Row() {
         Text('GPU 负载')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.4)
         Text('未接入')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.primary)
       }
       .width('100%')
@@ -274,11 +339,11 @@ struct ShaderPreviewPage {
 
       Row() {
         Text('延迟')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.4)
         Text('仅预览')
-          .fontSize(10)
+          .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.primary)
       }
       .width('100%')

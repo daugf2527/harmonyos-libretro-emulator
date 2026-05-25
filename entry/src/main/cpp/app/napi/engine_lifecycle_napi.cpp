@@ -192,7 +192,6 @@ static napi_value GetRawFileList(napi_env env, napi_callback_info info) {
 }
 
 struct RawFileListAsyncContext {
-  napi_env env = nullptr;
   napi_deferred deferred = nullptr;
   napi_async_work work = nullptr;
   NativeResourceManager *mgr = nullptr;
@@ -219,7 +218,19 @@ static void CompleteGetRawFileListAsync(napi_env env, napi_status status,
     LOGF(LOG_ERROR,
          "[NEW] GetRawFileListAsync work failed: status=%{public}d",
          static_cast<int>(status));
-    ctx->files.clear();
+    napi_value errMsg;
+    napi_create_string_utf8(env, "async_work_failed", NAPI_AUTO_LENGTH, &errMsg);
+    napi_reject_deferred(env, ctx->deferred, errMsg);
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    if (ctx->mgr) {
+      OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
+      ctx->mgr = nullptr;
+    }
+    delete ctx;
+    return;
   }
 
   napi_value result = BuildStringArray(env, ctx->files);
@@ -260,7 +271,6 @@ static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
   }
 
   auto *ctx = new RawFileListAsyncContext();
-  ctx->env = env;
   ctx->mgr = mgr;
   ctx->dir = dir;
 
@@ -361,7 +371,6 @@ static napi_value LoadRom(napi_env env, napi_callback_info info) {
 }
 
 struct SwitchGameAsyncContext {
-  napi_env env = nullptr;
   napi_deferred deferred = nullptr;
   napi_async_work work = nullptr;
   std::string corePath;
@@ -715,7 +724,6 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   }
 
   auto *ctx = new SwitchGameAsyncContext();
-  ctx->env = env;
   ctx->corePath = corePath;
   ctx->romPath = resolvedRomPath;
   ctx->filesDir = filesDir;
@@ -794,7 +802,6 @@ static napi_value StopEngine(napi_env env, napi_callback_info info) {
 }
 
 struct StopEngineAsyncContext {
-  napi_env env = nullptr;
   napi_async_work work = nullptr;
   bool stopped = false;
 };
@@ -844,7 +851,6 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
   }
 
   auto *ctx = new StopEngineAsyncContext();
-  ctx->env = env;
 
   napi_value resourceName;
   napi_create_string_utf8(env, "StopEngineAsyncWork", NAPI_AUTO_LENGTH,

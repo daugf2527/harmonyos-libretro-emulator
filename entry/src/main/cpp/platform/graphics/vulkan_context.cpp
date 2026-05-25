@@ -5,7 +5,7 @@
 #include <hilog/log.h>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD00C
 #undef LOG_TAG
 #define LOG_TAG "VulkanContext"
 #undef LOG_FLOW

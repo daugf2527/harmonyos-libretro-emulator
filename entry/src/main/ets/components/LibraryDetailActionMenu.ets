@@ -1,4 +1,4 @@
-import { EmuColors } from '../common/EmuUiTokens'
+import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuIcon } from './EmuIcon'
 
 export type LibraryDetailActionKey =
@@ -77,7 +77,7 @@ export struct LibraryDetailActionMenu {
   ) {
     Row() {
       Text(title)
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontWeight(isDanger ? FontWeight.Bold : FontWeight.Medium)
         .fontColor(isDanger ? EmuColors.error : EmuColors.onSurface)
 
@@ -102,7 +102,7 @@ export struct LibraryDetailActionMenu {
   private MenuCoverAction() {
     Row() {
       Text('修改封面')
-        .fontSize(14)
+        .fontSize(EmuTypography.md)
         .fontWeight(FontWeight.Medium)
         .fontColor(EmuColors.onSurface)
 
@@ -115,7 +115,7 @@ export struct LibraryDetailActionMenu {
         })
 
         Text('AUTO')
-          .fontSize(18)
+          .fontSize(EmuTypography.xl)
           .fontWeight(FontWeight.Medium)
           .fontColor('#B8B8B8')
           .fontFamily('monospace')
