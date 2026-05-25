@@ -628,3 +628,24 @@ memory `feedback_agent_worktree_isolation`（"worktree 隔离不可靠"）是基
 - `feedback_dont_inject_path_to_claude_settings` —— env.PATH 注入副作用
 - `feedback_subagent_model` —— Agent 工具必须显式传 model（与 SE1 协同）
 - `feedback_windows_pitfalls` —— 本会话新增 / WIN2 —— Windows 平台 W2/W3/W5/W7/W9 坑
+
+---
+
+## 附录 O — 重启 Claude Code 后的 wire-up 验证清单
+
+S2 P0 + S4 P1 实施完毕后，7 项依赖"Claude Code 真重启 + 真触发"才能确认生效。
+重启 cwd = `D:/windsulf/daugf2527-repos/harmonyos-libretro-emulator`，逐项验：
+
+| # | 验什么 | 怎么触发 | 期望 | 失败兜底 |
+|---|---|---|---|---|
+| 1 | **H3 SessionStart hook** | 重启后开场不给提示，直接问"现状如何？" | Claude 立刻知道分支 / 最近 3 commit / 上次 quick_signals 状态 | 检查 `bash .claude/hooks/session-start.sh` forward 是否仍 PASS + settings.json `SessionStart` 段在 |
+| 2 | **OS1 statusLine** | 看 Claude Code 底部状态栏 | 显示 `[refactor/build-method-split-newarch*] qs:PASS idle:Nm` | 用户级 statusline 可能覆盖；检查项目级 `statusLine.command` 字段 |
+| 3 | **SE1 项目级 model** | 跟 Claude 聊几句看 statusline / 风格 | 默认 sonnet 不是 opus | 用户级 settings.json `model` 字段可能覆盖；字段待 v2.1.101+ 验证 |
+| 4 | **CT3 @import 子 CLAUDE.md** | 不切 cwd 问 "我们 NativeBuffer 用 mmap 还是 FromNativeWindowBuffer？" | 立刻答 FromNativeWindowBuffer（cpp/CLAUDE.md 内容） | Claude 说"我需要 Read cpp/CLAUDE.md" → 说明 @import 旧版本忽略 |
+| 5 | **CT5 napi-reviewer memory** | 让 Claude "用 napi-boundary-reviewer 审一下 engine_lifecycle_napi.cpp" | agent 引用 memory.md 的 56 函数 / 4 线程 / TSFN canonical | agent 没引用 → 手动让 Claude 先 Read memory.md |
+| 6 | **SC1+SC2 skill frontmatter** | 触发 `/closed-loop` 或 `/auto-commit-cicd` 看 statusline model | 显示 sonnet | 看不出 → 字段未识别，等 Claude Code 升级 |
+| 7 | **NT1 Notification hook** | 让 Claude 跑 `hvigorw assembleHap` 等长任务 | 任务结束 / 等输入时 Windows 桌面弹 toast / message box | 手动测：`echo '{"message":"test"}' \| bash .claude/hooks/notify.sh` 应弹通知 |
+
+**重启操作**：完全退出 Claude Code（kill 进程 / Cmd+Q / Alt+F4）→ 重新打开 → 进入项目目录。**关闭当前 tab 不算重启**，需进程级 restart。
+
+**所有项失败 = 仍然有价值**：on-demand 加载 / 用户级 statusline / 用户级 model / 手动 Read 子 CLAUDE.md / 手动 dispatch agent / Stop hook 卫生检查 都是 fallback，harness 整体不破。
