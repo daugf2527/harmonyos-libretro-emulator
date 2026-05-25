@@ -186,7 +186,7 @@ harmony skills 远远落后 carbon（1 vs 6），但**不该盲目补齐到 6**�
 | **S1（本会话）** | harmony | ≈3 h | 产出本设计文档 + 写入 `feedback_setup_harness_first_before_coding` memory | 设计文档 commit + MEMORY.md 多一行 | ✅ 2026-05-24 |
 | **S2** | harmony | 2 h | **P0 harmony 侧**：H1 + H2 + B1.harmony **+ WIN1.harmony**（CLAUDE.md 加 Windows 注意事项一节，详见附录 L） | 各按 P0 验收口径手动跑一遍 → 提 PR 到 harmony | ✅ 2026-05-25 (commit 74e446d) |
 | **S3** | carbon | 2 h | **P0 carbon 侧**：C1 + C2 + B1.carbon + CT1 + CT2 **+ WIN1.carbon**（详见附录 A、L） | settings.json 改完 + CLAUDE.md 拆分完成 + Windows 段添加 + 提 PR | ⏳ pending（待切 cwd 到 carbon） |
-| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 / CT3 / CT5 / FB1 / AG1 **+ SE1 / SE3 / PM1 / PM2 / SA1 / SC1 / SC2 / WT1 / NT1 / PG1 / OS1**（详见附录 A-L），每会话挑 1-2 项 | - | 🟡 S4 部分：2026-05-25 落地 FB1 + SC1 + SC2；PM2/WT1 已在 S2 顺带；PG1 deferred；H3 / B2 / CT3 / CT5 / SE1 / SA1 / NT1 / OS1 待跑 |
+| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 / CT3 / CT5 / FB1 / AG1 **+ SE1 / SE3 / PM1 / PM2 / SA1 / SC1 / SC2 / WT1 / NT1 / PG1 / OS1**（详见附录 A-L），每会话挑 1-2 项 | - | 🟡 S4 部分：2026-05-25 落地 FB1 + SC1 + SC2 + PG1（commit 17579d7 + audit 收尾）；PM2/WT1 已在 S2 顺带；H3 / B2 / CT3 / CT5 / SE1 / SA1 / NT1 / OS1 待跑 |
 | **S7+** | 视情况 | - | **P2 探索**：观察 P0/P1 跑 2-4 周效果后决策 | - | ⏳ 观察期（2026-05-25 起） |
 
 ---
@@ -518,7 +518,12 @@ memory `feedback_agent_worktree_isolation`（"worktree 隔离不可靠"）是基
 
 **P1**：
 - **PG1**（两边）：跑一次 `/plugin marketplace browse` 看是否有现成 plugin 能替代：① carbon 的 typecheck hook / statusline ② harmony 的 cclsp.json LSP / codelinter post-edit。如有合适的 install + 删自维护对应件；如无，记一笔继续自维护。验收：审完官方 marketplace + 决策记录在 design.md 这条 P1 下。
-  - **Status 2026-05-25**：deferred —— `/plugin marketplace browse` 是 Claude Code 内置 slash command，sub-process 无法触发；用户主动敲后回写本条。
+  - **Status 2026-05-25**：✅ audit 完毕（通过 `gh api repos/anthropics/claude-plugins-official/contents/` 查 35 internal + 15 external plugin）。**结论：harmony 侧不装任何 plugin，继续自维护**：
+    - `clangd-lsp` plugin（最直接候选）只是 clangd 安装文档目录，无 `plugin.json` / 无 MCP 配置 / 无 commands —— **不替代** `.claude/cclsp.json`（cclsp MCP server 精细绑 HarmonyOS NDK 路径）
+    - ArkTS codelinter —— marketplace 无 HarmonyOS 相关 plugin，必须继续自维护 `post-edit-cpp.sh`
+    - 重叠 plugin（`code-review` / `commit-commands` / `session-report` / `hookify` / `skill-creator`）按命名是通用入门级，跟已定制化的 `closed-loop`（9 step + 4 checkpoint） / `auto-commit-cicd`（CI 修复循环） / `session-debrief`（5 固定问题）功能深度不在同一量级 —— **不冒替换风险**
+    - `serena`（external）已通过全局 MCP 使用，切项目级反而增加同步成本 —— **保持全局**
+  - carbon 侧 PG1 留待 S3 会话内同样方式 audit（推断结论类似）
 
 **P2 / 不做**：自建项目 plugin / 第三方 marketplace。
 
