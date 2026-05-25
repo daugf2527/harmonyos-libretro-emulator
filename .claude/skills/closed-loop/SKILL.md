@@ -7,6 +7,8 @@ description: |
   "audit + 修 X" / "完整审一下 X" / "/closed-loop". Drives the 9-step
   trust chain end-to-end with 4 mandatory human checkpoints.
 disable-model-invocation: true
+allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
+model: sonnet
 trigger: when user explicitly invokes /closed-loop, OR says "完整闭环走一遍 / audit + 修 / 闭环跑 X"
 ---
 

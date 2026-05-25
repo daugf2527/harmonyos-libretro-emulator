@@ -2,6 +2,8 @@
 name: auto-commit-cicd
 description: 自动化代码提交 → 推送 → 创建 PR → CI 监控 → 合并 main 的完整工作流。如果 CI 失败，自动分析错误并修复，最多重试 3 次。
 disable-model-invocation: true
+allowed-tools: Bash, Read, Grep, Glob, Edit, Write
+model: sonnet
 metadata:
   short-description: 自动化 Git 提交、推送、创建 PR、CI 监控与合并工作流
 ---
