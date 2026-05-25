@@ -8,7 +8,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **`entry/src/main/ets/CLAUDE.md`**: ArkTS/ArkUI patterns and anti-patterns.
 - **`entry/src/main/cpp/CLAUDE.md`**: C++ engine threading, NativeBuffer, LOG_DOMAIN constraints.
 
-Sub-directory CLAUDE.md files are pulled in on demand when Claude works under those paths.
+v2.1+ auto-inlines the sub-directory CLAUDE.md files via the @imports below;
+older clients pull them in on demand when Claude works under those paths.
+
+@entry/src/main/ets/CLAUDE.md
+@entry/src/main/cpp/CLAUDE.md
 
 ## Common Development Commands
 
