@@ -1,0 +1,79 @@
+{
+  "defaultMode": "acceptEdits",
+  "permissions": {
+    "allow": [
+      "Bash(hvigorw*)",
+      "Bash(bash scripts/ci/*)",
+      "Bash(git*)",
+      "Bash(gh pr*)",
+      "Bash(gh run*)",
+      "Bash(gh auth*)",
+      "Bash(git push*)",
+      "Bash(npm run*)",
+      "Read(**)",
+      "Grep(**)",
+      "Glob(**)"
+    ],
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(curl*)",
+      "Bash(* | bash*)",
+      "Read(**.env)",
+      "Read(**secrets**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-deprecated.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-vendored-libretro.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/guard-lockfile.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/stop-hook.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/post-edit-cpp.sh",
+            "timeout": 10,
+            "statusMessage": "codelinter (single-file C++)"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-idle-on-prompt.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

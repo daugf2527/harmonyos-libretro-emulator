@@ -77,6 +77,19 @@ Restart session and verify with `node --version` plus `/mcp` (all servers should
 
 **statusline**: `~/.claude/statusline.sh` uses pure bash JSON parsing (grep + sed) to avoid node/jq dependency.
 
+**Windows 注意事项速查**（onboard 新机器 / Claude Code 升级 / 加新 MCP 时必撞，全版见 memory `feedback_windows_pitfalls`）：
+
+| # | 坑 | 一句话应对 |
+|---|---|---|
+| W1 | `cmd /c` 包装 stdio MCP（npx → npx.cmd batch script） | MCP JSON `"command":"cmd","args":["/c","npx","-y","<pkg>"]` |
+| W2 | Git Bash 不在 PATH 时 Claude Code 起不来 | 环境变量 `CLAUDE_CODE_GIT_BASH_PATH=C:\Program Files\Git\bin\bash.exe` |
+| W3 | PowerShell `claude` not recognized | `SetEnvironmentVariable("PATH","$env:USERPROFILE\.local\bin;...","User")` 后重启 PS |
+| W4 | `%USERPROFILE%` vs `~` | PowerShell + Git Bash 用 `~`；CMD 用 `%USERPROFILE%` |
+| W5 | PowerShell 中文 / emoji 乱码 | `chcp 65001; [Console]::OutputEncoding=[Text.Encoding]::UTF8` |
+| W6 | Plan mode Shift+Tab 某些终端 skip plan mode | 改按 **Alt+M** 进入 plan mode |
+| W7 | MCP server OAuth 后启动超时 | 启动前 `$env:MCP_TIMEOUT=10000` |
+| W9 | 不知 Claude Code 健康状态 | 会话内 `/doctor`；命令行 `claude doctor` |
+
 ## Web research tips (developer.huawei.com)
 
 1. First try: `WebSearch` English query + `site:developer.huawei.com`.
