@@ -71,6 +71,23 @@ git ls-files --others --exclude-standard
    - 参考 `git log --oneline -5` 查看最近的提交风格
    - 示例：`fix(perf): 提取 setInterval 动画组件避免全量 build() 重渲染`
 
+### ─── MANDATORY HUMAN CHECKPOINT — commit message 确认 ───
+
+在执行子步骤 4（`git commit`）**之前必须**：
+
+向用户展示子步骤 3 生成的**完整** commit message 草稿（type/scope/标题/body
+含 Co-Authored-By 行）。通过 `AskUserQuestion` 问 go / edit / abort：
+
+- **go** → 进入子步骤 4 创建提交
+- **edit** → 用户指明改哪里 → 回子步骤 3 修订 → 重新走本 checkpoint
+- **abort** → 放弃提交，退出 skill（保留 working tree，不删 staged changes）
+
+未收到明确 "go" 之前，**禁止**调用 `git commit`。
+
+**理由**：commit 进入历史后 rewrite（amend / rebase / force-push）成本是
+10 倍。让用户在 message 上拍一次板比 commit 后改廉价得多。
+参考 `.claude/skills/closed-loop/SKILL.md` 第 274-295 行 CHECKPOINT D 同精神。
+
 4. 创建提交：
 ```bash
 git commit -m "$(cat <<'EOF'
