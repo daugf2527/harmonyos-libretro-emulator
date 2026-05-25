@@ -101,8 +101,25 @@ done
 echo ""
 if (( total_fail == 0 )); then
   echo "==== ALL PASS / SKIP ===="
-  exit 0
+  final_status="ALL PASS / SKIP"
+  exit_code=0
 else
   echo "==== ${total_fail} FAIL ===="
-  exit 1
+  final_status="${total_fail} FAIL"
+  exit_code=1
 fi
+
+# Persist summary for H3 SessionStart hook to read on next session.
+# Failure to write is non-fatal (e.g. read-only filesystem in CI).
+{
+  mkdir -p .claude 2>/dev/null
+  {
+    echo "# quick_signals snapshot — $(date '+%Y-%m-%d %H:%M:%S')"
+    for i in "${!NAMES[@]}"; do
+      printf "  %-12s %-5s (%ss)\n" "${NAMES[$i]}" "${RESULTS[$i]}" "${SECS[$i]}"
+    done
+    echo "  => ${final_status}"
+  } > .claude/.last-quick-signals.txt 2>/dev/null
+} || true
+
+exit "${exit_code}"

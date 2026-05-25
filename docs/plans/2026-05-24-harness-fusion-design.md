@@ -186,7 +186,7 @@ harmony skills 远远落后 carbon（1 vs 6），但**不该盲目补齐到 6**�
 | **S1（本会话）** | harmony | ≈3 h | 产出本设计文档 + 写入 `feedback_setup_harness_first_before_coding` memory | 设计文档 commit + MEMORY.md 多一行 | ✅ 2026-05-24 |
 | **S2** | harmony | 2 h | **P0 harmony 侧**：H1 + H2 + B1.harmony **+ WIN1.harmony**（CLAUDE.md 加 Windows 注意事项一节，详见附录 L） | 各按 P0 验收口径手动跑一遍 → 提 PR 到 harmony | ✅ 2026-05-25 (commit 74e446d) |
 | **S3** | carbon | 2 h | **P0 carbon 侧**：C1 + C2 + B1.carbon + CT1 + CT2 **+ WIN1.carbon**（详见附录 A、L） | settings.json 改完 + CLAUDE.md 拆分完成 + Windows 段添加 + 提 PR | ⏳ pending（待切 cwd 到 carbon） |
-| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 / CT3 / CT5 / FB1 / AG1 **+ SE1 / SE3 / PM1 / PM2 / SA1 / SC1 / SC2 / WT1 / NT1 / PG1 / OS1**（详见附录 A-L），每会话挑 1-2 项 | - | 🟡 S4 持续：2026-05-25 落地 FB1 + SC1 + SC2 + PG1 + CT3 + CT5 + B2 + SA1（commit 17579d7 / d1b91a9 / 7938f80 / 待发）；PM2/WT1 已在 S2 顺带；H3 / SE1 / NT1 / OS1 待跑 |
+| **S4-S6** | 按需 | 各 1 h | **P1**：H3 / C3 / B2 / CT3 / CT5 / FB1 / AG1 **+ SE1 / SE3 / PM1 / PM2 / SA1 / SC1 / SC2 / WT1 / NT1 / PG1 / OS1**（详见附录 A-L），每会话挑 1-2 项 | - | 🟡 S4 持续：2026-05-25 落地 FB1 + SC1 + SC2 + PG1 + CT3 + CT5 + B2 + SA1 + H3 + SE1（10/12，commit 17579d7 / d1b91a9 / 7938f80 / 9944fbb / 待发）；PM2/WT1 已在 S2 顺带；剩 NT1 + OS1 |
 | **S7+** | 视情况 | - | **P2 探索**：观察 P0/P1 跑 2-4 周效果后决策 | - | ⏳ 观察期（2026-05-25 起） |
 
 ---

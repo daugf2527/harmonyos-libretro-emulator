@@ -1,5 +1,6 @@
 {
   "defaultMode": "acceptEdits",
+  "model": "sonnet",
   "permissions": {
     "allow": [
       "Bash(hvigorw*)",
@@ -23,6 +24,16 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Edit|Write",
