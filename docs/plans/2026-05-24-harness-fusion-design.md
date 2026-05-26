@@ -649,3 +649,109 @@ S2 P0 + S4 P1 实施完毕后，7 项依赖"Claude Code 真重启 + 真触发"�
 **重启操作**：完全退出 Claude Code（kill 进程 / Cmd+Q / Alt+F4）→ 重新打开 → 进入项目目录。**关闭当前 tab 不算重启**，需进程级 restart。
 
 **所有项失败 = 仍然有价值**：on-demand 加载 / 用户级 statusline / 用户级 model / 手动 Read 子 CLAUDE.md / 手动 dispatch agent / Stop hook 卫生检查 都是 fallback，harness 整体不破。
+
+---
+
+## 附录 P — 双仓库 DAG + 回退矩阵 + 分支节点
+
+> 补齐"完美闭环 + 颗粒度对齐 + 可回退 + 分支主干"的三块短板：依赖关系显式画图、验证失败有明确回退路径、主流程内嵌 if-then 分支节点。
+
+### P.1 19 + 19 项依赖 DAG（实线=数据依赖；虚线=验证依赖）
+
+```mermaid
+graph LR
+  subgraph harmony["harmony 19 项 (S2 + S4 已完成)"]
+    H_QS[quick_signals 摘要落盘]
+    H_H3[H3 SessionStart]
+    H_OS1[OS1 statusLine]
+    H_SC2[SC2 model: sonnet]
+    H_ind["独立 13 项<br/>H1/H2/B1.h/SE1/B2/SA1<br/>FB1/SC1/PG1/CT3/CT5/NT1/WIN1.h"]
+    H_QS --> H_H3
+    H_QS --> H_OS1
+    H_OS1 -.->|validate| H_SC2
+  end
+
+  subgraph carbon["carbon 19 项 (S2-S6 pending)"]
+    C_C3[C3 Stop hook]
+    C_TS[".last-analyze.txt<br/>.last-activity-ts"]
+    C_H3[H3.carbon SessionStart]
+    C_OS1[OS1.carbon statusLine]
+    C_CB2[CB2 idle 检测]
+    C_SC2[SC2 model: sonnet]
+    C_B1[B1.carbon]
+    C_SC1[SC1 allowed-tools]
+    C_CB1[CB1 移植 auto-commit-cicd]
+    C_AG1[AG1 combat-kernel-reviewer frontmatter]
+    C_CT5[CT5.carbon memory.md]
+    C_ind["独立 10 项<br/>C1/C2/CT2/WIN1.c/SE1<br/>B2/FB1.c/NT1.c/PM1+PM2/PG1.c"]
+    C_C3 --> C_TS
+    C_TS --> C_H3
+    C_TS --> C_OS1
+    C_TS --> C_CB2
+    C_OS1 -.->|validate| C_SC2
+    C_B1 --> C_CB1
+    C_SC1 --> C_CB1
+    C_SC2 --> C_CB1
+    C_AG1 --> C_CT5
+  end
+
+  H_QS -.->|design pattern reuse| C_C3
+```
+
+**乱序代价（如果不按 DAG 跑）**：
+
+| 错误顺序 | 后果 | 修复 |
+|---|---|---|
+| H3/OS1 在 quick_signals 摘要落盘前做 | statusline 显示 `qs:?`，SessionStart 缺摘要段 | 重跑一次 `quick_signals.sh`（不阻塞） |
+| H3.carbon/OS1.carbon/CB2 在 C3 前做 | 三者都读不到 `.last-analyze.txt` / `.last-activity-ts`，显示 `?` 占位 | 跑一次 stop 就有了 |
+| CB1 在 B1+SC1+SC2 前做 | CB1 frontmatter 范式不齐，事后补 | 补 frontmatter 即可 |
+| CT5 在 AG1 前做 | memory.md 没有 frontmatter 锚点，描述对不上 | 先做 AG1 再 review CT5 |
+
+### P.2 回退矩阵（对照附录 O / carbon §7 验证清单）
+
+每项独立 commit → `git revert <sha>` 单点回退物理可行。下表给出**比 revert 更轻量的局部禁用方法**：
+
+| ID | 失败现象 | 局部回退（不动 commit） |
+|---|---|---|
+| C1/deny | 拒错正常 Bash | settings.json 删那条 pattern |
+| C2/acceptEdits | 误改文件没拦住 | settings.json 删 `defaultMode` 行 → 回 ask |
+| B1 disable-model-invocation | skill 完全不能触发 | SKILL.md frontmatter 删那一行 |
+| H3 / H3.carbon | 开场 token 爆 / git 命令失败 | session-start.sh 或 reset-status.mjs 末尾段注释掉 |
+| OS1 / OS1.carbon | statusline 乱码 / 不显示 | settings.json `statusLine` 字段删掉 → 回全局 |
+| SE1 model | Claude Code 报字段不识别 | settings.json `model` 字段删掉（SC2 兜底） |
+| SC2 model: sonnet | 同上 | SKILL.md frontmatter 删 `model:` 行（SE1 兜底） |
+| NT1 / NT1.carbon | 通知狂轰 / BurntToast 错 | settings.json `Notification` hook 段删掉 |
+| FB1 / FB1.carbon | pre-commit 阻 commit 太严 | `chmod -x .git/hooks/pre-commit` 或 `--no-verify` |
+| CB2 idle 检测 | 注入文案频繁 | reset-status.mjs idle 段注释掉 |
+| CB1 auto-commit-cicd | CI 跑炸 / merge 错 | 删 SKILL.md 文件，回手动 push + gh pr create |
+| CT3 @import | 子 CLAUDE.md 没加载 | root CLAUDE.md 删 `@xxx/CLAUDE.md` 行（回 on-demand Read） |
+| CT5 / CT5.carbon memory | review 引用错误 invariants | 删 `.memory.md` 文件（回 description-only） |
+
+### P.3 主流程内嵌的 if-then 分支节点
+
+实施时遇到这些岔路口必须 stop and decide，**不要默认走主路径**：
+
+| 决策点 | 判断条件 | 主路径 | 分支路径 |
+|---|---|---|---|
+| **D1 SE1 字段** | `claude doctor` 看 `model` 字段当前版本是否支持？ | 落 `"model": "sonnet"` | 删 SE1，仅靠 SC2 + 用户级 default（兜底已就位） |
+| **D2 BurntToast** | `Get-Module -ListAvailable BurntToast` 是否有结果？ | `New-BurntToastNotification` | `msg "%USERNAME%"` fallback（阻塞 message box，UX 差但能用） |
+| **D3 carbon CLAUDE.md 350 行** | 是否有明确模块边界（Combat/Data/Phaser 各独立段）？ | CT1 拆分 + CT3 @import | CT1 标 P2 评估，不拆（接受边界值） |
+| **D4 CB1 移植 auto-commit-cicd** | carbon S2-S5 跑完后用户手动 `git push + gh pr create` 体感够用？ | S6 移植 CB1 | CB1 降级 P2，S6 只做 B2/CT5/PG1 |
+| **D5 PG1 marketplace** | `/plugin marketplace browse` 找到能替代自维护件的 plugin？ | install plugin + 删自维护对应件 | 记一笔继续自维护（harmony 已走此分支） |
+| **D6 实施 cwd 误位** | `pwd \| grep <项目名>` 是否匹配？ | 继续 | 立刻 `cd` 正确目录 + `git diff` 检查已改文件是否落错仓库 |
+
+### P.4 闭环反向边（验证失败 → 回到哪一步）
+
+| 验证项 | 失败 | 反向流转目标 |
+|---|---|---|
+| 附录 O #1 H3 / carbon #10 H3 | 开场无摘要 | 回 S4(harmony) / S5(carbon) 改 hook 脚本 |
+| 附录 O #2 / carbon #11 OS1 | statusline 不显示 | 回 S4 / S5 改 statusline 脚本；若字段不支持回 P.2 局部禁用 |
+| 附录 O #3 / carbon #13 SE1 | 字段不识别 | 走 D1 分支路径（依赖 SC2） |
+| 附录 O #4 CT3 | @import 旧版本忽略 | 回 S4 改子文件路径；或接受手动 Read fallback |
+| 附录 O #6 / carbon #12 SC1+SC2 | statusline 看不出 model | 等 OS1 先通过；OS1 已通过仍看不出 = 字段不识别，走 D1 |
+| 附录 O #7 / carbon #9 NT1 | 桌面无通知 | 走 D2 分支路径（msg fallback） |
+| carbon #14 AG1 | 自动派 agent 没触发 | 回 S3 改 description "Use when ... NOT for ..." 措辞 |
+| carbon #15 CB1 | CI 跑炸 | 走 D4 分支路径（降级 P2） |
+| carbon #17 CT5 | review 没引用 memory | 检查 AG1 是否先通过；通过仍没引用 = 升级 Claude Code 等 v2.1.33+ |
+
+**至此**：① DAG 显式（P.1） ② 回退路径有局部 + revert 双层（P.2） ③ 主流程分支节点提到 D1-D6（P.3） ④ 反向边把验证失败映射回设计阶段（P.4）。这套规划才真正具备"DAG + 可回退 + 分支主干"四个属性。
