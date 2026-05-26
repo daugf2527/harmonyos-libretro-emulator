@@ -11,6 +11,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 v2.1+ auto-inlines the sub-directory CLAUDE.md files via the @imports below;
 older clients pull them in on demand when Claude works under those paths.
 
+`AGENTS.md` 是 Codex Bot 风格的项目级规范（强制规则 + ArkTS 编程规范 + ArkUI/ArkTS UI 开发指南），
+内容通用，本 CLAUDE.md 也 `@import` 引入避免分裂双轨。
+
+@AGENTS.md
 @entry/src/main/ets/CLAUDE.md
 @entry/src/main/cpp/CLAUDE.md
 
@@ -62,6 +66,45 @@ older clients pull them in on demand when Claude works under those paths.
 - Prioritize official HarmonyOS docs + `libretro.h`.
 - Deprecated code lives only in `deprecated/legacy/` (excluded from mainline, also in `.claudeignore`).
 - All changes must pass regression guards (`scripts/ci/check_regression_guards.sh`).
+
+## MCP / Skill 工具决策树
+
+5 个 MCP 已 `/mcp ✓ connected`（cclsp / serena / ast-grep / mcp-server-firecrawl / sequential-thinking）。**别只用 Read/Grep**——按场景选工具，否则手动 Read + Grep 是低效路径。
+
+### 工具能力速查
+
+| 场景 | 优先工具 | 备选 | 何时退 Read/Grep |
+|---|---|---|---|
+| 找符号定义（"NAPI 函数 X 在哪定义"） | `mcp__cclsp__find_definition` / `mcp__serena__find_symbol` | Grep | LSP 索引未跑 / 跨语言失败 |
+| 找符号引用（"谁调用 X"） | `mcp__cclsp__find_references` / `mcp__serena__find_referencing_symbols` | Grep | 短期一次性查 |
+| 调用链（incoming/outgoing） | `mcp__cclsp__prepare_call_hierarchy` + `get_incoming_calls` / `get_outgoing_calls` | 手动追 | 深度 1-2 简单时 |
+| 类型 / 接口悬浮信息 | `mcp__cclsp__get_hover` | Read 整文件 | 仅看一行 |
+| 文件 LSP 诊断（type/warning） | `mcp__cclsp__get_diagnostics_for_file` / `mcp__serena__get_diagnostics_for_file` | Bash `hvigorw` | 仅看一行 |
+| 文件符号总览（"这文件有哪些类/函数"） | `mcp__serena__get_symbols_overview` | Read 整文件 | 小文件 |
+| AST 模式扫（"找所有 `mmap(` / `OH_NativeBuffer_*` / `TODO`"） | `mcp__ast-grep__find_code` / `find_code_by_rule` | Grep | 字面 string 匹配够用 |
+| 复杂多角度推理（finding 拿不准 / 设计权衡） | `mcp__sequential-thinking__sequentialthinking` | — | 简单 finding |
+| Web 文档抓取（HarmonyOS 官方 / GitHub） | `mcp__mcp-server-firecrawl__firecrawl_scrape` / `firecrawl_search` | WebFetch | 简单页面 |
+| 跨仓库 / 项目级 symbol 搜索 | `mcp__cclsp__find_workspace_symbols` | Glob + Read | 单文件 |
+
+### 何时**必须**用 MCP 而不是 Read/Grep
+
+- **NAPI 边界改动**（`entry/src/main/cpp/app/napi/**`）→ **必须** `find_references` 看 caller 影响面 + `get_incoming_calls` 看调用链——纯 Grep 会漏 ArkTS 侧的 EventBridge / TSFN 引用
+- **Engine 状态机改动**（`core/engine/libretro_engine.cpp`）→ **必须** `find_workspace_symbols` 找跨文件 enum / struct 引用
+- **NativeBuffer / Resource lifecycle 类 review** → **必须** `ast-grep find_code` 找 `OH_NativeBuffer_*` / `OH_NativeWindow_*` 全部 callsite 做配对检查
+- **Type / interface 改动** → **必须** `find_references` + `get_diagnostics_for_file` 看下游 type warning
+
+### 何时**可以**退回 Read/Grep
+
+- **citation 验证**（"这 5 行字节真的在那位置吗"——pure text 对比，LSP 杀鸡用牛刀）—— 见 `.claude/skills/closed-loop/SKILL.md` Step 2/7
+- 单文件一次性 lookup
+- 文档 / 注释类（非代码）
+- LSP 索引未跑 / MCP 暂时不可用（fallback）
+
+### 工具协同准则
+
+- **先 LSP 看影响面 → 再 Read 那几个 callsite 确认行为** — 别上来直接 Read 全文件
+- **配对检查类问题**（acquire/release / ref create/delete / map/unmap）— 用 `ast-grep find_code_by_rule` 扫配对模式比逐文件 Read 快 10×
+- **跨线程 / threading violation 检测** — `ast-grep` 跨文件扫 pattern（譬如 `GameLoop` 里直接 `napi_call_function`）
 
 ## Environment (Windows + Git Bash)
 

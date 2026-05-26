@@ -67,7 +67,8 @@ for x in errs[:20]:
     msg  = x.get('message', '')
     lines.append(f'  L{ln}: [{rule}] {msg}')
 reason = (f'codelinter found {len(errs)} error(s) in {file_path}:\n'
-          + '\n'.join(lines))
+          + '\n'.join(lines)
+          + '\n\nTip: use mcp__cclsp__get_diagnostics_for_file for LSP-level diagnostics (type + lint, often more precise than codelinter; see CLAUDE.md MCP 工具决策树).')
 print(json.dumps({'decision': 'block', 'reason': reason}))
 " "$report" "$file"
 

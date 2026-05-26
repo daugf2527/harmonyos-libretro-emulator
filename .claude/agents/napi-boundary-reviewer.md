@@ -1,7 +1,7 @@
 ---
 name: napi-boundary-reviewer
 description: Review NAPI boundary changes in entry/src/main/cpp/app/napi/. Use when files in that directory (especially engine_*_napi.cpp, core_loader_napi.cpp, libretro_engine_napi.cpp) are added, modified, or refactored. Focuses on napi_env lifetime, TSFN thread binding, ArkTS↔C++ type mapping, error-throw paths, reference/buffer lifecycle. NOT for general C++ review.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, mcp__cclsp__find_references, mcp__cclsp__find_definition, mcp__cclsp__get_incoming_calls, mcp__cclsp__get_outgoing_calls, mcp__cclsp__get_hover, mcp__cclsp__get_diagnostics_for_file, mcp__cclsp__find_workspace_symbols, mcp__cclsp__prepare_call_hierarchy, mcp__ast-grep__find_code, mcp__ast-grep__find_code_by_rule, mcp__serena__find_symbol, mcp__serena__find_referencing_symbols, mcp__serena__get_symbols_overview, mcp__serena__get_diagnostics_for_file
 model: sonnet
 ---
 
@@ -32,6 +32,28 @@ The C++ side runs four thread classes. Boundary code must respect which thread i
 - **Engine thread** — Owns `GameLoop`, `VideoPipeline`, `retro_run`. Graphics API (`OH_NativeWindow_*`, GLES, Vulkan, EGL) ONLY here.
 - **Audio thread** — `AudioBridge` only.
 - **EventBridge / TSFN callback thread** — Asynchronous callbacks from C++ → ArkTS must go through `EventBridge` (TSFN-wrapped) — never directly call a `napi_value` from the engine thread.
+
+## How to investigate (MCP 协同 — 2026-05-26 ECP3 加)
+
+**不要只用 Read/Grep**。NAPI 边界 review 的本质是"覆盖面 + 深度"——MCP 工具优先于纯文件阅读：
+
+| 你想知道 | 用 |
+|---|---|
+| 这个 NAPI 函数被谁调用（ArkTS + C++ 双侧） | `mcp__cclsp__find_references` |
+| 调用链谁触发 / 触达哪里 | `mcp__cclsp__get_incoming_calls` / `get_outgoing_calls` |
+| 函数签名 / 类型 / NAPI 宏定义 | `mcp__cclsp__get_hover` / `mcp__cclsp__find_definition` |
+| 项目里所有同类 NAPI 函数（譬如所有 `napi_throw_error` 调用） | `mcp__ast-grep__find_code` 用 `napi_throw_error($$$)` 模式 |
+| TSFN 配对 / ref 配对（acquire/release 是否成对，create/delete 是否配对） | `mcp__ast-grep__find_code_by_rule` 写 yaml 模式扫配对 |
+| LSP 自带 type/warning（编译器已经知道的） | `mcp__cclsp__get_diagnostics_for_file` |
+| 文件符号总览（"这文件有哪些函数 / 哪些 register"） | `mcp__serena__get_symbols_overview` |
+| 跨项目 symbol 搜索（譬如找所有 `EventBridge::Emit` 用法） | `mcp__cclsp__find_workspace_symbols` |
+
+**协同准则**：
+
+- **先 `find_references` 看影响面 → 再 Read 那几个 callsite 确认行为**——别上来直接 Read 全文件
+- **NAPI 边界 review 的本质 = 配对检查**（acquire/release / ref create/delete / map/unmap / TSFN acquire/release）——用 `ast-grep find_code_by_rule` 扫配对模式比逐文件 Read 快 10×
+- **Threading violation 检测**（譬如 `GameLoop` 里直接 `napi_call_function`）——用 `ast-grep` 跨文件扫 pattern
+- **`napi_env` 跨线程持有检测**——用 `ast-grep` 找 `napi_env env_` 类成员字段 → 再 `find_references` 看在哪些 thread context 被读
 
 ## Review checklist (in priority order)
 

@@ -158,6 +158,15 @@ notes (e.g., "T4 over-labels P0 on geometry resize").
 has been read in this step. Skipping the Read means trusting the
 sub-agent verbatim — exactly the failure mode this workflow prevents.
 
+**LSP / AST 协同**（2026-05-26 ECP2 加；总览见 root `CLAUDE.md` "MCP / Skill 工具决策树"）：
+
+判 verdict 前**优先用 MCP**，纯 Read 是 fallback：
+- `mcp__cclsp__find_references` / `mcp__serena__find_referencing_symbols` — 看 finding 影响面（多 caller 同问题 → severity 上调；单 caller → 可能 REAL_LOWER）
+- `mcp__cclsp__get_diagnostics_for_file` — LSP 已知的 type/warning 可能直接判 `FALSE_POSITIVE`（LSP 不报警 = 编译器满意）
+- `mcp__ast-grep__find_code` — 看 finding pattern 是否泛存在（譬如 finding 说 "F12 mmap 用错" → `mmap(` 模式扫，看是单点还是全项目通病）
+- `mcp__cclsp__get_hover` — 看相关类型 / 函数签名，NAPI 边界改动尤其有用
+- `mcp__sequential-thinking__sequentialthinking` — 罕见 finding 拿不准时多角度推理（不滥用）
+
 **State after step 3**: `AUDIT_DIR/CORE-REVIEW.md` exists with verdict per finding.
 
 ### ─── CHECKPOINT B (MANDATORY HUMAN) ───
@@ -197,6 +206,15 @@ For each finding the user approved (per FIX-PLAN.md):
 main Claude is the implementer. The only sub-agent dispatch in step 4 is
 the `napi-boundary-reviewer` *pre-review*, which is verification, not
 implementation.
+
+**LSP 协同**（2026-05-26 ECP2 加）：
+
+每个 fix 前**必看**：
+- `mcp__cclsp__find_references` — 看这个函数 / 类型在哪些其他地方被引用，fix 是否影响 caller 行为
+- `mcp__cclsp__get_incoming_calls` — 调用链谁触发，理解 fix 的实际触发条件
+- `mcp__serena__get_diagnostics_for_file` — fix 前后看 type warning 是否变化
+
+NAPI 边界改动的 LSP 协同与 `napi-boundary-reviewer` agent **并行**——agent 跑深度审；MCP 跑覆盖面。
 
 **State after step 4**: uncommitted edits in the working tree, listed by
 `git diff --stat`.

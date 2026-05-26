@@ -185,12 +185,12 @@ gh run list --branch <current-branch> --limit 1 --json databaseId,status,conclus
 gh run view <run-id> --log --job <job-id> 2>&1 | tail -200
 ```
 
-2. 分析错误原因：
-   - 编译错误 → 检查语法、类型、导入
-   - codelinter 错误 → 按照 codelinter 报告修复
+2. 分析错误原因（MCP 协同优先于纯 log 阅读 — 2026-05-26 ECP2 加；总览见 root `CLAUDE.md` "MCP / Skill 工具决策树"）：
+   - 编译错误 → 检查语法、类型、导入；**优先** `mcp__cclsp__get_diagnostics_for_file` 看 LSP 详细诊断（比 CI log tail 更精准定位）
+   - codelinter 错误 → 按 codelinter 报告修复；**配合** `mcp__cclsp__find_references` 看违规函数 caller 是否一并要改
    - 签名错误 → 检查 secrets 配置（无法自动修复，报告用户）
-   - HAP 构建错误 → 检查 build 脚本和配置
-   - 仓库卫生/回归守卫错误 → 参考 Step 2 的修复指引
+   - HAP 构建错误 → 检查 build 脚本和配置；**配合** `mcp__ast-grep__find_code` 找类似 build 配置 pattern
+   - 仓库卫生 / 回归守卫错误 → 参考 Step 2 的修复指引；**配合** `mcp__ast-grep__find_code` 找类似违规 pattern（`mmap(` / `TODO` / 硬编码 timeout 等）
 
 3. 修复代码后提交：
 ```bash

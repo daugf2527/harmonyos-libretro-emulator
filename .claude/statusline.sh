@@ -29,6 +29,12 @@ if [[ -f .claude/.last-quick-signals.txt ]]; then
   fi
 fi
 
+mcp=""
+if [[ -f .claude/.last-mcp-status.txt ]]; then
+  mcp_val=$(cat .claude/.last-mcp-status.txt 2>/dev/null | head -1)
+  [[ -n "$mcp_val" ]] && mcp=" mcp:$mcp_val"
+fi
+
 idle=""
 if [[ -f .claude/.last-activity-ts ]]; then
   last_ts=$(cat .claude/.last-activity-ts 2>/dev/null)
@@ -41,4 +47,4 @@ if [[ -f .claude/.last-activity-ts ]]; then
   fi
 fi
 
-echo "[$branch$dirty] qs:$qs$idle"
+echo "[$branch$dirty] qs:$qs$mcp$idle"
