@@ -494,15 +494,12 @@ void VideoPipeline::SetRenderModeState(RenderModeState state) {
 void VideoPipeline::EnterDegradedMode(ScalingMode sourceMode,
                                       const char *reason) {
 #if defined(__i386__) || defined(__x86_64__)
-  // Windows 模拟器强制 GLES-only：禁止自动降级到软件路径。
-  if (sourceMode != ScalingMode::SOFTWARE_SCALING) {
-    if (ShouldLog(render_log_count_, 5, 60)) {
-      LOGF(LOG_WARN,
-           "Skip software degrade on x86: reason=%{public}s source=%{public}d",
-           reason ? reason : "unknown", static_cast<int>(sourceMode));
-    }
-    return;
-  }
+  // Audit T4-F4: previously x86 emulator paths refused to degrade to SW from GLES,
+  // which made GlesState::FATAL terminal — the renderer stayed permanently black after
+  // 5 reinit failures. Allow degradation on x86 too, otherwise dev-mode debugging is
+  // impossible. The original "x86 GLES-only" intent (don't fall back unsupervised) is
+  // preserved at the gameplay-mode level by upstream policy, not here.
+  // (Old behaviour: `if (sourceMode != ScalingMode::SOFTWARE_SCALING) return;`)
 #endif
   if (sourceMode == ScalingMode::SOFTWARE_SCALING) {
     return;
@@ -1332,8 +1329,12 @@ VideoPipeline::RenderCPU(OHNativeWindow *window, const void *data,
     if (drop_count_ % 60 == 0 || drop_count_ < 5) {
       LOGF(LOG_ERROR, "FlushBuffer failed: ret=%{public}d", ret);
     }
-    m->nwAbortBufferCalls++;
-    OH_NativeWindow_NativeWindowAbortBuffer(window, buffer);
+    // Audit T4-F1: do NOT call OH_NativeWindow_NativeWindowAbortBuffer after a failed FlushBuffer.
+    // Per external_window.h, both FlushBuffer and AbortBuffer are producer ownership-release
+    // operations on the same buffer; HarmonyOS does not document buffer ownership semantics
+    // when FlushBuffer fails, so the safest assumption is that the buffer queue has already
+    // taken ownership (success or failure of the flush). Calling AbortBuffer afterwards risks
+    // double-release / state-machine corruption on the consumer pipeline.
     OH_NativeBuffer_Unreference(nativeBuffer);
     drop_count_++;
     return RenderResult::DROPPED;
@@ -1646,6 +1647,9 @@ void VideoPipeline::DestroyHardwareRenderer(EnvState &env_state) {
 }
 
 void VideoPipeline::DestroyHardwareRendererImpl(EnvState &env_state) {
+  // Audit T4-F7: reset HW-present log throttle so a subsequent InitializeHardwareRendererImpl
+  // emits "HW render present active" again on the next presented frame.
+  hw_present_log_count_ = 0;
   const auto &cb = env_state.GetHwRenderCallback();
   if (cb.context_type == RETRO_HW_CONTEXT_VULKAN) {
     env_state.SetVulkanInterface(nullptr);
@@ -1748,11 +1752,13 @@ void VideoPipeline::SwapHardwareBuffersImpl(EnvState &env_state) {
     MarkHardwarePathFailure("hw_egl_not_ready");
     return;
   }
-  static bool logged = false;
-  if (!logged) {
-    logged = true;
+  // Audit T4-F7: log "HW render present active" via member-counter throttle so the
+  // signal re-fires after each destroy/reinit (previously a function-local
+  // `static bool logged` permanently muted this diagnostic).
+  if (ShouldLog(hw_present_log_count_, 1, 120)) {
     LOGF(LOG_INFO, "HW render present active");
   }
+  hw_present_log_count_++;
   if (hw_presenter_ && hw_presenter_->IsReady()) {
     int windowW = window_width_.load();
     int windowH = window_height_.load();

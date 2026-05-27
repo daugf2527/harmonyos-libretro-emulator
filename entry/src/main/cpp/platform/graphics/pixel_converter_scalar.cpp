@@ -315,27 +315,39 @@ static void ConvertAndScaleXRGB8888_Scalar(
     unsigned destHeight,
     unsigned destStride
 ) {
-    // 计算缩放比例
-    float scaleX = static_cast<float>(srcWidth) / destWidth;
-    float scaleY = static_cast<float>(srcHeight) / destHeight;
-    
-    for (unsigned dstY = 0; dstY < destHeight; dstY++) {
-        for (unsigned dstX = 0; dstX < destWidth; dstX++) {
-            // 计算源像素位置 (最近邻)
-            unsigned srcX = static_cast<unsigned>(dstX * scaleX);
-            unsigned srcY = static_cast<unsigned>(dstY * scaleY);
-            
-            // 边界检查
-            if (srcX >= srcWidth || srcY >= srcHeight) {
+    // Audit T4-F8: use the same 16.16 fixed-point step+accumulator pattern as the
+    // general ConvertAndScaleScalar path. Float scaling here would drift relative to
+    // the RGB565 / 0RGB1555 paths at moderate dimensions (single-precision mantissa
+    // = 23 bits limits clean integer pixel indices to ~2048), causing a one-pixel
+    // seam on adjacent-format comparisons. Fixed-point unifies behaviour across
+    // all formats with no precision discrepancy.
+    if (destWidth == 0 || destHeight == 0 || srcWidth == 0 || srcHeight == 0) {
+        return;
+    }
+    const uint32_t xStep = static_cast<uint32_t>(
+        (static_cast<uint64_t>(srcWidth) << 16) / static_cast<uint64_t>(destWidth));
+    const uint32_t yStep = static_cast<uint32_t>(
+        (static_cast<uint64_t>(srcHeight) << 16) / static_cast<uint64_t>(destHeight));
+
+    uint32_t yAcc = 0;
+    for (unsigned dstY = 0; dstY < destHeight; dstY++, yAcc += yStep) {
+        const unsigned srcY = yAcc >> 16;
+        if (srcY >= srcHeight) {
+            continue;
+        }
+        uint32_t xAcc = 0;
+        for (unsigned dstX = 0; dstX < destWidth; dstX++, xAcc += xStep) {
+            const unsigned srcX = xAcc >> 16;
+            if (srcX >= srcWidth) {
                 continue;
             }
-            
+
             // 读取源像素 (XRGB8888)
             const uint8_t* srcPixel = srcData + srcY * srcPitch + srcX * 4;
             uint8_t b = srcPixel[0];
             uint8_t g = srcPixel[1];
             uint8_t r = srcPixel[2];
-            
+
             // 写入目标像素 (RGBA8888)
             uint32_t color = (0xFF << 24) | (b << 16) | (g << 8) | r;
             destData[dstY * destStride + dstX] = color;

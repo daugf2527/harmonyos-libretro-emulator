@@ -1064,10 +1064,13 @@ void GLESRenderer::Render(const void *data, unsigned width, unsigned height,
 
     GLint prevUnpackAlignment = 4;
     GLint prevUnpackRowLength = 0;
-    if (diagEnabled) {
-      glGetIntegerv(GL_UNPACK_ALIGNMENT, &prevUnpackAlignment);
-      glGetIntegerv(GL_UNPACK_ROW_LENGTH, &prevUnpackRowLength);
-    }
+    // Audit T4-F6: always query the current GL unpack state before overwriting it.
+    // Previously the `if (diagEnabled)` guard left prev* at their stack defaults (4/0),
+    // so the restore below would blindly write defaults back — corrupting a HW
+    // libretro core's own UNPACK_ALIGNMENT / ROW_LENGTH state if it had set non-defaults
+    // before calling retro_video_refresh. Two glGetIntegerv calls per frame are cheap.
+    glGetIntegerv(GL_UNPACK_ALIGNMENT, &prevUnpackAlignment);
+    glGetIntegerv(GL_UNPACK_ROW_LENGTH, &prevUnpackRowLength);
     glPixelStorei(GL_UNPACK_ALIGNMENT, unpackAlignment);
     glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength);
     LogGlError("pixel_store");

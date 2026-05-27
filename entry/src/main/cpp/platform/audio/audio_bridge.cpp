@@ -598,6 +598,8 @@ bool AudioBridge::Reset(int32_t sample_rate) {
       // 重新初始化重采样器与 DRC 状态，以避免沿用上一次的动态比率
       resampler_.Init(core_sample_rate_, output_sample_rate_);
       drc_skew_.store(1.0);
+      // Audit T3-F2: clear DRC throttle timestamp so the first post-Reset update is not delayed by stale timing
+      drc_last_update_ = std::chrono::steady_clock::time_point{};
       SetRunState(AudioRunState::INIT, "reset_same_rate");
 
       LOGF(LOG_INFO,
@@ -618,6 +620,8 @@ bool AudioBridge::Reset(int32_t sample_rate) {
       ring_buffer_.reset();
       initialized_.store(false);
       recover_streak_ = 0;
+      // Audit T3-F2: clear DRC throttle timestamp on full reinit path too
+      drc_last_update_ = std::chrono::steady_clock::time_point{};
       SetRunState(AudioRunState::INIT, "reset_reinit");
     }
   }

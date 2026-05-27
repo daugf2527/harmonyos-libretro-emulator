@@ -384,6 +384,10 @@ private:
   // 渲染统计
   size_t frame_count_ = 0;
   size_t drop_count_ = 0;
+  // Audit T4-F7: per-init "HW render present active" log throttle (replaces a
+  // function-local `static bool logged` that survived destroy/reinit and silenced
+  // the diagnostic forever after the first activation).
+  size_t hw_present_log_count_ = 0;
 
   // Dupe 帧缓存
   std::vector<uint8_t> lastFrame_;

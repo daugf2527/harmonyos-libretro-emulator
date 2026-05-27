@@ -172,27 +172,30 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
        frame_size, bytes_per_frame);
 
   // 3. 设置回调函数
-  OH_AudioRenderer_Callbacks callbacks;
-  memset(&callbacks, 0, sizeof(OH_AudioRenderer_Callbacks));
-  // API 11 回调：在旧版本上由 builder callbacks 使用
-  callbacks.OH_AudioRenderer_OnWriteData = OnWriteDataLegacy;
-  callbacks.OH_AudioRenderer_OnInterruptEvent = OnInterruptEvent;
-
-  result = OH_AudioStreamBuilder_SetRendererCallback(builder_, callbacks, this);
-  if (result != AUDIOSTREAM_SUCCESS) {
-    LOGF(LOG_ERROR,
-         "%{public}s Failed to set renderer callback: %{public}d",
-         kAudioChainPrefix, result);
-    Cleanup();
-    return false;
-  }
-
-  // API 12+ 推荐: 使用 SetRendererWriteDataCallback 设置写入回调
+  // Audit T3-F5: only register the API 12+ write-data callback. Previously the legacy
+  // `OH_AudioStreamBuilder_SetRendererCallback` slot was also unconditionally set,
+  // which is fragile — on devices where the OS honours both slots, the ring buffer
+  // would be drained twice per render cycle (silent half-amplitude artifact).
+  // Project compileSdkVersion targets API 12+, so the legacy slot is no longer needed.
+  // Interrupt callback is registered separately via SetRendererInterruptCallback below.
   OH_AudioRenderer_OnWriteDataCallback writeDataCb = OnWriteDataCallback;
   result = OH_AudioStreamBuilder_SetRendererWriteDataCallback(builder_, writeDataCb, this);
   if (result != AUDIOSTREAM_SUCCESS) {
     LOGF(LOG_ERROR,
          "%{public}s Failed to set renderer write data callback: %{public}d",
+         kAudioChainPrefix, result);
+    Cleanup();
+    return false;
+  }
+
+  // Register interrupt-event callback only (no write-data slot here, see T3-F5).
+  OH_AudioRenderer_Callbacks interruptOnly;
+  memset(&interruptOnly, 0, sizeof(OH_AudioRenderer_Callbacks));
+  interruptOnly.OH_AudioRenderer_OnInterruptEvent = OnInterruptEvent;
+  result = OH_AudioStreamBuilder_SetRendererCallback(builder_, interruptOnly, this);
+  if (result != AUDIOSTREAM_SUCCESS) {
+    LOGF(LOG_ERROR,
+         "%{public}s Failed to set renderer interrupt callback: %{public}d",
          kAudioChainPrefix, result);
     Cleanup();
     return false;

@@ -81,9 +81,14 @@ size_t AudioResampler::Resample(const int16_t *in, size_t in_frames,
   if (!in || !out || in_frames == 0 || current_ratio_ <= 0.0)
     return 0;
 
+  // Audit T3-F8: history init assumes interleaved stereo (`in` size must be >= in_frames * 2).
+  // All current callers (AudioBridge::ProcessAudio -> retro_audio_sample_batch, and
+  // AudioBridge::AudioSampleCallback which builds an explicit 2-element array)
+  // satisfy this. If a future mono caller appears, gate this block on a stereo flag
+  // or route the per-channel reads through fetch_channel (which has bounds via in_frames).
   if (!history_init_ && in_frames >= 1) {
-    int16_t l0 = in[0];
-    int16_t r0 = in[1];
+    const int16_t l0 = in[0];
+    const int16_t r0 = in[1];
     hist_l_[0] = hist_l_[1] = hist_l_[2] = hist_l_[3] = l0;
     hist_r_[0] = hist_r_[1] = hist_r_[2] = hist_r_[3] = r0;
     history_init_ = true;
