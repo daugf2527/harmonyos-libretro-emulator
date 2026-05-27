@@ -34,7 +34,17 @@ echo ""
 echo "=== MCP servers available (declarative) ==="
 echo "Project (.claude/cclsp.json): cclsp (12 — find_definition/find_references/get_diagnostics_for_file/get_hover/get_incoming_calls/get_outgoing_calls/find_workspace_symbols/prepare_call_hierarchy/rename_symbol/etc) | serena (21 — find_symbol/find_referencing_symbols/get_symbols_overview/get_diagnostics_for_file/replace_symbol_body/list_memories/write_memory/etc)"
 echo "User: ast-grep (4 — find_code/find_code_by_rule/dump_syntax_tree/test_match_code_rule) | mcp-server-firecrawl (24 — scrape/search/extract/etc) | sequential-thinking (1)"
-echo "Decision tree: CLAUDE.md 'MCP / Skill 工具决策树' — 别只用 Read/Grep"
+
+echo ""
+echo "=== MCP TOOL POLICY — 本会话强制执行 ==="
+echo "【禁止】用 Grep 回答以下问题：'谁调用了 X / X 在哪定义 / 哪些地方引用了 X'"
+echo "【必须】符号/引用/调用链查询，MUST 优先选："
+echo "  cclsp  : find_references | find_definition | get_incoming_calls | get_outgoing_calls | find_workspace_symbols"
+echo "  serena : find_symbol | find_referencing_symbols | get_symbols_overview"
+echo "  ast-grep: find_code | find_code_by_rule   （AST 模式 / 配对检查）"
+echo "【允许 Grep 的场景】文件内容文本搜索 | CI regression guard 扫 banned-pattern | 非符号字符串匹配"
+echo "判断原则：MCP 能给更精确答案的地方用 Grep = 工具选型错误，不是 fallback。"
+echo "详见：CLAUDE.md 'MCP / Skill 工具决策树'"
 
 # Write static MCP status for statusline (5 servers configured)
 echo "5/5" > .claude/.last-mcp-status.txt 2>/dev/null

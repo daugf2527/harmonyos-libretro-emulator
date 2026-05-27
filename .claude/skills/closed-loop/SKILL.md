@@ -99,6 +99,13 @@ agent must:
 
 - Receive constraint: "DO NOT modify files. DO NOT run hvigorw / cmake.
   DO NOT invent citations — only cite lines you actually Read."
+- **TOOL POLICY (MANDATORY)**: Using Grep to answer "who calls X / where is X defined /
+  what references X" is FORBIDDEN in this agent. For symbol/reference/caller lookup
+  you MUST use MCP tools:
+  `mcp__cclsp__find_references` | `mcp__cclsp__find_definition` |
+  `mcp__cclsp__get_incoming_calls` | `mcp__serena__find_referencing_symbols` |
+  `mcp__cclsp__find_workspace_symbols`.
+  Grep is allowed ONLY for non-symbol file-content text searches.
 
 Dispatch ALL agents in PARALLEL (single message, multiple Agent tool calls).
 
@@ -160,12 +167,14 @@ sub-agent verbatim — exactly the failure mode this workflow prevents.
 
 **LSP / AST 协同**（2026-05-26 ECP2 加；总览见 root `CLAUDE.md` "MCP / Skill 工具决策树"）：
 
-判 verdict 前**优先用 MCP**，纯 Read 是 fallback：
+判 verdict 前 **MUST 先用 MCP**——Grep/Read 不是等效替代，不是 fallback：
 - `mcp__cclsp__find_references` / `mcp__serena__find_referencing_symbols` — 看 finding 影响面（多 caller 同问题 → severity 上调；单 caller → 可能 REAL_LOWER）
 - `mcp__cclsp__get_diagnostics_for_file` — LSP 已知的 type/warning 可能直接判 `FALSE_POSITIVE`（LSP 不报警 = 编译器满意）
 - `mcp__ast-grep__find_code` — 看 finding pattern 是否泛存在（譬如 finding 说 "F12 mmap 用错" → `mmap(` 模式扫，看是单点还是全项目通病）
 - `mcp__cclsp__get_hover` — 看相关类型 / 函数签名，NAPI 边界改动尤其有用
 - `mcp__sequential-thinking__sequentialthinking` — 罕见 finding 拿不准时多角度推理（不滥用）
+
+**用 Grep/Read 之前必须问自己**：MCP 能回答这个问题吗？能 → 用 MCP；不能（如内容文本搜索）→ 再用 Grep。
 
 **State after step 3**: `AUDIT_DIR/CORE-REVIEW.md` exists with verdict per finding.
 
@@ -209,10 +218,12 @@ implementation.
 
 **LSP 协同**（2026-05-26 ECP2 加）：
 
-每个 fix 前**必看**：
+每个 fix 前 **MUST 先查 MCP**——Grep/Read 不是等效替代：
 - `mcp__cclsp__find_references` — 看这个函数 / 类型在哪些其他地方被引用，fix 是否影响 caller 行为
 - `mcp__cclsp__get_incoming_calls` — 调用链谁触发，理解 fix 的实际触发条件
 - `mcp__serena__get_diagnostics_for_file` — fix 前后看 type warning 是否变化
+
+**用 Grep/Read 之前必须问自己**：MCP 能回答这个问题吗？能 → 用 MCP；不能 → 再用 Grep。
 
 NAPI 边界改动的 LSP 协同与 `napi-boundary-reviewer` agent **并行**——agent 跑深度审；MCP 跑覆盖面。
 
@@ -265,6 +276,9 @@ user picked findings from in step 3). Each agent's prompt MUST include:
 4. New `citation` must point at the **fix code** (where the new guard /
    check / release lives), not the original buggy line
 5. Constraint: "DO NOT find NEW issues; only verify the listed originals"
+6. **TOOL POLICY (MANDATORY)**: Same as audit agent — Grep for symbol/reference lookup
+   is FORBIDDEN. Use `mcp__cclsp__find_references` | `mcp__cclsp__find_definition` |
+   `mcp__serena__find_referencing_symbols` for any caller/definition lookup.
 
 Output to `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`.
 

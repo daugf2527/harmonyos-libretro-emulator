@@ -37,11 +37,14 @@ fi
 
 if [[ $should_remind -eq 1 ]]; then
   cat >&2 <<EOF
-[mcp-hint] Grep call #$count this session. If looking up symbols/refs/AST patterns, MCP is usually better:
-  - mcp__cclsp__find_references / find_definition / get_incoming_calls   (cross-file C++/TS callers)
-  - mcp__serena__find_symbol / find_referencing_symbols / get_symbols_overview
-  - mcp__ast-grep__find_code / find_code_by_rule                          (AST/pair-matching patterns)
-This Grep is still allowed. Reminder is informational. See CLAUDE.md 'MCP / Skill 工具决策树'.
+[MCP-POLICY] Grep call #$count this session.
+!! 本次 Grep 若是在查"谁调用了 X / X 在哪定义 / 哪些地方引用了 X"= POLICY VIOLATION !!
+   MUST 改用 MCP：
+     find_references | find_definition | get_incoming_calls | get_outgoing_calls   (cclsp)
+     find_symbol | find_referencing_symbols                                         (serena)
+     find_code | find_code_by_rule                                                  (ast-grep)
+   Grep 仅允许：文件内容文本搜索 / CI banned-pattern 扫描 / 非符号字符串匹配。
+   MCP 能更精确回答的问题上用 Grep = 工具选型错误。(CLAUDE.md 'MCP / Skill 工具决策树')
 EOF
 fi
 
