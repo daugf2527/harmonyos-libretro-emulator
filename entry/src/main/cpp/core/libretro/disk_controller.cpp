@@ -33,6 +33,16 @@ void DiskController::SetCallbacks(const retro_disk_control_callback* cbs) {
   }
 }
 
+void DiskController::ClearCallbacks() {
+  // T8-A-F2: 在 core dlclose 前调用,清零悬空指针。
+  // ejected_/is_ext_ 一同重置,新 core 注册时从空白状态开始。
+  std::lock_guard<std::mutex> lock(mutex_);
+  callbacks_ = {};
+  is_ext_ = false;
+  ejected_ = false;
+  LOGF(LOG_INFO, "Disk control callbacks cleared (T8-A-F2)");
+}
+
 bool DiskController::Eject() {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!callbacks_.set_eject_state) return false;

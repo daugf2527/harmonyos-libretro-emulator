@@ -40,7 +40,8 @@ export async function saveStateData(
   const targetPath = buildSaveFilePath(context.filesDir, fileName)
   // T6-F4: .state written before manifest; crash here leaves an orphan .state (no romFile association).
   // Mitigated by T6-F3 (both writes are atomic), but a process kill between the two steps is still possible.
-  writeArrayBufferToFile(targetPath, data)
+  // T8-C-F1: writeArrayBufferToFile 改 async, 避免 PS1/GBA 等大存档 (128KB-1MB) 阻塞主线程。
+  await writeArrayBufferToFile(targetPath, data)
   const item: SaveStateManifestItem = {
     id: fileName,
     fileName: fileName,
@@ -107,11 +108,46 @@ export async function deleteSaveStateItem(
   try {
     await fs.unlink(buildSaveFilePath(context.filesDir, safeName))
   } catch (err) {
+    // T8-C-F2: ENOENT (文件已不存在) 容忍——继续更新 manifest 清理孤立记录。
+    // 其他错误 (EACCES / EBUSY / EIO) 必须 rethrow,不能静默吞掉后更新 manifest,
+    // 否则会导致文件残留在磁盘但 manifest 已无记录 → 永久孤立文件,用户数据丢失。
+    const errno = (err as ErrorWithCode).code
     const message = (err as Error).message || String(err)
-    LogHelper.warn('SaveStateRepository', 'Delete', `删除存档文件失败: ${message}`)
+    if (errno !== undefined && errno !== ERR_CODE_ENOENT && errno !== ERR_CODE_ENOENT_NUM) {
+      LogHelper.error('SaveStateRepository', 'Delete', `删除存档文件失败 (code=${errno}): ${message}`)
+      throw err as Error
+    }
+    // 文件本就不存在,或 errno 不明: 走容忍路径,清理 manifest
+    LogHelper.warn('SaveStateRepository', 'Delete', `删除存档文件: ${message} (按文件不存在处理)`)
   }
   const document = await loadManifest(context)
   const nextItems = document.items.filter((item: SaveStateManifestItem) => item.fileName !== safeName)
+  await saveManifest(context, {
+    version: SAVE_STATE_VERSION,
+    items: nextItems
+  })
+}
+
+// T8-C-F2: HarmonyOS @kit.CoreFileKit 错误码类型 (file/cstd ENOENT 为 13900002, posix ENOENT 为 2).
+export interface ErrorWithCode {
+  code?: string | number
+}
+export const ERR_CODE_ENOENT = '13900002'
+export const ERR_CODE_ENOENT_NUM: string | number = 13900002
+
+// T8-C-F3: 提供给 LibrarySaveFilePurger 调用,删除文件后同步更新 manifest。
+// 否则 SaveStatePage 仍显示已删存档条目,点击读档才报错。
+export async function pruneManifestForFileNames(
+  context: common.UIAbilityContext,
+  removedFileNames: string[]
+): Promise<void> {
+  if (removedFileNames.length === 0) {
+    return
+  }
+  const removedSet = new Set<string>()
+  removedFileNames.forEach((name: string) => { removedSet.add(sanitizeFileName(name)) })
+  const document = await loadManifest(context)
+  const nextItems = document.items.filter((item: SaveStateManifestItem) => !removedSet.has(item.fileName))
   await saveManifest(context, {
     version: SAVE_STATE_VERSION,
     items: nextItems
@@ -196,24 +232,25 @@ async function saveManifest(
   }
 }
 
-function writeArrayBufferToFile(path: string, data: ArrayBuffer): void {
+async function writeArrayBufferToFile(path: string, data: ArrayBuffer): Promise<void> {
   // Audit T6-F3: tmp+rename atomic write — crash during write leaves .tmp, not a corrupt .state
+  // T8-C-F1: async fs.* avoids blocking main thread on 128KB-1MB save serialization.
   const tmpPath = path + '.tmp'
   let file: fs.File | undefined = undefined
   try {
-    file = fs.openSync(tmpPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
+    file = await fs.open(tmpPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     const writeOptions: WriteOptions = {
       length: data.byteLength
     }
-    fs.writeSync(file.fd, data, writeOptions)
-    fs.closeSync(file.fd)
+    await fs.write(file.fd, data, writeOptions)
+    await fs.close(file.fd)
     file = undefined
-    fs.renameSync(tmpPath, path)
+    await fs.rename(tmpPath, path)
   } catch (err) {
     if (file) {
-      try { fs.closeSync(file.fd) } catch (_) {}
+      try { await fs.close(file.fd) } catch (_) {}
     }
-    try { fs.unlinkSync(tmpPath) } catch (_) {}
+    try { await fs.unlink(tmpPath) } catch (_) {}
     throw err as Error
   }
 }

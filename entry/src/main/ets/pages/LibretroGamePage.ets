@@ -300,20 +300,30 @@ struct LibretroGamePage {
 
   private async quickSaveRuntimeState(): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    this.runtimeSaveStatusText = await this.runtimeSaveStateController.quickSave(
+    const result = await this.runtimeSaveStateController.quickSave(
       context,
       this.gameRunning,
       this.getCurrentRuntimeRomFile()
     );
+    // T8-C-F5: await 后必须检查 pageActive,否则离页后仍向已销毁页面写 @State。
+    if (!this.pageActive) {
+      return;
+    }
+    this.runtimeSaveStatusText = result;
   }
 
   private async quickLoadRuntimeState(): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    this.runtimeSaveStatusText = await this.runtimeSaveStateController.quickLoad(
+    const result = await this.runtimeSaveStateController.quickLoad(
       context,
       this.gameRunning,
       this.getCurrentRuntimeRomFile()
     );
+    // T8-C-F5: 同 quickSaveRuntimeState。
+    if (!this.pageActive) {
+      return;
+    }
+    this.runtimeSaveStatusText = result;
   }
 
   private handlePauseTileAction(actionCode: string): void {

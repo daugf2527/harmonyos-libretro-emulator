@@ -48,20 +48,15 @@ public:
   explicit EngineSyncTask(std::function<void()> task) : task_(std::move(task)) {}
 
   void Run() {
-    // 调用方 Wait 超时后会标记 abandoned_,此时捕获的栈引用已悬空,跳过执行
-    if (abandoned_.load(std::memory_order_acquire)) {
-      std::lock_guard<std::mutex> lock(mutex_);
-      done_ = true;
-      cond_.notify_all();
-      return;
-    }
-    if (task_) {
+    // T8-B-F1: abandoned_ 检查与 task_() 执行必须在同一 mutex 临界区内,
+    // 否则 Wait 在 Run 检查 abandoned_=false 之后、task_() 之前超时,
+    // 调用方栈帧销毁,task_() 触发悬挂引用 UB。
+    // task_() 持锁执行不会死锁: Wait 内的 wait_for 已释放 lock 在等待 done_。
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!abandoned_ && task_) {
       task_();
     }
-    {
-      std::lock_guard<std::mutex> lock(mutex_);
-      done_ = true;
-    }
+    done_ = true;
     cond_.notify_all();
   }
 
@@ -71,7 +66,9 @@ public:
         lock, std::chrono::milliseconds(timeoutMs),
         [this]() { return done_; });
     if (!ok) {
-      abandoned_.store(true, std::memory_order_release);
+      // T8-B-F1: 在持有 mutex 时设置 abandoned_; 与 Run() 的临界区互斥,
+      // 保证 task_() 要么完整执行,要么完整跳过——不会与栈销毁竞争。
+      abandoned_ = true;
     }
     return ok;
   }
@@ -1332,6 +1329,11 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     if (coreLoader_.IsLoaded()) {
       LOGF(LOG_INFO, "[NEW] Unloading previous core before loading new one");
       UnloadGameIfNeeded("switch_core");
+      // T8-A-F2: 在 UnloadCore (dlclose) 之前清零 DiskController callbacks_,
+      // 否则 callbacks_ 持有指向已释放代码页的悬空函数指针。
+      if (diskController_) {
+        diskController_->ClearCallbacks();
+      }
       if (coreLoader_.GetDeinit()) {
         coreLoader_.GetDeinit()();
       }
@@ -2420,48 +2422,97 @@ std::string LibretroEngine::GetCoreOptionsJson() const {
 }
 
 // --- 磁盘控制接口 ---
+// T8-B-F2: 全部走 ExecuteSyncTask 进 Engine 线程,与 SaveState/SRAM 同模式。
+// 否则 NAPI 线程直接调用 DiskController 会在 retro_run 之外触发 core disk callbacks,
+// 违反 libretro core 的 game-loop context 要求,可能损坏 core 内部状态。
 
 bool LibretroEngine::DiskControlSetEjectState(bool ejected) {
   if (!diskController_)
     return false;
-  return ejected ? diskController_->Eject() : diskController_->Insert();
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, ejected, &ok]() {
+            ok = ejected ? diskController_->Eject() : diskController_->Insert();
+          },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  return ok;
 }
 
 bool LibretroEngine::DiskControlGetEjectState() {
   if (!diskController_)
     return false;
-  return diskController_->IsEjected();
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, &ok]() { ok = diskController_->IsEjected(); },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  return ok;
 }
 
 unsigned LibretroEngine::DiskControlGetImageIndex() {
   if (!diskController_)
     return 0;
-  return diskController_->GetImageIndex();
+  unsigned result = 0;
+  if (!ExecuteSyncTask(
+          [this, &result]() { result = diskController_->GetImageIndex(); },
+          kSyncTaskTimeoutMs)) {
+    return 0;
+  }
+  return result;
 }
 
 bool LibretroEngine::DiskControlSetImageIndex(unsigned index) {
   if (!diskController_)
     return false;
-  return diskController_->SetImageIndex(index);
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, index, &ok]() { ok = diskController_->SetImageIndex(index); },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  return ok;
 }
 
 unsigned LibretroEngine::DiskControlGetNumImages() {
   if (!diskController_)
     return 0;
-  return diskController_->GetNumImages();
+  unsigned result = 0;
+  if (!ExecuteSyncTask(
+          [this, &result]() { result = diskController_->GetNumImages(); },
+          kSyncTaskTimeoutMs)) {
+    return 0;
+  }
+  return result;
 }
 
 bool LibretroEngine::DiskControlReplaceImageIndex(unsigned index,
                                                   const std::string &path) {
   if (!diskController_)
     return false;
-  return diskController_->ReplaceImageIndex(index, path);
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, index, &path, &ok]() {
+            ok = diskController_->ReplaceImageIndex(index, path);
+          },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  return ok;
 }
 
 bool LibretroEngine::DiskControlAddImageIndex() {
   if (!diskController_)
     return false;
-  return diskController_->AddImageIndex();
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, &ok]() { ok = diskController_->AddImageIndex(); },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  return ok;
 }
 
 void LibretroEngine::TransitionTo(EngineState newState) {
@@ -2568,6 +2619,11 @@ void LibretroEngine::DetectCoreQuirks() {
 // --- SaveState 实现 ---
 
 size_t LibretroEngine::GetSaveStateSize() {
+  // T8-A-F1: 拒绝在 !IsGameLoadedState() 时调用——core 未加载游戏时
+  // serialize_size 行为未定义,且无 game state 时返回 0 已是死路。
+  if (!IsGameLoadedState(state_.load())) {
+    return 0;
+  }
   size_t size = 0;
   (void)ExecuteSyncTask(
       [this, &size]() {
@@ -2580,6 +2636,13 @@ size_t LibretroEngine::GetSaveStateSize() {
 }
 
 bool LibretroEngine::SaveState(std::vector<uint8_t> &outData) {
+  // T8-A-F1: 状态机 guard——拒绝在 game 未加载时调用 retro_serialize,
+  // 也防止 !running_ 时 ExecuteSyncTask 快速路径在 NAPI 线程直接执行 retro_serialize。
+  if (!IsGameLoadedState(state_.load())) {
+    LOGF(LOG_WARN, "[NEW] SaveState rejected: state=%{public}d (game not loaded)",
+         static_cast<int>(state_.load()));
+    return false;
+  }
   bool ok = false;
   std::vector<uint8_t> snapshot;
   if (!ExecuteSyncTask(
@@ -2599,6 +2662,12 @@ bool LibretroEngine::SaveState(std::vector<uint8_t> &outData) {
 }
 
 bool LibretroEngine::LoadState(const std::vector<uint8_t> &data) {
+  // T8-A-F1: 同 SaveState——游戏未加载时拒绝。
+  if (!IsGameLoadedState(state_.load())) {
+    LOGF(LOG_WARN, "[NEW] LoadState rejected: state=%{public}d (game not loaded)",
+         static_cast<int>(state_.load()));
+    return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, &ok, &data]() {
@@ -2615,6 +2684,12 @@ bool LibretroEngine::LoadState(const std::vector<uint8_t> &data) {
 // --- SRAM 接口 ---
 
 bool LibretroEngine::GetSRAM(std::vector<uint8_t> &outData) {
+  // T8-A-F1: SRAM 同样需要游戏已加载。
+  if (!IsGameLoadedState(state_.load())) {
+    LOGF(LOG_WARN, "[NEW] GetSRAM rejected: state=%{public}d (game not loaded)",
+         static_cast<int>(state_.load()));
+    return false;
+  }
   bool ok = false;
   std::vector<uint8_t> snapshot;
   if (!ExecuteSyncTask(
@@ -2634,6 +2709,12 @@ bool LibretroEngine::GetSRAM(std::vector<uint8_t> &outData) {
 }
 
 bool LibretroEngine::SetSRAM(const std::vector<uint8_t> &data) {
+  // T8-A-F1: SRAM 写入同样需要游戏已加载。
+  if (!IsGameLoadedState(state_.load())) {
+    LOGF(LOG_WARN, "[NEW] SetSRAM rejected: state=%{public}d (game not loaded)",
+         static_cast<int>(state_.load()));
+    return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, &ok, &data]() {

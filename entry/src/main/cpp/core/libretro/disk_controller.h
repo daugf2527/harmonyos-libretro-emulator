@@ -30,6 +30,8 @@ public:
   void SetCallbacks(const retro_disk_control_ext_callback* cbs);
   // 兼容旧版回调
   void SetCallbacks(const retro_disk_control_callback* cbs);
+  // T8-A-F2: core unload 前必须调用,清零悬空函数指针(指向已 dlclose 的 .so 代码段)。
+  void ClearCallbacks();
   
   bool Eject();
   bool Insert();

@@ -14,7 +14,7 @@ import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
 
 interface SaveStateNapi {
-  refactoredSaveState(): ArrayBuffer | null
+  refactoredSaveStateAsync(): Promise<ArrayBuffer | null>
   refactoredLoadState(data: ArrayBuffer): boolean
 }
 
@@ -246,7 +246,11 @@ struct SaveStatePage {
       return
     }
     try {
-      const stateData = nativeApi.refactoredSaveState()
+      // T8-B-F5 / T8C-F8: 改用 async 版本, 避免同步 NAPI 阻塞 UI 主线程最长 5s。
+      const stateData = await nativeApi.refactoredSaveStateAsync()
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
       if (!stateData || stateData.byteLength <= 0) {
         this.showToastMessage('SAVE_STATE_UNAVAILABLE')
         return

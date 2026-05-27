@@ -43,6 +43,10 @@ bool CoreStateManager::SaveState(std::vector<uint8_t> &outData) {
 
   size_t size = sizeFn();
   if (size == 0) {
+    // T8-A-F5: 区分"游戏未加载"vs"core serialize 内部出错"——便于排查。
+    // 上层 LibretroEngine::SaveState 已加 state guard,正常路径不会到这里;
+    // 若仍走到,说明 core 在 GAME_LOADED 状态下 serialize_size 返回 0,是 core 问题。
+    LOGF(LOG_WARN, "SaveState: serialize_size returned 0 (game state may not be ready)");
     return false;
   }
 
@@ -57,6 +61,10 @@ bool CoreStateManager::SaveState(std::vector<uint8_t> &outData) {
 
 bool CoreStateManager::LoadState(const std::vector<uint8_t> &data) {
   if (!coreLoader_.IsLoaded() || data.empty()) {
+    // T8-A-F5: 区分 "core 未加载" vs "传入空 data"。
+    if (data.empty()) {
+      LOGF(LOG_WARN, "LoadState: input data is empty");
+    }
     return false;
   }
   auto fn = coreLoader_.GetUnserialize();
@@ -79,9 +87,14 @@ bool CoreStateManager::GetSRAM(std::vector<uint8_t> &outData) {
   if (!dataFn || !sizeFn) {
     return false;
   }
-  void *ptr = dataFn(RETRO_MEMORY_SAVE_RAM);
+  // T8-A-F3: 先查 size 再取 data 指针——libretro 惯用顺序。
+  // 部分 core 在 size 调用时才初始化内部 SRAM 结构,反向调用可能拿到未初始化指针。
   size_t size = sizeFn(RETRO_MEMORY_SAVE_RAM);
-  if (!ptr || size == 0) {
+  if (size == 0) {
+    return false;
+  }
+  void *ptr = dataFn(RETRO_MEMORY_SAVE_RAM);
+  if (!ptr) {
     return false;
   }
   outData.assign(static_cast<uint8_t *>(ptr),
@@ -98,9 +111,13 @@ bool CoreStateManager::SetSRAM(const std::vector<uint8_t> &data) {
   if (!dataFn || !sizeFn) {
     return false;
   }
-  void *ptr = dataFn(RETRO_MEMORY_SAVE_RAM);
+  // T8-A-F3: 先 size 再 data,与 GetSRAM 保持一致。
   size_t size = sizeFn(RETRO_MEMORY_SAVE_RAM);
-  if (!ptr || size == 0) {
+  if (size == 0) {
+    return false;
+  }
+  void *ptr = dataFn(RETRO_MEMORY_SAVE_RAM);
+  if (!ptr) {
     return false;
   }
   size_t copySize = std::min(size, data.size());

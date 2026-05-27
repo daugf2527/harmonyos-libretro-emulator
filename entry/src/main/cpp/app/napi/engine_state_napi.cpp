@@ -9,6 +9,90 @@ static napi_value GetSaveStateSize(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+// --- GetSaveStateSizeAsync (T8-B-F3) ---
+// 同步版会阻塞 NAPI/UI 主线程最长 5s (kSyncTaskTimeoutMs)。
+// 新调用方应使用 Async 变体;同步版保留兼容性,但 LibretroEngine::GetSaveStateSize 已加 state guard。
+struct GetSaveStateSizeAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  size_t size = 0;
+};
+
+static void ExecuteGetSaveStateSizeAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<GetSaveStateSizeAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->size = GetEngine()->GetSaveStateSize();
+}
+
+static void CompleteGetSaveStateSizeAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<GetSaveStateSizeAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  // T8-B-F4: cancel guard.
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] GetSaveStateSizeAsync cancelled; skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+  if (status != napi_ok) {
+    napi_value reason;
+    napi_get_undefined(env, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
+  } else {
+    napi_value result;
+    napi_create_int64(env, static_cast<int64_t>(ctx->size), &result);
+    napi_resolve_deferred(env, ctx->deferred, result);
+  }
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value GetSaveStateSizeAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new GetSaveStateSizeAsyncContext();
+  napi_value promise;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+  napi_value resourceName;
+  napi_create_string_utf8(env, "GetSaveStateSizeAsync", NAPI_AUTO_LENGTH, &resourceName);
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteGetSaveStateSizeAsync,
+      CompleteGetSaveStateSizeAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    LOGF(LOG_ERROR, "[NEW] GetSaveStateSizeAsync create work failed");
+    napi_value zero;
+    napi_create_int64(env, 0, &zero);
+    napi_resolve_deferred(env, ctx->deferred, zero);
+    delete ctx;
+    return promise;
+  }
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] GetSaveStateSizeAsync queue work failed");
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    napi_value zero;
+    napi_create_int64(env, 0, &zero);
+    napi_resolve_deferred(env, ctx->deferred, zero);
+    delete ctx;
+    return promise;
+  }
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value SaveState(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   std::vector<uint8_t> data;
@@ -193,6 +277,18 @@ static void CompleteSaveStateAsync(napi_env env, napi_status status, void *data)
     return;
   }
 
+  // T8-B-F4: env teardown 时 status == napi_cancelled,任何 napi_* 调用都是 UB。
+  // 必须先单独处理 cancel,不能与 napi_ok 之外的"逻辑失败"混在同一分支。
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] SaveStateAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
   // Audit T1-F2: cancel guard first; logical failures reject so ArkTS .catch() is reachable
   if (status != napi_ok) {
     napi_value reason;
@@ -290,6 +386,17 @@ static void CompleteLoadStateAsync(napi_env env, napi_status status, void *data)
     return;
   }
 
+  // T8-B-F4: env teardown 时 status == napi_cancelled,必须先单独处理。
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] LoadStateAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
   // Audit T1-F2: guard against napi_cancelled; napi_get_boolean/napi_resolve_deferred on cancelled env is UB
   if (status != napi_ok) {
     napi_value reason;
@@ -370,6 +477,7 @@ static napi_value LoadStateAsync(napi_env env, napi_callback_info info) {
 void RegisterStateNapi(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"refactoredGetSaveStateSize", nullptr, GetSaveStateSize, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredGetSaveStateSizeAsync", nullptr, GetSaveStateSizeAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSaveState", nullptr, SaveState, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredLoadState", nullptr, LoadState, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSaveStateAsync", nullptr, SaveStateAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
