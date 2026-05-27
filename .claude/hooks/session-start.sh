@@ -9,6 +9,9 @@
 
 cd "$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
+# Reset per-session Grep counter for the MCP-nudge hook
+echo 0 > .claude/.grep-call-count.txt 2>/dev/null
+
 echo "=== git status -s ==="
 git status -s 2>&1 | head -30
 

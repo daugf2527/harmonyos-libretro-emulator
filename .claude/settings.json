@@ -55,6 +55,15 @@
             "command": ".claude/hooks/guard-lockfile.sh"
           }
         ]
+      },
+      {
+        "matcher": "Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/nudge-mcp-on-grep.sh"
+          }
+        ]
       }
     ],
     "Stop": [

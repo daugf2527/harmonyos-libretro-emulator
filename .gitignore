@@ -19,6 +19,8 @@ oh_modules/
 # but exclude per-machine state and personal overrides.
 .claude/.last-activity-ts
 .claude/.last-quick-signals.txt
+.claude/.last-mcp-status.txt
+.claude/.grep-call-count.txt
 .claude/settings.local.json
 .claude/settings.local.json.bak.*
 .claude/worktrees/
