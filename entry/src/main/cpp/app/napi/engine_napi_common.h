@@ -102,6 +102,7 @@ inline bool GetStringArg(napi_env env, napi_value arg, char *out,
   if (size >= outSize) {
     LOGF(LOG_ERROR,
                  "[NEW] %s string arg too long: %{public}s", func, argName);
+    napi_throw_range_error(env, nullptr, "String argument exceeds maximum length");  // Audit B-F1
     return false;
   }
   status = napi_get_value_string_utf8(env, arg, out, outSize, &size);
@@ -128,11 +129,13 @@ inline bool GetStringArgAllowEmpty(napi_env env, napi_value arg, char *out,
   if (status != napi_ok) {
     LOGF(LOG_ERROR,
          "[NEW] %s invalid string arg: %{public}s", func, argName);
+    napi_throw_type_error(env, nullptr, "Expected string argument");  // Audit B-F1
     return false;
   }
   if (size >= outSize) {
     LOGF(LOG_ERROR,
          "[NEW] %s string arg too long: %{public}s", func, argName);
+    napi_throw_range_error(env, nullptr, "String argument exceeds maximum length");  // Audit B-F1
     return false;
   }
   status = napi_get_value_string_utf8(env, arg, out, outSize, &size);

@@ -276,6 +276,14 @@ export class LibretroEventHub {
     return LibretroEventHub.instance;
   }
 
+  static destroy(): void {  // Audit C-F2: reset singleton on Ability restart so new NAPI callback can be registered
+    if (LibretroEventHub.instance) {
+      LibretroEventHub.instance.listeners.clear();
+      LibretroEventHub.instance.lastPayloads.clear();
+      LibretroEventHub.instance = undefined;
+    }
+  }
+
   start(): boolean {
     return this.initializeIfNeeded();
   }
@@ -305,7 +313,7 @@ export class LibretroEventHub {
         try {
           listener.callback(last);
         } catch (err) {
-          this.removeListener(event, listener.id);
+          // Audit C-F8: do NOT removeListener here — would permanently drop statefulEvent subscriptions
           this.logCallbackError(event, err);
         }
       }

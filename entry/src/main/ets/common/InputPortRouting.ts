@@ -82,6 +82,8 @@ export function findPortAssignment(assignments: PortAssignState[], portId: numbe
   if (found) {
     return found;
   }
+  // Audit C-F6: log when portId not found to distinguish "port inactive" from "portId out of range"
+  console.warn(`[InputPortRouting] findPortAssignment: portId=${portId} not in assignments (len=${assignments.length}), returning sentinel`);
   return {
     portId: portId,
     sourceType: InputSourceType.None,

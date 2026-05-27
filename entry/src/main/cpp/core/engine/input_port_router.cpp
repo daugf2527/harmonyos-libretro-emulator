@@ -186,6 +186,8 @@ bool InputPortRouter::ResolvePortForDevice(const std::string &deviceId,
       continue;
     }
     if (source.deviceId.empty()) {
+      // Audit A-F7: deviceId erased from deviceToPort_ above (or never existed), so
+      // this auto-bind does not bypass AssignPort conflict checks; mutex_ held throughout.
       portSources_[port].deviceId = deviceId;
       deviceToPort_[deviceId] = port;
       LOGF(LOG_INFO,

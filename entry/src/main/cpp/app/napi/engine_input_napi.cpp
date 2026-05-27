@@ -136,22 +136,26 @@ static napi_value ListInputDevices(napi_env env, napi_callback_info info) {
     devices = input->ListInputDevices();
   }
   napi_value array = nullptr;
-  napi_create_array_with_length(env, devices.size(), &array);
+  // Audit B-F2: all napi_create_* calls checked; OOM returns nullptr (bubbles JS exception)
+  if (napi_create_array_with_length(env, devices.size(), &array) != napi_ok) {
+    return nullptr;
+  }
 
   for (size_t i = 0; i < devices.size(); ++i) {
     napi_value obj = nullptr;
-    napi_create_object(env, &obj);
+    if (napi_create_object(env, &obj) != napi_ok) { return nullptr; }
 
     napi_value val = nullptr;
-    napi_create_string_utf8(env, devices[i].deviceId.c_str(),
-                            NAPI_AUTO_LENGTH, &val);
+    if (napi_create_string_utf8(env, devices[i].deviceId.c_str(),
+                                NAPI_AUTO_LENGTH, &val) != napi_ok) { return nullptr; }
     napi_set_named_property(env, obj, "deviceId", val);
 
-    napi_create_int32(env, static_cast<int32_t>(devices[i].sourceType), &val);
+    if (napi_create_int32(env, static_cast<int32_t>(devices[i].sourceType),
+                          &val) != napi_ok) { return nullptr; }
     napi_set_named_property(env, obj, "sourceType", val);
 
-    napi_create_string_utf8(env, devices[i].name.c_str(), NAPI_AUTO_LENGTH,
-                            &val);
+    if (napi_create_string_utf8(env, devices[i].name.c_str(), NAPI_AUTO_LENGTH,
+                                &val) != napi_ok) { return nullptr; }
     napi_set_named_property(env, obj, "name", val);
 
     napi_set_element(env, array, i, obj);
@@ -229,5 +233,8 @@ void RegisterInputNapi(napi_env env, napi_value exports) {
       {"refactoredSendSensor", nullptr, SendSensor, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetControllerPortDevice", nullptr, SetControllerPortDevice, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
-  napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  if (regStatus != napi_ok) {  // Audit B-F3: log only; throwing here has undefined behavior in module init
+    LOGF(LOG_ERROR, "RegisterInputNapi: napi_define_properties failed: %{public}d", regStatus);
+  }
 }

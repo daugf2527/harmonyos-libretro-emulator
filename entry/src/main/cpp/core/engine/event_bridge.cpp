@@ -75,8 +75,8 @@ EventBridge::~EventBridge() { Release(); }
 bool EventBridge::Initialize(napi_env env, napi_value callback) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (tsfn_) {
-    LOGF(LOG_WARN, "EventBridge already initialized. Releasing old TSFN and re-creating.");
-    napi_release_threadsafe_function(tsfn_, napi_tsfn_release);
+    LOGF(LOG_WARN, "EventBridge already initialized. Aborting old TSFN and re-creating.");
+    napi_release_threadsafe_function(tsfn_, napi_tsfn_abort);  // Audit A-F4: abort mode drains pending EventData* before re-init
     tsfn_ = nullptr;
   }
 
@@ -216,7 +216,12 @@ void EventBridge::CallJsHandler(napi_env env, napi_value js_cb, void *context,
   // 调用 JS 回调
   napi_value undefined;
   napi_get_undefined(env, &undefined);
-  napi_call_function(env, undefined, js_cb, 1, &result, nullptr);
+  napi_status call_status = napi_call_function(env, undefined, js_cb, 1, &result, nullptr);
+  if (call_status == napi_pending_exception) {  // Audit A-F5: clear JS exception to prevent NAPI state corruption
+    napi_value exception;
+    napi_get_and_clear_last_exception(env, &exception);
+    LOGF(LOG_WARN, "EventBridge JS callback threw; exception cleared");
+  }
 
   delete eventData;
 }

@@ -33,8 +33,8 @@ export function sendRuntimeAnalog(
   if (!isVirtualPortActive(assignments, port)) {
     return false
   }
-  nativeApi.refactoredSendAnalog(port, index, 0, normalizeAnalogValue(x))
-  return nativeApi.refactoredSendAnalog(port, index, 1, normalizeAnalogValue(y))
+  const xOk = nativeApi.refactoredSendAnalog(port, index, 0, normalizeAnalogValue(x))  // Audit C-F1
+  return xOk && nativeApi.refactoredSendAnalog(port, index, 1, normalizeAnalogValue(y))
 }
 
 function normalizeAnalogValue(value: number): number {

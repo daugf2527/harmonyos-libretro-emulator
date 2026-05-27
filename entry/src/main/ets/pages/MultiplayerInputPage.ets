@@ -98,7 +98,7 @@ struct MultiplayerInputPage {
   @State private inputLogs: InputLogItem[] = []
 
   aboutToAppear(): void {
-    this.refreshDevices()
+    void this.refreshDevices()  // Audit C-F5: async fire-and-forget; yields main thread before NAPI call
   }
 
   private buildControllerSlots(): ControllerSlotItem[] {
@@ -131,7 +131,8 @@ struct MultiplayerInputPage {
     ]
   }
 
-  private refreshDevices(): void {
+  private async refreshDevices(): Promise<void> {
+    await Promise.resolve();  // Audit C-F5: yield main thread before NAPI call
     const devices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
     const names: string[] = []
     const logs: InputLogItem[] = [

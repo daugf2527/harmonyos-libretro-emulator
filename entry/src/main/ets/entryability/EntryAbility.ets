@@ -40,6 +40,7 @@ export default class EntryAbility extends UIAbility {
 
   onDestroy(): void {
     LogHelper.info('EntryAbility', 'Lifecycle', 'Ability onDestroy');
+    LibretroEventHub.destroy();  // Audit C-F2: reset singleton so Ability restart re-registers NAPI callback
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {

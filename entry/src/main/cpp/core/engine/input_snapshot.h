@@ -82,7 +82,8 @@ public:
    * @brief 获取模拟量状态
    */
   int16_t GetAnalog(int port, int index, int id) const {
-    if (!IsValidPort(port) || index < 0 || id < 0) {
+    if (!IsValidPort(port) || index < 0 || id < 0 ||
+        index >= kMaxAnalogAxes / 2 || id >= 2) {  // Audit A-F2: pre-check prevents (index*2)+id overflow
       return 0;
     }
     int axis_idx = (index * 2) + id;
@@ -188,6 +189,14 @@ private:
   static bool IsValidPort(int port) {
     return port >= 0 && port < kMaxPorts;
   }
+
+  // Audit A-F8: 60fps read path assumes lock-free atomics; assert at compile time.
+  // HarmonyOS libc++ lacks is_always_lock_free member; use C11 ATOMIC_*_LOCK_FREE macros (== 2 means always lock-free).
+  static_assert(ATOMIC_INT_LOCK_FREE == 2,   "atomic<uint32_t> must be lock-free on this platform");
+  static_assert(ATOMIC_SHORT_LOCK_FREE == 2, "atomic<int16_t> must be lock-free on this platform");
+  // float is same size as int (4 bytes on AArch64); lock-free iff ATOMIC_INT_LOCK_FREE==2
+  static_assert(ATOMIC_INT_LOCK_FREE == 2,   "atomic<float> must be lock-free on this platform");
+  static_assert(ATOMIC_LLONG_LOCK_FREE == 2, "atomic<uint64_t> must be lock-free on this platform");
 
   // 使用原子 32 位整数位图存储按键状态（支持 32 个按键）
   std::atomic<uint32_t> buttons_mask_[kMaxPorts];
