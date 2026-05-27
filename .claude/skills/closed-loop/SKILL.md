@@ -3,9 +3,10 @@ name: closed-loop
 description: |
   Run the full audit → core-review → fix → fix-verify → gate → commit
   workflow on a harmony stage topic (NAPI / Engine / Audio / Video /
-  NativeBuffer / Resource lifecycle). Use when user says "跑闭环 X" /
-  "audit + 修 X" / "完整审一下 X" / "/closed-loop". Drives the 9-step
-  trust chain end-to-end with 4 mandatory human checkpoints.
+  NativeBuffer / Resource lifecycle / Input+EventBridge /
+  SaveState+SRAM+Disk). Use when user says "跑闭环 X" / "audit + 修 X" /
+  "完整审一下 X" / "/closed-loop". Drives the 9-step trust chain
+  end-to-end with 4 mandatory human checkpoints.
 disable-model-invocation: true
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
 model: sonnet
@@ -48,7 +49,7 @@ form of the trust chain pattern; see [[harness-fusion-2026-05-24]].
 
 Use this skill when:
 - User explicitly says `/closed-loop` or "跑闭环" / "audit + 修" / "完整审"
-- User asks to deep-audit + fix a specific scope (one of the 6 topics
+- User asks to deep-audit + fix a specific scope (one of the 8 topics
   below, or a custom scope)
 - A major milestone is about to commit and we want one last semantic sweep
 
@@ -59,7 +60,7 @@ Do NOT use this skill for:
 - UI / ArkTS-only fixes (different workflow, ts/ets layer doesn't have
   NativeBuffer lifetime hazards that justify the full 9-step gauntlet)
 
-## Topics (6 fixed, harmony-tuned)
+## Topics (8 fixed, harmony-tuned)
 
 | ID | Name | Scope | Hazards |
 |---|---|---|---|
@@ -69,13 +70,15 @@ Do NOT use this skill for:
 | **T4** | VideoPipeline | `entry/src/main/cpp/core/engine/video_pipeline.*` + renderer | pixel format negotiation / geometry resize / Hardware/Software/GLES/Vulkan switch / NativeBuffer dequeue/queue |
 | **T5** | NativeBuffer 用法 | cross-cutting: any code calling `OH_NativeBuffer_*` / `OH_NativeWindow_*` | acquire/release pairing / format mismatch / map/unmap pairing / use-after-free |
 | **T6** | 资源生命周期 | XComponent / NativeWindow / EGL surface / file descriptors / SRAM/SaveState | surface recreation under config change / fd leaks / atomic save guarantees |
+| **T7** | Input / EventBridge 跨层 | `cpp/app/napi/engine_input_napi.cpp` + `core/engine/event_bridge.cpp` + `core/input/input_snapshot.h` + `core/input/input_port_router.cpp` + `ets/common/LibretroEventHub.ets` + `ets/common/RuntimeInputCommandBridge.ets` + `ets/common/RuntimeInputPortController.ets` + `ets/pages/MultiplayerInputPage.ets` | input snapshot atomicity / 整数溢出 / TSFN release+abort 顺序 / CallJsHandler pending-exception / 跨层 event 路由 (ArkTS hub ↔ C++ bridge ↔ libretro input) / engine-ready guard / async lifecycle (replayLatest catch / removeListener / Hub singleton destroy) / NAPI error-throw helper 一致性 |
+| **T8** | SaveState / SRAM / Disk I/O 持久化 | `cpp/core/engine/core_state_manager.*` + `core/engine/libretro_engine.cpp` (SaveState/SRAM/Disk 路径) + `cpp/core/libretro/disk_controller.*` + `cpp/app/napi/engine_state_napi.cpp` + `cpp/app/napi/engine_disk_napi.cpp` + `ets/common/SaveStateRepository.ets` + `ets/common/LibrarySaveFilePurger.ets` + `ets/common/RuntimeSaveStateController.ets` + `ets/pages/SaveStatePage.ets` + `ets/pages/LibretroGamePage.ets` (quick save/load 路径) | state-machine guard (GAME_LOADED required) / retro_serialize+retro_get_memory_data 线程模型 (Engine thread + ExecuteSyncTask) / DiskController callbacks_ 在 core unload 时悬空 / EngineSyncTask 超时栈悬挂 TOCTOU / NAPI async_work + napi_cancelled guard / ArkTS 文件 I/O 原子写 (tmp+rename) + manifest 一致性 / async file I/O 不阻塞主线程 / unlink ENOENT 容忍语义 / purge 按 manifest.romFile 过滤 vs 文件名前缀
 
 ## The 9 steps
 
 ### Step 1 — Audit dispatch
 
 Ask user which topic(s) (default: ask user to choose, do NOT auto-default
-to all 6 — the audit is expensive). Create
+to all 8 — the audit is expensive). Create
 `docs/audit/audit-<YYYYMMDD-HHMMSS>/` directory; remember this path as
 AUDIT_DIR.
 

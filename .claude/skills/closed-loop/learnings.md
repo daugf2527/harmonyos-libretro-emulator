@@ -26,6 +26,14 @@ Reuse before re-discovering.
 
 ### Resource lifecycle
 
+### Input / EventBridge 跨层 (T7)
+
+<!-- input snapshot atomicity / TSFN release+abort / 跨层 event 路由 / async lifecycle -->
+
+### SaveState / SRAM / Disk I/O 持久化 (T8)
+
+<!-- state-machine guard / Engine 线程 ExecuteSyncTask / DiskController callbacks 悬空 / EngineSyncTask TOCTOU / NAPI napi_cancelled guard / ArkTS 原子写 + manifest 一致性 / purge 按 manifest.romFile 过滤 -->
+
 ## Process meta-learnings
 
 How the 9-step trust chain + 4 checkpoints actually performed across sessions.
