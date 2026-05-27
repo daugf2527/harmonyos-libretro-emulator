@@ -13,7 +13,7 @@
 
 #undef LOG_DOMAIN
 #undef LOG_TAG
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD060
 #define LOG_TAG "GambatteTest"
 #undef LOG_FLOW
 #define LOG_FLOW "Test"

@@ -152,3 +152,39 @@ void GLESRenderer::Deinit() {
 ## 遗留问题
 
 - **T4-F2 PARTIAL 遗留**: 0xD003 仍被 17 个非 graphics TU 共用。建议新立 finding，分轮次给 audio / core / resource 子系统各分配唯一域。
+
+---
+
+## 2026-05-27 update — T4-F2-RESIDUAL CLOSED
+
+按子系统分块给 17 个 TU 分配独占 `[0xD000, 0xFFFF]` domain，0xD003 释放给 `core/libretro/*` vendored 桥接专用。`quick_signals.sh` 全 PASS (regression / hygiene / ui-fixes / cxx-build 21 TU 重编 + link)。
+
+### 新分配表（first-party 全部唯一，按值排序）
+
+| 值 | 子系统 | TU |
+|---|---|---|
+| 0xD000 | tests/unit | core_loader_test.cpp |
+| 0xD001 | NAPI loader / framework | plugin_manager / core_loader_napi / module_init / rom_loader（4 TU，沿用） |
+| **0xD002** | **NAPI engine bridge (新)** | **engine_napi_common.h** (→ 7 engine_*_napi.cpp 跟着) |
+| 0xD003 | vendored libretro 桥 | core/libretro/* (first-party 不再使用) |
+| 0xD004 | diagnostics | logger_provider.cpp |
+| 0xD005 | core/engine input | input_port_router.cpp |
+| 0xD006-0xD00F | platform/graphics + render/video | graphics_context / gles_renderer / render_thread / video_pipeline / hw_render_presenter / vulkan_presenter / vulkan_context / vulkan_loader / pixel_converter_neon / pixel_converter_scalar |
+| **0xD010-0xD014** | **core/engine 子系统 (新)** | libretro_engine / core_state_manager / core_quirks_manager / event_bridge / input_manager |
+| **0xD020-0xD022** | **platform/audio 子系统 (新)** | audio_bridge / audio_player / ring_buffer |
+| **0xD030-0xD032** | **platform/resource 子系统 (新)** | platform_resource_manager / rawfile_rom_processor / temp_file_manager |
+| **0xD040** | **platform/sync (新)** | native_vsync_driver |
+| **0xD050-0xD051** | **common util (新)** | fence_utils / file_security |
+| **0xD060-0xD061** | **tests/integration (新)** | test_gambatte_load / test_gambatte_rom |
+
+### 验收
+
+- 17/17 TU `^#define LOG_DOMAIN 0xD003$` → 各自唯一新值（grep 结果一一对应）
+- first-party 仍用 0xD003 的：**0 条**（仅 vendored 保留）
+- 唯一性自检：仅 0xD001 napi 一族 4 TU 共用 —— 不在本次 scope，留作 follow-up（详见下方）
+- quick_signals: regression / hygiene / ui-fixes / cxx-build (22/22 ninja step) 全 PASS
+
+### 未做（follow-up，超出本 scope）
+
+- **0xD001 4 TU 共用**: plugin_manager / core_loader_napi / module_init / rom_loader 共用 0xD001。这 4 个原本就共用（不是本轮新引入），且都是 NAPI 一族启动期/资源 loader 子系统，hilog 过滤角度可接受。若需进一步唯一化，可按 `0xD002` 段落模式拆开。
+- **T1-F4 / T3-F2 防御性注释**: 上轮 fix-verify 已建议，与本 LOG_DOMAIN 任务无关。

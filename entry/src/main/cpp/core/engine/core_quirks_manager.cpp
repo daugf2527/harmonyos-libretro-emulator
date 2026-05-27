@@ -4,7 +4,7 @@
 #include <hilog/log.h>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD012
 #undef LOG_TAG
 #define LOG_TAG "CoreQuirks"
 #include "../../common/log_prefix.h"

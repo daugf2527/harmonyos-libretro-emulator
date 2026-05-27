@@ -22,7 +22,7 @@
 #include <unistd.h>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD030
 #undef LOG_TAG
 #define LOG_TAG "PlatformResourceManager"
 #undef LOG_FLOW

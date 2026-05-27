@@ -16,7 +16,7 @@
 
 #undef LOG_DOMAIN
 #undef LOG_TAG
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD061
 #define LOG_TAG "GambatteROMTest"
 #undef LOG_FLOW
 #define LOG_FLOW "Test"

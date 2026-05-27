@@ -2,7 +2,7 @@
 #include <hilog/log.h>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD013
 #undef LOG_TAG
 #define LOG_TAG "EventBridge"
 #undef LOG_FLOW

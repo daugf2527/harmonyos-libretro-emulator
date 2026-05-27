@@ -5,7 +5,7 @@
 #include <utility>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD014
 #undef LOG_TAG
 #define LOG_TAG "InputManager"
 #undef LOG_FLOW

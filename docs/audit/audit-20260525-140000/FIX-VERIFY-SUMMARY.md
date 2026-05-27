@@ -10,7 +10,7 @@
 |---|---|---|
 | **VERIFIED** | 27 | commit 0bb99ce 真的把 fix 落到代码里且符合 FIX-PLAN |
 | **CHANGED_APPROACH** | 2 | T1-F4 / T6-F4 用了合理的替代策略 |
-| **PARTIAL** | 1 | T4-F2 LOG_DOMAIN 修了一部分 TU，剩 17 个 TU 仍共用 0xD003 |
+| **PARTIAL → CLOSED 2026-05-27** | 1 | T4-F2 PARTIAL 已闭环：17 TU 各自独占 domain（详见 FIX-VERIFY-T4.md 2026-05-27 update 段） |
 | **遗漏 P2 防御性注释** | 1 | T3-F2 P2 可接受 |
 
 **总计：30 项 fix 中 27 完全合规 + 3 项 explanation/partial = 全部有 traceable verdict**。
@@ -102,12 +102,12 @@
 
 ## 5. 需要的 follow-up
 
-### 必做（创建新 finding）
+### ✅ 已闭环（2026-05-27）
 
-- **T4-F2 残余**：audio/core/resource 子系统 17 个 TU 仍共用 LOG_DOMAIN 0xD003。
-  - 影响：hilog 过滤无法区分这 17 个 TU
-  - 优先级：P2（与原 T4-F2 一致）
-  - 行动：新立 finding `T4-F2-RESIDUAL`，下次 audit 周期处理
+- **T4-F2 残余 = T4-F2-RESIDUAL CLOSED**：17 TU 按子系统分块分配独占 domain（0xD002 napi engine bridge / 0xD010-0xD014 core/engine / 0xD020-0xD022 audio / 0xD030-0xD032 resource / 0xD040 sync / 0xD050-0xD051 common / 0xD060-0xD061 tests）。详见 FIX-VERIFY-T4.md `2026-05-27 update` 段。
+  - 验收: first-party 仍用 0xD003 = 0 条；quick_signals 全 PASS（含 22/22 ninja step 重编）。
+
+### 仍待处理
 
 ### 建议（防御性增强）
 
@@ -133,4 +133,4 @@ NT1（#7）已静态 PASS，长任务通知留作机会性验证。
 
 **harmony 项目工作流 = 闭环成立**（设计 + 物理落地 + 静态验证 + 30 项 fix verify 都齐了，剩用户 ≤3 min 重启验证手动跑一次即可 100% 闭环）。
 
-唯一新立的 follow-up: **T4-F2-RESIDUAL（17 个 TU 共用 LOG_DOMAIN）**。这是 verify 过程才发现的，证明 verify step 不可跳。
+唯一新立的 follow-up: **T4-F2-RESIDUAL（17 个 TU 共用 LOG_DOMAIN）→ 2026-05-27 CLOSED**。这是 verify 过程才发现的，证明 verify step 不可跳。

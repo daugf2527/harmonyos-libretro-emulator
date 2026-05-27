@@ -20,7 +20,7 @@
 #include <hilog/log.h>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD022
 #undef LOG_TAG
 #define LOG_TAG "RingBuffer"
 #undef LOG_FLOW

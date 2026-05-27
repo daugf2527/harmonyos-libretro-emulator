@@ -7,7 +7,7 @@
 #include <unordered_set>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD031
 #undef LOG_TAG
 #define LOG_TAG "RawfileRom"
 #undef LOG_FLOW

@@ -21,7 +21,7 @@
 #include <vector>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD020
 #undef LOG_TAG
 #define LOG_TAG "AudioBridge"
 #undef LOG_FLOW

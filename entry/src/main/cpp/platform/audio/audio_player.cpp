@@ -20,7 +20,7 @@
 #include <hilog/log.h>
 
 #undef LOG_DOMAIN
-#define LOG_DOMAIN 0xD003
+#define LOG_DOMAIN 0xD021
 #undef LOG_TAG
 #define LOG_TAG "AudioPlayer"
 #undef LOG_FLOW
