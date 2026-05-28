@@ -69,29 +69,26 @@ older clients pull them in on demand when Claude works under those paths.
 
 ## MCP / Skill 工具决策树
 
-5 个 MCP 已 `/mcp ✓ connected`（cclsp / serena / ast-grep / mcp-server-firecrawl / sequential-thinking）。**别只用 Read/Grep**——按场景选工具，否则手动 Read + Grep 是低效路径。
+**按语言 + 用途分工**（消除 "cclsp 优先 / serena 备选" 二选一歧义）：
 
-### 工具能力速查
+| 工具 | 覆盖语言 | 主要用途 |
+|---|---|---|
+| **cclsp** | **C/C++ 只**（本地 `.claude/cclsp.json` 配的 clangd） | find_definition / find_references / get_incoming_calls / get_outgoing_calls / find_workspace_symbols / get_hover / get_diagnostics_for_file / prepare_call_hierarchy |
+| **serena** | 全仓库（C++/ets/md）+ project memory | get_symbols_overview / find_symbol / find_referencing_symbols / list_memories / write_memory / 跨语言文件级符号操作 |
+| **ast-grep** | 任意语言（AST pattern） | find_code / find_code_by_rule — **配对检查**（acquire/release、map/unmap）、threading violation 跨文件扫 |
+| **firecrawl** | Web | scrape / search — HarmonyOS 官方文档抓取；本机 SDK header 优先（`feedback_websearch_fail_fallback_to_sdk_header`） |
+| **sequential-thinking** | — | 罕见 finding 拿不准时多角度推理（不滥用） |
 
-| 场景 | 优先工具 | 备选 | 何时退 Read/Grep |
-|---|---|---|---|
-| 找符号定义（"NAPI 函数 X 在哪定义"） | `mcp__cclsp__find_definition` / `mcp__serena__find_symbol` | Grep | LSP 索引未跑 / 跨语言失败 |
-| 找符号引用（"谁调用 X"） | `mcp__cclsp__find_references` / `mcp__serena__find_referencing_symbols` | Grep | 短期一次性查 |
-| 调用链（incoming/outgoing） | `mcp__cclsp__prepare_call_hierarchy` + `get_incoming_calls` / `get_outgoing_calls` | 手动追 | 深度 1-2 简单时 |
-| 类型 / 接口悬浮信息 | `mcp__cclsp__get_hover` | Read 整文件 | 仅看一行 |
-| 文件 LSP 诊断（type/warning） | `mcp__cclsp__get_diagnostics_for_file` / `mcp__serena__get_diagnostics_for_file` | Bash `hvigorw` | 仅看一行 |
-| 文件符号总览（"这文件有哪些类/函数"） | `mcp__serena__get_symbols_overview` | Read 整文件 | 小文件 |
-| AST 模式扫（"找所有 `mmap(` / `OH_NativeBuffer_*` / `TODO`"） | `mcp__ast-grep__find_code` / `find_code_by_rule` | Grep | 字面 string 匹配够用 |
-| 复杂多角度推理（finding 拿不准 / 设计权衡） | `mcp__sequential-thinking__sequentialthinking` | — | 简单 finding |
-| Web 文档抓取（HarmonyOS 官方 / GitHub） | `mcp__mcp-server-firecrawl__firecrawl_scrape` / `firecrawl_search` | WebFetch | 简单页面 |
-| 跨仓库 / 项目级 symbol 搜索 | `mcp__cclsp__find_workspace_symbols` | Glob + Read | 单文件 |
+### 何时**必须**用 MCP（按代码位置 / 操作类型）
 
-### 何时**必须**用 MCP 而不是 Read/Grep
-
-- **NAPI 边界改动**（`entry/src/main/cpp/app/napi/**`）→ **必须** `find_references` 看 caller 影响面 + `get_incoming_calls` 看调用链——纯 Grep 会漏 ArkTS 侧的 EventBridge / TSFN 引用
-- **Engine 状态机改动**（`core/engine/libretro_engine.cpp`）→ **必须** `find_workspace_symbols` 找跨文件 enum / struct 引用
-- **NativeBuffer / Resource lifecycle 类 review** → **必须** `ast-grep find_code` 找 `OH_NativeBuffer_*` / `OH_NativeWindow_*` 全部 callsite 做配对检查
-- **Type / interface 改动** → **必须** `find_references` + `get_diagnostics_for_file` 看下游 type warning
+| 改动位置 / 操作 | 必用工具 | 为什么 |
+|---|---|---|
+| `entry/src/main/cpp/app/napi/**` 改动 | `cclsp__find_references` + `cclsp__get_incoming_calls` | 纯 Grep 会漏 ArkTS 侧 EventBridge / TSFN 引用 |
+| `core/engine/libretro_engine.cpp` 状态机 | `cclsp__find_workspace_symbols` | 跨文件 enum / struct 引用 |
+| NativeBuffer / Resource lifecycle 配对 | `ast-grep__find_code` | `OH_NativeBuffer_*` / `OH_NativeWindow_*` callsite 配对扫描 |
+| C++ 类型 / 接口改动 | `cclsp__find_references` + `cclsp__get_diagnostics_for_file` | 下游 type warning |
+| ets 文件符号总览 / 找符号 | `serena__get_symbols_overview` + `serena__find_symbol` | cclsp 不覆盖 ets;ets LSP 走 serena |
+| 多文件 audit / cross-cutting review | `serena__find_referencing_symbols` | 跨文件批量查引用 |
 
 ### 何时**可以**退回 Read/Grep
 
@@ -105,6 +102,15 @@ older clients pull them in on demand when Claude works under those paths.
 - **先 LSP 看影响面 → 再 Read 那几个 callsite 确认行为** — 别上来直接 Read 全文件
 - **配对检查类问题**（acquire/release / ref create/delete / map/unmap）— 用 `ast-grep find_code_by_rule` 扫配对模式比逐文件 Read 快 10×
 - **跨线程 / threading violation 检测** — `ast-grep` 跨文件扫 pattern（譬如 `GameLoop` 里直接 `napi_call_function`）
+
+### 工具瘦身记录（外网 ETH arXiv:2602.11988 实证 14-22% token 浪费）
+
+| 检查项 | 现状 | 决策 |
+|---|---|---|
+| cclsp ↔ serena 重叠 | 描述层重叠（"优先/备选"），实际**按语言分工**不重叠（cclsp=C++ only, serena=全仓库 + memory） | 保留双方，决策树改成按语言分工（本次提交） |
+| firecrawl 24 工具 | 30 天调用主要是 search / scrape；rest 18 个工具 token 占位 | **TODO**：等用户决策是否项目级关闭 / 删除（影响其他个人项目） |
+| sequential-thinking 1 工具 | 偶用于 audit 罕见 finding 推理 | 保留 |
+| ast-grep 4 工具 | 配对检查不可替代 | 保留 |
 
 ## Environment (Windows + Git Bash)
 

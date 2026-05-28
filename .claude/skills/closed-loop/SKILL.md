@@ -73,7 +73,45 @@ Do NOT use this skill for:
 | **T7** | Input / EventBridge 跨层 | `cpp/app/napi/engine_input_napi.cpp` + `core/engine/event_bridge.cpp` + `core/input/input_snapshot.h` + `core/input/input_port_router.cpp` + `ets/common/LibretroEventHub.ets` + `ets/common/RuntimeInputCommandBridge.ets` + `ets/common/RuntimeInputPortController.ets` + `ets/pages/MultiplayerInputPage.ets` | input snapshot atomicity / 整数溢出 / TSFN release+abort 顺序 / CallJsHandler pending-exception / 跨层 event 路由 (ArkTS hub ↔ C++ bridge ↔ libretro input) / engine-ready guard / async lifecycle (replayLatest catch / removeListener / Hub singleton destroy) / NAPI error-throw helper 一致性 |
 | **T8** | SaveState / SRAM / Disk I/O 持久化 | `cpp/core/engine/core_state_manager.*` + `core/engine/libretro_engine.cpp` (SaveState/SRAM/Disk 路径) + `cpp/core/libretro/disk_controller.*` + `cpp/app/napi/engine_state_napi.cpp` + `cpp/app/napi/engine_disk_napi.cpp` + `ets/common/SaveStateRepository.ets` + `ets/common/LibrarySaveFilePurger.ets` + `ets/common/RuntimeSaveStateController.ets` + `ets/pages/SaveStatePage.ets` + `ets/pages/LibretroGamePage.ets` (quick save/load 路径) | state-machine guard (GAME_LOADED required) / retro_serialize+retro_get_memory_data 线程模型 (Engine thread + ExecuteSyncTask) / DiskController callbacks_ 在 core unload 时悬空 / EngineSyncTask 超时栈悬挂 TOCTOU / NAPI async_work + napi_cancelled guard / ArkTS 文件 I/O 原子写 (tmp+rename) + manifest 一致性 / async file I/O 不阻塞主线程 / unlink ENOENT 容忍语义 / purge 按 manifest.romFile 过滤 vs 文件名前缀
 
-## The 9 steps
+## The 10 steps (Step 0 added 2026-05-28)
+
+### Step 0 — Done criteria(sprint contract,开工前定)
+
+外网共识(Addy Osmani):"写下 done-condition 阻止 scope drift 比任何 prompt 调整都管用"。
+项目 memory `feedback_completeness_is_scenario_not_form` 反复出现的根因——开工时未明确
+"什么叫审完",fix 完了才回头问 "够不够"。
+
+**动作**:在创建 `AUDIT_DIR` 之后(Step 1 之前)立刻写 `AUDIT_DIR/DONE.md`:
+
+```markdown
+# Done criteria — audit-<TS> (topic: T<n>)
+
+## 边界(必明确,防 scope drift)
+- Scope in:  <文件 glob / 目录列表 / 行为子集>
+- Scope out: <显式排除的相邻子系统,例如 "T7 不审 ArkTS 侧 keymap UI">
+
+## 完成条件(场景驱动,逐条 checkbox,fix 完逐条勾选)
+- [ ] 所有 P0 finding 已 fix 或显式标记 WONT_FIX(理由必填)
+- [ ] 所有 fix 通过 Step 6/7 verify(verify agent 报 FIXED + 主 Claude citation 确认)
+- [ ] Step 8 quick_signals 全 PASS
+- [ ] 业务侧"会踩坑的真实场景"(由用户/topic 性质给出)逐条验证:
+  - [ ] <场景 1,例如 T7: 切核重启后 input 不再重发已释放 TSFN>
+  - [ ] <场景 2,例如 T7: ArkTS 侧 hub 离页后 C++ 侧 listener 自动清理>
+  - [ ] ...
+- [ ] napi-boundary-reviewer(若 fix 涉及 NAPI)verdict ≠ block
+- [ ] audit-evaluator(若有)drift ≤ 20%
+
+## 不在本次范围(显式 defer)
+- <项 1: 理由 + defer 到哪个 audit>
+- <项 2>
+```
+
+**约束**:
+- 完成条件 MUST 是**场景驱动**,不是"checklist 填空"(memory `feedback_completeness_is_scenario_not_form`)
+- 场景由 topic 性质 + 项目 memory 共同决定;不要凭空发明
+- DONE.md 一旦写定,Step 1 之后**不许悄悄改**——确实要改 scope 必须显式记录 "scope drift: <原因>"
+
+**State after step 0**: `AUDIT_DIR/DONE.md` 存在,scope + checkbox 全部填写。
 
 ### Step 1 — Audit dispatch
 
@@ -306,6 +344,15 @@ first** (loop back to step 4 — do not commit a half-fixed state).
 If quick_signals reports SKIP for `cmake --build` because DevEco Sync
 hasn't been run, run a full sync once via DevEco Studio UI, then re-run.
 
+**Done-criteria gate(2026-05-28 加)**:
+打开 `AUDIT_DIR/DONE.md`,逐条 checkbox 自检:
+- 全部勾上 → 通过
+- 有未勾 → 要么补漏(回 Step 4)、要么显式升为 WONT_FIX(理由写进 DONE.md 同一条)
+- 场景类未勾(场景没法在本环境验证)→ 标 `[DEFER-MANUAL]` + 写明用户/真机什么时候验
+
+不许"checkbox 大部分勾上,凑合 commit"——`feedback_completeness_is_scenario_not_form`
+的原话:**完整不是形式美,是场景驱动**。
+
 ### ─── CHECKPOINT D (MANDATORY HUMAN) ───
 
 Draft the commit message:
@@ -350,23 +397,27 @@ If the user comes back mid-flow and says "继续闭环" / "/closed-loop resume",
 detect state via artifacts (no script — use `ls docs/audit/*/`):
 
 ```
-Has AUDIT_DIR/agent-*.md ?
-├── no  → step 1 not done, start fresh
-└── yes → has AUDIT_DIR/VERIFIED.md ?
-   ├── no  → resume step 2 (citation-verify)
-   └── yes → has AUDIT_DIR/CORE-REVIEW.md ?
-      ├── no  → resume step 3 (core-review)
-      └── yes → has AUDIT_DIR/FIX-PLAN.md ?
-         ├── no  → resume CHECKPOINT B (ask user what to fix)
-         └── yes → git diff non-empty?
-            ├── no  → resume step 4 (fixing)
-            └── yes → has FIXVERIFY_DIR ?
-               ├── no  → resume step 5 (rebuild)
-               └── yes → has FIXVERIFY_DIR/<reports> ?
-                  ├── no  → resume step 6 (dispatch fix-verify agents)
-                  └── yes → green gates ?
-                     ├── no  → resume step 7-8 (citation-verify + gate)
-                     └── yes → resume CHECKPOINT D (commit draft)
+Has AUDIT_DIR/DONE.md ?
+├── no  → step 0 not done, must write DONE.md first
+└── yes → has AUDIT_DIR/agent-*.md ?
+   ├── no  → step 1 not done, resume step 1
+   └── yes → has AUDIT_DIR/VERIFIED.md ?
+      ├── no  → resume step 2 (citation-verify)
+      └── yes → has AUDIT_DIR/CORE-REVIEW.md ?
+         ├── no  → resume step 3 (core-review)
+         └── yes → has AUDIT_DIR/FIX-PLAN.md ?
+            ├── no  → resume CHECKPOINT B (ask user what to fix)
+            └── yes → git diff non-empty?
+               ├── no  → resume step 4 (fixing)
+               └── yes → has FIXVERIFY_DIR ?
+                  ├── no  → resume step 5 (rebuild)
+                  └── yes → has FIXVERIFY_DIR/<reports> ?
+                     ├── no  → resume step 6 (dispatch fix-verify agents)
+                     └── yes → green gates ?
+                        ├── no  → resume step 7-8 (citation-verify + gate)
+                        └── yes → DONE.md checkbox 全勾?
+                           ├── no  → 补漏 / 升 WONT_FIX + 理由 / 改 scope
+                           └── yes → resume CHECKPOINT D (commit draft)
 ```
 
 Pick the most recent timestamped dir as the "active" one if multiple exist.
@@ -401,6 +452,11 @@ If user pushes for any of these, refuse and explain why:
 - **"Skip the napi-boundary-reviewer for this one NAPI fix"** — NAPI
   edits have hidden env / thread / ref-lifetime hazards that the
   reviewer agent is specifically tuned to catch.
+
+- **"Skip Step 0 because 'we know what we're auditing'"** — Step 0 是
+  sprint contract,memory `feedback_completeness_is_scenario_not_form` 反复
+  踩过这个坑。开工不写 done criteria 等于让 fix scope 飘。3 分钟写 DONE.md
+  比 fix 完反复追问 "审完了吗" 省时间。
 
 ## What this skill does NOT cover
 
