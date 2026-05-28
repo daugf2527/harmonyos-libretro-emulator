@@ -342,6 +342,16 @@ the agent's evidence_excerpt is the right code but the line range is
 off-by-a-few — read the code yourself to confirm the fix is actually
 correct (line-range drift ≠ fix failure).
 
+**Cross-model verification(2026-05-28 加,可选)**:
+
+P0 finding 或涉及线程/生命周期/NAPI 的 fix,**强烈建议**对 audit-evaluator 启用 cross-validate mode:
+- 第一次 dispatch:`Agent(audit-evaluator, model=sonnet, MODE=cross-validate)` — Phase A
+- 第二次 dispatch:`Agent(audit-evaluator, model=opus, MODE=cross-validate-phase-b, PHASE_A_REPORT=<path>)` — Phase B
+
+漂移收敛规则:任一 Phase B DISAGREE_A → 取 Phase B 判定回 Step 4;UNCERTAIN → CHECKPOINT D。
+
+参考 HN vibe42 实操 + Anthropic sycophancy 实证。
+
 ### Step 8 — Gate gauntlet
 
 ```bash

@@ -113,6 +113,64 @@ EVALUATOR_VERDICT: <TOPIC> drift=M/N (X%) — <pass | concerns | block>
 - **concerns**: 0 < M/N ≤ 30%,有局部漂移但不影响整体 fix 决策
 - **block**: M/N > 30% 或任意 HIGH severity finding 漂成 UNFIXED → 主 Claude 不应继续 Step 8 gate,需先回 Step 4 重 fix
 
+## Multi-model cross-validation(可选 mode,主 Claude dispatch 时显式启用)
+
+参考 HN vibe42 + AgentsMesh 4-layer feedback 的 cross-model 实操:
+单 model 自评有系统性 sycophancy 偏差(Anthropic 实测)。可让 model A 评一轮,
+model B 复审 A 的结论。漂移率显著降低。
+
+### 何时启用
+
+主 Claude dispatch 此 agent 时 prompt 含 `MODE=cross-validate` 即启用:
+- closed-loop Step 7+ 关键 fix(P0 / 涉及线程 / 涉及生命周期)— 推荐
+- 一般 fix-verify — 不需要(单 model 够)
+
+不启用时按原 mode(单 sonnet 第三方评分员)跑。
+
+### Cross-validate 流程(只在 MODE=cross-validate 时跑)
+
+#### Phase 1 — Model A(本 agent,sonnet)按现有 5 步流程评一轮
+
+写到 `<AUDIT_DIR>-fixverify/AUDIT-EVALUATOR.md` 的 `## Topic <TOPIC> — Phase A (sonnet)` 段。
+
+#### Phase 2 — 主 Claude dispatch 同一 agent 第二次,模型升 opus
+
+dispatch prompt 加:
+- `MODE=cross-validate-phase-b`
+- `PHASE_A_REPORT=<上一轮报告路径>`
+
+Phase B 不重新看代码(否则就重复劳动了),**只读 Phase A 的 verdict 表 + DRIFT 分析**,
+对每条 finding 独立判:
+- AGREE_A — 同意 Phase A 的判定
+- DISAGREE_A — 不同意,**必须 Read fix 代码原位独立判一次**(只在不同意时才动 MCP)
+- UNCERTAIN — 看不准,主 Claude 应该 escalate human checkpoint
+
+#### Phase 3 — 漂移收敛
+
+写 `## Topic <TOPIC> — Phase B (opus)` 段:
+
+```
+| # | Phase A | Phase B | 一致? | 行动 |
+|---|---|---|---|---|
+| F1 | FIXED | AGREE_A | ✓ | 收敛 FIXED |
+| F2 | FIXED | DISAGREE_A→PARTIAL | ✗ | 升级 PARTIAL,主 Claude 回 Step 4 |
+| F3 | PARTIAL | UNCERTAIN | ⚠️ | escalate CHECKPOINT D |
+```
+
+最终 verdict:
+- 全 AGREE_A → 与 Phase A 一致
+- 任一 DISAGREE_A → 取 Phase B 判定(opus 默认更保守)
+- 任一 UNCERTAIN → 标 `cross_validation: human_required`
+
+### Verdict 行(终段升级)
+
+原 `EVALUATOR_VERDICT:` 改为:
+```
+EVALUATOR_VERDICT: <TOPIC> drift=M/N (X%) [single|cross-validate] — pass | concerns | block
+```
+
+cross-validate mode 下 X% 是 Phase A+B 漂移**合并率**(任一 phase DRIFT 都计)。
+
 ## What you do NOT do
 
 - 不发现 NEW issues(那是 audit agent 的活)
