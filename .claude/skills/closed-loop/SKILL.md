@@ -5,7 +5,7 @@ description: |
   workflow on a harmony stage topic (NAPI / Engine / Audio / Video /
   NativeBuffer / Resource lifecycle / Input+EventBridge /
   SaveState+SRAM+Disk). Use when user says "跑闭环 X" / "audit + 修 X" /
-  "完整审一下 X" / "/closed-loop". Drives the 9-step trust chain
+  "完整审一下 X" / "/closed-loop". Drives the 8-step trust chain
   end-to-end with 4 mandatory human checkpoints.
 disable-model-invocation: true
 allowed-tools: Bash, Read, Grep, Glob, Edit, Write, Agent, TaskCreate, TaskUpdate, TaskList, TaskGet
@@ -58,7 +58,7 @@ Do NOT use this skill for:
 - Single-file lookup (use Read/Grep)
 - Plain agent dispatch without verification (just use `Agent` tool directly)
 - UI / ArkTS-only fixes (different workflow, ts/ets layer doesn't have
-  NativeBuffer lifetime hazards that justify the full 9-step gauntlet)
+  NativeBuffer lifetime hazards that justify the full 8-step gauntlet)
 
 ## Topics (8 fixed, harmony-tuned)
 
@@ -79,7 +79,7 @@ Do NOT use this skill for:
 **新增 topic**: 复制 `topics/T<n>.md` 模板(任一现存的拿来改),把新行加到上表。
 主 SKILL.md 不再变长。
 
-## The 10 steps (Step 0 added 2026-05-28)
+## The 9 steps (Step 5 merged into Step 7 on 2026-05-28; Step 0 added 2026-05-28)
 
 ### Step 0 — Done criteria(sprint contract,开工前定)
 
@@ -101,8 +101,8 @@ Do NOT use this skill for:
 
 ## 完成条件(场景驱动,逐条 checkbox,fix 完逐条勾选)
 - [ ] 所有 P0 finding 已 fix 或显式标记 WONT_FIX(理由必填)
-- [ ] 所有 fix 通过 Step 6/7 verify(verify agent 报 FIXED + 主 Claude citation 确认)
-- [ ] Step 8 quick_signals 全 PASS
+- [ ] 所有 fix 通过 Step 5/6 verify(verify agent 报 FIXED + 主 Claude citation 确认)
+- [ ] Step 7 quick_signals 全 PASS
 - [ ] 业务侧"会踩坑的真实场景"(由用户/topic 性质给出)逐条验证:
   - [ ] <场景 1,例如 T7: 切核重启后 input 不再重发已释放 TSFN>
   - [ ] <场景 2,例如 T7: ArkTS 侧 hub 离页后 C++ 侧 listener 自动清理>
@@ -282,27 +282,6 @@ NAPI 边界改动的 LSP 协同与 `napi-boundary-reviewer` agent **并行**—�
 **State after step 4**: uncommitted edits in the working tree, listed by
 `git diff --stat`.
 
-### Step 5 — Rebuild (if C++ changed)
-
-If any file under `entry/src/main/cpp/` changed, incrementally build via
-DevEco Studio's existing `.cxx` ninja directory:
-
-```bash
-# Discover the build.ninja path (one of the architectures):
-ls entry/.cxx/*/*/*/build.ninja 2>/dev/null
-# Pick the most recently used arch (default arm64-v8a) and build:
-cmake --build "entry/.cxx/<config>/<arch>/<abi>" --target libentry_static
-```
-
-Or run the wider hygiene + incremental build via:
-
-```bash
-bash scripts/check/quick_signals.sh
-```
-
-If only ets/ets-side changed, no C++ rebuild needed — step 8's
-`quick_signals.sh` covers TS-side regression.
-
 ### ─── CHECKPOINT C (MANDATORY HUMAN) ───
 
 Show user `git diff --stat` + (if C++ built) the build PASS/FAIL line. Ask:
@@ -314,7 +293,7 @@ N files changed (+X -Y). C++ build: <OK / FAIL>. Diff looks reasonable?
 
 **Wait for response.** Do not proceed without it.
 
-### Step 6 — Fix-verify agent dispatch
+### Step 5 — Fix-verify agent dispatch
 
 Create `docs/audit/audit-<ORIGINAL_TS>-fixverify/` (suffix the original
 audit dir's timestamp — aids correlation).
@@ -334,7 +313,7 @@ user picked findings from in step 3). Each agent's prompt MUST include:
 
 Output to `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`.
 
-### Step 7 — Citation verify on the fix-verify reports (Read + grep, manual)
+### Step 6 — Citation verify on the fix-verify reports (Read + grep, manual)
 
 Same procedure as step 2, but on the fix-verify reports. The fix code
 must exist where the agent claims; a `CITATION_DRIFT` here often means
@@ -352,7 +331,19 @@ P0 finding 或涉及线程/生命周期/NAPI 的 fix,**强烈建议**对 audit-e
 
 参考 HN vibe42 实操 + Anthropic sycophancy 实证。
 
-### Step 8 — Gate gauntlet
+### Step 7 — Gate gauntlet(含 C++ 增量 rebuild)
+
+**2026-05-28 重构**:原 Step 5 "Rebuild (if C++ changed)" 已合并进本步——
+`quick_signals.sh` chain 内置 `cmake --build`(避免重复 rebuild step)。
+
+如需在 quick_signals 之前**单独验** C++ build(罕见,例如想看 build 详细错误而不是 quick_signals 简略输出),可手动跑:
+
+```bash
+ls entry/.cxx/*/*/*/build.ninja 2>/dev/null
+cmake --build "entry/.cxx/<config>/<arch>/<abi>" --target libentry_static
+```
+
+否则直接进 Gate gauntlet。
 
 ```bash
 bash scripts/check/quick_signals.sh
@@ -397,7 +388,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 
 Show user the full draft. Wait for "go" / "edit X" / "abort".
 
-### Step 9 — Stage + commit
+### Step 8 — Stage + commit
 
 **Explicit file list, no `git add -A`**. Only stage files YOU edited in
 step 4 + the audit artifacts under `docs/audit/`. Files modified by the
@@ -431,11 +422,11 @@ Has AUDIT_DIR/DONE.md ?
             └── yes → git diff non-empty?
                ├── no  → resume step 4 (fixing)
                └── yes → has FIXVERIFY_DIR ?
-                  ├── no  → resume step 5 (rebuild)
+                  ├── no  → resume step 5 (dispatch fix-verify agents)
                   └── yes → has FIXVERIFY_DIR/<reports> ?
-                     ├── no  → resume step 6 (dispatch fix-verify agents)
+                     ├── no  → resume step 5 (dispatch fix-verify agents)
                      └── yes → green gates ?
-                        ├── no  → resume step 7-8 (citation-verify + gate)
+                        ├── no  → resume step 6-7 (citation-verify + gate)
                         └── yes → DONE.md checkbox 全勾?
                            ├── no  → 补漏 / 升 WONT_FIX + 理由 / 改 scope
                            └── yes → resume CHECKPOINT D (commit draft)
@@ -464,7 +455,7 @@ If user pushes for any of these, refuse and explain why:
   because fixes can look right in code but still subtly break behavior.
 - **"Dispatch a fix agent for each finding"** — adds a new trust layer
   without a verifier. Main Claude is the implementer, by design.
-- **"Run all 9 steps no checkpoints"** — checkpoints B/C/D exist for
+- **"Run all 8 steps no checkpoints"** — checkpoints B/C/D exist for
   decision authority. Removing them gives Claude autonomy that isn't
   earned yet on this codebase.
 - **"Fix the warnings I just noticed while you're in there"** — scope
