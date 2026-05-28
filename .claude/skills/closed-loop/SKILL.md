@@ -62,16 +62,22 @@ Do NOT use this skill for:
 
 ## Topics (8 fixed, harmony-tuned)
 
-| ID | Name | Scope | Hazards |
+每个 topic 的完整 scope / files / hazards / done-criteria 模板见 `topics/T<n>-<name>.md`。
+本表只列 ID + name + 一句话 scope,主流程节点引用 topic file 详情(progressive disclosure)。
+
+| ID | Name | Scope (one-liner) | Details |
 |---|---|---|---|
-| **T1** | NAPI 边界 | `entry/src/main/cpp/app/napi/` | env lifetime / TSFN thread / ArkTS↔C++ type / error-throw / ref+buffer lifecycle |
-| **T2** | Engine 状态机 | `entry/src/main/cpp/core/engine/libretro_engine.*` | state transitions / message queue races / retro_run reentrancy / cleanup ordering |
-| **T3** | Audio bridge | `entry/src/main/cpp/platform/audio/audio_bridge.*` | resampler buffer ownership / DRC bounds / ring buffer race / underrun handling |
-| **T4** | VideoPipeline | `entry/src/main/cpp/core/engine/video_pipeline.*` + renderer | pixel format negotiation / geometry resize / Hardware/Software/GLES/Vulkan switch / NativeBuffer dequeue/queue |
-| **T5** | NativeBuffer 用法 | cross-cutting: any code calling `OH_NativeBuffer_*` / `OH_NativeWindow_*` | acquire/release pairing / format mismatch / map/unmap pairing / use-after-free |
-| **T6** | 资源生命周期 | XComponent / NativeWindow / EGL surface / file descriptors / SRAM/SaveState | surface recreation under config change / fd leaks / atomic save guarantees |
-| **T7** | Input / EventBridge 跨层 | `cpp/app/napi/engine_input_napi.cpp` + `core/engine/event_bridge.cpp` + `core/input/input_snapshot.h` + `core/input/input_port_router.cpp` + `ets/common/LibretroEventHub.ets` + `ets/common/RuntimeInputCommandBridge.ets` + `ets/common/RuntimeInputPortController.ets` + `ets/pages/MultiplayerInputPage.ets` | input snapshot atomicity / 整数溢出 / TSFN release+abort 顺序 / CallJsHandler pending-exception / 跨层 event 路由 (ArkTS hub ↔ C++ bridge ↔ libretro input) / engine-ready guard / async lifecycle (replayLatest catch / removeListener / Hub singleton destroy) / NAPI error-throw helper 一致性 |
-| **T8** | SaveState / SRAM / Disk I/O 持久化 | `cpp/core/engine/core_state_manager.*` + `core/engine/libretro_engine.cpp` (SaveState/SRAM/Disk 路径) + `cpp/core/libretro/disk_controller.*` + `cpp/app/napi/engine_state_napi.cpp` + `cpp/app/napi/engine_disk_napi.cpp` + `ets/common/SaveStateRepository.ets` + `ets/common/LibrarySaveFilePurger.ets` + `ets/common/RuntimeSaveStateController.ets` + `ets/pages/SaveStatePage.ets` + `ets/pages/LibretroGamePage.ets` (quick save/load 路径) | state-machine guard (GAME_LOADED required) / retro_serialize+retro_get_memory_data 线程模型 (Engine thread + ExecuteSyncTask) / DiskController callbacks_ 在 core unload 时悬空 / EngineSyncTask 超时栈悬挂 TOCTOU / NAPI async_work + napi_cancelled guard / ArkTS 文件 I/O 原子写 (tmp+rename) + manifest 一致性 / async file I/O 不阻塞主线程 / unlink ENOENT 容忍语义 / purge 按 manifest.romFile 过滤 vs 文件名前缀
+| **T1** | NAPI 边界 | ArkTS ↔ C++ 互调的 NAPI 层 | [`topics/T1-napi.md`](topics/T1-napi.md) |
+| **T2** | Engine 状态机 | LibretroEngine 状态机 + 消息队列 + retro_run 调度 | [`topics/T2-engine.md`](topics/T2-engine.md) |
+| **T3** | Audio bridge | AudioBridge 重采样 / DRC / RingBuffer / underrun | [`topics/T3-audio.md`](topics/T3-audio.md) |
+| **T4** | VideoPipeline | VideoPipeline 模式协商 + 渲染(CPU/GLES/Vulkan) | [`topics/T4-video.md`](topics/T4-video.md) |
+| **T5** | NativeBuffer 用法 | Cross-cutting `OH_NativeBuffer_*` / `OH_NativeWindow_*` 配对 | [`topics/T5-nativebuffer.md`](topics/T5-nativebuffer.md) |
+| **T6** | 资源生命周期 | XComponent / NativeWindow / EGL / fd / SRAM/SaveState 文件 | [`topics/T6-resource.md`](topics/T6-resource.md) |
+| **T7** | Input / EventBridge 跨层 | 输入 + 跨语言事件路由(ArkTS hub ↔ C++ bridge ↔ libretro input) | [`topics/T7-input.md`](topics/T7-input.md) |
+| **T8** | SaveState / SRAM / Disk I/O 持久化 | SaveState + SRAM + Disk Control 全链路 I/O | [`topics/T8-savestate.md`](topics/T8-savestate.md) |
+
+**新增 topic**: 复制 `topics/T<n>.md` 模板(任一现存的拿来改),把新行加到上表。
+主 SKILL.md 不再变长。
 
 ## The 10 steps (Step 0 added 2026-05-28)
 
@@ -81,7 +87,10 @@ Do NOT use this skill for:
 项目 memory `feedback_completeness_is_scenario_not_form` 反复出现的根因——开工时未明确
 "什么叫审完",fix 完了才回头问 "够不够"。
 
-**动作**:在创建 `AUDIT_DIR` 之后(Step 1 之前)立刻写 `AUDIT_DIR/DONE.md`:
+**动作**:在创建 `AUDIT_DIR` 之后(Step 1 之前)立刻:
+1. `cat .claude/skills/closed-loop/topics/T<n>-<name>.md` 拿到该 topic 的 hazards
+   清单 + done-criteria 模板(2026-05-28 progressive disclosure 拆分)
+2. 把模板 copy 到 `AUDIT_DIR/DONE.md`,**按本次 audit 的具体范围**调整 checkbox
 
 ```markdown
 # Done criteria — audit-<TS> (topic: T<n>)
@@ -140,6 +149,8 @@ agent must:
 
 - Receive constraint: "DO NOT modify files. DO NOT run hvigorw / cmake.
   DO NOT invent citations — only cite lines you actually Read."
+- **Hazards source**: agent prompt **必须** 包含一行 `先 cat .claude/skills/closed-loop/topics/T<n>-<name>.md`
+  指示——hazards 详情在 topic file 里,不再在主 prompt 里转述(主 prompt 短、agent 自取 hazards)。
 - **TOOL POLICY (MANDATORY)**: Using Grep to answer "who calls X / where is X defined /
   what references X" is FORBIDDEN in this agent. For symbol/reference/caller lookup
   you MUST use MCP tools:
