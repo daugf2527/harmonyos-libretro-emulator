@@ -12,6 +12,11 @@
 # Exit code:
 #   0 = all signals PASS or SKIP
 #   1 = at least one signal FAIL
+#
+# Flags:
+#   --quiet / -q  suppress per-check output; only emit summary (+ failing
+#                 check output on FAIL). Used by pre-commit hook so a clean
+#                 commit doesn't flood the terminal with 100+ lines.
 
 set -u
 
@@ -44,37 +49,41 @@ find_cmake() {
 NAMES=()
 RESULTS=()
 SECS=()
+LOGS=()   # per-check log paths (quiet mode only)
+
+QUIET=0
+for arg in "$@"; do
+  case "$arg" in --quiet|-q) QUIET=1 ;; esac
+done
 
 run_check() {
-  local name="$1"
-  shift
-  local t0=${SECONDS}
+  local name="$1"; shift
+  local t0=${SECONDS} rc=0
 
-  "$@" 2>&1 | sed "s|^|[${name}] |"
-  local rc=${PIPESTATUS[0]}
+  if [[ $QUIET -eq 1 ]]; then
+    local tmp; tmp=$(mktemp)
+    LOGS+=("$tmp")
+    "$@" >"$tmp" 2>&1; rc=$?
+    sed -i "s|^|[${name}] |" "$tmp" 2>/dev/null || true
+  else
+    "$@" 2>&1 | sed "s|^|[${name}] |"
+    rc=${PIPESTATUS[0]}
+  fi
 
   local dur=$((SECONDS - t0))
-  NAMES+=("${name}")
-  SECS+=("${dur}")
-  if (( rc == 0 )); then
-    RESULTS+=("PASS")
-  else
-    RESULTS+=("FAIL")
-  fi
+  NAMES+=("$name"); SECS+=("$dur")
+  (( rc == 0 )) && RESULTS+=("PASS") || RESULTS+=("FAIL")
 }
 
 skip_check() {
-  local name="$1"
-  local reason="$2"
-  echo "[${name}] SKIP: ${reason}"
-  NAMES+=("${name}")
-  SECS+=("0")
-  RESULTS+=("SKIP")
+  local name="$1" reason="$2"
+  [[ $QUIET -eq 0 ]] && echo "[${name}] SKIP: ${reason}"
+  NAMES+=("$name"); SECS+=("0"); RESULTS+=("SKIP")
 }
 
 trap 'echo ""; echo "==== quick_signals interrupted ===="; exit 130' INT TERM
 
-echo "==== quick_signals starting ===="
+[[ $QUIET -eq 0 ]] && echo "==== quick_signals starting ===="
 
 run_check regression bash scripts/ci/check_regression_guards.sh
 run_check hygiene    bash scripts/ci/check_repo_hygiene.sh
@@ -90,23 +99,40 @@ else
   skip_check cxx-build "no build.ninja under ${CXX_BUILD_DIR}; run DevEco Sync first"
 fi
 
-echo ""
-echo "==== quick_signals summary ===="
 total_fail=0
 for i in "${!NAMES[@]}"; do
-  printf "  %-12s %-5s (%ss)\n" "${NAMES[$i]}" "${RESULTS[$i]}" "${SECS[$i]}"
   [[ "${RESULTS[$i]}" == "FAIL" ]] && total_fail=$((total_fail + 1))
 done
 
-echo ""
 if (( total_fail == 0 )); then
-  echo "==== ALL PASS / SKIP ===="
   final_status="ALL PASS / SKIP"
   exit_code=0
 else
-  echo "==== ${total_fail} FAIL ===="
   final_status="${total_fail} FAIL"
   exit_code=1
+fi
+
+if [[ $QUIET -eq 1 && $exit_code -ne 0 ]]; then
+  # Quiet+FAIL: replay buffered output for failing checks only.
+  for i in "${!NAMES[@]}"; do
+    if [[ "${RESULTS[$i]}" == "FAIL" && -n "${LOGS[$i]:-}" ]]; then
+      cat "${LOGS[$i]}"
+    fi
+  done
+fi
+# Clean up temp logs.
+for f in "${LOGS[@]:-}"; do [[ -f "$f" ]] && rm -f "$f"; done
+
+echo ""
+echo "==== quick_signals summary ===="
+for i in "${!NAMES[@]}"; do
+  printf "  %-12s %-5s (%ss)\n" "${NAMES[$i]}" "${RESULTS[$i]}" "${SECS[$i]}"
+done
+echo ""
+if (( total_fail == 0 )); then
+  echo "==== ALL PASS / SKIP ===="
+else
+  echo "==== ${total_fail} FAIL ===="
 fi
 
 # Persist summary for H3 SessionStart hook to read on next session.
