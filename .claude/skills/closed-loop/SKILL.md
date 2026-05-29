@@ -354,8 +354,8 @@ N files changed (+X -Y). C++ build: <OK / FAIL>. Diff looks reasonable?
 
 > **In**:  Step 4 产出代码改动 + `AUDIT_DIR/FIX-PLAN.md` 列出的 finding ID
 > **Out**: `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`(每条 fix 配 verdict: FIXED / PARTIAL / UNFIXED)→ Step 6 字节验证
-> **Role**: [L3 subagent per topic] 重审 fix 代码; [NOT] subagent 不找 NEW issues(constraint 强制),不修代码
-> **Done**: [ ] 每个受影响 topic 有一份 fixverify 报告;[ ] 每条原 finding 配 FIXED/PARTIAL/UNFIXED 之一
+> **Role**: [L3 subagent per topic] 重审 fix 代码; [L2 MCP] subagent 必用 mcp__web-search__web_search 验 fix 引用的本地规则是否仍代表上游官方现状; [NOT] subagent 不找 NEW issues(constraint 强制),不修代码
+> **Done**: [ ] 每个受影响 topic 有一份 fixverify 报告;[ ] 每条原 finding 配 FIXED/PARTIAL/UNFIXED 之一;[ ] rule-based fix 已 web verify(skipped 要标 reason)
 
 Create `docs/audit/audit-<ORIGINAL_TS>-fixverify/` (suffix the original
 audit dir's timestamp — aids correlation).
@@ -372,6 +372,13 @@ user picked findings from in step 3). Each agent's prompt MUST include:
 6. **TOOL POLICY (MANDATORY)**: Same as audit agent — Grep for symbol/reference lookup
    is FORBIDDEN. Use `mcp__cclsp__find_references` | `mcp__cclsp__find_definition` |
    `mcp__serena__find_referencing_symbols` for any caller/definition lookup.
+7. **WEB VERIFY (2026-05-29 加)**: 若 fix 引用了本地规则(CLAUDE.md / AGENTS.md / memory /
+   scanner pattern)判 FIXED,**必跑 `mcp__web-search__web_search` 验证规则仍代表
+   上游官方现状**(见 memory `feedback_local_rule_may_lag_upstream`)。例外:
+   - 项目业务约定(LOG_DOMAIN / 路径 glob / EmuUiTokens)— 标 `skipped: 业务约定`
+   - 安全/正确性硬约束(mmap / 跨线程加锁)— 标 `skipped: 上游契约稳定`
+   - session 内 < 30 分钟刚下的决策 — 标 `skipped: 无脱节窗口`
+   未 verify 的 rule-based fix 不得判 FIXED;改判 `PARTIAL: rule unverified`。
 
 Output to `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`.
 
@@ -379,14 +386,21 @@ Output to `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`.
 
 > **In**:  Step 5 产出 fixverify 报告
 > **Out**: `<FIXVERIFY_DIR>/FIX-VERIFY-SUMMARY.md`(每条 fix 字节级验证 + 跨模型 calibration)→ Step 7 gate
-> **Role**: [L4 主 AI] Read fix 代码 + 比对 fixverify evidence_excerpt; [NOT] 不容忍 UNFIXED(必回 Step 4 重修)
-> **Done**: [ ] 每条 fix 验证字节是否落地;[ ] 0 条 UNFIXED(若有则回 Step 4)
+> **Role**: [L4 主 AI] Read fix 代码 + 比对 fixverify evidence_excerpt; [L4 主 AI] 对 Step 5 标 `PARTIAL: rule unverified` 的 fix 兜底跑 mcp__web-search__web_search; [NOT] 不容忍 UNFIXED(必回 Step 4 重修),不容忍 rule unverified 进 Step 7(必兜底)
+> **Done**: [ ] 每条 fix 验证字节是否落地;[ ] 0 条 UNFIXED;[ ] 0 条 rule unverified(全部 verified upstream 或显式 skipped)
 
 Same procedure as step 2, but on the fix-verify reports. The fix code
 must exist where the agent claims; a `CITATION_DRIFT` here often means
 the agent's evidence_excerpt is the right code but the line range is
 off-by-a-few — read the code yourself to confirm the fix is actually
 correct (line-range drift ≠ fix failure).
+
+**Rule verify 兜底(2026-05-29 加)**: Step 5 subagent 标 `PARTIAL: rule unverified`
+的 fix 在本步必须由主 AI 跑 `mcp__web-search__web_search` 兜底 verify:
+- 若 verify 通过(本地规则仍代表上游)→ 升级为 FIXED
+- 若 verify 发现规则过时 → 改为 `META: rule outdated`,加 meta-finding 进 FIX-VERIFY-SUMMARY.md
+  (该 finding 不算 fix 失败,但建议下次会话改本地规则)
+未兜底 verify 的 rule unverified 项不得放行进 Step 7 gate。
 
 **Cross-model verification(2026-05-28 加,可选)**:
 
