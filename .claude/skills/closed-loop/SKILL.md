@@ -228,6 +228,22 @@ sub-agent verbatim — exactly the failure mode this workflow prevents.
 
 **用 Grep/Read 之前必须问自己**：MCP 能回答这个问题吗？能 → 用 MCP；不能（如内容文本搜索）→ 再用 Grep。
 
+**Web verify 前置**(2026-05-29 加):
+
+判 verdict 之前,如果 finding 引用的是**本地规则**(CLAUDE.md / AGENTS.md / scanner pattern / memory rule),**必跑 web verify** 检查规则是否仍然代表上游官方现状:
+
+```
+1. 识别 finding 引用的规则出处
+2. mcp__web-search__web_search "<framework> <feature> <year> best practice"
+3. 对比:本地规则 vs 上游
+   - 一致 → 按 verdict 流程判
+   - 上游已演进 → verdict = FALSE_POSITIVE 或 REAL_LOWER + 加 meta-finding(本地规则需更新)
+```
+
+**例外**(可跳 verify):安全/正确性硬约束(mmap / 跨线程加锁) / 项目业务约定(LOG_DOMAIN / 路径 glob) / session 内 < 30 分钟刚下的决策。
+
+详见 memory `feedback_local_rule_may_lag_upstream`。
+
 **State after step 3**: `AUDIT_DIR/CORE-REVIEW.md` exists with verdict per finding.
 
 ### ─── CHECKPOINT B (MANDATORY HUMAN) ───

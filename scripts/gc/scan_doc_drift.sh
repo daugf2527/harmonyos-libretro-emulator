@@ -16,18 +16,50 @@ rpt() { printf '%s\n' "$*" | tee -a "${REPORT}"; }
 
 extract_paths() {
   local file="$1"
-  grep -oE '`(entry|scripts|docs)/[^` )]+`|\((entry|scripts|docs)/[^)]+\)|(entry|scripts|docs)/[A-Za-z0-9_./*-]+' "$file" 2>/dev/null \
+  # 提取候选路径,然后多重过滤剔除 scanner 假阳性来源:
+  # B5 <TS>/<YYYYMMDD-HHMMSS> 等模板占位符 — 行级过滤(整行含 < > 跳过)
+  # B6 ... 省略号占位符(英文) — 路径级 grep -v 过滤
+  # B4 句末标点(.md. / .md, / .md; / .md-) — 路径级 sed 剥除
+  # B3 跨仓库绝对路径(/d/foo/docs/...) — 提取正则加锚点要求前面非路径字符
+  # B1 否定语境(replaces / NOT exist / removed / 不存在 / deprecated) — 行级过滤
+  # B2 fenced code block(```...```) 内跳过 — awk 跟踪 fence 状态,
+  #    剔除 bash 命令里的 glob(如 `ls entry/.cxx/*/*/*/build.ninja`)
+  awk '
+    BEGIN { in_code = 0 }
+    /^[ \t]*```/ { in_code = !in_code; next }
+    { if (!in_code) printf "%d:%s\n", NR, $0 }
+  ' "$file" 2>/dev/null \
+    | grep -E '(^|[ `(\[\|])(entry|scripts|docs)/[A-Za-z0-9_./*-]+' \
+    | while IFS=: read -r lno content; do
+        # B1: 跳过含否定语境的整行
+        if echo "$content" | grep -qE '(replaces|REPLACED|removed|deprecated|DEPRECATED|NOT exist|不存在|已弃用|已删除|已移除)'; then
+          continue
+        fi
+        # B5: 跳过含模板占位符 <...> 的整行(提取后再过滤会丢失 < > 信息)
+        if echo "$content" | grep -qE '<[A-Za-z_][A-Za-z0-9_-]*>'; then
+          continue
+        fi
+        # 提取该行所有候选路径(要求前面是非路径字符)
+        echo "$content" | grep -oE '(^|[ `(\[\|])(entry|scripts|docs)/[A-Za-z0-9_./*-]+' \
+          | sed 's/^[^a-zA-Z]//'
+      done \
     | sed 's/^`//; s/`$//; s/^(//; s/)$//' \
     | sed 's/:[0-9]*$//' \
+    | sed 's/[.,;:-]*$//' \
+    | grep -vE '<[^>]+>' \
+    | grep -vE '\.\.\.' \
     | sort -u
 }
 
 path_exists() {
   local p="$1"
   if [[ "$p" == *"*"* ]]; then
-    local parent="${p%%\**}"
-    parent="${parent%/}"
-    [ -d "$parent" ]
+    # 含 glob 的路径: 用 bash glob 实际展开,看是否有任何匹配
+    # 旧实现"只查第一个 * 之前的父目录存在"会误报多 * pattern(如 docs/gc-*-report-*.md
+    # 拆出 docs/gc- 父目录就不存在);改用 compgen 真实展开
+    local matches
+    matches=$(compgen -G "$p" 2>/dev/null | head -1)
+    [ -n "$matches" ]
   else
     [ -e "$p" ]
   fi
@@ -202,4 +234,10 @@ fi
 echo ""
 echo "Report written to: ${ROOT_DIR}/${REPORT}"
 
-exit ${grand_drifts}
+# Exit code 仅表示 clean/dirty(0/1),drift 数字通过 stdout + REPORT 提供。
+# bash exit code 只有 0-255,grand_drifts > 255 时会被 mod 256 截断造成误判。
+if [ ${grand_drifts} -gt 0 ]; then
+  exit 1
+else
+  exit 0
+fi

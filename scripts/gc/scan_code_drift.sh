@@ -162,4 +162,11 @@ echo "[scan_code_drift] Report: ${REPORT}"
 echo "  P1:${p1_hits} P2:${p2_hits} P3:${p3_hits} P4:${p4_hits} P5:${p5_hits} P6:${p6_hits}"
 
 total=$((p1_hits + p2_hits + p3_hits + p4_hits + p5_hits + p6_hits))
-exit ${total}
+# Exit code 仅表示 clean/dirty（0/1），total 数字通过上方 echo + REPORT 提供。
+# 历史曾用 exit ${total},但 bash exit code 只有 0-255,total > 255 会被 mod 256 截断
+# (例 total=640 → exit 128 看起来像 SIGTERM,且 total=256 → exit 0 误判为 clean)。
+if [ ${total} -gt 0 ]; then
+  exit 1
+else
+  exit 0
+fi

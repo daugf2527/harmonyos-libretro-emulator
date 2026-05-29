@@ -54,7 +54,7 @@ bash scripts/gc/scan_doc_drift.sh
 - 扫描对象：`CLAUDE.md` / `AGENTS.md` / `docs/plans/*.md` / `docs/tech-debt-tracker.md`
   中引用的文件路径、函数名、章节标题是否仍然存在于代码库
 - 输出：`docs/gc-drift-report-<TS>.md`（TS = `date +%Y%m%d-%H%M%S`）
-- 退出码 = drift 总数（0 = clean）
+- 退出码：0 = clean，1 = 有 drift（drift 总数见 stdout + 报告 Summary 段）
 - 若脚本不存在 → 报错停止，不继续 Step 2
 
 ### Step 2 — Code drift scan
@@ -66,7 +66,7 @@ bash scripts/gc/scan_code_drift.sh
 - 扫描对象：`entry/src/main/cpp/**/*.cpp` / `entry/src/main/ets/**/*.ets`
   中的软规则违反（过时 API 用法、已知 anti-pattern、注释里的 TODO/FIXME 残留）
 - 输出：`docs/gc-code-drift-<TS>.md`（同一 TS）
-- 退出码 = drift 总数（0 = clean）
+- 退出码：0 = clean，1 = 有 drift（各 pattern 命中数见 stdout + 报告 Summary 段）
 - 若 Step 1 退出码 = 0 且 Step 2 退出码 = 0 → 输出 "✓ clean，无新 debt" 并停止
 
 ### Step 3 — 提取 new debt（主 Claude 做，非自动）
@@ -82,6 +82,21 @@ Read 两份报告，提取**新的、有具体 `file:line` 的** drift 条目。
 ```
 | D<NNN> | <P0/P1/P2> | <file:line> | <一句话描述> | gc-<TS> | open |
 ```
+
+**Scanner 输出必逐条手工验证**(2026-05-29 加,因 scanner 自身有 bug 会产假阳性):
+
+```
+对 scanner 报的每一行 "X referenced in F:L -> MISSING":
+  - 含 < > 占位符(<TS> / <YYYYMMDD-HHMMSS>) → scanner 噪音,跳过
+  - 含 ...(英文省略号占位) → scanner 噪音,跳过
+  - 路径末尾带 . / : / 等标点 → 提取正则 bug,跳过
+  - 其他 → ls 实测路径,确认 MISSING 真假
+```
+
+不要"眼神判一批"。19 项 MISSING 报告里混了 3 项真 drift + 14 项 scanner 噪音的事故见 `feedback_local_rule_may_lag_upstream` 同会话案例。
+
+**Rule lag 维度由 `/four-way-audit` 覆盖**: /gc 只做"引用是否解析得到 + scanner pattern 命中",不做"本地规则 vs 上游官方"验证。
+后者交 `/four-way-audit` skill(L2 竖切阶段 web verify)。
 
 优先级判断：
 - **P0**：影响运行时正确性 / 安全 / 数据丢失
@@ -137,6 +152,8 @@ Edit docs/tech-debt-tracker.md
 | "/gc 顺便修了所有 P0" | /gc 只扫不修；真要修走 `/closed-loop` |
 | "/gc 跑前先 git pull" | 只读本地状态，不 pull |
 | "跳过 Step 3 的 checkpoint 直接追加" | checkpoint 是强制人工确认，不可绕过 |
+| "30 条同 pattern 告警先全追加再优化" | 噪音让用户对 gc 报告失去信任;同 pattern 批量告警应先逐条 ls 实测,该撤的撤 |
+| "/gc 顺便检查规则是否过时" | rule lag 维度交 `/four-way-audit`;/gc 只做引用解析 + scanner pattern |
 
 ## Reference
 
