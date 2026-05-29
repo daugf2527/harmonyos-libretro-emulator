@@ -20,6 +20,7 @@ export struct RuntimePauseOverlay {
   private readonly actions: RuntimePauseAction[] = [
     { title: '快速存档', code: '当前进度落盘', iconText: '▣', actionCode: 'quick_save' },
     { title: '快速读档', code: '加载上次存档', iconText: '◫', actionCode: 'quick_load' },
+    { title: '重启游戏', code: '从头开始本局', iconText: '↻', actionCode: 'restart_game' },
     { title: '按键映射', code: '自定义虚拟按键', iconText: '▥', actionCode: 'input_mapping' },
     { title: '画面风格', code: '切换滤镜与配色', iconText: '▧', actionCode: 'visual_filters' }
   ]

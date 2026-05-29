@@ -325,6 +325,11 @@ struct LibretroGamePage {
       void this.quickLoadRuntimeState();
       return;
     }
+    if (actionCode === 'restart_game') {
+      this.resumeGame();
+      void this.startOrSwitchGame(true);
+      return;
+    }
     if (actionCode === 'input_mapping') {
       this.resumeGame();
       this.getUIContext().getRouter().pushUrl({ url: 'pages/InputLayoutPage' }).catch((err: Error) => {
