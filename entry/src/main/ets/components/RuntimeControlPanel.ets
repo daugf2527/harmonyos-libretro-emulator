@@ -1,5 +1,4 @@
 import { EmuMotion, EmuStateColors, EmuTypography } from '../common/EmuUiTokens'
-import { EmuLoadingSpinner } from './EmuLoadingSpinner'
 
 @Component
 export struct RuntimeControlPanel {
@@ -13,8 +12,6 @@ export struct RuntimeControlPanel {
   @Prop currentRomLabel: ResourceStr = '无'
   @Prop hasRomOptions: boolean = false
   @Prop switching: boolean = false
-  @Prop coreCheckRunning: boolean = false
-  @Prop coreCheckText: string = ''
   @Prop scalingMode: number = 2
   @Prop softwareMaxPresetIndex: number = 1
   @Prop hwRenderAllowed: boolean = true
@@ -22,9 +19,6 @@ export struct RuntimeControlPanel {
   @Prop gameRunning: boolean = false
   @Prop gamePaused: boolean = false
   @Prop runtimeSaveStatusText: string = '存档就绪'
-  @Prop soakRunning: boolean = false
-  @Prop soakSecondsLeft: number = 0
-  @Prop soakSummaryText: string = ''
   @Prop switchError: string = ''
 
   @Prop portOptions: SelectOption[] = []
@@ -36,7 +30,6 @@ export struct RuntimeControlPanel {
   onInputSourceSelect?: (index: number) => void
   onCoreSelect?: (index: number) => void
   onRomSelect?: (index: number) => void
-  onCoreCheck?: () => void
   onRenderModeSelect?: (index: number) => void
   onSoftwareResolutionSelect?: (index: number) => void
   onHwRenderChange?: (value: boolean) => void
@@ -48,7 +41,6 @@ export struct RuntimeControlPanel {
   onStopGame?: () => void
   onQuickSave?: () => void
   onQuickLoad?: () => void
-  onSoakToggle?: () => void
 
   private readonly renderModeLabels: ResourceStr[] = ['硬件渲染', '软件渲染', 'GLES渲染']
   private readonly softwareResolutionLabels: ResourceStr[] = ['480p', '720p', '1080p']
@@ -100,47 +92,6 @@ export struct RuntimeControlPanel {
           })
       }
       .alignItems(HorizontalAlign.Start)
-      .width('100%')
-    }
-  }
-
-  @Builder
-  private CoreCheckBlock() {
-    ListItem() {
-      Column({ space: 8 }) {
-        Button() {
-          Row({ space: 8 }) {
-            if (this.coreCheckRunning) {
-              EmuLoadingSpinner({ dotSize: 16, color: '#FFFFFF', trackOpacity: 0.25 })
-            }
-            Text(this.coreCheckRunning ? '验证中...' : '验证核心符号')
-              .fontSize(EmuTypography.lg)
-              .fontColor(Color.White)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-          .alignItems(VerticalAlign.Center)
-          .justifyContent(FlexAlign.Center)
-        }
-          .height(44)
-          .width('100%')
-          .type(ButtonType.Normal)
-          .borderRadius(8)
-          .backgroundColor(this.coreCheckRunning ? '#607D8B' : '#546E7A')
-          .opacity(this.coreCheckRunning || this.switching ? 0.75 : 1)
-          .animation({ duration: EmuMotion.stateChangeMs, curve: Curve.EaseInOut })
-          .enabled(!this.coreCheckRunning && !this.switching)
-          .onClick(() => {
-            this.onCoreCheck?.()
-          })
-
-        if (this.coreCheckText) {
-          Text(this.coreCheckText)
-            .fontSize(EmuTypography.sm)
-            .fontColor(Color.White)
-            .padding(4)
-        }
-      }
       .width('100%')
     }
   }
@@ -338,47 +289,6 @@ export struct RuntimeControlPanel {
     }
   }
 
-  @Builder
-  private SoakBlock() {
-    ListItem() {
-      Column({ space: 8 }) {
-        Button() {
-          Row({ space: 8 }) {
-            if (this.soakRunning) {
-              EmuLoadingSpinner({ dotSize: 14, color: '#FFFFFF', trackOpacity: 0.25 })
-            }
-            Text(this.soakRunning ? `压力测试中 ${this.soakSecondsLeft}s` : '压力测试 (10min)')
-              .fontSize(EmuTypography.md)
-              .fontColor(Color.White)
-              .maxLines(1)
-              .textOverflow({ overflow: TextOverflow.Ellipsis })
-          }
-          .alignItems(VerticalAlign.Center)
-          .justifyContent(FlexAlign.Center)
-        }
-          .height(40)
-          .width('100%')
-          .type(ButtonType.Normal)
-          .borderRadius(8)
-          .backgroundColor(this.soakRunning ? '#607D8B' : '#455A64')
-          .opacity(this.switching ? 0.6 : 1)
-          .animation({ duration: EmuMotion.stateChangeMs, curve: Curve.EaseInOut })
-          .enabled(!this.switching)
-          .onClick(() => {
-            this.onSoakToggle?.()
-          })
-
-        if (this.soakSummaryText) {
-          Text(this.soakSummaryText)
-            .fontSize(EmuTypography.sm)
-            .fontColor('#CCCCCC')
-            .width('100%')
-        }
-      }
-      .width('100%')
-    }
-  }
-
   build() {
     Column() {
       Row() {
@@ -419,12 +329,10 @@ export struct RuntimeControlPanel {
           this.currentRomLabel, this.hasRomOptions && !this.switching, (index: number) => {
             this.onRomSelect?.(index)
           })
-        this.CoreCheckBlock()
         this.RenderModeBlock()
         this.SoftwareResolutionBlock()
         this.SwitchOptionsBlock()
         this.GameActionsBlock()
-        this.SoakBlock()
 
         if (this.switchError) {
           ListItem() {

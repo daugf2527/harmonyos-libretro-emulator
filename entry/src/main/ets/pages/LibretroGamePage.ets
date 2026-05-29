@@ -71,14 +71,9 @@ import {
   RuntimeRenderSettingsProfile,
   saveRuntimeRenderSettingsProfile
 } from '../common/RuntimeRenderSettingsRepository'
-import {
-  RuntimeSoakState,
-  RuntimeSoakTestController
-} from '../common/RuntimeSoakTestController'
 import { runtimeRenderSettingsController } from '../common/RuntimeRenderSettingsController'
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
 import { scanRuntimeRomSources } from '../common/RuntimeRomSourceScanner'
-import { runtimeCoreDiagnosticController } from '../common/RuntimeCoreDiagnosticController'
 
 interface LibraryLaunchRouteParams {
   coreId?: string
@@ -104,11 +99,6 @@ interface PerfDisplayState {
   geometryText: string;
 }
 
-interface CoreCheckState {
-  running: boolean;
-  text: string;
-}
-
 @Entry
 @Component
 struct LibretroGamePage {
@@ -118,8 +108,6 @@ struct LibretroGamePage {
   @State gamePaused: boolean = false;
   @State switching: boolean = false;
   @State switchError: string = '';
-  @State coreCheck: CoreCheckState = { running: false, text: '' };
-  @State soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
   @State selectedCoreIndex: number = 0;
   @State selectedRomIndex: number = 0;
   @State selectedPortIndex: number = 0;
@@ -157,7 +145,6 @@ struct LibretroGamePage {
   private readonly librarySessionTracker: RuntimeLibrarySessionTracker = new RuntimeLibrarySessionTracker();
   private readonly inputDebugTracker: RuntimeInputDebugTracker = new RuntimeInputDebugTracker();
   private readonly runtimeSaveStateController: RuntimeSaveStateController = new RuntimeSaveStateController();
-  private readonly soakController: RuntimeSoakTestController = new RuntimeSoakTestController();
   private renderSettingsProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile();
   private readonly startOrSwitchDebounceMs: number = 600;
   private readonly runtimeInputLayoutWidth: number = 440;
@@ -230,7 +217,6 @@ struct LibretroGamePage {
       this.eventScope = undefined;
     }
     this.stopGame();
-    this.stopSoak();
     this.stopInputDebug();
   }
 
@@ -373,9 +359,6 @@ struct LibretroGamePage {
     if (stateValue === EngineState.RUNNING && this.pendingStart) {
       this.pendingStart = false;
       LogHelper.info('LibretroGame', 'Engine', '游戏启动成功');
-    }
-    if (!running) {
-      this.stopSoak();
     }
   }
 
@@ -529,7 +512,6 @@ struct LibretroGamePage {
     this.gameRunning = false;
     this.gamePaused = false;
     void this.finalizeActiveLibrarySession();
-    this.stopSoak();
     LogHelper.error('LibretroGame', 'Event', `core_crash: ${message}`);
   }
 
@@ -712,42 +694,6 @@ struct LibretroGamePage {
     return consumePendingLibraryLaunchRequest()
   }
 
-  async runCoreCheck(): Promise<void> {
-    if (this.coreCheck.running) {
-      return;
-    }
-    const core = this.cores[this.selectedCoreIndex];
-    if (!core) {
-      this.coreCheck.text = '核心无效';
-      return;
-    }
-    this.coreCheck.running = true;
-    this.coreCheck.text = '正在验证核心符号...';
-    try {
-      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-      if (!context) {
-        this.coreCheck.text = '获取 Context 失败';
-        this.coreCheck.running = false;
-        return;
-      }
-      const bundleCodeDir = context.bundleCodeDir;
-      const corePath = await resolveRuntimeCorePath(bundleCodeDir, core.soFile);
-      const result = runtimeCoreDiagnosticController.testCoreLoader(corePath);
-      this.coreCheck.text = result;
-    } catch (e) {
-      const msg = (e as Error)?.message || String(e);
-      this.coreCheck.text = `Failed: ${msg}`;
-      LogHelper.error('LibretroGame', 'Core', `符号验证异常: ${msg}`);
-    } finally {
-      this.coreCheck.running = false;
-    }
-  }
-
-  private resetCoreCheckState() {
-    this.coreCheck.running = false;
-    this.coreCheck.text = '';
-  }
-
   private getRuntimeFpsText(): string {
     const fps = this.perfDisplay.coreFps > 0 ? this.perfDisplay.coreFps : this.perfDisplay.realtimeFps;
     return fps > 0 ? fps.toFixed(1) : '--.-';
@@ -796,14 +742,12 @@ struct LibretroGamePage {
   private handleCoreSelect(index: number): void {
     this.selectedCoreIndex = this.clampIndex(index, this.cores.length);
     this.updateRomOptions();
-    this.resetCoreCheckState();
     const core = this.cores[this.selectedCoreIndex];
     LogHelper.info('LibretroGame', 'UI', `选择核心: ${core ? core.name : '未知'}`);
   }
 
   private handleRomSelect(index: number): void {
     this.selectedRomIndex = this.clampIndex(index, this.romOptions.length);
-    this.resetCoreCheckState();
     const roms = this.getAvailableRoms();
     const rom = roms.length > 0 ? roms[this.selectedRomIndex] : null;
     LogHelper.info('LibretroGame', 'UI', `选择 ROM: ${rom ? rom.name : '未知'}`);
@@ -819,15 +763,7 @@ struct LibretroGamePage {
     LogHelper.info('LibretroGame', 'Config', `重置性能统计: okStats=${okStats}`);
   }
 
-  private stopSoakBeforeConfigChange(): void {
-    if (this.soakState.running) {
-      this.stopSoak();
-      this.clearSoakSummary();
-    }
-  }
-
   private applySoftwareResolutionPreset(index: number): void {
-    this.stopSoakBeforeConfigChange();
     this.softwareMaxPresetIndex = index;
     const presets: ResolutionPreset[] = [
       { w: 640, h: 480 },
@@ -842,7 +778,6 @@ struct LibretroGamePage {
   }
 
   private applyRenderMode(index: number): void {
-    this.stopSoakBeforeConfigChange();
     this.scalingMode = index;
     const okMode = runtimeRenderSettingsController.setScalingMode(index);
     if (index === 1) {
@@ -1012,8 +947,6 @@ struct LibretroGamePage {
         currentRomLabel: this.currentRomLabel,
         hasRomOptions: this.hasRomOptions,
         switching: this.switching,
-        coreCheckRunning: this.coreCheck.running,
-        coreCheckText: this.coreCheck.text,
         scalingMode: this.scalingMode,
         softwareMaxPresetIndex: this.softwareMaxPresetIndex,
         hwRenderAllowed: this.hwRenderAllowed,
@@ -1021,9 +954,6 @@ struct LibretroGamePage {
         gameRunning: this.gameRunning,
         gamePaused: this.gamePaused,
         runtimeSaveStatusText: this.runtimeSaveStatusText,
-        soakRunning: this.soakState.running,
-        soakSecondsLeft: this.soakState.secondsLeft,
-        soakSummaryText: this.soakState.summaryText,
         switchError: this.switchError,
         onClose: () => {
           this.showControls = false;
@@ -1039,9 +969,6 @@ struct LibretroGamePage {
         },
         onRomSelect: (index: number) => {
           this.handleRomSelect(index);
-        },
-        onCoreCheck: () => {
-          void this.runCoreCheck();
         },
         onRenderModeSelect: (index: number) => {
           this.applyRenderMode(index);
@@ -1079,13 +1006,6 @@ struct LibretroGamePage {
         },
         onQuickLoad: () => {
           void this.quickLoadRuntimeState();
-        },
-        onSoakToggle: () => {
-          if (this.soakState.running) {
-            this.stopSoak();
-          } else {
-            this.startSoak(600);
-          }
         }
       })
     }
@@ -1280,33 +1200,7 @@ struct LibretroGamePage {
       this.gameRunning = false;
       this.gamePaused = false;
       this.runtimeInputDescriptorMask = 0;
-      this.stopSoak();
       LogHelper.info('LibretroGame', 'Engine', '游戏已停止');
     }
-  }
-
-  // Soak Test (使用 refactoredGetStats)
-  startSoak(durationSeconds: number) {
-    this.soakController.start(durationSeconds, this.gameRunning, (state: RuntimeSoakState) => {
-      this.applySoakState(state);
-    });
-  }
-
-  stopSoak() {
-    this.soakController.stop((state: RuntimeSoakState) => {
-      this.applySoakState(state);
-    });
-  }
-
-  private clearSoakSummary(): void {
-    this.soakController.clearSummary((state: RuntimeSoakState) => {
-      this.applySoakState(state);
-    });
-  }
-
-  private applySoakState(state: RuntimeSoakState): void {
-    this.soakState.running = state.running;
-    this.soakState.secondsLeft = state.secondsLeft;
-    this.soakState.summaryText = state.summaryText;
   }
 }
