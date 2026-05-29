@@ -88,6 +88,7 @@ trap 'echo ""; echo "==== quick_signals interrupted ===="; exit 130' INT TERM
 run_check regression bash scripts/ci/check_regression_guards.sh
 run_check hygiene    bash scripts/ci/check_repo_hygiene.sh
 run_check ui-fixes   bash scripts/test/verify_ui_fixes.sh
+run_check skill-contract bash scripts/ci/check_skill_contract.sh
 
 if [[ -f "${CXX_BUILD_DIR}/build.ninja" ]]; then
   if cmake_bin="$(find_cmake)"; then

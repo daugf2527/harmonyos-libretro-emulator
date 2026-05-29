@@ -216,9 +216,52 @@ else
 fi
 rpt ""
 
+# ── Check E ──────────────────────────────────────────────────────────────────
+# 元规则扩散扫描(2026-05-29 加,机制 3)
+# memory 含 MANDATORY/必备/必跑/必用 等元规则关键词的 feedback_*.md,
+# 应在 CLAUDE.md / AGENTS.md / .claude/skills/**/*.md 至少一处被引用,
+# 否则是"决策孤岛"(memory 立规但散在文档不知道,见 feedback_deprecation_drift_needs_mechanism)
+rpt "## E. Memory meta-rule diffusion (元规则扩散扫描)"
+rpt ""
+
+e_total=0; e_warn=0; e_warn_text=""
+
+if [ -d "$MEMORY_DIR" ]; then
+  # 找含元规则关键词的 memory 文件
+  while IFS= read -r mfile; do
+    [ -f "$mfile" ] || continue
+    # 文件含 "MANDATORY" / "必备" / "必跑" / "必用" / "强制" → 视为元规则 memory
+    if ! grep -qiE 'MANDATORY|必备|必跑|必用|强制' "$mfile" 2>/dev/null; then
+      continue
+    fi
+    e_total=$((e_total + 1))
+    total_refs=$((total_refs + 1))
+
+    # 拿 memory 文件名(不含路径,不含 .md 后缀)作为引用 key
+    mname=$(basename "$mfile" .md)
+
+    # 扫 CLAUDE.md / AGENTS.md / .claude/skills/**/*.md 是否含此 key
+    if ! grep -rqlE "${mname}" CLAUDE.md AGENTS.md entry/src/main/ets/CLAUDE.md entry/src/main/cpp/CLAUDE.md .claude/skills 2>/dev/null; then
+      e_warn=$((e_warn + 1))
+      total_drifts=$((total_drifts + 1))
+      e_warn_text="${e_warn_text}  - \`${mname}\` (memory MANDATORY rule) -> NOT REFERENCED in CLAUDE.md/AGENTS.md/skills/\n"
+    fi
+  done < <(find "$MEMORY_DIR" -name 'feedback_*.md' 2>/dev/null || true)
+fi
+
+rpt "- Total meta-rule memory checked: ${e_total}"
+rpt "- Diffusion gaps (memory not referenced anywhere): ${e_warn}"
+if [[ -n "$e_warn_text" ]]; then
+  rpt "- Drifted:"
+  printf '%b' "$e_warn_text" | tee -a "${REPORT}"
+else
+  rpt "- Drifted: none"
+fi
+rpt ""
+
 # ── Summary ──────────────────────────────────────────────────────────────────
-grand_total=$((a_total + b_total + d_total + c_total))
-grand_drifts=$((a_drifts + b_drifts + d_drifts))
+grand_total=$((a_total + b_total + d_total + c_total + e_total))
+grand_drifts=$((a_drifts + b_drifts + d_drifts + e_warn))
 
 rpt "## Summary"
 rpt ""

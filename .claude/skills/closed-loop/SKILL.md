@@ -379,6 +379,17 @@ user picked findings from in step 3). Each agent's prompt MUST include:
    - 安全/正确性硬约束(mmap / 跨线程加锁)— 标 `skipped: 上游契约稳定`
    - session 内 < 30 分钟刚下的决策 — 标 `skipped: 无脱节窗口`
    未 verify 的 rule-based fix 不得判 FIXED;改判 `PARTIAL: rule unverified`。
+8. **WEB VERIFY 证据字段(2026-05-29 加,机制 2)**: 在每条 finding 末尾必须加结构化字段:
+   ```
+   web_verify:
+     status: verified-upstream | skipped | not-applicable
+     queries: ["<query 1>", "<query 2>"]   # status=verified-upstream 时必填,≥1 query
+     reason: "<一句话说明 verify 结果或 skipped 理由>"
+   ```
+   - `not-applicable`: fix 未引用本地规则(纯字节修),不需 verify
+   - `skipped`: 见上面 3 类例外,reason 必填
+   - `verified-upstream`: queries 必含至少 1 条 mcp__web-search__web_search 实跑的查询
+   主 AI Step 6 会扫所有 finding 必须含此字段;**缺字段 = subagent 越权,要求重跑**。
 
 Output to `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`.
 
@@ -386,8 +397,8 @@ Output to `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`.
 
 > **In**:  Step 5 产出 fixverify 报告
 > **Out**: `<FIXVERIFY_DIR>/FIX-VERIFY-SUMMARY.md`(每条 fix 字节级验证 + 跨模型 calibration)→ Step 7 gate
-> **Role**: [L4 主 AI] Read fix 代码 + 比对 fixverify evidence_excerpt; [L4 主 AI] 对 Step 5 标 `PARTIAL: rule unverified` 的 fix 兜底跑 mcp__web-search__web_search; [NOT] 不容忍 UNFIXED(必回 Step 4 重修),不容忍 rule unverified 进 Step 7(必兜底)
-> **Done**: [ ] 每条 fix 验证字节是否落地;[ ] 0 条 UNFIXED;[ ] 0 条 rule unverified(全部 verified upstream 或显式 skipped)
+> **Role**: [L4 主 AI] Read fix 代码 + 比对 fixverify evidence_excerpt; [L4 主 AI] 对 Step 5 标 `PARTIAL: rule unverified` 的 fix 兜底跑 mcp__web-search__web_search; [L1 grep] 机制扫 finding 数 vs web_verify 块数(缺即 subagent 越权); [NOT] 不容忍 UNFIXED,不容忍 rule unverified 进 Step 7,不容忍 web_verify 字段缺失
+> **Done**: [ ] 每条 fix 验证字节是否落地;[ ] 0 条 UNFIXED;[ ] 0 条 rule unverified;[ ] 每条 finding 含 web_verify 字段(grep 验证)
 
 Same procedure as step 2, but on the fix-verify reports. The fix code
 must exist where the agent claims; a `CITATION_DRIFT` here often means
@@ -399,8 +410,23 @@ correct (line-range drift ≠ fix failure).
 的 fix 在本步必须由主 AI 跑 `mcp__web-search__web_search` 兜底 verify:
 - 若 verify 通过(本地规则仍代表上游)→ 升级为 FIXED
 - 若 verify 发现规则过时 → 改为 `META: rule outdated`,加 meta-finding 进 FIX-VERIFY-SUMMARY.md
-  (该 finding 不算 fix 失败,但建议下次会话改本地规则)
+  (该 finding 不算 fix 失败,但建议下次会话改本地修)
 未兜底 verify 的 rule unverified 项不得放行进 Step 7 gate。
+
+**机制化 scan(2026-05-29 加,机制 2)**: 主 AI 必须扫每个 `agent-<topic>-fixverify.md`
+报告里的每条 finding 是否含 `web_verify:` 结构化字段(Step 5 prompt 第 8 条要求的):
+```bash
+# 主 AI 做的机械扫(脚本示例,主 AI 可直接 grep):
+for f in <FIXVERIFY_DIR>/agent-*-fixverify.md; do
+  finding_count=$(grep -cE '^## F[0-9]+:' "$f")
+  verify_count=$(grep -cE '^\s+web_verify:' "$f")
+  if [[ $finding_count -ne $verify_count ]]; then
+    echo "[FAIL] $f: ${finding_count} findings but only ${verify_count} web_verify blocks — subagent 越权"
+    # 要求重跑该 topic 的 Step 5 subagent
+  fi
+done
+```
+此 scan 是机制兜底,不是纪律 — 缺字段强制重跑。
 
 **Cross-model verification(2026-05-28 加,可选)**:
 
