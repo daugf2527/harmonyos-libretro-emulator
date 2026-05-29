@@ -874,22 +874,24 @@ struct LibretroGamePage {
       .width('100%')
       .height('100%')
 
-      // 左上角系统菜单按钮（仅未运行时显示，运行中靠系统返回键唤出暂停）
-      if (!this.gameRunning) {
-        Button('MENU')
-          .width(46)
-          .height(40)
-          .fontSize(EmuTypography.xl)
-          .fontColor(EmuColors.primary)
-          .backgroundColor('#CC000000')
-          .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-          .borderRadius(4)
-          .margin({ left: 18, top: 48 })
-          .enabled(!this.switching)
-          .onClick(() => {
+      // 左上角系统菜单按钮：未运行时唤出 RuntimeControlPanel；运行中显示暂停图标，点击触发 PauseOverlay。
+      Button(this.gameRunning ? '⏸' : 'MENU')
+        .width(46)
+        .height(40)
+        .fontSize(this.gameRunning ? 20 : EmuTypography.xl)
+        .fontColor(EmuColors.primary)
+        .backgroundColor('#CC000000')
+        .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+        .borderRadius(4)
+        .margin({ left: 18, top: 48 })
+        .enabled(!this.switching && (!this.gameRunning || !this.gamePaused))
+        .onClick(() => {
+          if (this.gameRunning) {
+            this.pauseGame();
+          } else {
             this.openRuntimeControlPanel();
-          })
-      }
+          }
+        })
 
       if (this.showControls) {
         this.ControlPanelOverlay()
