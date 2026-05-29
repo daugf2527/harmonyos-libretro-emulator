@@ -279,7 +279,8 @@ struct SaveStatePage {
     }
     try {
       const stateData = readSaveStateData(context, fileName)
-      const loaded = nativeApi.refactoredLoadState(stateData)
+      // 与 quickSave() 保持一致，避免同步 NAPI 调用阻塞 UI 线程。
+      const loaded = await nativeApi.refactoredLoadStateAsync(stateData)
       this.showToastMessage(loaded ? 'SAVE_STATE_LOADED' : 'LOAD_STATE_REJECTED')
     } catch (err) {
       const message = (err as Error).message || String(err)

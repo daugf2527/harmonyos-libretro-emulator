@@ -99,6 +99,17 @@
 | 状态 | open |
 | 备注 | `/gc` 2026-05-28 首次扫描发现;`napi-boundary-reviewer` agent 已经覆盖修改路径,但缺文档化的入口让 agent 自助查找;批量补一次性投资,后续靠 Pattern 5 增量守 |
 
+### D007 — 30 处 @State 装饰复杂类型（V1 模式整体替换，V2 迁移时需改为 @ObservedV2+@Trace）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-05-29 / `docs/gc-code-drift-20260529-113336.md` Pattern 1 |
+| 位置 | `entry/src/main/ets/pages/**` 和 `entry/src/main/ets/components/**`（30 处完整清单见 `docs/gc-code-drift-20260529-113336.md` L8-37;典型：`CoreLoaderTest.ets:30` / `LibraryPage.ets:101` / `LibretroNewArchTestPage.ets:131-132` / `ImportTaskOverlayPage.ets:95+101`） |
+| 影响 | P3 — 风格债;当前使用整体替换模式（`this.arr = newArr`）能正常触发 rerender,不是 bug;但不是 V2 最佳实践（`@ObservedV2`+`@Trace` 可做增量 rerender,性能更优） |
+| 拟修 | V1→V2 迁移时批量处理：(1) 将涉及的 model 类改为 `@ObservedV2` 装饰 + 属性加 `@Trace`；(2) 组件内 `@State` 改为 `@Local`（或保持 `@State` 兼容模式）；(3) 实例化用 `new` 构造；参考 2026 官方文档 developer.huawei.com/consumer/en/doc/harmonyos-guides/arkts-new-observedv2-and-trace |
+| 状态 | open |
+| 备注 | `/gc` 2026-05-29 扫描 + web verify 核实上游规则;抽查 6 个全部用整体替换,无 mutation;项目当前仍在 V1 模式（无 `@ObservedV2`/`@ComponentV2` 关键字）;优先级 P3 = 不影响功能,V2 迁移时统一处理 |
+
 ---
 
 ## 引用此文件的地方

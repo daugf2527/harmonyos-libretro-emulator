@@ -27,13 +27,13 @@ fi
 
 echo ""
 echo "=== Skills available (declarative inventory) ==="
-echo "Project: closed-loop (audit→fix→commit cycle on harmony subsystem) | auto-commit-cicd (auto git→PR→CI→merge w/ retry)"
-echo "User: using-superpowers (skill bootstrap, call first each session) | dispatching-parallel-agents (2+ independent tasks no shared state) | executing-plans (written plan w/ checkpoints) | subagent-driven-development (multi-agent plan exec) | systematic-debugging (before any bug fix) | test-driven-development (test before impl) | brainstorming (before creative work) | finishing-a-development-branch (impl done → merge/PR) | session-debrief (end/bye/idle injection)"
+echo "Project: closed-loop (audit→fix→commit cycle on harmony subsystem) | auto-commit-cicd (auto git→PR→CI→merge w/ retry) | gc (entropy/drift scanner) | four-way-audit (cross-source consistency audit) | arkui-design (ArkUI/ArkTS page & component design)"
+echo "User: using-superpowers (skill bootstrap, call first each session) | dispatching-parallel-agents (2+ independent tasks no shared state) | executing-plans (written plan w/ checkpoints) | subagent-driven-development (multi-agent plan exec) | systematic-debugging (before any bug fix) | test-driven-development (test before impl) | finishing-a-development-branch (impl done → merge/PR) | session-debrief (end/bye/idle injection)"
 
 echo ""
 echo "=== MCP servers available (declarative) ==="
 echo "Project (.claude/cclsp.json): cclsp (12 — find_definition/find_references/get_diagnostics_for_file/get_hover/get_incoming_calls/get_outgoing_calls/find_workspace_symbols/prepare_call_hierarchy/rename_symbol/etc) | serena (21 — find_symbol/find_referencing_symbols/get_symbols_overview/get_diagnostics_for_file/replace_symbol_body/list_memories/write_memory/etc)"
-echo "User: ast-grep (4 — find_code/find_code_by_rule/dump_syntax_tree/test_match_code_rule) | mcp-server-firecrawl (24 — scrape/search/extract/etc) | sequential-thinking (1)"
+echo "User: ast-grep (4 — find_code/find_code_by_rule/dump_syntax_tree/test_match_code_rule) | web-search (2 — web_fetch/web_search) | sequential-thinking (1)"
 
 echo ""
 echo "=== MCP TOOL POLICY — 本会话强制执行 ==="
