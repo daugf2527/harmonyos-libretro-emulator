@@ -49,6 +49,7 @@ import {
   RuntimeInputDebugTracker
 } from '../common/RuntimeInputDebugTracker'
 import {
+  getRuntimeInputDescriptorMask,
   sendRuntimeAnalog,
   sendRuntimeButton
 } from '../common/RuntimeInputCommandBridge'
@@ -140,6 +141,9 @@ struct LibretroGamePage {
   @State private gameAspectRatio: number = 0;
   @State runtimeSaveStatusText: string = '存档就绪';
   private runtimeInputLayoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons;
+  // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS mask:bit N = RETRO_DEVICE_ID_JOYPAD_N 被
+  // 当前 core 声明使用,0 = core 未上报(用 fallback 全键集)。@State 触发子组件 re-render。
+  @State private runtimeInputDescriptorMask: number = 0;
   
   // 使用包含 "new_arch" 的 ID 以触发 C++ 侧的新引擎逻辑
   private xComponentId: string = 'new_arch_game_xcomponent';
@@ -585,6 +589,12 @@ struct LibretroGamePage {
         this.gameAspectRatio = ratio;
       }
     }
+    // GeometryUpdate 是 core 完成 av_info 后下发,SET_INPUT_DESCRIPTORS 通常在
+    // 此前已被 core 上报。switchGame 返回时窗口太早,这里再拉一次兜底。
+    const mask = getRuntimeInputDescriptorMask();
+    if (mask !== this.runtimeInputDescriptorMask) {
+      this.runtimeInputDescriptorMask = mask;
+    }
   }
 
   private startInputDebug() {
@@ -903,16 +913,17 @@ struct LibretroGamePage {
             })
         }
         .width('100%')
-        .layoutWeight(this.gameRunning && !this.gamePaused && !this.hideVirtualController ? 72 : 100)
+        .layoutWeight(this.gameRunning && !this.gamePaused && !this.hideVirtualController ? 65 : 100)
         .backgroundColor(Color.Black)
 
-        // 虚拟按键区 — 底部 28%（仅运行时显示）
+        // 虚拟按键区 — 底部 35%(仅运行时显示)
         if (this.gameRunning && !this.gamePaused && !this.hideVirtualController) {
           Column() {
             RuntimeVirtualControllerLayer({
               buttons: this.runtimeInputLayoutButtons,
               layoutWidth: this.runtimeInputLayoutWidth,
               layoutHeight: this.runtimeInputLayoutHeight,
+              inputDescriptorMask: this.runtimeInputDescriptorMask,
               onButtonChange: (keyId: number, pressed: boolean) => {
                 this.setButton(keyId, pressed);
               },
@@ -922,7 +933,7 @@ struct LibretroGamePage {
             })
           }
           .width('100%')
-          .layoutWeight(28)
+          .layoutWeight(35)
         }
       }
       .width('100%')
@@ -1199,6 +1210,9 @@ struct LibretroGamePage {
       this.gameRunning = true;
       this.gamePaused = false;
       this.pendingStart = false;
+      // core 在 retro_load_game / retro_run 早期 frame 通过 SET_INPUT_DESCRIPTORS
+      // 声明使用的按键,这里在 switchGame 成功后立刻拉一次。
+      this.runtimeInputDescriptorMask = getRuntimeInputDescriptorMask();
       this.refreshHudMetricsCache();
       await markLibraryRecordPlayed(context, rom.file);
       if (!this.isCurrentSwitchTask(token)) {
@@ -1265,6 +1279,7 @@ struct LibretroGamePage {
       void runtimeSessionController.stopAsync();
       this.gameRunning = false;
       this.gamePaused = false;
+      this.runtimeInputDescriptorMask = 0;
       this.stopSoak();
       LogHelper.info('LibretroGame', 'Engine', '游戏已停止');
     }

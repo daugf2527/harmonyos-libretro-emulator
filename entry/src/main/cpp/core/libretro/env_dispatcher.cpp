@@ -929,6 +929,23 @@ bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data) {
   }
 
   case RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS: {
+    // 数组以 description==NULL 终结。仅取 port==0 + device==RETRO_DEVICE_JOYPAD,
+    // 把出现的 id 累成 16-bit mask;前端用此 mask 决定虚拟手柄显示哪些键。
+    if (!data) {
+      state.ClearInputDescriptorMask();
+      return true;
+    }
+    const ::retro_input_descriptor *desc =
+        static_cast<const ::retro_input_descriptor *>(data);
+    uint16_t mask = 0;
+    for (; desc && desc->description != nullptr; ++desc) {
+      if (desc->port == 0 && desc->device == RETRO_DEVICE_JOYPAD &&
+          desc->id < 16) {
+        mask |= static_cast<uint16_t>(1u << desc->id);
+      }
+    }
+    state.SetInputDescriptorMask(mask);
+    LOGF(LOG_INFO, "Input descriptor mask: 0x%{public}04X", mask);
     return true;
   }
 

@@ -636,6 +636,7 @@ void LibretroEngine::UnloadGameIfNeeded(const char *reason) {
   unload();
   TransitionTo(EngineState::CORE_LOADED);
   currentGameData_.reset();
+  envState_.ClearInputDescriptorMask();
 }
 
 void LibretroEngine::Pause() {

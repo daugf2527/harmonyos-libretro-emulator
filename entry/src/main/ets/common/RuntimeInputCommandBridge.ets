@@ -7,9 +7,22 @@ import {
 export interface RuntimeInputCommandApi {
   refactoredSendInput(port: number, keyId: number, pressed: boolean): boolean
   refactoredSendAnalog(port: number, index: number, id: number, value: number): boolean
+  refactoredGetInputDescriptorMask(): number
 }
 
 const nativeApi = testNapi as RuntimeInputCommandApi
+
+// 16-bit mask of RETRO_DEVICE_ID_JOYPAD_* declared by the active core via
+// RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. 0 = core hasn't declared, callers
+// should fall back to the full layout instead of hiding everything.
+export function getRuntimeInputDescriptorMask(): number {
+  const fn = nativeApi.refactoredGetInputDescriptorMask
+  if (typeof fn !== 'function') {
+    return 0
+  }
+  const mask = fn.call(nativeApi)
+  return Number.isFinite(mask) ? (mask & 0xFFFF) : 0
+}
 
 export function sendRuntimeButton(
   assignments: PortAssignState[],

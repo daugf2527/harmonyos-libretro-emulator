@@ -217,6 +217,22 @@ public:
     return has_disk_control_ext_cb_ ? &disk_control_ext_cb_ : nullptr;
   }
 
+  // Input descriptor mask:RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS 收到的
+  // RETRO_DEVICE_ID_JOYPAD_* 累计为 16-bit mask (bit N = ID_JOYPAD_N 被 core 声明使用)。
+  // 0 = core 未声明,前端按全键集合显示。
+  void SetInputDescriptorMask(uint16_t mask) {
+    std::lock_guard<std::mutex> lock(input_descriptors_mutex_);
+    input_descriptor_mask_ = mask;
+  }
+  uint16_t GetInputDescriptorMask() const {
+    std::lock_guard<std::mutex> lock(input_descriptors_mutex_);
+    return input_descriptor_mask_;
+  }
+  void ClearInputDescriptorMask() {
+    std::lock_guard<std::mutex> lock(input_descriptors_mutex_);
+    input_descriptor_mask_ = 0;
+  }
+
 private:
   std::string system_directory_;
   std::string save_directory_;
@@ -282,6 +298,9 @@ private:
   retro_hw_render_context_negotiation_interface_vulkan vulkan_negotiation_{};
   bool has_vulkan_negotiation_ = false;
   ::retro_hw_context_type hw_context_type_ = ::RETRO_HW_CONTEXT_NONE;
+
+  mutable std::mutex input_descriptors_mutex_;
+  uint16_t input_descriptor_mask_ = 0;
 };
 
 bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data);

@@ -51,6 +51,10 @@ export const refactoredSendInput: (port: number, id: number, pressed: boolean) =
 export const refactoredSendAnalog: (port: number, index: number, id: number, value: number) => boolean;
 export const refactoredAssignPortSource: (port: number, sourceType: number, deviceId?: string) => boolean;
 export const refactoredUnassignPort: (port: number) => boolean;
+// 16-bit mask of RETRO_DEVICE_ID_JOYPAD_* declared by the active core via
+// RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. 0 = core hasn't declared, frontend
+// should fall back to the full key set.
+export const refactoredGetInputDescriptorMask: () => number;
 export interface InputDeviceInfo {
   deviceId: string;
   sourceType: number;

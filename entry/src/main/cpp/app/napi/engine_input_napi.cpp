@@ -223,6 +223,16 @@ static napi_value SetControllerPortDevice(napi_env env, napi_callback_info info)
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+static napi_value GetInputDescriptorMask(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *engine = GetEngine();
+  uint16_t mask = engine ? engine->GetInputDescriptorMask() : 0;
+  napi_value result = nullptr;
+  napi_create_uint32(env, static_cast<uint32_t>(mask), &result);
+  return result;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 void RegisterInputNapi(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"refactoredSendInput", nullptr, SendInput, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -232,6 +242,7 @@ void RegisterInputNapi(napi_env env, napi_value exports) {
       {"refactoredListInputDevices", nullptr, ListInputDevices, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSendSensor", nullptr, SendSensor, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetControllerPortDevice", nullptr, SetControllerPortDevice, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredGetInputDescriptorMask", nullptr, GetInputDescriptorMask, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   if (regStatus != napi_ok) {  // Audit B-F3: log only; throwing here has undefined behavior in module init

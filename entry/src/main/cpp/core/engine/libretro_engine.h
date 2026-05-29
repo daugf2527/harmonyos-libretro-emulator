@@ -214,6 +214,12 @@ public:
   bool SetCoreOption(const std::string &key, const std::string &value);
   std::string GetCoreOptionsJson() const;
 
+  // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS 上报的 button mask
+  // (bit N = RETRO_DEVICE_ID_JOYPAD_N 被 core 声明使用,0 = core 未声明)。
+  uint16_t GetInputDescriptorMask() const {
+    return envState_.GetInputDescriptorMask();
+  }
+
   // --- 磁盘控制接口 ---
   bool DiskControlSetEjectState(bool ejected);
   bool DiskControlGetEjectState();
