@@ -79,7 +79,7 @@ Do NOT use this skill for:
 **新增 topic**: 复制 `topics/T<n>.md` 模板(任一现存的拿来改),把新行加到上表。
 主 SKILL.md 不再变长。
 
-## The 9 steps (Step 5 merged into Step 7 on 2026-05-28; Step 0 added 2026-05-28)
+## The 8 fix steps (Step 0 是 sprint contract，不计入 fix step；Step 5 Rebuild 已并入 Step 7)
 
 ### Step 0 — Done criteria(sprint contract,开工前定)
 

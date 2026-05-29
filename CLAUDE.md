@@ -76,7 +76,7 @@ older clients pull them in on demand when Claude works under those paths.
 | **cclsp** | **C/C++ 只**（本地 `.claude/cclsp.json` 配的 clangd） | find_definition / find_references / get_incoming_calls / get_outgoing_calls / find_workspace_symbols / get_hover / get_diagnostics_for_file / prepare_call_hierarchy |
 | **serena** | 全仓库（C++/ets/md）+ project memory | get_symbols_overview / find_symbol / find_referencing_symbols / list_memories / write_memory / 跨语言文件级符号操作 |
 | **ast-grep** | 任意语言（AST pattern） | find_code / find_code_by_rule — **配对检查**（acquire/release、map/unmap）、threading violation 跨文件扫 |
-| **firecrawl** | Web | scrape / search — HarmonyOS 官方文档抓取；本机 SDK header 优先（`feedback_websearch_fail_fallback_to_sdk_header`） |
+| **web-search** | Web | `mcp__web-search__web_fetch`（单 URL）/ `mcp__web-search__web_search`（关键词）— HarmonyOS 官方文档抓取；本机 SDK header 优先（`feedback_websearch_fail_fallback_to_sdk_header`）。**firecrawl 已弃用**（见 memory `feedback_firecrawl_deprecated`） |
 | **sequential-thinking** | — | 罕见 finding 拿不准时多角度推理（不滥用） |
 
 ### 何时**必须**用 MCP（按代码位置 / 操作类型）
@@ -108,7 +108,7 @@ older clients pull them in on demand when Claude works under those paths.
 | 检查项 | 现状 | 决策 |
 |---|---|---|
 | cclsp ↔ serena 重叠 | 描述层重叠（"优先/备选"），实际**按语言分工**不重叠（cclsp=C++ only, serena=全仓库 + memory） | 保留双方，决策树改成按语言分工（本次提交） |
-| firecrawl 24 工具 | 30 天调用主要是 search / scrape；rest 18 个工具 token 占位 | **TODO**：等用户决策是否项目级关闭 / 删除（影响其他个人项目） |
+| firecrawl 24 工具 | 2026-05-28 用户决定整体弃用（GitHub 超 token / 中文短文 LLM 不可靠 / web-search 直接覆盖） | **已弃用**（见 memory `feedback_firecrawl_deprecated`），改用 `mcp__web-search__*` |
 | sequential-thinking 1 工具 | 偶用于 audit 罕见 finding 推理 | 保留 |
 | ast-grep 4 工具 | 配对检查不可替代 | 保留 |
 
@@ -145,7 +145,8 @@ Restart session and verify with `node --version` plus `/mcp` (all servers should
 
 ## Web research tips (developer.huawei.com)
 
-1. First try: `WebSearch` English query + `site:developer.huawei.com`.
-2. If empty: `firecrawl_search` (check credits) — `sources` param must be `[{type: "web"}]` array.
-3. For JS-rendered pages: `firecrawl_scrape` with `waitFor: 5000`.
-4. Local PDFs/DOCX: `firecrawl_parse`.
+1. First try: `mcp__web-search__web_search` 英文 query + `site:developer.huawei.com`。
+2. 单 URL 深读：`mcp__web-search__web_fetch` 传 url + prompt。
+3. 本机 SDK header 优先（OH_* API 契约直接读 `D:\Program Files\DevEco Studio\sdk\...\external_window.h` 等）—— 见 memory `feedback_websearch_fail_fallback_to_sdk_header`。
+
+> firecrawl 工具组（scrape / search / parse 等 24 个）已于 2026-05-28 整体弃用，见 memory `feedback_firecrawl_deprecated`。
