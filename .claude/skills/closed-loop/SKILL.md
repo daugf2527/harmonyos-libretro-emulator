@@ -81,7 +81,28 @@ Do NOT use this skill for:
 
 ## The 8 fix steps (Step 0 是 sprint contract，不计入 fix step；Step 5 Rebuild 已并入 Step 7)
 
+## Contract block(2026-05-29 加,见 memory `feedback_task_contract_missing`)
+
+**每个 Step 开头的 5 段契约块统一使用以下缩写格式**(避免 SKILL 膨胀):
+
+```
+> **In**:  <上一步产物 file/state>
+> **Out**: <我交什么 → 下一步如何 trust>
+> **Role**: [L1 脚本 / L2 MCP / L3 subagent / L4 主 AI] + [NOT 越权]
+> **Done**: [ ] checklist 可勾选
+```
+
+ROLE 4 层:L1 脚本(机械事实)/L2 MCP(语义查询)/L3 subagent(并行发现)/L4 主 AI(推理判断)。
+**越权(任何方向)= bug**,见 memory `feedback_skill_role_separation`。
+
+---
+
 ### Step 0 — Done criteria(sprint contract,开工前定)
+
+> **In**:  user 指定 topic(T1-T8)+ AUDIT_DIR 已建
+> **Out**: `AUDIT_DIR/DONE.md` — 本次 audit 边界 + done-checklist → Step 1+ 据此约束 scope
+> **Role**: [L4 主 AI] cat topic 模板 + 按本次范围调整 checkbox; [NOT] 不开工 audit
+> **Done**: [ ] AUDIT_DIR/DONE.md 含 scope-in / scope-out / 完成判据,user 已 review
 
 外网共识(Addy Osmani):"写下 done-condition 阻止 scope drift 比任何 prompt 调整都管用"。
 项目 memory `feedback_completeness_is_scenario_not_form` 反复出现的根因——开工时未明确
@@ -124,6 +145,11 @@ Do NOT use this skill for:
 
 ### Step 1 — Audit dispatch
 
+> **In**:  Step 0 产出 `AUDIT_DIR/DONE.md`(scope 边界已定)
+> **Out**: `AUDIT_DIR/agent-<topic-id>.md` × N(structured findings,机器可验)→ Step 2 逐条字节比对
+> **Role**: [L4 主 AI] 决定 topic + 写 prompt + dispatch; [L3 subagent] 并行 broad scan,structured output; [NOT] subagent 不判 verdict(留 Step 3 主 AI)
+> **Done**: [ ] N 个 agent 报告齐;[ ] 每条 finding 有 file:line + evidence_excerpt
+
 Ask user which topic(s) (default: ask user to choose, do NOT auto-default
 to all 8 — the audit is expensive). Create
 `docs/audit/audit-<YYYYMMDD-HHMMSS>/` directory; remember this path as
@@ -165,6 +191,11 @@ Dispatch ALL agents in PARALLEL (single message, multiple Agent tool calls).
 
 ### Step 2 — Citation verify (Read + grep, manual)
 
+> **In**:  Step 1 产出 `AUDIT_DIR/agent-*.md`(每 topic structured findings)
+> **Out**: `AUDIT_DIR/VERIFIED.md`(分桶: VERIFIED / CITATION_DRIFT / FORMAT_ERROR / FILE_MISSING)→ Step 3 只 review VERIFIED 的
+> **Role**: [L4 主 AI] 逐条 Read file:line + grep evidence_excerpt 字节比对; [L1 机械] grep/Read 字节匹配; [NOT] 不判 finding 真伪(留 Step 3),不修代码
+> **Done**: [ ] 每条 finding 都有一个 verdict 桶;[ ] VERIFIED.md 表格生成
+
 For each finding in each `agent-<topic>.md`:
 
 1. `Read` the cited file at the cited line range.
@@ -187,6 +218,11 @@ Report counts: "X VERIFIED / Y CITATION_DRIFT / Z FORMAT_ERROR /
 W FILE_MISSING across N topics." Do not pause unless user explicitly asked.
 
 ### Step 3 — Main Claude core-review
+
+> **In**:  Step 2 产出 `AUDIT_DIR/VERIFIED.md`(只看 VERIFIED 桶)
+> **Out**: `AUDIT_DIR/CORE-REVIEW.md`(每条 finding 配 verdict: REAL / REAL_LOWER / MITIGATED / DESIGN / FALSE_POSITIVE)+ Top-P0 提示给 user CHECKPOINT B
+> **Role**: [L4 主 AI] verdict 判定 + 严重度 calibration; [L2 MCP] 必用 cclsp/serena/ast-grep 看影响面 + web_search 验上游规则现状; [NOT] 不直接 grep 替代 LSP(MCP 静态文字不够,见 `feedback_mcp_static_text_insufficient`)
+> **Done**: [ ] 每条 VERIFIED finding 有 verdict;[ ] 用 MCP 验证过影响面;[ ] rule-based finding 已 web verify
 
 For EACH finding stamped `VERIFIED`:
 
@@ -264,6 +300,11 @@ so step 4 has a stable to-do.
 
 ### Step 4 — Main Claude fixes
 
+> **In**:  Step 3 产出 `AUDIT_DIR/CORE-REVIEW.md` + user CHECKPOINT B 选定的 finding 列表(`AUDIT_DIR/FIX-PLAN.md`)
+> **Out**: 代码改动(working tree dirty)+ 改动文件清单 → Step 5 fix-verify agent 按此清单重审
+> **Role**: [L4 主 AI] 直接 Edit 修 REAL findings; [L3 napi-boundary-reviewer agent] 改 `app/napi/**` 前 MUST 先 dispatch(见 `feedback_napi_reviewer_no_skip`); [NOT] 不改 FALSE_POSITIVE / DESIGN finding
+> **Done**: [ ] 所有 user 选定 finding 都已 Edit;[ ] napi 改动已经过 napi-reviewer;[ ] working tree diff 可读
+
 For each finding the user approved (per FIX-PLAN.md):
 
 1. Re-read the cited code + surrounding context to find the right place
@@ -311,6 +352,11 @@ N files changed (+X -Y). C++ build: <OK / FAIL>. Diff looks reasonable?
 
 ### Step 5 — Fix-verify agent dispatch
 
+> **In**:  Step 4 产出代码改动 + `AUDIT_DIR/FIX-PLAN.md` 列出的 finding ID
+> **Out**: `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`(每条 fix 配 verdict: FIXED / PARTIAL / UNFIXED)→ Step 6 字节验证
+> **Role**: [L3 subagent per topic] 重审 fix 代码; [NOT] subagent 不找 NEW issues(constraint 强制),不修代码
+> **Done**: [ ] 每个受影响 topic 有一份 fixverify 报告;[ ] 每条原 finding 配 FIXED/PARTIAL/UNFIXED 之一
+
 Create `docs/audit/audit-<ORIGINAL_TS>-fixverify/` (suffix the original
 audit dir's timestamp — aids correlation).
 
@@ -331,6 +377,11 @@ Output to `<FIXVERIFY_DIR>/agent-<topic>-fixverify.md`.
 
 ### Step 6 — Citation verify on the fix-verify reports (Read + grep, manual)
 
+> **In**:  Step 5 产出 fixverify 报告
+> **Out**: `<FIXVERIFY_DIR>/FIX-VERIFY-SUMMARY.md`(每条 fix 字节级验证 + 跨模型 calibration)→ Step 7 gate
+> **Role**: [L4 主 AI] Read fix 代码 + 比对 fixverify evidence_excerpt; [NOT] 不容忍 UNFIXED(必回 Step 4 重修)
+> **Done**: [ ] 每条 fix 验证字节是否落地;[ ] 0 条 UNFIXED(若有则回 Step 4)
+
 Same procedure as step 2, but on the fix-verify reports. The fix code
 must exist where the agent claims; a `CITATION_DRIFT` here often means
 the agent's evidence_excerpt is the right code but the line range is
@@ -348,6 +399,11 @@ P0 finding 或涉及线程/生命周期/NAPI 的 fix,**强烈建议**对 audit-e
 参考 HN vibe42 实操 + Anthropic sycophancy 实证。
 
 ### Step 7 — Gate gauntlet(含 C++ 增量 rebuild)
+
+> **In**:  Step 6 产出 `FIX-VERIFY-SUMMARY.md`(0 UNFIXED)
+> **Out**: gate PASS 信号 + `.last-quick-signals.txt` 时间戳 → Step 8 stage+commit
+> **Role**: [L1 脚本] `bash scripts/check/quick_signals.sh` + 可选 hvigorw / cmake; [L4 主 AI] 解读 gate 输出 + 必要时回 Step 4 修问题
+> **Done**: [ ] regression / hygiene / ui-fixes / cxx-build 全 PASS;[ ] gate 输出时间戳已写入
 
 **2026-05-28 重构**:原 Step 5 "Rebuild (if C++ changed)" 已合并进本步——
 `quick_signals.sh` chain 内置 `cmake --build`(避免重复 rebuild step)。
@@ -405,6 +461,11 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 Show user the full draft. Wait for "go" / "edit X" / "abort".
 
 ### Step 8 — Stage + commit
+
+> **In**:  Step 7 产出 gate PASS + 代码改动 + AUDIT_DIR
+> **Out**: git commit(commit message 含 audit dir 路径)→ HEAD 推进 1 个 commit
+> **Role**: [L1 git] git add / git commit; [L4 主 AI] 写 commit message + 经 user CHECKPOINT C 确认; [NOT] 不 push(用户决定)
+> **Done**: [ ] commit 已落地;[ ] commit message 引用 AUDIT_DIR 路径;[ ] working tree clean
 
 **Explicit file list, no `git add -A`**. Only stage files YOU edited in
 step 4 + the audit artifacts under `docs/audit/`. Files modified by the

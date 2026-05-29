@@ -22,6 +22,11 @@ metadata:
 
 ### Step 1: 检查工作区
 
+> **In**:  仓库当前状态
+> **Out**: clean working tree 信号 / 当前分支名 → Step 2 本地预检
+> **Role**: [L1 git] git status / git branch; [L4 主 AI] 决定是否需要 stash; [NOT] 不自动 stash(用户决定)
+> **Done**: [ ] 知道是否有 uncommitted 改动;[ ] 知道当前分支
+
 ```
 cd "D:\windsulf\daugf2527-repos\harmonyos-libretro-emulator"
 git status --short
@@ -31,6 +36,11 @@ git status --short
 - 如果工作区干净 → 提示用户"没有需要提交的改动"，退出
 
 ### Step 2: 本地预检
+
+> **In**:  Step 1 产出 clean working tree
+> **Out**: 本地 PASS / FAIL 信号 → Step 3 commit / 回 Step 4 修复
+> **Role**: [L1 脚本] bash scripts/check/quick_signals.sh; [L4 主 AI] 解读 FAIL 输出; [NOT] 不跳过 FAIL 直接 commit
+> **Done**: [ ] regression / hygiene / ui-fixes / cxx-build 全 PASS
 
 在提交前运行本地 CI 脚本，确保代码符合项目规范：
 
@@ -51,6 +61,11 @@ bash scripts/ci/check_regression_guards.sh
 - `TODO/FIXME` 残留 → 替换为实现代码或移除
 
 ### Step 3: 提交改动
+
+> **In**:  Step 2 产出 PASS 信号
+> **Out**: 1 个新 commit(HEAD 推进)→ Step 4 push
+> **Role**: [L4 主 AI] 写 commit message(scope/type/why); [L1 git] git add + commit; [NOT] 不 --amend(创建 NEW commit),不 --no-verify
+> **Done**: [ ] commit message 含 scope/type;[ ] working tree clean
 
 1. 确认当前分支名：
 ```bash
@@ -102,6 +117,11 @@ EOF
 
 ### Step 4: 推送并创建 PR
 
+> **In**:  Step 3 产出 commit
+> **Out**: 远程 PR 链接 → Step 5 监控 CI
+> **Role**: [L1 gh] git push -u + gh pr create; [L4 主 AI] 写 PR title(<70 字符)+ body; [NOT] 不 force push 到 main/master
+> **Done**: [ ] PR 已创建;[ ] PR 链接已返回
+
 1. 推送当前分支到远端：
 ```bash
 git push origin <current-branch>
@@ -138,6 +158,11 @@ gh pr view --json url,number,state
 
 ### Step 5: 监控 CI
 
+> **In**:  Step 4 产出 PR 链接
+> **Out**: CI 全 PASS 信号 → Step 6 合并 / 进 Step 7 修复循环
+> **Role**: [L1 gh] gh pr checks --watch; [L4 主 AI] 解读 CI 失败原因; [NOT] 不跳过 CI 直接合并
+> **Done**: [ ] 所有 CI checks 状态已知;[ ] 全 PASS 进 Step 6,有 FAIL 进 Step 7
+
 PR 创建后会自动触发 `harmonyos-pr-ci.yml`。监控 CI 状态：
 
 ```bash
@@ -155,6 +180,11 @@ gh pr checks
 
 ### Step 6: 合并 PR
 
+> **In**:  Step 5 产出 CI 全 PASS
+> **Out**: PR 已合并,main 分支推进 → 流程完成
+> **Role**: [L1 gh] gh pr merge --squash; [L4 主 AI] 经 user 确认合并(关键 PR)或自动合并(小修复); [NOT] 不 delete branch 没经 user 同意
+> **Done**: [ ] PR status = MERGED;[ ] working tree 清理完成
+
 CI 全部通过后，合并 PR 到 master：
 
 ```bash
@@ -170,6 +200,11 @@ gh pr merge <PR_URL> --merge
 - ✅ 已合并到 master
 
 ### Step 7: 修复循环（最多 3 次迭代）
+
+> **In**:  Step 5 产出 CI FAIL 信号 + 失败 check 详情
+> **Out**: 修复 commit + 推送 → 回 Step 5 重新监控(最多迭代 3 次)
+> **Role**: [L4 主 AI] 解析 CI log + 找根因; [L4 主 AI] Edit 修复; [L1 git/gh] commit + push; [NOT] 第 3 次仍 FAIL 必须停止 + 报告给用户(不无限循环)
+> **Done**: [ ] CI 全 PASS(回 Step 6) OR [ ] 3 次迭代未通过 → 报告 user 介入
 
 CI 失败时执行修复循环：
 

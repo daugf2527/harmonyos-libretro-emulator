@@ -49,9 +49,20 @@ Do NOT use this skill for:
 - 自动 commit/PR → `/auto-commit-cicd`
 - 单文件 typo → 直接 Edit
 
-## 6 层方法论(L1-L6)
+## 6 层方法论(L1-L6,5 段契约)
+
+每层必备 5 段(契约缺失会让"完成"无 ground truth,见 memory `feedback_task_contract_missing`):
+**Input** / **Goal** / **ROLE matrix** / **Output** / **Done criteria**
+
+ROLE 4 层(见 memory `feedback_skill_role_separation`):L1 脚本(机械事实)/ L2 MCP(语义查询)/ L3 subagent(并行发现)/ L4 主 AI(推理判断)。
+**越权(任何方向)= bug**。
 
 ### L1 — 四方快照(基础数据采集)
+
+> **In**:  仓库当前 working tree + memory 当前状态
+> **Out**: 4 张事实清单(心里记,不落地)→ L2 横切数量对比
+> **Role**: [L1 脚本] git log / ls / cat; [L2 MCP] serena list_memories / Read MEMORY.md; [L4 主 AI] 并行采集 4 源; [NOT] 不判一致性(留 L2-L6)
+> **Done**: [ ] git 最近 30 commit 已列;[ ] code .claude/ + scripts/ 已 ls;[ ] md CLAUDE.md/AGENTS.md/docs 已 find;[ ] memory 49 文件已列
 
 并行做 4 个采集,产 4 张事实清单:
 
@@ -81,6 +92,11 @@ Read C:/Users/newwo/.claude/projects/<proj>/memory/MEMORY.md
 
 ### L2 — 横切(数量层)
 
+> **In**:  L1 产出 4 张快照
+> **Out**: `| # | 指标 | 期望 vs 实际 | 状态 |` 表(全绿才进 L3)→ L3 行为验证基准
+> **Role**: [L1 脚本] ls / wc -l / grep -c; [L4 主 AI] 比对期望 vs 实测; [NOT] 不深查行为(L3 干),不判 P0/P1 之外的细分(L6 干)
+> **Done**: [ ] 10 项 invariant 全部检查;[ ] 不一致项标 P0/P1;[ ] 全绿才进 L3
+
 10 项左右的 invariant 数量检查,期望值 vs 实测,全绿才进 L3:
 
 | 典型项 | 期望来源 | 检查方式 |
@@ -104,6 +120,11 @@ L2 出 drift 即 P0/P1 — 数量级错配是硬 bug,不是叙事 drift。
 
 ### L3 — 竖切(行为层)
 
+> **In**:  L2 全绿表 + 最近 N 个 commit / 重大决策
+> **Out**: 行为验证表(成熟度 stub/编译/测试/跑通)→ L4 SOT 盘表
+> **Role**: [L4 主 AI] Read 关键文件 + 试运行; [L1 Bash] 试调脚本验"真跑通"; [L2 MCP] 用 cclsp/serena 验调用链是否齐全; [NOT] 不 grep 字面替代行为验证("有这行字"≠"真跑通")
+> **Done**: [ ] 每个验证项标成熟度;[ ] stub 项进 P2 drift
+
 每个新近 commit / 重大决策 / harness 改造,验证"真的能跑通"。这层是核心。
 
 | # | 验证项 | 实测方式 | 成熟度 |
@@ -119,6 +140,11 @@ L2 出 drift 即 P0/P1 — 数量级错配是硬 bug,不是叙事 drift。
 L3 出 drift 即 **stub-级 drift**(声称跑通,实测 stub) — 是叙事 vs 实物的脱节。
 
 ### L3.5 — 规则 vs 上游 web verify(2026-05-29 加)
+
+> **In**:  L3 验证项中**基于本地规则判违规/通过**的 finding
+> **Out**: 每条 finding 配 `[verified upstream]` / `[skipped: 业务约定]` / `[meta: rule outdated]` → L6 决定 finding 成立 / 撤回 / 改 meta-finding
+> **Role**: [L2 MCP] mcp__web-search__web_search 查上游官方; [L4 主 AI] 对比本地规则 vs 上游 + 标注分类; [NOT] 不跳 verify(本地规则可能滞后,见 `feedback_local_rule_may_lag_upstream`)
+> **Done**: [ ] 每条 rule-based finding 已 web verify;[ ] 例外(业务约定/硬约束/<30min 决策)显式标 skipped
 
 L3 验证项中**凡是基于"本地规则"判违规/通过的**,必跑 `mcp__web-search__web_search` 核对上游官方现状:
 
@@ -142,6 +168,11 @@ L3 验证项中**凡是基于"本地规则"判违规/通过的**,必跑 `mcp__we
 
 ### L4 — SOT 盘表(Single Source of Truth)
 
+> **In**:  L1-L3 累积的事实 + finding 清单
+> **Out**: SOT 表(每主题 SOT + 派生引用方 + 一致性状态)→ L5 治理路径
+> **Role**: [L4 主 AI] 列主题 + 找 SOT + 看派生引用是否一致; [L2 MCP] 用 find_references 找派生方; [NOT] 不重复定义 SOT(派生方必须 link 不复制)
+> **Done**: [ ] 每个关键主题有 SOT;[ ] 重复/冲突的派生方标 P1
+
 列出每个关键主题的 SOT,看是否有重复定义 / 冲突:
 
 | 主题 | SOT | 派生引用方 | 一致? |
@@ -153,6 +184,11 @@ L3 验证项中**凡是基于"本地规则"判违规/通过的**,必跑 `mcp__we
 发现重复定义/冲突即 P1 — 派生方必须只 link 不复制。
 
 ### L5 — 机制 vs 纪律分账
+
+> **In**:  L2-L4 累积的所有 drift / finding
+> **Out**: 治理路径表(每条 drift 标"机制"或"纪律"或"混合")→ L6 决定修法
+> **Role**: [L4 主 AI] 对每条 drift 判机制可行性; [NOT] 不滥用机制(一次性/个体 drift 用纪律即可),不滥用纪律(同类反复出现就该升级机制)
+> **Done**: [ ] 每条 drift 有治理路径标注;[ ] "可机制化"项目标待落地
 
 对每条 drift,判治理路径:
 
@@ -166,6 +202,11 @@ L3 验证项中**凡是基于"本地规则"判违规/通过的**,必跑 `mcp__we
 不滥用机制 — 一次性 / 个体 drift 用纪律即可。
 
 ### L6 — 现场处理 + 报告 + 沉淀
+
+> **In**:  L1-L5 累积的全部分析
+> **Out**: `docs/four-way-audit-<TS>.md` 报告 + 现场修(P0/P1 当场)+ tech-debt 追加(P2)+ memory 沉淀(L7 方法论)→ HEAD 推进 N 个 commit
+> **Role**: [L4 主 AI] 按 P0(立修)/P1(同会话修)/P2(tracker)/P3(harness bug 当场修)分桶; [L4 主 AI] 写报告 6 层全; [NOT] 不 commit P3 进 tracker(harness bug 当场修不积压)
+> **Done**: [ ] 报告含 6 层全部表;[ ] P0/P1 现场修完;[ ] P2 进 tracker;[ ] memory 关键沉淀已写
 
 按优先级分桶处理:
 

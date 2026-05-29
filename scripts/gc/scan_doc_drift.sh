@@ -16,14 +16,17 @@ rpt() { printf '%s\n' "$*" | tee -a "${REPORT}"; }
 
 extract_paths() {
   local file="$1"
-  # 提取候选路径,然后多重过滤剔除 scanner 假阳性来源:
-  # B5 <TS>/<YYYYMMDD-HHMMSS> 等模板占位符 — 行级过滤(整行含 < > 跳过)
-  # B6 ... 省略号占位符(英文) — 路径级 grep -v 过滤
-  # B4 句末标点(.md. / .md, / .md; / .md-) — 路径级 sed 剥除
-  # B3 跨仓库绝对路径(/d/foo/docs/...) — 提取正则加锚点要求前面非路径字符
-  # B1 否定语境(replaces / NOT exist / removed / 不存在 / deprecated) — 行级过滤
-  # B2 fenced code block(```...```) 内跳过 — awk 跟踪 fence 状态,
-  #    剔除 bash 命令里的 glob(如 `ls entry/.cxx/*/*/*/build.ninja`)
+  # 提取候选路径,做纯机械层(L1)过滤:
+  # B5 <TS>/<YYYYMMDD-HHMMSS> 等模板占位符 — 字符级匹配,L1 合法
+  # B6 ... 省略号占位符(英文) — 字符级,L1 合法
+  # B4 句末标点(.md. / .md, / .md; / .md-) — 字符级 sed 剥除,L1 合法
+  # B3 跨仓库绝对路径(/d/foo/docs/...) — 提取正则加锚点,字符级,L1 合法
+  # B2 fenced code block(```...```) — markdown 结构语法,机械可识别,L1 合法
+  #
+  # 不在 L1 做(已上移到 /gc Step 3 主 AI):
+  # B1 否定语境(replaces/removed/deprecated)— 关键词匹配是脆弱启发式,
+  #    新词("superseded by"等)会漏;改由主 AI Step 3 看上下文 5-10 行判定。
+  #    见 memory feedback_skill_role_separation.
   awk '
     BEGIN { in_code = 0 }
     /^[ \t]*```/ { in_code = !in_code; next }
@@ -31,10 +34,6 @@ extract_paths() {
   ' "$file" 2>/dev/null \
     | grep -E '(^|[ `(\[\|])(entry|scripts|docs)/[A-Za-z0-9_./*-]+' \
     | while IFS=: read -r lno content; do
-        # B1: 跳过含否定语境的整行
-        if echo "$content" | grep -qE '(replaces|REPLACED|removed|deprecated|DEPRECATED|NOT exist|不存在|已弃用|已删除|已移除)'; then
-          continue
-        fi
         # B5: 跳过含模板占位符 <...> 的整行(提取后再过滤会丢失 < > 信息)
         if echo "$content" | grep -qE '<[A-Za-z_][A-Za-z0-9_-]*>'; then
           continue
