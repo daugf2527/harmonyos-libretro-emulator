@@ -198,7 +198,7 @@ assert_grep "Per-button @State pressed" \
 assert_grep "Pressed visual: primary fill" \
   "this\.pressed" "$F"
 assert_grep "Pressed visual: scale-down" \
-  "scale\(this\.pressed" "$F"
+  "scale\(this\.isPressedNow\(\)" "$F"
 assert_no_grep "Full-screen scanline shroud removed" \
   "ScanlineBackground" "$F"
 assert_no_grep "Gradient veil over game removed" \
@@ -207,8 +207,8 @@ assert_no_grep "Gradient veil over game removed" \
 F=entry/src/main/ets/pages/LibretroGamePage.ets
 assert_grep "LibretroGamePage uses Column split layout" \
   "layoutWeight\(this\.gameRunning" "$F"
-assert_grep "Game area 72%, controller 28% when running" \
-  "layoutWeight\(28\)" "$F"
+assert_grep "Game area 65%, controller 35% when running" \
+  "layoutWeight\(35\)" "$F"
 F=entry/src/main/ets/common/InputLayoutRepository.ets
 assert_grep "D-pad 上 size 60 (放大 +12)" \
   "id: 'up', label: '上', caption: 'Directional_Up', x: 80, y: 130, size: 60" "$F"
@@ -245,7 +245,7 @@ assert_grep "RuntimeKeyButton supports disabled prop" \
 assert_grep "RuntimeKeyButton uses disabledBackground token" \
   "EmuStateColors\.disabledBackground" "$F"
 assert_grep "RuntimeKeyButton disabled overrides pressed (priority)" \
-  "this\.pressed && !this\.disabled" "$F"
+  "this\.isPressedNow\(\) && !this\.disabled" "$F"
 
 F=entry/src/main/ets/components/RuntimeControlPanel.ets
 assert_grep "RuntimeControlPanel imports EmuLoadingSpinner" \
