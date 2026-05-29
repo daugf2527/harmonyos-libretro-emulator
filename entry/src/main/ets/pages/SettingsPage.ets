@@ -15,6 +15,12 @@ import {
   saveRuntimeRenderSettingsProfile
 } from '../common/RuntimeRenderSettingsRepository'
 import {
+  createDefaultRuntimeInputPreferencesProfile,
+  loadRuntimeInputPreferencesProfile,
+  RuntimeInputPreferencesProfile,
+  saveRuntimeInputPreferencesProfile
+} from '../common/RuntimeInputPreferencesRepository'
+import {
   getLibraryTelemetryBars,
   getLibraryTelemetryCells,
   LibraryTelemetryBar,
@@ -114,6 +120,7 @@ struct SettingsPage {
   @State private telemetryFooterRight: string = '进入游戏后会更新摘要'
   @State private telemetryBars: BarChartItem[] = this.createEmptyTelemetryBars()
   @State private renderProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile()
+  @State private inputPreferences: RuntimeInputPreferencesProfile = createDefaultRuntimeInputPreferencesProfile()
   @State private advancedStatusText: string = '运行时设置尚未读取'
   @State private runtimeApplyStatusText: string = '尚未执行运行时写入'
   private pageActive: boolean = false
@@ -233,6 +240,7 @@ struct SettingsPage {
       this.inputLayoutSummaryText = '无法读取布局信息'
       this.inputLayoutDetailText = '请重新进入页面'
       this.renderProfile = createDefaultRuntimeRenderSettingsProfile()
+      this.inputPreferences = createDefaultRuntimeInputPreferencesProfile()
       this.advancedStatusText = '上下文不可用'
       this.applyEmptyTelemetry()
       return
@@ -243,6 +251,11 @@ struct SettingsPage {
       return
     }
     this.renderProfile = renderProfile
+    const inputPreferences = await loadRuntimeInputPreferencesProfile(context)
+    if (!this.isCurrentRefresh(token)) {
+      return
+    }
+    this.inputPreferences = inputPreferences
     this.refreshAdvancedStatus()
 
     const inputDevices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
@@ -329,6 +342,27 @@ struct SettingsPage {
       return
     }
     await this.persistRenderProfile(nextProfile)
+  }
+
+  private async toggleHideVirtualController(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.setRuntimeApplyStatus('虚拟手柄显示', false)
+      return
+    }
+    const nextProfile: RuntimeInputPreferencesProfile = {
+      version: this.inputPreferences.version,
+      hideVirtualController: !this.inputPreferences.hideVirtualController,
+      hideUndeclaredKeys: this.inputPreferences.hideUndeclaredKeys,
+      updatedAt: this.inputPreferences.updatedAt
+    }
+    try {
+      const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
+      this.inputPreferences = saved
+      this.setRuntimeApplyStatus('虚拟手柄显示', true)
+    } catch (_err) {
+      this.setRuntimeApplyStatus('虚拟手柄显示', false)
+    }
   }
 
   private async cycleRenderMode(): Promise<void> {
@@ -854,6 +888,14 @@ struct SettingsPage {
     Column({ space: 18 }) {
       this.SectionTitle('高级设置', 'ADVANCED_RUNTIME')
       this.AdvancedControlsCard()
+      this.AdvancedSettingRow(
+        '虚拟手柄显示',
+        this.inputPreferences.hideVirtualController ? '当前隐藏 · 运行时不渲染屏上手柄' : '当前显示 · 运行时叠加屏上手柄',
+        this.inputPreferences.hideVirtualController ? '显示' : '隐藏',
+        () => {
+          void this.toggleHideVirtualController()
+        }
+      )
       this.AdvancedSettingRow(
         'GPU Backend',
         this.gpuBackendText,
