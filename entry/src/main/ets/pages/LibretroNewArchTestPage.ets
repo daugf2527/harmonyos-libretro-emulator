@@ -33,6 +33,12 @@ import {
 import LogHelper from '../common/LogHelper';
 import { EmuStateColors, EmuTypography } from '../common/EmuUiTokens';
 import { EmuButton, EmuButtonKind, EmuButtonSize } from '../components/EmuButton';
+import { DevDiagnosticsBlock } from '../components/DevDiagnosticsBlock';
+import { runtimeCoreDiagnosticController } from '../common/RuntimeCoreDiagnosticController';
+import {
+  RuntimeSoakState,
+  RuntimeSoakTestController
+} from '../common/RuntimeSoakTestController';
 
 // NAPI 接口定义 (遵循 AGENTS.md 规范)
 interface LibretroNapi {
@@ -121,6 +127,11 @@ interface ResolutionPreset {
   h: number;
 }
 
+interface CoreCheckState {
+  running: boolean;
+  text: string;
+}
+
 
 // RetroPad Constants removed (imported inputs used dynamically)
 
@@ -171,7 +182,10 @@ struct LibretroNewArchTestPage {
   @State aiUpscaleEnabled: boolean = false;
   @State xengineAvailable: boolean = false;
   @State hideVirtualController: boolean = false;
-  
+  @State coreCheck: CoreCheckState = { running: false, text: '' };
+  @State soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
+  private readonly soakController: RuntimeSoakTestController = new RuntimeSoakTestController();
+
   private xComponentId: string = 'new_arch_xcomponent';
   private eventScope: EventHubScope | undefined = undefined;
   private inputDebugTimer: number = -1;
@@ -706,6 +720,70 @@ struct LibretroNewArchTestPage {
     const rawAbiList = String(deviceInfo.abiList ?? '').toLowerCase();
     return rawAbiList.indexOf('x86_64') >= 0 ? 'x86_64' : 'arm64';
   }
+
+  // 复用 onLoadCore 同款 corePath（gambatte），保持 dev 页只验证当前正在用的核心。
+  private resolveDiagnosticCorePath(): string {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      return '';
+    }
+    const abiPath = this.resolveAbiPath();
+    return `${context.bundleCodeDir}/libs/${abiPath}/libgambatte_libretro.so`;
+  }
+
+  async runCoreCheck(): Promise<void> {
+    if (this.coreCheck.running) {
+      return;
+    }
+    this.coreCheck.running = true;
+    this.coreCheck.text = '正在验证核心符号...';
+    try {
+      const corePath = this.resolveDiagnosticCorePath();
+      if (!corePath) {
+        this.coreCheck.text = '获取 Context 失败';
+        return;
+      }
+      const result = runtimeCoreDiagnosticController.testCoreLoader(corePath);
+      this.coreCheck.text = result;
+    } catch (e) {
+      const msg = (e as Error)?.message || String(e);
+      this.coreCheck.text = `Failed: ${msg}`;
+      LogHelper.error('NewArchTest', 'Core', `符号验证异常: ${msg}`);
+    } finally {
+      this.coreCheck.running = false;
+    }
+  }
+
+  startSoak(durationSeconds: number): void {
+    const running = nativeApi.refactoredGetState() === EngineState.RUNNING;
+    this.soakController.start(durationSeconds, running, (state: RuntimeSoakState) => {
+      this.applySoakState(state);
+    });
+  }
+
+  stopSoak(): void {
+    this.soakController.stop((state: RuntimeSoakState) => {
+      this.applySoakState(state);
+    });
+  }
+
+  private applySoakState(state: RuntimeSoakState): void {
+    this.soakState.running = state.running;
+    this.soakState.secondsLeft = state.secondsLeft;
+    this.soakState.summaryText = state.summaryText;
+  }
+
+  private onCoreCheckClick = (): void => {
+    void this.runCoreCheck();
+  };
+
+  private onSoakToggleClick = (): void => {
+    if (this.soakState.running) {
+      this.stopSoak();
+    } else {
+      this.startSoak(600);
+    }
+  };
 
 
   parseOptionsJson(s: string): CoreOptionItem[] {
@@ -1463,6 +1541,17 @@ struct LibretroNewArchTestPage {
           if (!this.useDrawer) {
             this.MainPanelContent()
           }
+
+          DevDiagnosticsBlock({
+            coreCheckRunning: this.coreCheck.running,
+            coreCheckText: this.coreCheck.text,
+            soakRunning: this.soakState.running,
+            soakSecondsLeft: this.soakState.secondsLeft,
+            soakSummaryText: this.soakState.summaryText,
+            switching: false,
+            onCoreCheck: this.onCoreCheckClick,
+            onSoakToggle: this.onSoakToggleClick
+          })
         }
         .width('100%')
       }
