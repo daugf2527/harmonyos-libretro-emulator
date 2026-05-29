@@ -240,11 +240,13 @@ if [ -d "$MEMORY_DIR" ]; then
     # 拿 memory 文件名(不含路径,不含 .md 后缀)作为引用 key
     mname=$(basename "$mfile" .md)
 
-    # 扫 CLAUDE.md / AGENTS.md / .claude/skills/**/*.md 是否含此 key
-    if ! grep -rqlE "${mname}" CLAUDE.md AGENTS.md entry/src/main/ets/CLAUDE.md entry/src/main/cpp/CLAUDE.md .claude/skills 2>/dev/null; then
+    # 扫 CLAUDE.md / AGENTS.md / 项目内 sub-CLAUDE.md / .claude/skills 是否含此 key
+    # 加 user-level ~/.claude/CLAUDE.md(跨项目方法论可能在 user 层引,不算孤岛)
+    user_claudemd="${HOME}/.claude/CLAUDE.md"
+    if ! grep -rqlE "${mname}" CLAUDE.md AGENTS.md entry/src/main/ets/CLAUDE.md entry/src/main/cpp/CLAUDE.md .claude/skills "$user_claudemd" 2>/dev/null; then
       e_warn=$((e_warn + 1))
       total_drifts=$((total_drifts + 1))
-      e_warn_text="${e_warn_text}  - \`${mname}\` (memory MANDATORY rule) -> NOT REFERENCED in CLAUDE.md/AGENTS.md/skills/\n"
+      e_warn_text="${e_warn_text}  - \`${mname}\` (memory MANDATORY rule) -> NOT REFERENCED in CLAUDE.md/AGENTS.md/skills/ (含 user-level)\n"
     fi
   done < <(find "$MEMORY_DIR" -name 'feedback_*.md' 2>/dev/null || true)
 fi

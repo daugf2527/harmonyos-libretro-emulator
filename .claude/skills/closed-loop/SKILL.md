@@ -560,6 +560,12 @@ Pick the most recent timestamped dir as the "active" one if multiple exist.
 - Sub-agent model floor (Sonnet min, no Haiku): [[feedback_subagent_model]]
 - Worktree isolation caveat: [[feedback_agent_worktree_isolation]]
 - Hook stdin lesson: post-edit-cpp.sh history (heredoc + json.load conflict)
+- **审计经验教训(必读)**: [[feedback_t7_audit_lessons]] — 5 条:
+  1. `find_references` 是审计核心(Step 3 verdict 前必跑)
+  2. SDK 限制用构建验证(Step 7 gate cxx-build),不靠记忆
+  3. 跨层耦合 finding 必须同批修(Step 4 FIX-PLAN 一起)
+  4. catch 块禁止 removeListener/unsubscribe(订阅生命周期反模式)
+  5. NAPI 层独立批次 + napi-boundary-reviewer 预审(Step 4 改 `app/napi/**` 时)
 
 ## Anti-patterns to refuse
 
