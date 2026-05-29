@@ -802,6 +802,7 @@ static napi_value StopEngine(napi_env env, napi_callback_info info) {
 }
 
 struct StopEngineAsyncContext {
+  napi_deferred deferred = nullptr;
   napi_async_work work = nullptr;
   bool stopped = false;
 };
@@ -812,13 +813,15 @@ static void ExecuteStopEngineAsync(napi_env env, void *data) {
     return;
   }
   ctx->stopped = GetEngine()->Stop();
+  // 门禁在 Execute 尾部复位，确保异常路径（Stop 超时返回 false）也能解除门禁，
+  // 让后续调用不被永久阻断。Complete 不再重复复位。
+  stop_in_progress.store(false);
 }
 
 static void CompleteStopEngineAsync(napi_env env, napi_status status,
                                     void *data) {
   auto *ctx = static_cast<StopEngineAsyncContext *>(data);
   if (!ctx) {
-    stop_in_progress.store(false);
     return;
   }
 
@@ -828,12 +831,19 @@ static void CompleteStopEngineAsync(napi_env env, napi_status status,
     GetEngine()->SetLastErrorInfo("stop_async_work_failed",
                                   "StopEngineAsync",
                                   "StopEngineAsync complete callback status was not napi_ok");
-  } else if (!ctx->stopped) {
-    LOGF(LOG_WARN,
-         "[NEW] StopEngineAsync completed with stop timeout/failure");
+    napi_value errMsg;
+    napi_create_string_utf8(env, "stop_async_work_failed", NAPI_AUTO_LENGTH,
+                            &errMsg);
+    napi_reject_deferred(env, ctx->deferred, errMsg);
+  } else {
+    if (!ctx->stopped) {
+      LOGF(LOG_WARN,
+           "[NEW] StopEngineAsync completed with stop timeout/failure");
+    }
+    napi_value result;
+    napi_get_boolean(env, ctx->stopped, &result);
+    napi_resolve_deferred(env, ctx->deferred, result);
   }
-
-  stop_in_progress.store(false);
 
   if (ctx->work) {
     napi_delete_async_work(env, ctx->work);
@@ -847,10 +857,13 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
   LOGF(LOG_INFO, " [NEW] StopEngineAsync called");
   if (stop_in_progress.exchange(true)) {
     LOGF(LOG_WARN, "[NEW] StopEngineAsync ignored: stop already in progress");
-    return MakeBool(env, true);
+    return MakeResolvedPromise(env, true);
   }
 
   auto *ctx = new StopEngineAsyncContext();
+
+  napi_value promise;
+  napi_create_promise(env, &ctx->deferred, &promise);
 
   napi_value resourceName;
   napi_create_string_utf8(env, "StopEngineAsyncWork", NAPI_AUTO_LENGTH,
@@ -864,8 +877,11 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
                                   "StopEngineAsync",
                                   "napi_create_async_work failed");
     stop_in_progress.store(false);
+    napi_value falseVal;
+    napi_get_boolean(env, false, &falseVal);
+    napi_resolve_deferred(env, ctx->deferred, falseVal);
     delete ctx;
-    return MakeBool(env, false);
+    return promise;
   }
 
   napi_status queueStatus = napi_queue_async_work(env, ctx->work);
@@ -877,11 +893,14 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
     stop_in_progress.store(false);
+    napi_value falseVal;
+    napi_get_boolean(env, false, &falseVal);
+    napi_resolve_deferred(env, ctx->deferred, falseVal);
     delete ctx;
-    return MakeBool(env, false);
+    return promise;
   }
 
-  return MakeBool(env, true);
+  return promise;
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -930,5 +949,8 @@ void RegisterLifecycleNapi(napi_env env, napi_value exports) {
       {"refactoredGetRawFileListAsync", nullptr, GetRawFileListAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredInitEventBridge", nullptr, InitEventBridge, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
-  napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  if (regStatus != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] RegisterLifecycleNapi: napi_define_properties failed: %{public}d", regStatus);
+  }
 }

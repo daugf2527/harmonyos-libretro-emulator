@@ -72,9 +72,9 @@ static napi_value GetSaveStateSizeAsync(napi_env env, napi_callback_info info) {
       CompleteGetSaveStateSizeAsync, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] GetSaveStateSizeAsync create work failed");
-    napi_value zero;
-    napi_create_int64(env, 0, &zero);
-    napi_resolve_deferred(env, ctx->deferred, zero);
+    napi_value reason;
+    napi_create_string_utf8(env, "async_work_create_failed", NAPI_AUTO_LENGTH, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
     delete ctx;
     return promise;
   }
@@ -83,9 +83,9 @@ static napi_value GetSaveStateSizeAsync(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] GetSaveStateSizeAsync queue work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value zero;
-    napi_create_int64(env, 0, &zero);
-    napi_resolve_deferred(env, ctx->deferred, zero);
+    napi_value reason;
+    napi_create_string_utf8(env, "async_work_queue_failed", NAPI_AUTO_LENGTH, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
     delete ctx;
     return promise;
   }
@@ -340,9 +340,9 @@ static napi_value SaveStateAsync(napi_env env, napi_callback_info info) {
       CompleteSaveStateAsync, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] SaveStateAsync create work failed");
-    napi_value nullVal;
-    napi_get_null(env, &nullVal);
-    napi_resolve_deferred(env, ctx->deferred, nullVal);
+    napi_value reason;
+    napi_create_string_utf8(env, "async_work_create_failed", NAPI_AUTO_LENGTH, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
     delete ctx;
     return promise;
   }
@@ -352,9 +352,9 @@ static napi_value SaveStateAsync(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] SaveStateAsync queue work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value nullVal;
-    napi_get_null(env, &nullVal);
-    napi_resolve_deferred(env, ctx->deferred, nullVal);
+    napi_value reason;
+    napi_create_string_utf8(env, "async_work_queue_failed", NAPI_AUTO_LENGTH, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
     delete ctx;
     return promise;
   }
@@ -451,9 +451,9 @@ static napi_value LoadStateAsync(napi_env env, napi_callback_info info) {
       CompleteLoadStateAsync, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] LoadStateAsync create work failed");
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    napi_value reason;
+    napi_create_string_utf8(env, "async_work_create_failed", NAPI_AUTO_LENGTH, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
     delete ctx;
     return promise;
   }
@@ -463,9 +463,9 @@ static napi_value LoadStateAsync(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] LoadStateAsync queue work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    napi_value reason;
+    napi_create_string_utf8(env, "async_work_queue_failed", NAPI_AUTO_LENGTH, &reason);
+    napi_reject_deferred(env, ctx->deferred, reason);
     delete ctx;
     return promise;
   }
@@ -490,5 +490,8 @@ void RegisterStateNapi(napi_env env, napi_value exports) {
       {"refactoredGetCoreOptions", nullptr, GetCoreOptions, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetCoreOption", nullptr, SetCoreOption, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
-  napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  if (regStatus != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] RegisterStateNapi: napi_define_properties failed: %{public}d", regStatus);
+  }
 }

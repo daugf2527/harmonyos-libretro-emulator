@@ -23,7 +23,7 @@ export interface RefactoredEvent {
 }
 export const refactoredStartEngine: () => boolean;
 export const refactoredStopEngine: () => boolean;
-export const refactoredStopEngineAsync: () => boolean;
+export function refactoredStopEngineAsync(): Promise<boolean>;
 export const refactoredResetEngine: () => boolean;
 export const refactoredPauseEngine: () => boolean;
 export const refactoredResumeEngine: () => boolean;

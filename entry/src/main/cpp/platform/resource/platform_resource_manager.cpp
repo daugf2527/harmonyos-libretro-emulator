@@ -57,6 +57,12 @@ void PlatformResourceManager::Initialize(NativeResourceManager *native_mgr) {
   LOGF(LOG_INFO, "PlatformResourceManager initialized with NativeResourceManager: %{public}p", native_mgr);
 }
 
+void PlatformResourceManager::Release() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  native_resource_manager_ = nullptr;
+  LOGF(LOG_INFO, "PlatformResourceManager released NativeResourceManager handle");
+}
+
 bool PlatformResourceManager::LoadRawFileUnlocked(
     const std::string &path,
     NativeResourceManager *native_mgr,

@@ -3,7 +3,7 @@ import { resourceManager } from '@kit.LocalizationKit'
 import { EngineErrorInfo } from './LibretroEventHub'
 
 interface RuntimeSessionNapi {
-  refactoredStopEngineAsync(): boolean
+  refactoredStopEngineAsync(): Promise<boolean>
   refactoredSwitchGameAsync(
     corePath: string,
     romPath: string,
@@ -71,7 +71,7 @@ export class RuntimeSessionController {
     return nativeApi.refactoredResumeEngine()
   }
 
-  stopAsync(): boolean {
+  stopAsync(): Promise<boolean> {
     return nativeApi.refactoredStopEngineAsync()
   }
 

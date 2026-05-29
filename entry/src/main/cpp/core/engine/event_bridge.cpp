@@ -144,6 +144,7 @@ void EventBridge::Emit(EventType event, const std::string &payload,
 
       auto pending_it = pending_payload_.find(eventKey);
       if (pending_it != pending_payload_.end()) {
+        payload_to_send = pending_it->second;
         pending_payload_.erase(pending_it);
       }
     }

@@ -370,23 +370,34 @@ bool LibretroEngine::Start() {
                      "Start ignored: start already in progress");
     return false;
   }
+  // RAII guard: reset startInProgress_ on all exit paths, including exceptions
+  // thrown by std::thread construction or any early-return below.
+  struct StartGuard {
+    std::atomic<bool> &flag;
+    bool released = false;
+    explicit StartGuard(std::atomic<bool> &f) : flag(f) {}
+    void release() { released = true; }
+    ~StartGuard() {
+      if (!released) {
+        flag.store(false);
+      }
+    }
+  } startGuard(startInProgress_);
+
   if (stopInProgress_.load()) {
     LOGF(LOG_WARN, "[NEW] Start ignored: stop in progress");
     SetLastErrorInfo("start_blocked_stop_in_progress", "Start",
                      "Start ignored: stop in progress");
-    startInProgress_.store(false);
     return false;
   }
   if (stopTimedOut_.load()) {
     LOGF(LOG_ERROR, "[NEW] Start blocked: previous stop timed out");
     SetLastErrorInfo("start_blocked_stop_timeout", "Start",
                      "previous stop timed out; call refactoredResetEngine");
-    startInProgress_.store(false);
     return false;
   }
   if (running_) {
     LOGF(LOG_WARN, "[NEW] Already running, skip Start");
-    startInProgress_.store(false);
     return true;
   }
 
@@ -397,6 +408,8 @@ bool LibretroEngine::Start() {
   TransitionTo(EngineState::STARTING);
 
   running_.store(true);
+  // std::thread constructor may throw std::system_error if thread creation
+  // fails. The StartGuard above ensures startInProgress_ is reset in that case.
   gameThread_ = std::thread(&LibretroEngine::GameLoop, this);
   if (renderThread_ && render_thread_enabled_.load(std::memory_order_relaxed)) {
     renderThread_->SetEnabled(true);
@@ -405,6 +418,7 @@ bool LibretroEngine::Start() {
     renderThread_->Start();
   }
   LOGF(LOG_INFO, " [NEW] Engine Thread Started");
+  startGuard.release();
   startInProgress_.store(false);
 
   auto scopedWindowInit = windowGuard_.AcquireWindow();
@@ -561,8 +575,14 @@ void LibretroEngine::Reset() {
   }
 
   // 5. 重置引擎状态。Reset 是强制收敛入口，不能受普通状态迁移表限制。
+  // P2-5: 直接写 state_ 后必须持 stateMutex_ 再 notify_all，与 TransitionTo
+  // 保持一致，防止 WaitForState 的 wait_for 在 store 和 notify 之间醒来后
+  // 重新进入等待，导致永久阻塞。
   state_.store(EngineState::INIT);
-  stateCond_.notify_all();
+  {
+    std::lock_guard<std::mutex> lk(stateMutex_);
+    stateCond_.notify_all();
+  }
   eventBridge_.Emit("engine_state", "{\"state\": 0}", false);
   ClearLastErrorInfo();
   frameCount_ = 0;
@@ -1749,20 +1769,29 @@ void LibretroEngine::SetupCallbacks() {
   if (!coreLoader_.IsLoaded())
     return;
 
+  // retro_set_* functions are void — they have no return value to check.
+  // Observability is provided by tracking which symbols the core exported
+  // and logging a summary at INFO level. Missing non-critical callbacks are
+  // logged at WARN; the engine continues without them (libretro spec allows
+  // cores to omit optional callbacks).
+
+  bool hasEnv = false;
+  bool hasVideoRefresh = false;
   bool hasAudioSample = false;
   bool hasAudioBatch = false;
-
-  // [FIX] 添加对 retro_set_video_refresh 等函数的空指针检查
-  // Mesen 核心可能在加载时某些函数指针未正确获取或核心本身未导出所有符号
+  bool hasInputPoll = false;
+  bool hasInputState = false;
 
   if (auto fn = coreLoader_.GetSetEnvironment()) {
     fn(OnEnvironment);
+    hasEnv = true;
   } else {
     LOGF(LOG_WARN, "Core missing retro_set_environment");
   }
 
   if (auto fn = coreLoader_.GetSetVideoRefresh()) {
     fn(OnVideoRefresh);
+    hasVideoRefresh = true;
   } else {
     LOGF(LOG_WARN, "Core missing retro_set_video_refresh");
   }
@@ -1780,19 +1809,17 @@ void LibretroEngine::SetupCallbacks() {
   } else {
     LOGF(LOG_WARN, "Core missing retro_set_audio_sample_batch");
   }
-  LOGF(LOG_INFO,
-       "%{public}s Audio callbacks registered: sample=%{public}d, "
-       "batch=%{public}d",
-       kAudioChainPrefix, hasAudioSample ? 1 : 0, hasAudioBatch ? 1 : 0);
 
   if (auto fn = coreLoader_.GetSetInputPoll()) {
     fn(InputManager::OnInputPoll);
+    hasInputPoll = true;
   } else {
     LOGF(LOG_WARN, "Core missing retro_set_input_poll");
   }
 
   if (auto fn = coreLoader_.GetSetInputState()) {
     fn(InputManager::OnInputState);
+    hasInputState = true;
   } else {
     LOGF(LOG_WARN, "Core missing retro_set_input_state");
   }
@@ -1803,6 +1830,15 @@ void LibretroEngine::SetupCallbacks() {
   // 注册全局 Sensor 回调
   SetGlobalSensorCallbacks(InputManager::OnSensorSetState,
                            InputManager::OnSensorGetInput);
+
+  // Summary log: one line showing which callbacks were successfully registered.
+  LOGF(LOG_INFO,
+       "SetupCallbacks: env=%{public}d video=%{public}d "
+       "audio_sample=%{public}d audio_batch=%{public}d "
+       "input_poll=%{public}d input_state=%{public}d",
+       hasEnv ? 1 : 0, hasVideoRefresh ? 1 : 0,
+       hasAudioSample ? 1 : 0, hasAudioBatch ? 1 : 0,
+       hasInputPoll ? 1 : 0, hasInputState ? 1 : 0);
 }
 
 // [REMOVED] Old Input Callbacks (Moved to InputManager)

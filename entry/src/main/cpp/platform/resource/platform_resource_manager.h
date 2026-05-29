@@ -53,6 +53,10 @@ public:
   // 初始化 (传入 HarmonyOS 资源管理器句柄)
   void Initialize(NativeResourceManager *native_mgr);
 
+  // 释放内部句柄引用，使后续 Get*() 调用安全降级到文件系统路径。
+  // 不释放 NativeResourceManager 本身的所有权（由调用方负责）。
+  void Release();
+
 private:
   PlatformResourceManager();
   ~PlatformResourceManager() override;

@@ -22,7 +22,7 @@ import { EmuStateColors, EmuTypography } from '../common/EmuUiTokens';
 interface LibretroNapi {
   refactoredStartEngine(): boolean;
   refactoredStopEngine(): boolean;
-  refactoredStopEngineAsync(): boolean;
+  refactoredStopEngineAsync(): Promise<boolean>;
   refactoredLoadCore(path: string): boolean;
   refactoredLoadRom(
     path: string,
@@ -744,7 +744,7 @@ struct TestGambatte {
       const timeoutMs = 5000;
       nativeApi.refactoredClearLastErrorInfo();
 
-      const stopOk = nativeApi.refactoredStopEngineAsync();
+      const stopOk = await nativeApi.refactoredStopEngineAsync();
       if (stopOk) {
         const stopped = await this.waitEngineQuiesced(timeoutMs);
         if (!stopped) {
@@ -887,7 +887,7 @@ struct TestGambatte {
 
     const timeoutMs = 5000;
     nativeApi.refactoredClearLastErrorInfo();
-    const stopOk = nativeApi.refactoredStopEngineAsync();
+    const stopOk = await nativeApi.refactoredStopEngineAsync();
     if (stopOk) {
       const stopped = await this.waitEngineQuiesced(timeoutMs);
       if (!stopped) {
@@ -1029,7 +1029,7 @@ struct TestGambatte {
       throw new Error(message);
     } finally {
       // 再次确保清理
-      nativeApi.refactoredStopEngineAsync();
+      void nativeApi.refactoredStopEngineAsync();
       await this.waitEngineQuiesced(2000);
     }
   }

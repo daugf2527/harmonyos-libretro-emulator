@@ -5,11 +5,19 @@
 
 #include <cctype>
 #include <map>
+#include <mutex>
 #include <string>
 #include <utility>
 
 namespace libretro {
 namespace core_options {
+
+// Serializes the read-modify-write in SetCoreOptionValue against concurrent
+// callers (e.g. EventBridge / NAPI thread racing with Engine thread).
+static std::mutex &GetSetValueMutex() {
+  static std::mutex mtx;
+  return mtx;
+}
 
 // Thread safety: only called from Engine thread (single-threaded access).
 // If multi-core loading is ever needed, wrap with std::mutex.
@@ -199,6 +207,9 @@ bool SetCoreOptionValue(EnvState &state, const char *key, const char *value) {
   if (!key || !value) {
     return false;
   }
+
+  // Serialize read-modify-write to prevent lost updates from concurrent callers
+  std::lock_guard<std::mutex> lock(GetSetValueMutex());
 
   const auto defsSnapshot = state.GetCoreOptionDefinitions();
   const CoreOptionDefinition *def = FindDefinitionByKey(defsSnapshot, key);

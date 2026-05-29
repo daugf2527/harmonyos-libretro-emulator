@@ -217,7 +217,7 @@ struct LibretroGamePage {
     this.switchToken += 1;
     this.pendingSwitch = undefined;
     if (this.switching) {
-      runtimeSessionController.stopAsync();
+      void runtimeSessionController.stopAsync();
       this.switching = false;
     }
     void this.finalizeActiveLibrarySession();
@@ -1223,7 +1223,7 @@ struct LibretroGamePage {
         return;
       }
       if (!success) {
-        runtimeSessionController.stopAsync();
+        void runtimeSessionController.stopAsync();
       }
       this.switching = false;
       if (this.pendingSwitch) {
@@ -1262,7 +1262,7 @@ struct LibretroGamePage {
     if (this.gameRunning || this.gamePaused) {
       void this.finalizeActiveLibrarySession();
       // stopAsync uses napi_async_work — returns immediately, real stop on worker
-      runtimeSessionController.stopAsync();
+      void runtimeSessionController.stopAsync();
       this.gameRunning = false;
       this.gamePaused = false;
       this.stopSoak();

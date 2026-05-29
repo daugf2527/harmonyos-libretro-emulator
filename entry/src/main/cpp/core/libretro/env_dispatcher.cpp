@@ -497,23 +497,39 @@ static struct retro_vfs_interface g_vfs_interface = {
     VfsCloseDir,
 };
 
-// Global callbacks for static interfaces
+// Global callbacks for static interfaces.
+//
+// Thread model:
+//   - SetGlobal* registration functions are called from LibretroEngine::SetupCallbacks(),
+//     which runs on the Engine thread (inside HandleMessage(LoadCore)).
+//     They must NOT be called from any other thread.
+//   - The static callback trampolines below (RumbleSetState, SensorSetState,
+//     SensorGetInput, GetCurrentFramebuffer) are invoked by the libretro core
+//     during retro_run(), which also executes on the Engine thread.
+//   - g_hw_framebuffer_cb is set once in LibretroEngine constructor (before any
+//     thread is started) and is read-only thereafter; it is safe to call from
+//     the Engine thread without a lock.
+//   - No other thread may read or write these globals.
 static libretro::RumbleCallback g_rumble_cb = nullptr;
 static libretro::SensorSetStateCallback g_sensor_set_cb = nullptr;
 static libretro::SensorGetInputCallback g_sensor_get_cb = nullptr;
 static std::function<uintptr_t(void)> g_hw_framebuffer_cb;
 
 namespace libretro {
+// Must be called on Engine thread (from SetupCallbacks / LibretroEngine constructor).
 void SetGlobalRumbleCallback(RumbleCallback cb) { g_rumble_cb = cb; }
+// Must be called on Engine thread (from SetupCallbacks).
 void SetGlobalSensorCallbacks(SensorSetStateCallback set_cb, SensorGetInputCallback get_cb) {
   g_sensor_set_cb = set_cb;
   g_sensor_get_cb = get_cb;
 }
+// Must be called before Engine thread starts (from LibretroEngine constructor).
 void SetGlobalHwRenderFramebufferCallback(HwRenderFramebufferCallback cb) {
   g_hw_framebuffer_cb = cb;
 }
 } // namespace libretro
 
+// Must be called on Engine thread (invoked by libretro core during retro_run).
 static bool RETRO_CALLCONV RumbleSetState(unsigned port, enum retro_rumble_effect effect,
                                          uint16_t strength) {
   if (g_rumble_cb) {
@@ -531,6 +547,7 @@ static void RETRO_CALLCONV LedSetState(int led, int state) {
 
 static struct retro_led_interface g_led_interface = {LedSetState};
 
+// Must be called on Engine thread (invoked by libretro core during retro_run).
 static bool RETRO_CALLCONV SensorSetState(unsigned port, enum retro_sensor_action action,
                                           unsigned rate) {
   if (g_sensor_set_cb) {
@@ -539,6 +556,7 @@ static bool RETRO_CALLCONV SensorSetState(unsigned port, enum retro_sensor_actio
   return false;
 }
 
+// Must be called on Engine thread (invoked by libretro core during retro_run).
 static float RETRO_CALLCONV SensorGetInput(unsigned port, unsigned id) {
   if (g_sensor_get_cb) {
     return g_sensor_get_cb(port, id);
@@ -554,6 +572,8 @@ static void RETRO_CALLCONV CameraStop(void) {}
 
 namespace libretro {
 
+// Must be called on Engine thread (invoked by libretro core via hw_render_callback
+// during retro_run or context_reset/context_destroy).
 static uintptr_t RETRO_CALLCONV GetCurrentFramebuffer(void) {
   if (g_hw_framebuffer_cb) {
     return g_hw_framebuffer_cb();
@@ -873,6 +893,10 @@ bool EnvState::ConsumeVariableUpdated() {
   return updated;
 }
 
+// Must be called on Engine thread.
+// This function is the retro_environment_t callback registered via
+// retro_set_environment(). The libretro core calls it from retro_init(),
+// retro_load_game(), and retro_run() — all of which execute on the Engine thread.
 bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data) {
   switch (cmd) {
   case RETRO_ENVIRONMENT_SET_ROTATION:

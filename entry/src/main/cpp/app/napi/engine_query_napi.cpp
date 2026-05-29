@@ -375,5 +375,8 @@ void RegisterQueryNapi(napi_env env, napi_value exports) {
       {"refactoredHasCoreLoaded", nullptr, HasCoreLoaded, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredHasGameLoaded", nullptr, HasGameLoaded, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
-  napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  if (regStatus != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] RegisterQueryNapi: napi_define_properties failed: %{public}d", regStatus);
+  }
 }

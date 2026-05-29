@@ -385,6 +385,9 @@ bool VulkanContext::PickQueueFamily(VkPhysicalDevice gpu, uint32_t &graphics,
   }
   std::vector<VkQueueFamilyProperties> props(count);
   api.get_physical_device_queue_family_properties(gpu, &count, props.data());
+
+  // First pass: prefer a single queue family that supports both graphics and
+  // present — avoids the overhead of concurrent swapchain sharing mode.
   for (uint32_t i = 0; i < count; ++i) {
     if (!(props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT)) {
       continue;
@@ -397,6 +400,36 @@ bool VulkanContext::PickQueueFamily(VkPhysicalDevice gpu, uint32_t &graphics,
       present = i;
       return true;
     }
+  }
+
+  // Second pass: find separate graphics and present queue families.
+  // Some devices expose a graphics queue that does not support present on the
+  // given surface; in that case we must use a dedicated presentation queue.
+  uint32_t graphics_family = UINT32_MAX;
+  uint32_t present_family = UINT32_MAX;
+  for (uint32_t i = 0; i < count; ++i) {
+    if ((props[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) &&
+        graphics_family == UINT32_MAX) {
+      graphics_family = i;
+    }
+    VkBool32 supports_present = VK_FALSE;
+    api.get_physical_device_surface_support_khr(gpu, i, surface_,
+                                                &supports_present);
+    if (supports_present && present_family == UINT32_MAX) {
+      present_family = i;
+    }
+    if (graphics_family != UINT32_MAX && present_family != UINT32_MAX) {
+      break;
+    }
+  }
+  if (graphics_family != UINT32_MAX && present_family != UINT32_MAX) {
+    LOGF(LOG_WARN,
+         "PickQueueFamily: using separate graphics(%{public}u) and "
+         "present(%{public}u) queue families",
+         graphics_family, present_family);
+    graphics = graphics_family;
+    present = present_family;
+    return true;
   }
   return false;
 }

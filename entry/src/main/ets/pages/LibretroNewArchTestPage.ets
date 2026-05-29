@@ -38,7 +38,7 @@ import { EmuButton, EmuButtonKind, EmuButtonSize } from '../components/EmuButton
 interface LibretroNapi {
   refactoredStartEngine(): boolean;
   refactoredStopEngine(): boolean;
-  refactoredStopEngineAsync(): boolean;
+  refactoredStopEngineAsync(): Promise<boolean>;
   refactoredLoadCore(path: string): boolean;
   refactoredLoadRom(
     path: string,
@@ -288,7 +288,7 @@ struct LibretroNewArchTestPage {
   };
   private onStopEngine = async (): Promise<void> => {
     this.log('调用 refactoredStopEngine');
-    const ok: boolean = nativeApi.refactoredStopEngineAsync();
+    const ok: boolean = await nativeApi.refactoredStopEngineAsync();
     this.log(`refactoredStopEngine 返回: ${ok}`);
     if (!ok) { this.status = '停止失败'; return; }
     const stopped = await nativeApi.refactoredWaitForStateAsync(EngineState.STOPPED, 5000);
@@ -447,7 +447,7 @@ struct LibretroNewArchTestPage {
       this.eventScope = undefined;
     }
     this.log('页面销毁，停止引擎');
-    nativeApi.refactoredStopEngineAsync();
+    void nativeApi.refactoredStopEngineAsync();
     this.stopInputDebug();
   }
 

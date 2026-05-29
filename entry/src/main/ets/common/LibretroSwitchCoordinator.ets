@@ -7,7 +7,7 @@ import { EngineErrorInfo, EngineState } from './LibretroEventHub';
 interface LibretroNapi {
   refactoredStartEngine(): boolean;
   refactoredStopEngine(): boolean;
-  refactoredStopEngineAsync(): boolean;
+  refactoredStopEngineAsync(): Promise<boolean>;
   refactoredResetEngine(): boolean;
   refactoredLoadCore(path: string): boolean;
   refactoredLoadRom(
@@ -95,7 +95,7 @@ export default class LibretroSwitchCoordinator {
     id: string,
     timeoutMs: number
   ): Promise<LibretroSwitchResult> {
-    nativeApi.refactoredStopEngineAsync();
+    void nativeApi.refactoredStopEngineAsync();
     const ok = await this.waitEngineQuiesced(timeoutMs);
     if (!ok) {
       const resetTriggered = nativeApi.refactoredResetEngine();

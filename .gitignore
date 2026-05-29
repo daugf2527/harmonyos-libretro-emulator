@@ -39,3 +39,5 @@ nul
 *.pem
 *.key
 *.p12
+*.keystore
+*.jks
