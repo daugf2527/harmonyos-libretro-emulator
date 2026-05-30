@@ -27,12 +27,13 @@
 - 测试高频切换场景
 - 报告: docs/audit/m0-t28-failure-recovery.md
 
-### 29. Switch 单飞验证
+### 29. ✅ Switch 单飞验证
 - 编写高频切换测试脚本
 - 验证无崩溃、无状态错乱
 - 记录验证结果
+- 报告: docs/audit/m0-t29-verification-plan.md
 
-### 30. Commit M0 (15min)
+### 30. ✅ Commit M0 (15min)
 - 提交 Switch 单飞改动
 - 更新 Roadmap.md
 
