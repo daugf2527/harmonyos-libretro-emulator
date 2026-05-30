@@ -1,4 +1,4 @@
-import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
@@ -15,12 +15,7 @@ interface HelpItem {
 @Component
 struct AboutHelpPage {
   @State private selectedHelpId: string = 'import'
-  private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
-    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: true }
-  ]
+  private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
   private readonly helpItems: HelpItem[] = [
     { id: 'import', title: '怎么导入游戏？', detail: 'Procedure / Storage / Pathing', value: '使用导入入口选择本地 ROM，导入完成后进入库页同步。' },
     { id: 'input', title: '按键没反应怎么办？', detail: 'Input / Mapping / Calibration', value: '进入 INPUT 页面检查端口映射；布局编辑只保存本地 UI 配置。' },

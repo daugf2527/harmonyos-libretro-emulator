@@ -1,6 +1,6 @@
 import testNapi from 'libentry.so'
 import { common } from '@kit.AbilityKit'
-import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import {
@@ -16,6 +16,7 @@ import LogHelper from '../common/LogHelper'
 interface SaveStateNapi {
   refactoredSaveStateAsync(): Promise<ArrayBuffer | null>
   refactoredLoadState(data: ArrayBuffer): boolean
+  refactoredLoadStateAsync(data: ArrayBuffer): Promise<boolean>
 }
 
 interface SaveSlotItem {
@@ -48,12 +49,7 @@ struct SaveStatePage {
   private toastTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0
-  private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
-    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: true }
-  ]
+  private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
   private readonly coverColors: string[] = ['#274530', '#27405E', '#4A3628', '#39364A']
 
   aboutToAppear(): void {

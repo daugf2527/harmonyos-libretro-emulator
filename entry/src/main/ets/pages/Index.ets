@@ -77,25 +77,6 @@ struct Index {
         .width('100%')
         .justifyContent(FlexAlign.Center)
 
-        // 通用 Libretro 游戏页面按钮
-        Row() {
-          Button('通用 Libretro 游戏')
-            .fontSize(EmuTypography.xl)
-            .width('80%')
-            .height(60)
-            .backgroundColor('#4CAF50')
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({
-                url: 'pages/LibretroGamePage'
-              }).catch((err: Error) => {
-                console.error(`[Index] Router error: ${err.message}`);
-              });
-            })
-        }
-        .margin({ top: 10 })
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-
         Row() {
           Button('产品入口：游戏库')
             .fontSize(EmuTypography.xl)

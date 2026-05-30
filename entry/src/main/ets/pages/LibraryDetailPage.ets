@@ -428,10 +428,6 @@ struct LibraryDetailPage {
       this.openLibraryPage()
       return
     }
-    if (key === 'engine') {
-      this.launchGame()
-      return
-    }
     const route = getEmuBottomNavTargetRoute(key, 'library')
     if (route.length === 0) {
       return

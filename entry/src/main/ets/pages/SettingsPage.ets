@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuButton, EmuButtonKind, EmuButtonSize, EmuButtonShape } from '../components/EmuButton'
-import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { BarChartBackground, BarChartItem, EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import { loadInputLayoutProfile } from '../common/InputLayoutRepository'
@@ -126,12 +126,7 @@ struct SettingsPage {
   private pageActive: boolean = false
   private refreshToken: number = 0
 
-  private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
-    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: true }
-  ]
+  private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
 
   private readonly aspectOptions: SettingOptionItem[] = [
     { key: '4:3', label: '4:3', isActive: true },

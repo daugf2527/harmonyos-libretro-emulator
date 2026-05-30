@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
-import { EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuBottomNav } from '../components/EmuBottomNav'
 import { ImportEmptyStateHero } from '../components/ImportEmptyStateHero'
 import { setPendingImportUris } from '../common/ImportTaskBridge'
@@ -90,12 +90,7 @@ struct ImportEntryPage {
   @State private particleBoosted: boolean = false
   private scanTimer: number = -1
   private pageActive: boolean = false
-  private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: true },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
-    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: false }
-  ]
+  private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('library')
 
   private onBottomNavClick(key: string): void {
     const route = getEmuBottomNavTargetRoute(key, 'library')

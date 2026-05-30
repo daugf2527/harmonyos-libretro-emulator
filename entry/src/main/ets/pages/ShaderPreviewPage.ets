@@ -1,4 +1,4 @@
-import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
@@ -57,12 +57,7 @@ struct ShaderPreviewPage {
   @State private statusText: string = '滤镜运行时未接入'
   private readonly scanlineRows: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
   private readonly previewStatBars: number[] = [12, 22, 34, 18, 42, 28]
-  private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: true },
-    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: false }
-  ]
+  private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
 
   private resetPreset(): void {
     this.scanlineIntensity = 65
@@ -96,7 +91,7 @@ struct ShaderPreviewPage {
   }
 
   private onBottomNavClick(key: string): void {
-    const route = getEmuBottomNavTargetRoute(key, 'engine')
+    const route = getEmuBottomNavTargetRoute(key, 'system')
     if (route.length === 0) {
       return
     }

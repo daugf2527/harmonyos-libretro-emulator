@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { fileIo as fs } from '@kit.CoreFileKit'
-import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
 import {
@@ -39,12 +39,7 @@ struct CoreManagerPage {
   @State private remoteUpdateText: string = '当前构建未配置远端 core / firmware 仓库'
   private pageActive: boolean = false
   private coreRefreshToken: number = 0
-  private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
-    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: false },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: true }
-  ]
+  private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
 
   aboutToAppear(): void {
     this.pageActive = true

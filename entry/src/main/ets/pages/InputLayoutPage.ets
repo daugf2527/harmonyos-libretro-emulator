@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit'
-import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuMetrics, EmuTypography } from '../common/EmuUiTokens'
@@ -58,12 +58,7 @@ struct InputLayoutPage {
   private dragStartY: number = 0
   private readonly editorLayoutWidth: number = 440
   private readonly editorLayoutHeight: number = 340
-  private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: false },
-    { key: 'input', iconName: 'sports_esports', label: '输入', isActive: true },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: false }
-  ]
+  private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('input')
   private readonly controllerCards: ControllerCardItem[] = [
     {
       id: 'p1',

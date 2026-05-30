@@ -8,12 +8,11 @@ export interface EmuBottomNavItem {
   isActive: boolean
 }
 
-export type EmuBottomNavKey = 'library' | 'engine' | 'input' | 'system'
+export type EmuBottomNavKey = 'library' | 'input' | 'system'
 
 export function createEmuBottomNavItems(activeKey: EmuBottomNavKey): EmuBottomNavItem[] {
   return [
     { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: activeKey === 'library' },
-    { key: 'engine', iconName: 'terminal', label: '引擎', isActive: activeKey === 'engine' },
     { key: 'input', iconName: 'sports_esports', label: '输入', isActive: activeKey === 'input' },
     { key: 'system', iconName: 'tune', label: '系统', isActive: activeKey === 'system' }
   ]
@@ -36,9 +35,6 @@ export struct EmuBottomNav {
   private getPrimaryLabel(item: EmuBottomNavItem): string {
     if (item.key === 'library') {
       return 'LIBRARY'
-    }
-    if (item.key === 'engine') {
-      return 'ENGINE'
     }
     if (item.key === 'input') {
       return 'INPUT'

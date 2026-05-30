@@ -1,6 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { EmuHeaderBar, GridBackground } from '../components/EmuAppShell'
-import { EmuBottomNav, EmuBottomNavItem } from '../components/EmuBottomNav'
+import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { consumePendingImportUris } from '../common/ImportTaskBridge'
 import { EmuColors, EmuStateColors, EmuTypography } from '../common/EmuUiTokens'
@@ -107,11 +107,7 @@ struct ImportTaskOverlayPage {
   private pageActive: boolean = false
   private importTaskToken: number = 0
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
-  private readonly navItems: EmuBottomNavItem[] = [
-    { key: 'library', iconName: 'grid_view', label: '游戏库', isActive: false },
-    { key: 'explore', iconName: 'explore', label: '探索', isActive: false },
-    { key: 'system', iconName: 'tune', label: '系统', isActive: true }
-  ]
+  private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('library')
 
   aboutToAppear(): void {
     this.pageActive = true
