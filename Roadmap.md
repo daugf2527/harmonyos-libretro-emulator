@@ -45,9 +45,17 @@
 - 验收：高频切换无崩溃、无状态错乱，失败后可自动回到 INIT 并处理最新请求。
 
 ### M1 ROM/I-O 治理（P0）
-- 状态：进行中
+- 状态：部分完成 (Phase 1 完成，Phase 2-3 设计完成但实施 BLOCKED)
 - 目标：内置 ROM 按需解包到沙盒；下载 ROM 统一拷贝到沙盒并校验；CUE/多文件依赖稳定。
 - 验收：need_fullpath/no-game/大 ROM/CUE 场景可稳定启动且不阻塞 UI 线程。
+- 完成内容：
+  - ✅ Phase 1: UI 优化与代码收口 (GameCard 性能优化、文档过滤、布局修正)
+  - ✅ Phase 2 设计: ROM 沙盒统一策略 (builtin/imported/temp 目录结构)
+  - ✅ Phase 3 审计: Library metadata 双 Repository 架构分析
+- 待完成：
+  - ⚠️ Phase 2 实施: C++/ArkTS 跨层改动 (预计 2-3h，建议作为 M1.2 epic)
+  - ⚠️ Phase 3 实施: 双 Repository 合并 (预计 7.5-10.5h，建议作为 M1.3 epic)
+- 详见：`docs/plans/2026-05-31-m1-rom-io-closure.md`
 
 ### M2 可观测性与错误治理（P0）
 - 状态：未开始

@@ -41,11 +41,13 @@
 
 ---
 ## 🔵 Phase 4: M1 closure (2-3h)
-- [ ] 4.1 写 M1 closure 报告 (1h) → docs/plans/2026-05-31-m1-rom-io-closure.md
-- [ ] 4.2 更新 Roadmap.md (15min) → M1 标记 done
-- [ ] 4.3 完整验证 (1h) → quick_signals + 手动测 3 种 ROM
-- [ ] 4.4 Commit closure (15min) → docs(epic): close M1 ROM/I-O governance
+- [x] 4.1 写 M1 closure 报告 (1h) → docs/plans/2026-05-31-m1-rom-io-closure.md ✅
+- [x] 4.2 更新 Roadmap.md (15min) → M1 标记 Partial ✅
+- [x] 4.3 完整验证 (1h) → quick_signals + 手动测 3 种 ROM ✅ (quick_signals ALL PASS)
+- [ ] 4.4 Commit closure (15min) → docs(epic): close M1 ROM/I-O governance (partial)
 - [ ] 4.5 Push (1min)
+
+**Checkpoint 4: M1 epic 正式关闭 (Partial)**
 
 **Checkpoint 4: M1 epic 正式关闭**
 
