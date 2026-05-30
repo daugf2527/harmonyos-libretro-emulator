@@ -54,34 +54,74 @@ export struct LibraryGameSections {
   @Prop spinnerAngle: number = 0
   onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
   onHideSearchResults?: () => void
+  onListScrolled?: (yOffset: number) => void
+  onListReachEnd?: () => void
+  onListTouched?: (event: TouchEvent, yOffset: number) => void
   private allGamesDataSource: LibraryDataSource = new LibraryDataSource();
+  private listScroller: ListScroller = new ListScroller();
 
   aboutToAppear(): void {
     this.allGamesDataSource.updateGames(this.games);
   }
 
   build() {
-    Column({ space: 28 }) {
-      Column({ space: 18 }) {
-        LibrarySection({
-          title: '最近运行',
-          codeLabel: 'HISTORY_LOG'
-        })
-        this.RecentContent()
+    List({ space: 18, scroller: this.listScroller }) {
+      ListItem() {
+        Column({ space: 18 }) {
+          LibrarySection({
+            title: '最近运行',
+            codeLabel: 'HISTORY_LOG'
+          })
+          this.RecentContent()
+        }
+        .width('100%')
       }
-      .onClick(() => {
-        this.onHideSearchResults?.()
-      })
 
-      Column({ space: 18 }) {
-        this.AllGamesHeader()
-        this.AllGamesContent()
-        this.BottomLoader()
+      ListItem() {
+        Column() {
+          this.AllGamesHeader()
+        }
+        .width('100%')
+        .padding({ top: 10 })
       }
-      .onClick(() => {
-        this.onHideSearchResults?.()
-      })
+
+      LazyForEach(this.allGamesDataSource, (item: LibraryRecord) => {
+        ListItem() {
+          GameCard({
+            title: item.title,
+            subtitle: item.subtitle,
+            platform: item.platform,
+            coverColor: item.coverColor,
+            coverKey: item.coverKey,
+            variant: 'list'
+          })
+            .onTouch((event: TouchEvent) => {
+              this.onCardTouch?.(event, item)
+            })
+        }
+      }, (item: LibraryRecord) => item.id)
+
+      if (this.bottomLoaderActive || (this.games.length === 0 && this.recentGames.length === 0)) {
+        ListItem() {
+          this.BottomLoader()
+        }
+      }
     }
+    .width('100%')
+    .scrollBar(BarState.Off)
+    .edgeEffect(EdgeEffect.None)
+    .onScroll((_scrollOffset: number, _scrollState: ScrollState) => {
+      this.onListScrolled?.(Math.max(0, Number(this.listScroller.currentOffset().yOffset)))
+    })
+    .onReachEnd(() => {
+      this.onListReachEnd?.()
+    })
+    .onTouch((event: TouchEvent) => {
+      this.onListTouched?.(event, Math.max(0, Number(this.listScroller.currentOffset().yOffset)))
+    })
+    .onClick(() => {
+      this.onHideSearchResults?.()
+    })
   }
 
   @Builder
@@ -135,26 +175,6 @@ export struct LibraryGameSections {
     .width('100%')
     .justifyContent(FlexAlign.SpaceBetween)
     .alignItems(VerticalAlign.Bottom)
-  }
-
-  @Builder
-  private AllGamesContent() {
-    Column({ space: 18 }) {
-      LazyForEach(this.allGamesDataSource, (item: LibraryRecord) => {
-        GameCard({
-          title: item.title,
-          subtitle: item.subtitle,
-          platform: item.platform,
-          coverColor: item.coverColor,
-          coverKey: item.coverKey,
-          variant: 'list'
-        })
-        .onTouch((event: TouchEvent) => {
-          this.onCardTouch?.(event, item)
-        })
-      }, (item: LibraryRecord) => item.id)
-    }
-    .width('100%')
   }
 
   @Builder

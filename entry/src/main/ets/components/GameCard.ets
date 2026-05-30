@@ -16,6 +16,8 @@ export struct GameCard {
   @State private scannerOffset: number = -120
   @State private glowOpacity: number = 0.28
   private scannerTimer: number = -1
+  private scannerFrame: number = 0
+  private isOnScreen: boolean = true
 
   aboutToAppear(): void {
     this.syncScannerLoop()
@@ -29,15 +31,22 @@ export struct GameCard {
     this.syncScannerLoop()
   }
 
-  private startScannerLoop(): void {
-    if (!this.isHighlighted || this.scannerTimer !== -1) {
+  private onVisibilityChanged(visible: boolean): void {
+    if (this.isOnScreen === visible) {
       return
     }
-    let frame = 0
+    this.isOnScreen = visible
+    this.syncScannerLoop()
+  }
+
+  private startScannerLoop(): void {
+    if (!this.isHighlighted || !this.isOnScreen || this.scannerTimer !== -1) {
+      return
+    }
     this.scannerTimer = setInterval(() => {
-      frame += 1
-      this.scannerOffset = -120 + (frame % 90) * 4
-      this.glowOpacity = 0.2 + (Math.sin(frame / 5) + 1) * 0.18
+      this.scannerFrame = (this.scannerFrame + 1) % 90
+      this.scannerOffset = -120 + this.scannerFrame * 4
+      this.glowOpacity = 0.2 + (Math.sin(this.scannerFrame / 5) + 1) * 0.18
     }, 90)
   }
 
@@ -46,12 +55,13 @@ export struct GameCard {
       clearInterval(this.scannerTimer)
       this.scannerTimer = -1
     }
+    this.scannerFrame = 0
     this.scannerOffset = -120
     this.glowOpacity = 0.28
   }
 
   private syncScannerLoop(): void {
-    if (this.isHighlighted) {
+    if (this.isHighlighted && this.isOnScreen) {
       this.startScannerLoop()
       return
     }
@@ -89,7 +99,7 @@ export struct GameCard {
       Stack() {
         Column()
           .width('100%')
-          .aspectRatio(3 / 4)
+          .height('100%')
           .backgroundColor(this.coverColor)
           .borderRadius(14)
           .border({
@@ -115,7 +125,7 @@ export struct GameCard {
           variant: 'recent'
         })
           .width('100%')
-          .aspectRatio(3 / 4)
+          .height('100%')
           .scale({ x: this.isHighlighted ? 1.02 : 1, y: this.isHighlighted ? 1.02 : 1 })
           .clip(true)
           .borderRadius(14)
@@ -145,6 +155,7 @@ export struct GameCard {
         this.CoverBadge()
       }
       .width('100%')
+      .aspectRatio(3 / 4)
 
       Column({ space: 4 }) {
         Text(this.title)
@@ -172,6 +183,9 @@ export struct GameCard {
     .onClick(() => {
       this.onCardClick?.()
     })
+    .onVisibleAreaChange([0.0, 0.1], (isVisible: boolean, currentRatio: number) => {
+      this.onVisibilityChanged(isVisible || currentRatio > 0)
+    })
   }
 
   @Builder
@@ -180,7 +194,7 @@ export struct GameCard {
       Stack() {
         Column()
           .width('100%')
-          .aspectRatio(4 / 3)
+          .height('100%')
           .backgroundColor(this.coverColor)
           .borderRadius(10)
           .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
@@ -191,7 +205,7 @@ export struct GameCard {
           variant: 'list'
         })
           .width('100%')
-          .aspectRatio(4 / 3)
+          .height('100%')
           .clip(true)
           .borderRadius(10)
       }

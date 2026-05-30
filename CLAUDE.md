@@ -150,3 +150,22 @@ Restart session and verify with `node --version` plus `/mcp` (all servers should
 3. 本机 SDK header 优先（OH_* API 契约直接读 `D:\Program Files\DevEco Studio\sdk\...\external_window.h` 等）—— 见 memory `feedback_websearch_fail_fallback_to_sdk_header`。
 
 > firecrawl 工具组（scrape / search / parse 等 24 个）已于 2026-05-28 整体弃用，见 memory `feedback_firecrawl_deprecated`。
+
+## 代码搜索工具策略
+
+**直接用 Grep + Glob，跳过 fast-context**——本仓三轮实测 fast-context 三连败：
+
+| 查询 | fast-context | Grep |
+|---|---|---|
+| Q1 音频核心初始化 | 命中 2 个 `docs/audit/*.md` 复盘文档（**0 源码**） | `audio_driver_init\|retro_audio_callback` 直接命中 `audio_player.cpp` / `audio_resampler.cpp` / `i_audio_sink.h` 等 |
+| Q2 NAPI 桥 | 返回 `entry/src/main/app/napi/**.*`（**目录通配符无效**） | `napi_module\|NAPI_MODULE` 直接命中 `entry/src/main/cpp/app/napi/module_init.cpp` |
+| Q3 输入事件流 ArkTS→native | `No files found` | 直接命中 `LibretroGamePage.ets` + `VirtualController.ets` + `libretro_engine.cpp` + `core_loader_napi.cpp` 整条链路 |
+
+原因：
+1. **Devstral 训练语料对 libretro + 鸿蒙 NAPI 覆盖低**（垂直领域语料稀缺）
+2. **C++ 文件深嵌套 5 层** `entry/src/main/cpp/core/libretro/`，fast-context 默认 `tree_depth=1` 看不到深层
+
+**关键命名提醒**（避免再像测试时一样翻车）：
+- 项目 NAPI 入口实际用 `napi_module` 类型 + `napi_module_register` 函数（**全小写**），不是常见的 `NAPI_MODULE` 宏
+
+详见 user memory `[[reference-fast-context-mcp]]`。

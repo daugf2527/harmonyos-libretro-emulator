@@ -15,6 +15,19 @@ export interface RuntimeRomSourceItem {
   launchPath: string
 }
 
+const DOCUMENTATION_BASENAMES: string[] = [
+  'readme', 'license', 'licence', 'copying', 'changelog', 'changes', 'notes',
+  'authors', 'contributors', 'install', 'todo', 'history', 'news', 'credits'
+]
+
+function isLikelyDocumentationFile(fileName: string): boolean {
+  const slashIndex = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'))
+  const base = slashIndex >= 0 ? fileName.substring(slashIndex + 1) : fileName
+  const dotIndex = base.lastIndexOf('.')
+  const stem = dotIndex > 0 ? base.substring(0, dotIndex) : base
+  return DOCUMENTATION_BASENAMES.includes(stem.toLowerCase())
+}
+
 export function buildRuntimeRomConfigs(sources: RuntimeRomSourceItem[]): RuntimeRomConfig[] {
   const uniqueSources = sources.filter((item: RuntimeRomSourceItem, index: number) => {
     return item.fileName.length > 0 &&
@@ -28,6 +41,9 @@ export function buildRuntimeRomConfigs(sources: RuntimeRomSourceItem[]): Runtime
   const roms: RuntimeRomConfig[] = []
   uniqueSources.forEach((source: RuntimeRomSourceItem) => {
     const fileName = source.fileName
+    if (isLikelyDocumentationFile(fileName)) {
+      return
+    }
     const lowerName = fileName.toLowerCase()
     const ext = getFileExtension(lowerName)
     if (!ext) {

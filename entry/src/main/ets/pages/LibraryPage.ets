@@ -113,7 +113,6 @@ struct LibraryPage {
   @State private pullRefreshOpacity: number = 0
   @State private refreshing: boolean = false
   @State private bottomLoaderActive: boolean = false
-  private scroller: Scroller = new Scroller()
   private searchTimer: number = -1
   private toastTimer: number = -1
   private refreshTimer: number = -1
@@ -132,10 +131,10 @@ struct LibraryPage {
   private cardTouchStartY: number = 0
   private cardTouchMoved: boolean = false
   private cardLongPressed: boolean = false
-  private cachedFilteredGames: LibraryRecord[] = []
-  private cachedFilteredRecentGames: LibraryRecord[] = []
-  private cachedSearchResults: LibraryRecord[] = []
-  private cachedDisplayPlatformFilters: string[] = []
+  @State private cachedFilteredGames: LibraryRecord[] = []
+  @State private cachedFilteredRecentGames: LibraryRecord[] = []
+  @State private cachedSearchResults: LibraryRecord[] = []
+  @State private cachedDisplayPlatformFilters: string[] = []
   @State private hasLastPlayed: boolean = false
   @State private lastPlayedTitle: string = ''
   @State private lastPlayedPlatform: string = ''
@@ -440,13 +439,8 @@ struct LibraryPage {
     }
   }
 
-  private onMainWillScroll(
-    _xOffset: number,
-    _yOffset: number,
-    _scrollState: number,
-    _scrollSource: number
-  ): void {
-    const currentOffset = Math.max(0, Number(this.scroller.currentOffset().yOffset))
+  private onMainWillScroll(yOffset: number): void {
+    const currentOffset = Math.max(0, yOffset)
     this.scrollOffsetY = currentOffset
     if (this.bottomLoaderActive && currentOffset < 360) {
       this.bottomLoaderActive = false
@@ -790,10 +784,10 @@ struct LibraryPage {
       keyword: this.searchKeyword,
       searchBusy: this.searchBusy,
       showSearchResults: this.showSearchResults,
-      searchResults: this.searchResults,
+      searchResults: this.cachedSearchResults,
       telemetryCells: getLibraryTelemetryCells(this.allGames),
       showTelemetry: hasLibraryTelemetryData(this.allGames),
-      platforms: this.getDisplayPlatformFilters(),
+      platforms: this.cachedDisplayPlatformFilters,
       selectedPlatform: this.selectedPlatform,
       onKeywordChange: (value: string) => {
         this.onSearchKeywordChange(value)
@@ -814,8 +808,8 @@ struct LibraryPage {
   @Builder
   private GameSections() {
     LibraryGameSections({
-      recentGames: this.filteredRecentGames,
-        games: this.filteredGames,
+      recentGames: this.cachedFilteredRecentGames,
+        games: this.cachedFilteredGames,
         highlightedRecentGameId: this.highlightedRecentGameId,
         bottomLoaderActive: this.bottomLoaderActive,
       onCardTouch: (event: TouchEvent, item: LibraryRecord) => {
@@ -823,38 +817,39 @@ struct LibraryPage {
       },
       onHideSearchResults: () => {
         this.hideSearchResultsIfOpened()
+      },
+      onListScrolled: (yOffset: number) => {
+        this.onMainWillScroll(yOffset)
+      },
+      onListReachEnd: () => {
+        this.onReachEnd()
+      },
+      onListTouched: (event: TouchEvent, yOffset: number) => {
+        this.scrollOffsetY = Math.max(0, yOffset)
+        this.onMainContentTouch(event)
       }
     })
+      .layoutWeight(1)
+      .width('100%')
   }
 
   @Builder
   private MainContent() {
-    Scroll(this.scroller) {
-      Column({ space: 28 }) {
-        this.PullRefreshArea()
+    Column({ space: 28 }) {
+      this.PullRefreshArea()
 
-        if (this.hasLastPlayed) {
-          this.LastPlayedChip()
-        }
-
-        this.SearchAndTelemetry()
-
-        this.GameSections()
+      if (this.hasLastPlayed) {
+        this.LastPlayedChip()
       }
-      .width('100%')
-      .padding({ top: 24, bottom: 40 })
-      .alignItems(HorizontalAlign.Start)
+
+      this.SearchAndTelemetry()
+
+      this.GameSections()
     }
-    .scrollBar(BarState.Off)
-    .onWillScroll((xOffset: number, yOffset: number, scrollState: number, scrollSource: number) => {
-      this.onMainWillScroll(xOffset, yOffset, scrollState, scrollSource)
-    })
-    .onReachEnd(() => {
-      this.onReachEnd()
-    })
-    .onTouch((event: TouchEvent) => {
-      this.onMainContentTouch(event)
-    })
+    .width('100%')
+    .height('100%')
+    .padding({ top: 24, bottom: 0 })
+    .alignItems(HorizontalAlign.Start)
   }
 
   @Builder
@@ -898,6 +893,7 @@ struct LibraryPage {
             this.MainContent()
           }
           .width('100%')
+          .height('100%')
           .constraintSize({ maxWidth: 460 })
         }
         .layoutWeight(1)

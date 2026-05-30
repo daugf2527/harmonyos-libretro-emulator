@@ -117,6 +117,11 @@ const MINIVMAC_EXTENSIONS: string[] = ['dsk', 'hvf']
 const CROCODS_EXTENSIONS: string[] = ['kcr', 'sna']
 const MULTIFILE_ENTRY_EXTENSIONS: string[] = ['cue', 'm3u']
 
+const DOCUMENTATION_BASENAMES: string[] = [
+  'readme', 'license', 'licence', 'copying', 'changelog', 'changes', 'notes',
+  'authors', 'contributors', 'install', 'todo', 'history', 'news', 'credits'
+]
+
 export function getRomFileExtension(fileName: string): string {
   const dotIndex = fileName.lastIndexOf('.')
   if (dotIndex < 0 || dotIndex === fileName.length - 1) {
@@ -125,7 +130,18 @@ export function getRomFileExtension(fileName: string): string {
   return fileName.substring(dotIndex + 1).toLowerCase()
 }
 
+function isLikelyDocumentationFile(fileName: string): boolean {
+  const slashIndex = Math.max(fileName.lastIndexOf('/'), fileName.lastIndexOf('\\'))
+  const base = slashIndex >= 0 ? fileName.substring(slashIndex + 1) : fileName
+  const dotIndex = base.lastIndexOf('.')
+  const stem = dotIndex > 0 ? base.substring(0, dotIndex) : base
+  return DOCUMENTATION_BASENAMES.includes(stem.toLowerCase())
+}
+
 export function getPreferredCoreIdForFile(fileName: string): string {
+  if (isLikelyDocumentationFile(fileName)) {
+    return ''
+  }
   const ext = getRomFileExtension(fileName)
   if (GAMBATTE_EXTENSIONS.includes(ext)) {
     return 'gambatte'

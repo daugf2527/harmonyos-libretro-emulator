@@ -57,6 +57,7 @@ export struct PlatformChipBar {
       .scrollable(ScrollDirection.Horizontal)
       .scrollBar(BarState.Off)
       .width('100%')
+      .height(40)
       .align(Alignment.Start)
 
       Column()
@@ -69,5 +70,6 @@ export struct PlatformChipBar {
         .hitTestBehavior(HitTestMode.None)
     }
     .width('100%')
+    .height(40)
   }
 }
