@@ -7,7 +7,7 @@ import {
 export interface RuntimeInputCommandApi {
   refactoredSendInput(port: number, keyId: number, pressed: boolean): boolean
   refactoredSendAnalog(port: number, index: number, id: number, value: number): boolean
-  refactoredGetInputDescriptorMask(): number
+  refactoredGetInputDescriptorMask?(): number
 }
 
 const nativeApi = testNapi as RuntimeInputCommandApi
@@ -16,11 +16,10 @@ const nativeApi = testNapi as RuntimeInputCommandApi
 // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. 0 = core hasn't declared, callers
 // should fall back to the full layout instead of hiding everything.
 export function getRuntimeInputDescriptorMask(): number {
-  const fn = nativeApi.refactoredGetInputDescriptorMask
-  if (typeof fn !== 'function') {
+  if (nativeApi.refactoredGetInputDescriptorMask === undefined) {
     return 0
   }
-  const mask = fn.call(nativeApi)
+  const mask = nativeApi.refactoredGetInputDescriptorMask()
   return Number.isFinite(mask) ? (mask & 0xFFFF) : 0
 }
 
