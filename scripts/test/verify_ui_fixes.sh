@@ -247,16 +247,6 @@ assert_grep "RuntimeKeyButton uses disabledBackground token" \
 assert_grep "RuntimeKeyButton disabled overrides pressed (priority)" \
   "this\.isPressedNow\(\) && !this\.disabled" "$F"
 
-F=entry/src/main/ets/components/RuntimeControlPanel.ets
-assert_grep "Stop button uses danger token (#ff4d4f)" \
-  "EmuStateColors\.dangerDefault" "$F"
-assert_grep "Stop button has EaseInOut animation" \
-  "Curve\.EaseInOut" "$F"
-assert_no_grep "No more #F44336 Material red on Stop" \
-  "#F44336" "$F"
-assert_no_grep "No more #FF5252 error text" \
-  "#FF5252" "$F"
-
 F=entry/src/main/ets/components/DevDiagnosticsBlock.ets
 assert_grep "DevDiagnosticsBlock imports EmuLoadingSpinner" \
   "import \{ EmuLoadingSpinner \}" "$F"

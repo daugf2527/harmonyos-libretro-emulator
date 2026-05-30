@@ -2,7 +2,7 @@ import { EmuMotion, EmuTypography } from '../common/EmuUiTokens'
 import { EmuLoadingSpinner } from './EmuLoadingSpinner'
 
 // Dev-only diagnostics: 验证核心符号 + 10 分钟压力测试。
-// 从 RuntimeControlPanel 抽出，挂在 LibretroNewArchTestPage / Settings 'dev' 分组。
+// 挂在 LibretroNewArchTestPage / Settings 'dev' 分组。
 // 生产 LibretroGamePage 不再承载这两个调试入口。
 @Component
 export struct DevDiagnosticsBlock {

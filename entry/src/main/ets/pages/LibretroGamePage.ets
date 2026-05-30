@@ -6,17 +6,11 @@
 import LogHelper from '../common/LogHelper';
 import { common } from '@kit.AbilityKit';
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens';
-import { RuntimeControlPanel } from '../components/RuntimeControlPanel';
 import { RuntimeHudMetric } from '../components/RuntimeTopHudBar';
 import { RuntimePauseOverlay } from '../components/RuntimePauseOverlay';
 import { RuntimeVirtualControllerLayer } from '../components/RuntimeVirtualControllerLayer';
 import {
-  buildInputSourceItems,
   createDefaultPortAssignments,
-  findPortAssignment,
-  getInputSourceItemIndex,
-  InputDeviceInfo,
-  InputSourceItem,
   InputSourceType,
   PortAssignState,
   updatePortAssignments
@@ -111,11 +105,7 @@ struct LibretroGamePage {
   @State selectedCoreIndex: number = 0;
   @State selectedRomIndex: number = 0;
   @State selectedPortIndex: number = 0;
-  @State portAssignmentVersion: number = 0;
   private portAssignments: PortAssignState[] = createDefaultPortAssignments();
-  private coreOptions: SelectOption[] = [];
-  private romOptions: SelectOption[] = [];
-  @State showControls: boolean = false;
   @State perfDisplay: PerfDisplayState = { realtimeFps: 0, coreFps: 0, audioStatusText: '', perfStatsText: '', geometryText: '' };
   @State inputDebugText: string = '';
   @State inputFocusText: string = '';
@@ -149,9 +139,7 @@ struct LibretroGamePage {
   private readonly startOrSwitchDebounceMs: number = 600;
   private readonly runtimeInputLayoutWidth: number = 440;
   private readonly runtimeInputLayoutHeight: number = 340;
-  // Assigned in refreshInputDevices() alongside inputSourceOptions
-  private inputSourceItems: InputSourceItem[] = [];
-  
+
   private roms: RuntimeRomConfig[] = [];
   private readonly cores: CoreConfig[] = LIBRETRO_CORE_CATALOG;
   // CRITICAL fix: cache getAvailableRoms() .filter() result (reference-equality on roms + coreIndex)
@@ -184,18 +172,8 @@ struct LibretroGamePage {
       this.handleGeometryUpdate(payload);
     });
 
-    // 初始化核心选项
-    let coreOpts = this.cores.map((core): SelectOption => {
-      return { value: core.name };
-    });
-    if (coreOpts.length === 0) {
-      coreOpts = [this.createSelectOption('无')];
-    }
-    this.coreOptions = coreOpts;
-
     void this.refreshRomList();
     this.startInputDebug();
-    this.refreshInputDevices();
     this.syncPortAssignments();
     void this.loadRuntimeInputLayout();
     void this.loadRuntimeRenderSettings();
@@ -367,116 +345,14 @@ struct LibretroGamePage {
     }
   }
 
-  private inputSourceOptions: SelectOption[] = [];
-
-  private refreshInputDevices() {
-    const devices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices();
-    const items: InputSourceItem[] = buildInputSourceItems(devices);
-    this.inputSourceItems = items;
-    this.inputSourceOptions = items.map((item): SelectOption => {
-      return { value: item.label };
-    });
-  }
-
   private syncPortAssignments() {
     this.portAssignments.forEach((assignment) => {
       this.applyPortAssignment(assignment.portId, assignment.sourceType, false, assignment.deviceId);
     });
   }
 
-  private getPortAssignment(portId: number): PortAssignState {
-    return findPortAssignment(this.portAssignments ?? [], portId);
-  }
-
-  private getInputSourceIndex(sourceType: InputSourceType, deviceId: string): number {
-    return getInputSourceItemIndex(this.inputSourceItems, sourceType, deviceId);
-  }
-
-  private createSelectOption(value: ResourceStr): SelectOption {
-    return { value: value };
-  }
-
-  private clampIndex(index: number, length: number): number {
-    const safeIndex = index ?? 0;
-    if (length <= 0) {
-      return 0;
-    }
-    if (safeIndex < 0) {
-      return 0;
-    }
-    if (safeIndex >= length) {
-      return length - 1;
-    }
-    return safeIndex;
-  }
-
-  private get currentPortAssignment(): PortAssignState {
-    return this.getPortAssignment(this.selectedPortIndex);
-  }
-
-  private get currentInputSourceIndex(): number {
-    const assignment = this.currentPortAssignment;
-    return this.getInputSourceIndex(assignment.sourceType, assignment.deviceId);
-  }
-
-  private get safeInputSourceIndex(): number {
-    return this.clampIndex(this.currentInputSourceIndex, this.inputSourceItems.length);
-  }
-
-  private get currentInputSourceLabel(): ResourceStr {
-    const item = this.inputSourceItems[this.safeInputSourceIndex];
-    return item ? item.label : '未分配';
-  }
-
-  private readonly portOptions: SelectOption[] = [
-    { value: 'P1' },
-    { value: 'P2' },
-    { value: 'P3' },
-    { value: 'P4' }
-  ];
-
-  private get safePortIndex(): number {
-    return this.clampIndex(this.selectedPortIndex, this.portOptions.length);
-  }
-
-  private get currentPortLabel(): ResourceStr {
-    const option = this.portOptions[this.safePortIndex];
-    return option?.value ?? 'P1';
-  }
-
-  private get safeCoreIndex(): number {
-    return this.clampIndex(this.selectedCoreIndex, this.cores.length);
-  }
-
-  private get currentCoreLabel(): ResourceStr {
-    const core = this.cores[this.safeCoreIndex];
-    return core ? core.name : '无';
-  }
-
-  private get safeRomIndex(): number {
-    return this.clampIndex(this.selectedRomIndex, this.romOptions.length);
-  }
-
-  private get currentRomLabel(): ResourceStr {
-    const option = this.romOptions[this.safeRomIndex];
-    return option?.value ?? '无';
-  }
-
-  private get hasRomOptions(): boolean {
-    const options = this.romOptions ?? [];
-    if (options.length === 0) {
-      return false;
-    }
-    // 如果只有一个选项且是占位符“无”，也视为没有有效选项
-    if (options.length === 1 && options[0].value === '无') {
-      return false;
-    }
-    return true;
-  }
-
   private updatePortAssignment(portId: number, sourceType: InputSourceType, deviceId: string) {
     this.portAssignments = updatePortAssignments(this.portAssignments, portId, sourceType, deviceId);
-    this.portAssignmentVersion++;
   }
 
   private applyPortAssignment(
@@ -600,19 +476,7 @@ struct LibretroGamePage {
     this.uiInputDebugText = state.uiInputDebugText;
   }
   
-  // 更新 ROM 选项
   updateRomOptions() {
-    const availableRoms = this.getAvailableRoms();
-    let options = availableRoms.map((rom): SelectOption => {
-      return { value: rom.name };
-    });
-    
-    // 确保列表不为空，保证 Select 组件正常渲染
-    if (options.length === 0) {
-      options = [this.createSelectOption('无')];
-    }
-    
-    this.romOptions = options;
     this.selectedRomIndex = 0;
   }
   
@@ -735,76 +599,6 @@ struct LibretroGamePage {
     return this.hudMetricsCache;
   }
 
-  private handleInputSourceSelect(index: number): void {
-    const item = this.inputSourceItems[index];
-    if (!item) {
-      return;
-    }
-    LogHelper.info('LibretroGame', 'Input', `选择输入源: ${item.label} (type=${item.type}, id=${item.deviceId})`);
-    this.applyPortAssignment(this.selectedPortIndex, item.type, true, item.deviceId);
-  }
-
-  private handleCoreSelect(index: number): void {
-    this.selectedCoreIndex = this.clampIndex(index, this.cores.length);
-    this.updateRomOptions();
-    const core = this.cores[this.selectedCoreIndex];
-    LogHelper.info('LibretroGame', 'UI', `选择核心: ${core ? core.name : '未知'}`);
-  }
-
-  private handleRomSelect(index: number): void {
-    this.selectedRomIndex = this.clampIndex(index, this.romOptions.length);
-    const roms = this.getAvailableRoms();
-    const rom = roms.length > 0 ? roms[this.selectedRomIndex] : null;
-    LogHelper.info('LibretroGame', 'UI', `选择 ROM: ${rom ? rom.name : '未知'}`);
-  }
-
-  private clearRuntimeStatsForConfigChange(): void {
-    const okStats = runtimeRenderSettingsController.resetStats();
-    this.perfDisplay.realtimeFps = 0;
-    this.perfDisplay.coreFps = 0;
-    this.perfDisplay.audioStatusText = '';
-    this.perfDisplay.perfStatsText = '';
-    this.perfDisplay.geometryText = '';
-    LogHelper.info('LibretroGame', 'Config', `重置性能统计: okStats=${okStats}`);
-  }
-
-  private applySoftwareResolutionPreset(index: number): void {
-    this.softwareMaxPresetIndex = index;
-    const presets: ResolutionPreset[] = [
-      { w: 640, h: 480 },
-      { w: 1280, h: 720 },
-      { w: 1920, h: 1080 }
-    ];
-    const preset = presets[index] || presets[1];
-    const okMax = runtimeRenderSettingsController.setSoftwareMaxResolution(preset.w, preset.h);
-    this.clearRuntimeStatsForConfigChange();
-    void this.persistRuntimeRenderSettingsProfile();
-    LogHelper.info('LibretroGame', 'Config', `设置软件最大分辨率: ${preset.w}x${preset.h}, okMax=${okMax}`);
-  }
-
-  private applyRenderMode(index: number): void {
-    this.scalingMode = index;
-    const okMode = runtimeRenderSettingsController.setScalingMode(index);
-    if (index === 1) {
-      const presets: ResolutionPreset[] = [
-        { w: 640, h: 480 },
-        { w: 1280, h: 720 },
-        { w: 1920, h: 1080 }
-      ];
-      const preset = presets[this.softwareMaxPresetIndex] || presets[1];
-      runtimeRenderSettingsController.setSoftwareMaxResolution(preset.w, preset.h);
-    }
-    this.clearRuntimeStatsForConfigChange();
-    void this.persistRuntimeRenderSettingsProfile();
-    LogHelper.info('LibretroGame', 'Config', `设置缩放模式: ${index}, okMode=${okMode}`);
-  }
-
-  private openRuntimeControlPanel(): void {
-    this.refreshInputDevices();
-    this.selectedPortIndex = 0;
-    this.showControls = true;
-  }
-
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
       // 主体：上下分屏。游戏区在顶部，虚拟手柄在底部。
@@ -879,7 +673,7 @@ struct LibretroGamePage {
       .width('100%')
       .height('100%')
 
-      // 左上角系统菜单按钮：未运行时唤出 RuntimeControlPanel；运行中显示暂停图标，点击触发 PauseOverlay。
+      // 左上角系统菜单按钮：运行中显示暂停图标，点击触发 PauseOverlay；未运行时按 MENU 返回上一页。
       Button(this.gameRunning ? '⏸' : 'MENU')
         .width(46)
         .height(40)
@@ -894,13 +688,9 @@ struct LibretroGamePage {
           if (this.gameRunning) {
             this.pauseGame();
           } else {
-            this.openRuntimeControlPanel();
+            this.getUIContext().getRouter().back();
           }
         })
-
-      if (this.showControls) {
-        this.ControlPanelOverlay()
-      }
 
       if (this.gamePaused) {
         RuntimePauseOverlay({
@@ -922,103 +712,6 @@ struct LibretroGamePage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Black)
-  }
-  
-  @Builder
-  ControlPanelOverlay() {
-    // 弹出层：遮罩 + 菜单面板
-    Stack({ alignContent: Alignment.TopStart }) {
-      Column() {
-        Blank()
-          .width('100%')
-          .height('100%')
-      }
-      .width('100%')
-      .height('100%')
-      .onClick(() => {
-        this.showControls = false;
-      })
-
-      RuntimeControlPanel({
-        portOptions: this.portOptions,
-        selectedPortIndex: this.safePortIndex,
-        currentPortLabel: this.currentPortLabel,
-        inputSourceOptions: this.inputSourceOptions,
-        selectedInputSourceIndex: this.safeInputSourceIndex,
-        currentInputSourceLabel: this.currentInputSourceLabel,
-        coreOptions: this.coreOptions,
-        selectedCoreIndex: this.safeCoreIndex,
-        currentCoreLabel: this.currentCoreLabel,
-        romOptions: this.romOptions,
-        selectedRomIndex: this.safeRomIndex,
-        currentRomLabel: this.currentRomLabel,
-        hasRomOptions: this.hasRomOptions,
-        switching: this.switching,
-        scalingMode: this.scalingMode,
-        softwareMaxPresetIndex: this.softwareMaxPresetIndex,
-        hwRenderAllowed: this.hwRenderAllowed,
-        hideVirtualController: this.hideVirtualController,
-        gameRunning: this.gameRunning,
-        gamePaused: this.gamePaused,
-        runtimeSaveStatusText: this.runtimeSaveStatusText,
-        switchError: this.switchError,
-        onClose: () => {
-          this.showControls = false;
-        },
-        onPortSelect: (index: number) => {
-          this.selectedPortIndex = this.clampIndex(index, this.portOptions.length);
-        },
-        onInputSourceSelect: (index: number) => {
-          this.handleInputSourceSelect(index);
-        },
-        onCoreSelect: (index: number) => {
-          this.handleCoreSelect(index);
-        },
-        onRomSelect: (index: number) => {
-          this.handleRomSelect(index);
-        },
-        onRenderModeSelect: (index: number) => {
-          this.applyRenderMode(index);
-        },
-        onSoftwareResolutionSelect: (index: number) => {
-          this.applySoftwareResolutionPreset(index);
-        },
-        onHwRenderChange: (value: boolean) => {
-          this.hwRenderAllowed = value;
-          const ok = runtimeRenderSettingsController.setHwRenderAllowed(value);
-          void this.persistRuntimeRenderSettingsProfile();
-          LogHelper.info('LibretroGame', 'Config', `设置 HW_RENDER 允许: ${value}, ok=${ok}`);
-        },
-        onHideVirtualControllerChange: (value: boolean) => {
-          this.hideVirtualController = value;
-          LogHelper.info('LibretroGame', 'Input', `隐藏虚拟手柄: ${value}`);
-        },
-        onStartGame: () => {
-          void this.startOrSwitchGame();
-        },
-        onResumeGame: () => {
-          this.resumeGame();
-        },
-        onPauseGame: () => {
-          this.pauseGame();
-        },
-        onRestartGame: () => {
-          void this.startOrSwitchGame();
-        },
-        onStopGame: () => {
-          this.stopGame();
-        },
-        onQuickSave: () => {
-          void this.quickSaveRuntimeState();
-        },
-        onQuickLoad: () => {
-          void this.quickLoadRuntimeState();
-        }
-      })
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#55000000')
   }
 
   // 设置按键状态 (新架构)
