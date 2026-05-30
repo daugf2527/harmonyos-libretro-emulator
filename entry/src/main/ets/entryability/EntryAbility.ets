@@ -47,7 +47,10 @@ export default class EntryAbility extends UIAbility {
     // Main window is created, set main page for this ability
     LogHelper.info('EntryAbility', 'Lifecycle', 'Ability onWindowStageCreate');
 
-    windowStage.loadContent('pages/Index', (err, data) => {
+    // Phase 2 of 2026-04-08 ui-translation-roadmap Task 6: switch default entry
+    // from debug launcher (pages/Index) to product main path (pages/LibraryPage).
+    // LibraryPage internally routes to ImportEntryPage when the library is empty.
+    windowStage.loadContent('pages/LibraryPage', (err, data) => {
       if (err.code) {
         LogHelper.error('EntryAbility', 'Lifecycle', `Failed to load the content. Cause: ${JSON.stringify(err) ?? ''}`);
         return;
