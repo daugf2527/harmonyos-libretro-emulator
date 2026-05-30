@@ -348,6 +348,70 @@ export async function loadAllLibraryRecords(
   return await loadLibraryIndex(context)
 }
 
+export async function upsertLibraryRecord(
+  context: common.UIAbilityContext,
+  record: LibraryRecord
+): Promise<void> {
+  const records = await loadLibraryIndex(context)
+  const nextRecords: LibraryRecord[] = []
+  let updated = false
+  records.forEach((item: LibraryRecord) => {
+    if (item.romFile === record.romFile) {
+      nextRecords.push({
+        ...record,
+        updatedAt: Date.now()
+      })
+      updated = true
+    } else {
+      nextRecords.push(item)
+    }
+  })
+  if (!updated) {
+    nextRecords.push({
+      ...record,
+      createdAt: record.createdAt || Date.now(),
+      updatedAt: Date.now()
+    })
+  }
+  await saveLibraryIndex(context, nextRecords)
+}
+
+export async function updateLibraryRecordMetadata(
+  context: common.UIAbilityContext,
+  romFile: string,
+  metadata: {
+    title?: string
+    publisher?: string
+    releaseYear?: number
+    platform?: string
+    coverKey?: string
+  }
+): Promise<LibraryRecord | undefined> {
+  const records = await loadLibraryIndex(context)
+  let targetRecord: LibraryRecord | undefined = undefined
+  const nextRecords = records.map((record: LibraryRecord): LibraryRecord => {
+    if (record.romFile !== romFile) {
+      return record
+    }
+    const nextRecord: LibraryRecord = {
+      ...record,
+      title: metadata.title !== undefined ? metadata.title : record.title,
+      publisher: metadata.publisher !== undefined ? metadata.publisher : record.publisher,
+      releaseYear: metadata.releaseYear !== undefined ? metadata.releaseYear : record.releaseYear,
+      platform: metadata.platform !== undefined ? metadata.platform : record.platform,
+      coverKey: metadata.coverKey !== undefined ? metadata.coverKey : record.coverKey,
+      updatedAt: Date.now()
+    }
+    targetRecord = nextRecord
+    return nextRecord
+  })
+  if (!targetRecord) {
+    return undefined
+  }
+  await saveLibraryIndex(context, nextRecords)
+  return targetRecord
+}
+
 export async function updateLibraryRecordCover(
   context: common.UIAbilityContext,
   romFile: string,

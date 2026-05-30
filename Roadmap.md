@@ -22,20 +22,21 @@
 
 ## 缺口清单（代码层）
 
-> **注意**: 详细问题与修复建议已迁移至 `问题.md`。
+> **注意**: 详细问题与修复建议已迁移至 `问题.md`。  
+> **最近更新**: 2026-05-31 代码审计后删除已修复问题（详见 `docs/2026-05-31-code-reality-audit.md`）
 
 ### 输入
-- 输入快照“analog”入口未打通：存在 SetAnalog，但未暴露 SendAnalog/NAPI 接口
+- ~~输入快照”analog”入口未打通~~（✅ 已修复：NAPI `refactoredSendAnalog` + ArkTS 链路完整）
 - Input Mapper 缺失：无法自定义键位
 
 ### 渲染
-- GLES PBO 缺失 (同步上传卡顿)
-- HwRender 状态保存冗余 (glGet 严重拖慢)
+- ~~GLES PBO 缺失~~（⚠️ 已实现但因驱动兼容性禁用，当前直接上传稳定可用，优化项见 P2）
+- ~~HwRender 状态保存冗余~~（✅ 已优化：每帧仅 2 次必要 glGetIntegerv，Audit T4-F6 修复）
 - Vulkan Sync Stubbed
 
 ### 音频
-- RingBuffer 非阻塞写入 (导致伪快进)
-- Frame Pacing 丢失
+- ~~RingBuffer 非阻塞写入~~（✅ 已修复：SyncMode 双模式，默认 AUDIO_BLOCKING 阻塞写入）
+- ~~Frame Pacing 丢失~~（✅ 已实现：GameLoop 软件节拍 + sleep 补齐到 targetFps）
 
 ## 近期里程碑（P0 / P1）
 
@@ -63,10 +64,11 @@
   - ⚠️ Phase 3 实施: 双 Repository 合并 (预计 7.5-10.5h，建议作为 M1.3 epic)
 - 详见：`docs/plans/2026-05-31-m1-rom-io-closure.md`
 
-### M2 可观测性与错误治理（P0）
+### M2 可观测性与错误治理（P1）
 - 状态：未开始
 - 目标：统一错误分类、步骤码、耗时统计与关键日志上报。
 - 验收：每次启动/切换能定位失败阶段与原因，关键耗时可追踪。
+- 备注：原 P0 音频/帧率问题已修复，M2 降为 P1。
 
 ### M3 质量保障门禁（P0/P1）
 - 状态：✅ 已完成 (2026-05-31)
@@ -105,6 +107,8 @@
 
 ## 中期与长期（P2+）
 
+- **GLES PBO 启用**（已实现但因驱动兼容性禁用，待 HarmonyOS 驱动稳定后重新评估）
+- **硬件 vsync 集成**（软件 Frame Pacing 已足够，硬件 vsync 可进一步优化）
 - Vulkan 后端与平台特性接入（按需）
 - Vulkan 全屏渲染管线（SPIR-V + RenderPass/Pipeline）
 - Graphics Accelerate / XEngine 画质增强（按设备能力门控）
@@ -112,18 +116,23 @@
 
 ## 已知限制与风险
 
-- 鸿蒙禁 JIT：3D/高负载核心性能天花板明显，Vulkan 只能解决“出画”，不保证可玩帧率。
+- 鸿蒙禁 JIT：3D/高负载核心性能天花板明显，Vulkan 只能解决”出画”，不保证可玩帧率。
 - Vulkan 走 Transfer-only：缺少后处理/滤镜能力，画质优化需引入 SPIR-V 管线。
 - 资源使用约束：core image 需支持 `TRANSFER_SRC`，swapchain image 需支持 `TRANSFER_DST`。
 - 生命周期压力：前后台切换/旋转频繁触发 swapchain 重建，需持续验证稳定性。
 - UI 主线程阻塞风险：任何同步 Stop/大 ROM 读取都可能触发卡顿，需要统一异步化与超时治理。
 - 多文件依赖风险：CUE/分卷/外部依赖文件若未统一落地到沙盒路径会导致加载失败。
+- ~~音频快进风险~~：✅ 已修复（SyncMode 阻塞写入已实现）
+- ~~帧率失控风险~~：✅ 已修复（软件 Frame Pacing 已实现）
 
 ## 参考
 
 - 技术白皮书与官方摘录已迁移至 `鸿蒙开发文档.txt`。
 
 ## 代码深度评估报告 (Code Depth Evaluation Report)
+
+> **最新审计**: 2026-05-31 代码现状深度审计（详见 `docs/2026-05-31-code-reality-audit.md`）  
+> **关键发现**: 原 P0/P1 标记的 5 个问题中 4 个已修复，文档与代码实现严重脱节。
 
 ### 总体评价
 这段代码实现了一个 **"Headless Backend" (无头后端)** 架构：

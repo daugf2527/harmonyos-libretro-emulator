@@ -24,10 +24,6 @@ import {
   purgeSaveFilesForBaseName
 } from '../common/LibrarySaveFilePurger'
 import {
-  GameMetadataRecord,
-  getGameMetadataByRomFile
-} from '../common/GameMetadataRepository'
-import {
   buildLibraryDetailTelemetrySnapshot,
   cleanLibraryFileName,
   getLibraryDetailConsoleLabel,
@@ -161,7 +157,6 @@ struct AnimatedDetailBody {
 @Component
 struct LibraryDetailPage {
   @State private libraryRecord: LibraryRecord | undefined = undefined
-  @State private metadataRecord: GameMetadataRecord | undefined = undefined
   @State private showExtendedDetails: boolean = false
   @State private showActionMenu: boolean = false
   @State private showToast: boolean = false
@@ -230,12 +225,7 @@ struct LibraryDetailPage {
       this.showToastMessage('条目不存在 RECORD_NOT_FOUND')
       return
     }
-    const metadata = await getGameMetadataByRomFile(context, record.romFile)
-    if (!this.isCurrentPageTask(token)) {
-      return
-    }
     this.libraryRecord = record
-    this.metadataRecord = metadata
     this.invalidateDerivedCaches()
     this.applyTelemetrySnapshot(record)
   }
@@ -566,7 +556,7 @@ struct LibraryDetailPage {
       return this.cachedCoreSpecItems
     }
     this.cachedCoreSpecItems = [
-      { label: 'ROM Version', value: getLibraryDetailRomVersionLabel(record, this.metadataRecord) },
+      { label: 'ROM Version', value: getLibraryDetailRomVersionLabel(record) },
       { label: 'Processor Cluster', value: getLibraryDetailEngineLabel(record) },
       { label: 'Memory Mode', value: getLibraryDetailMemoryModeLabel(record) }
     ]
@@ -577,14 +567,14 @@ struct LibraryDetailPage {
   private buildPrimaryCells(record: LibraryRecord): LibraryDetailSummaryCellData[] {
     return [
       { title: 'CN NAME', value: getLibraryDetailLocalizedTitle(record) },
-      { title: 'YEAR', value: getLibraryDetailYearLabel(record, this.metadataRecord) },
-      { title: 'CONSOLE', value: getLibraryDetailConsoleLabel(record, this.metadataRecord) }
+      { title: 'YEAR', value: getLibraryDetailYearLabel(record) },
+      { title: 'CONSOLE', value: getLibraryDetailConsoleLabel(record) }
     ]
   }
 
   private buildExtendedCells(record: LibraryRecord): LibraryDetailSummaryCellData[] {
     return [
-      { title: 'PUBLISHER', value: getLibraryDetailPublisherLabel(this.metadataRecord) },
+      { title: 'PUBLISHER', value: getLibraryDetailPublisherLabel(record) },
       { title: 'PLAYTIME', value: getLibraryDetailPlaytimeLabel(record) },
       { title: 'ENGINE', value: getLibraryDetailEngineLabel(record) },
       { title: 'REGION', value: getLibraryDetailRegionLabel(record) }
@@ -595,7 +585,7 @@ struct LibraryDetailPage {
   private DetailContent(record: LibraryRecord) {
     AnimatedDetailBody({
       coverKey: record.coverKey,
-      displayTitle: getLibraryDetailDisplayTitle(record, this.metadataRecord),
+      displayTitle: getLibraryDetailDisplayTitle(record),
       localizedTitle: getLibraryDetailLocalizedTitle(record),
       coreLabel: record.preferredCoreId.toUpperCase(),
       showExtendedDetails: this.showExtendedDetails,
@@ -606,8 +596,8 @@ struct LibraryDetailPage {
       telemetryAudioText: this.telemetryCpuText,
       telemetryDropText: this.telemetryGpuText,
       telemetryProfile: this.getSnapshot().profile,
-      overviewText: getLibraryDetailOverviewText(this.metadataRecord),
-      runtimeSummaryText: getLibraryDetailRuntimeSummaryText(record, this.metadataRecord),
+      overviewText: getLibraryDetailOverviewText(record),
+      runtimeSummaryText: getLibraryDetailRuntimeSummaryText(record),
       coreSpecItems: this.getCoreSpecItems(record),
       onLaunch: () => {
         this.beginLaunchSequence(record)

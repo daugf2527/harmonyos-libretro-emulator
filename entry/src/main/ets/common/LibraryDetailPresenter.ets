@@ -1,4 +1,3 @@
-import { GameMetadataRecord } from './GameMetadataRepository'
 import { LibraryRecord } from './LibraryRepository'
 
 export interface LibraryDetailTelemetrySnapshot {
@@ -12,25 +11,11 @@ export function getLibraryDetailLocalizedTitle(record: LibraryRecord): string {
   return cleanLibraryFileName(record.fileName)
 }
 
-export function getLibraryDetailDisplayTitle(
-  record: LibraryRecord,
-  metadata: GameMetadataRecord | undefined
-): string {
-  const metadataTitle = getMetadataTitle(metadata)
-  if (metadataTitle !== 'Unknown') {
-    return metadataTitle.toUpperCase()
-  }
+export function getLibraryDetailDisplayTitle(record: LibraryRecord): string {
   return record.title.toUpperCase()
 }
 
-export function getLibraryDetailConsoleLabel(
-  record: LibraryRecord,
-  metadata: GameMetadataRecord | undefined
-): string {
-  const metadataPlatform = getMetadataPlatform(metadata)
-  if (metadataPlatform !== 'Unknown') {
-    return metadataPlatform
-  }
+export function getLibraryDetailConsoleLabel(record: LibraryRecord): string {
   if (record.platform === 'SNES') {
     return 'SFC'
   }
@@ -40,36 +25,29 @@ export function getLibraryDetailConsoleLabel(
   return record.platform
 }
 
-export function getLibraryDetailYearLabel(
-  record: LibraryRecord,
-  metadata: GameMetadataRecord | undefined
-): string {
-  const releaseYear = getMetadataReleaseYear(metadata)
-  if (releaseYear.length > 0) {
-    return releaseYear
+export function getLibraryDetailYearLabel(record: LibraryRecord): string {
+  // 优先使用 LibraryRecord 中的 releaseYear
+  if (record.releaseYear !== undefined && record.releaseYear > 0) {
+    return String(record.releaseYear)
   }
+  // 其次从文件名提取标签
   const tag = extractTaggedTokens(record.fileName).find((item: string) => /^[12][0-9]{3}$/.test(item))
   if (tag) {
     return tag
   }
+  // 最后使用导入年份
   if (record.importedAt > 0) {
     return String(new Date(record.importedAt).getFullYear())
   }
   return '--'
 }
 
-export function getLibraryDetailOverviewText(metadata: GameMetadataRecord | undefined): string {
-  const metadataOverview = getMetadataOverview(metadata)
-  if (metadataOverview !== 'Unknown') {
-    return metadataOverview
-  }
+export function getLibraryDetailOverviewText(record: LibraryRecord): string {
+  // overview 字段已废弃，返回默认值
   return 'Unknown'
 }
 
-export function getLibraryDetailRuntimeSummaryText(
-  record: LibraryRecord,
-  metadata: GameMetadataRecord | undefined
-): string {
+export function getLibraryDetailRuntimeSummaryText(record: LibraryRecord): string {
   const segments: string[] = [
     `该条目来自${getLibraryDetailSourceLabel(record)} ROM 库，当前库状态为 ${getLibraryDetailStatusLabel(record)}。`,
     `系统识别平台为 ${record.platform}，默认核心为 ${record.preferredCoreId.toUpperCase()}。`,
@@ -78,6 +56,9 @@ export function getLibraryDetailRuntimeSummaryText(
   const region = getLibraryDetailRegionLabel(record)
   if (region !== 'AUTO / UNKNOWN') {
     segments.push(`文件标签中识别到区域信息 ${region}。`)
+  }
+  if (record.publisher !== undefined && record.publisher.length > 0) {
+    segments.push(`发行商为 ${record.publisher}。`)
   }
   if (record.importedAt > 0) {
     segments.push(`导入时间 ${formatLibraryDetailDate(record.importedAt)}。`)
@@ -90,7 +71,6 @@ export function getLibraryDetailRuntimeSummaryText(
   } else {
     segments.push('该条目尚未产生启动记录。')
   }
-  void metadata
   return segments.join('')
 }
 
@@ -117,12 +97,9 @@ export function getLibraryDetailEngineLabel(record: LibraryRecord): string {
   return `EMU_CORE_${record.preferredCoreId.toUpperCase()}`
 }
 
-export function getLibraryDetailPublisherLabel(
-  metadata: GameMetadataRecord | undefined
-): string {
-  const metadataPublisher = getMetadataPublisher(metadata)
-  if (metadataPublisher !== 'Unknown') {
-    return metadataPublisher
+export function getLibraryDetailPublisherLabel(record: LibraryRecord): string {
+  if (record.publisher !== undefined && record.publisher.length > 0) {
+    return record.publisher
   }
   return 'Unknown'
 }
@@ -134,11 +111,8 @@ export function getLibraryDetailPlaytimeLabel(record: LibraryRecord): string {
   return formatLibraryDetailDuration(record.totalPlayTimeMs)
 }
 
-export function getLibraryDetailRomVersionLabel(
-  record: LibraryRecord,
-  metadata: GameMetadataRecord | undefined
-): string {
-  const platform = getLibraryDetailConsoleLabel(record, metadata)
+export function getLibraryDetailRomVersionLabel(record: LibraryRecord): string {
+  const platform = getLibraryDetailConsoleLabel(record)
   const fileBase = cleanLibraryFileName(record.fileName).replace(/\s+/g, '_').toUpperCase()
   return `${platform}_v1.0_${fileBase.substring(0, Math.min(16, fileBase.length))}`
 }
@@ -239,29 +213,4 @@ function extractTaggedTokens(fileName: string): string[] {
   return matches.map((item: string) => {
     return item.substring(1, item.length - 1).trim()
   })
-}
-
-function getMetadataTitle(metadata: GameMetadataRecord | undefined): string {
-  const value = metadata?.title
-  return value && value.length > 0 ? value : 'Unknown'
-}
-
-function getMetadataPublisher(metadata: GameMetadataRecord | undefined): string {
-  const value = metadata?.publisher
-  return value && value.length > 0 ? value : 'Unknown'
-}
-
-function getMetadataOverview(metadata: GameMetadataRecord | undefined): string {
-  const value = metadata?.overview
-  return value && value.length > 0 ? value : 'Unknown'
-}
-
-function getMetadataPlatform(metadata: GameMetadataRecord | undefined): string {
-  const value = metadata?.platform
-  return value && value.length > 0 ? value : 'Unknown'
-}
-
-function getMetadataReleaseYear(metadata: GameMetadataRecord | undefined): string {
-  const value = metadata?.releaseYear
-  return value && value > 0 ? `${value}` : ''
 }

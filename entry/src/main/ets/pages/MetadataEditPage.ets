@@ -2,13 +2,9 @@ import { common } from '@kit.AbilityKit'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import {
-  GameMetadataRecord,
-  getGameMetadataByRomFile,
-  upsertGameMetadata
-} from '../common/GameMetadataRepository'
-import {
   getLibraryRecordByRomFile,
-  LibraryRecord
+  LibraryRecord,
+  updateLibraryRecordMetadata
 } from '../common/LibraryRepository'
 import LogHelper from '../common/LogHelper'
 
@@ -79,21 +75,20 @@ struct MetadataEditPage {
       return
     }
     const record = await getLibraryRecordByRomFile(context, targetRomFile)
-    const metadata = await getGameMetadataByRomFile(context, targetRomFile)
     if (!this.isCurrentPageTask(token)) {
       return
     }
-    this.applyInitialFields(record, metadata)
-    this.statusText = metadata ? 'LOCAL_METADATA_LOADED' : 'LOCAL_METADATA_EMPTY'
+    this.applyInitialFields(record)
+    this.statusText = record ? 'LOCAL_METADATA_LOADED' : 'LOCAL_METADATA_EMPTY'
   }
 
-  private applyInitialFields(record: LibraryRecord | undefined, metadata: GameMetadataRecord | undefined): void {
-    this.titleText = metadata?.title ?? record?.title ?? ''
-    this.publisherText = metadata?.publisher ?? ''
-    this.overviewText = metadata?.overview ?? ''
-    this.releaseYearText = metadata && metadata.releaseYear > 0 ? `${metadata.releaseYear}` : ''
-    this.platformText = metadata?.platform ?? record?.platform ?? ''
-    this.coverKeyText = metadata?.coverKey ?? record?.coverKey ?? ''
+  private applyInitialFields(record: LibraryRecord | undefined): void {
+    this.titleText = record?.title ?? ''
+    this.publisherText = record?.publisher ?? ''
+    this.overviewText = '' // overview 字段已废弃，不再显示
+    this.releaseYearText = record?.releaseYear && record.releaseYear > 0 ? `${record.releaseYear}` : ''
+    this.platformText = record?.platform ?? ''
+    this.coverKeyText = record?.coverKey ?? ''
   }
 
   private async saveMetadata(): Promise<void> {
@@ -108,16 +103,13 @@ struct MetadataEditPage {
       return
     }
     try {
-      const record: GameMetadataRecord = {
-        romFile: this.romFile,
+      await updateLibraryRecordMetadata(context, this.romFile, {
         title: this.titleText.trim(),
         publisher: this.publisherText.trim(),
-        overview: this.overviewText.trim(),
         releaseYear: this.parseReleaseYear(),
         platform: this.platformText.trim(),
         coverKey: this.coverKeyText.trim()
-      }
-      await upsertGameMetadata(context, record)
+      })
       if (!this.isCurrentPageTask(token)) {
         return
       }
