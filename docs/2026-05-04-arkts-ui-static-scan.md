@@ -69,7 +69,29 @@ rg -n "\.position\(|\.markAnchor\(|\.translate\(|\.offset\(|\.width\('[0-9]+vp'\
   - 保留 `maxWidth: 250` 作为面板上限 token，避免宽屏过宽；小窗口下由父容器百分比收缩。
   - 剩余风险是 `GPU LOAD / NOT_CONFIGURED` 与 `LATENCY / PREVIEW_ONLY` 在更窄窗口下的换行/截断，需要真机或预览确认。
 
-### 固定布局复扫结论
+### 2026-05-30 B1 收口记录(epic B Task 1)
+
+按 `docs/plans/2026-05-30-ui-polish-foldable-epic.md` Task B1 落地:
+
+- `entry/src/main/ets/pages/InputLayoutPage.ets:674-679`
+  - 在 `@Builder private EditableButton(button, isSelected)` 上方追加注释,说明 `.position(getEditorPercentX/Y)` 是业务坐标(布局 profile 百分比换算),外层 `EditableButtonLayer` 已用 `aspectRatio` 承载逻辑画布。
+  - 不改代码逻辑,只标注剩余真机验证项:触控热区精度、保存后 runtime 使用一致性、横竖屏缩放命中。
+
+- `entry/src/main/ets/components/VirtualController.ets:1-13`
+  - 文件头部 docstring 追加用途说明:供 `FoldableLayouts.ets` 的 SingleModeLayout / DualModeLayout / TripleModeLayout 使用,**不直接在 LibretroGamePage 主流程使用**(主流程用 `RuntimeVirtualControllerLayer`)。
+  - 标注 `.position()` + `.translate()` 是控件内部坐标,外层由 Stack 对齐,不是截图补丁式固定坐标。
+
+- `entry/src/main/ets/components/RuntimeVirtualControllerLayer.ets`
+  - 5-04 报告原计划修复的 `Quick Save rail` 固定 `top: 164` margin 在本次 grep 中**未找到任何匹配**(`buildQuickSaveRail` / `Quick Save` / `quickSave` / `.width(57)` / `.height(157)` 全无命中)。
+  - 推断:已在历史 commit 中移除或重构,无需本轮再修。该文件当前主结构是 dpad bbox + floating function buttons,坐标全部来自 `InputLayoutButton` 业务数据,不是截图补丁。
+
+### B1 剩余风险
+
+- `InputLayoutPage` 编辑器画布在小窗口(<600vp)下的触控命中精度需要真机验证。
+- `VirtualController` 仅供 FoldableLayouts 使用,接入主流程后(epic B Task 2)需要再次扫描固定坐标是否在折叠态下正常。
+- 5-04 报告其他保留命中(图标尺寸 / 按钮高度 / telemetry 柱状条)按 token 处理,不在 B1 范围。
+
+
 
 - 复扫命中仍较多，主要集中在图标、按钮、telemetry 条、虚拟手柄、弹层内部控件和状态动效。
 - 本轮明确消除的高风险项：

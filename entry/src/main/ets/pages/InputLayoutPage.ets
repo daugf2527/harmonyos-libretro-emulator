@@ -671,6 +671,9 @@ struct InputLayoutPage {
     .align(Alignment.Bottom)
   }
 
+  // EditableButton 用 .position(getEditorPercentX/Y) 业务坐标(布局 profile 百分比换算),
+  // 外层 EditableButtonLayer 已用 aspectRatio 承载逻辑画布。不是截图补丁式 fixed 坐标。
+  // 剩余真机验证项:触控热区精度、保存后 runtime 使用一致性、横竖屏缩放命中。
   @Builder
   private EditableButton(button: InputLayoutButton, isSelected: boolean) {
     Stack() {

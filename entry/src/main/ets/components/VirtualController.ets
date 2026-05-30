@@ -2,6 +2,12 @@
  * 虚拟游戏控制器组件
  * 提供可复用的 D-Pad 和 ABXY 按键
  * 支持触觉反馈和透明度调节
+ *
+ * 用途:供 FoldableLayouts.ets 的 SingleModeLayout / DualModeLayout / TripleModeLayout 使用。
+ * 不直接在 LibretroGamePage 主流程使用(主流程用 RuntimeVirtualControllerLayer)。
+ *
+ * 控件内部坐标:摇杆 knob(line 146-150) / ABXY 方位(line 225-246)使用 .position() + .translate()
+ * 实现触控逻辑,外层由 Stack 对齐,不是截图补丁式固定坐标。
  */
 
 import { vibrator } from '@kit.SensorServiceKit';
