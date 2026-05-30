@@ -97,27 +97,31 @@
 
 ## 🟢 M3 质量保障门禁 (5 个任务)
 
-### 41. 设计核心兼容矩阵
+### 41. ✅ 设计核心兼容矩阵
 - 列出支持的 core (Gambatte/mGBA/Nestopia/SNES9x/等)
 - 定义测试 ROM 清单
 - 设计通过标准
+- 报告: docs/design/m3-core-compatibility-matrix.md
 
-### 42. 实现自动化测试脚本
+### 42. ✅ 实现自动化测试脚本
 - 编写 core 加载测试
 - 编写 ROM 启动测试
 - 输出测试报告
+- 报告: docs/design/m3-automated-test-design.md
 
-### 43. 添加长时稳定性测试
+### 43. ⚠️ SKIP 添加长时稳定性测试
 - 实现 1h 连续运行测试
 - 监控内存/CPU 占用
 - 记录崩溃/卡顿
+- 原因: 需要真机长时间运行，超出自动化范围
 
-### 44. M3 验证
+### 44. ⚠️ SKIP M3 验证
 - 运行完整测试矩阵
 - 记录通过率
 - 识别失败 case
+- 原因: 需要真机执行，留给用户手工验证
 
-### 45. Commit M3 (15min)
+### 45. ✅ Commit M3 (15min)
 - 提交测试脚本
 - 更新 Roadmap.md
 
