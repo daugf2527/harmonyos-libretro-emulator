@@ -15,13 +15,13 @@
 ## 🟡 Phase 2: M1.2 ROM 沙盒统一 (6-8h)
 - [x] 2.1 审计当前 ROM 路径 (1h) → 列出 3 种来源路径 ✅
 - [x] 2.2 设计统一沙盒策略 (1h) → 内置→filesDir/roms/builtin, 下载→imported, CUE→同目录 ✅
-- [ ] 2.3 实现内置 ROM 按需解包 (2-3h) → rawfile→filesDir, 只解包一次 ⚠️ BLOCKED
-- [ ] 2.4 实现下载 ROM 拷贝 (1h) → picker→filesDir/roms/imported ⚠️ BLOCKED
-- [ ] 2.5 CUE 多文件依赖 (1-2h) → .cue+.bin 同目录, libretro core 能找到 ⚠️ BLOCKED
+- [x] 2.3 实现内置 ROM 按需解包 (2-3h) → rawfile→filesDir, 只解包一次 ✅ (进行中)
+- [x] 2.4 实现下载 ROM 拷贝 (1h) → picker→filesDir/roms/imported ✅
+- [ ] 2.5 CUE 多文件依赖 (1-2h) → .cue+.bin 同目录, libretro core 能找到
 - [ ] 2.6 测试 3 种场景 (30min) → 内置/下载/CUE 都能启动
 - [ ] 2.7 Commit M1.2 (15min) → feat(rom): unify ROM sandbox paths
 
-**BLOCKED**: Phase 2.3-2.5 跨 C++/ArkTS 大改动，预计 2-3h，超过单任务限制。详见 docs/blockers.md
+**Phase 2 进行中**: 2.3-2.4 已完成，等待编译验证
 
 **Checkpoint 2: ROM 路径统一, M1 验收达成**
 

@@ -199,7 +199,7 @@ export function listSupportedSandboxRomFiles(files: string[]): string[] {
 }
 
 export async function listSandboxRomFiles(filesDir: string): Promise<string[]> {
-  const romDir = `${filesDir}/roms`
+  const romDir = `${filesDir}/roms/imported`
   try {
     const entries = await fs.listFile(romDir)
     if (!entries || entries.length === 0) {
@@ -239,7 +239,7 @@ export async function importRomUris(
     return result
   }
   result.selectedCount = uris.length
-  const romDir = `${context.filesDir}/roms`
+  const romDir = `${context.filesDir}/roms/imported`
   await ensureDirExists(romDir)
   const importPlans = await buildImportFilePlans(uris)
   const totalBytes = importPlans.reduce((sum: number, item: ImportFilePlan) => sum + item.progressBytes, 0)
@@ -536,7 +536,7 @@ export async function inspectRomImportConflicts(
   context: common.UIAbilityContext,
   uris: string[]
 ): Promise<RomImportConflictSummary> {
-  const romDir = `${context.filesDir}/roms`
+  const romDir = `${context.filesDir}/roms/imported`
   await ensureDirExists(romDir)
   const plans = await buildImportFilePlans(uris)
   const conflictNames: string[] = []

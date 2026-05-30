@@ -25,6 +25,14 @@ bool TempFileManager::Initialize() {
     if (!common::EnsureDirExists(filesDir_)) {
         return false;
     }
+    // Create roms/builtin for persistent built-in ROM storage
+    if (!common::EnsureDirExists(filesDir_ + "/roms")) {
+        return false;
+    }
+    if (!common::EnsureDirExists(filesDir_ + "/roms/builtin")) {
+        return false;
+    }
+    // Keep temp_roms for backward compatibility during migration
     return common::EnsureDirExists(filesDir_ + "/temp_roms");
 }
 
@@ -34,22 +42,30 @@ bool TempFileManager::WriteTempRom(const std::string& rawfilePath, const std::ve
     }
 
     std::string baseName = common::GetBaseName(rawfilePath);
-    std::string tempPath = filesDir_ + "/temp_roms/" + baseName;
-    
-    // Ensure temp_roms directory exists
-    std::string tempDir = filesDir_ + "/temp_roms";
-    if (!common::EnsureDirExists(tempDir)) {
-        LOGF(LOG_ERROR, "Failed to create temp_roms directory: %{public}s", tempDir.c_str());
-        return false;
-    }
+    // Use roms/builtin for persistent storage (M1.2)
+    std::string builtinPath = filesDir_ + "/roms/builtin/" + baseName;
 
-    if (common::WriteFileAll(tempPath, data.data(), data.size())) {
-        LOGF(LOG_INFO, "Wrote temp ROM file: %{public}s", tempPath.c_str());
-        outTempPath = tempPath;
+    // Check if already extracted (use access() to check file existence)
+    if (access(builtinPath.c_str(), F_OK) == 0) {
+        LOGF(LOG_INFO, "Built-in ROM already exists: %{public}s", builtinPath.c_str());
+        outTempPath = builtinPath;
         return true;
     }
 
-    LOGF(LOG_ERROR, "Failed to write temp ROM file: %{public}s", tempPath.c_str());
+    // Ensure builtin directory exists
+    std::string builtinDir = filesDir_ + "/roms/builtin";
+    if (!common::EnsureDirExists(builtinDir)) {
+        LOGF(LOG_ERROR, "Failed to create builtin directory: %{public}s", builtinDir.c_str());
+        return false;
+    }
+
+    if (common::WriteFileAll(builtinPath, data.data(), data.size())) {
+        LOGF(LOG_INFO, "Wrote built-in ROM file: %{public}s", builtinPath.c_str());
+        outTempPath = builtinPath;
+        return true;
+    }
+
+    LOGF(LOG_ERROR, "Failed to write built-in ROM file: %{public}s", builtinPath.c_str());
     return false;
 }
 
