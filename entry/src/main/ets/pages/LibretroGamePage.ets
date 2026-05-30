@@ -114,6 +114,7 @@ struct LibretroGamePage {
   @State softwareMaxPresetIndex: number = 1;
   @State hwRenderAllowed: boolean = true;
   @State hideVirtualController: boolean = false;
+  @State private idleHintReady: boolean = false;
   // 游戏画面 aspect ratio：0 表示尚未收到 geometry_update（用 fallback 4/3）。
   // handleGeometryUpdate 会写入真实值（如 2048 ≈ 0.81 竖屏、GBA 1.5 横屏）。
   @State private gameAspectRatio: number = 0;
@@ -521,6 +522,7 @@ struct LibretroGamePage {
     this.roms = nextRoms;
     this.updateRomOptions();
     this.applyPendingLibraryLaunchRequest()
+    this.idleHintReady = true
   }
 
   private applyPendingLibraryLaunchRequest(): void {
@@ -708,10 +710,55 @@ struct LibretroGamePage {
           }
         })
       }
+
+      if (this.idleHintReady && !this.gameRunning && !this.switching && !this.pendingStart && !this.gamePaused) {
+        this.IdleEmptyState()
+      }
     }
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Black)
+  }
+
+  @Builder
+  private IdleEmptyState() {
+    Column({ space: 18 }) {
+      Text('▢')
+        .fontSize(56)
+        .fontColor(EmuColors.primary)
+        .opacity(0.6)
+
+      Text('未加载游戏')
+        .fontSize(18)
+        .fontColor(EmuColors.onSurface)
+        .fontWeight(FontWeight.Medium)
+
+      Text('从游戏库选择一个游戏开始')
+        .fontSize(13)
+        .fontColor('#FF9D9E9E')
+        .fontFamily('monospace')
+        .letterSpacing(0.6)
+        .textAlign(TextAlign.Center)
+
+      Button('返回游戏库')
+        .fontSize(14)
+        .fontColor(EmuColors.primary)
+        .fontWeight(FontWeight.Bold)
+        .backgroundColor('#0F1A0F')
+        .border({ width: 0.5, color: '#5500FF41', style: BorderStyle.Solid })
+        .borderRadius(6)
+        .height(40)
+        .padding({ left: 20, right: 20 })
+        .margin({ top: 12 })
+        .onClick(() => {
+          this.getUIContext().getRouter().back()
+        })
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .padding({ left: 32, right: 32 })
   }
 
   // 设置按键状态 (新架构)
