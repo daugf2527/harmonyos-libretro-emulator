@@ -361,7 +361,27 @@ struct SettingsPage {
       this.inputPreferences = saved
       this.setRuntimeApplyStatus('虚拟手柄显示', true)
     } catch (_err) {
-      this.setRuntimeApplyStatus('虚拟手柄显示', false)
+      this.setRuntimeApplyStatus('虚拟手柄显示', false)    }
+  }
+
+  private async toggleHideUndeclaredKeys(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.setRuntimeApplyStatus('按 core 隐藏未声明键', false)
+      return
+    }
+    const nextProfile: RuntimeInputPreferencesProfile = {
+      version: this.inputPreferences.version,
+      hideVirtualController: this.inputPreferences.hideVirtualController,
+      hideUndeclaredKeys: !this.inputPreferences.hideUndeclaredKeys,
+      updatedAt: this.inputPreferences.updatedAt
+    }
+    try {
+      const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
+      this.inputPreferences = saved
+      this.setRuntimeApplyStatus('按 core 隐藏未声明键', true)
+    } catch (_err) {
+      this.setRuntimeApplyStatus('按 core 隐藏未声明键', false)
     }
   }
 
@@ -894,6 +914,14 @@ struct SettingsPage {
         this.inputPreferences.hideVirtualController ? '显示' : '隐藏',
         () => {
           void this.toggleHideVirtualController()
+        }
+      )
+      this.AdvancedSettingRow(
+        '按 core 隐藏未声明键',
+        this.inputPreferences.hideUndeclaredKeys ? '当前开启 · 仅显示当前 core 声明使用的按键' : '当前关闭 · 显示完整虚拟手柄按键集',
+        this.inputPreferences.hideUndeclaredKeys ? '关闭' : '开启',
+        () => {
+          void this.toggleHideUndeclaredKeys()
         }
       )
       this.AdvancedSettingRow(
