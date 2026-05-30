@@ -10,6 +10,7 @@ export struct GameCard {
   @Prop platform: string = ''
   @Prop coverColor: string = '#2C2C2C'
   @Prop coverKey: string = ''
+  @Prop coverUrl: string = ''
   @Prop variant: GameCardVariant = 'recent'
   @Prop @Watch('onHighlightChanged') isHighlighted: boolean = false
   onCardClick?: () => void
@@ -122,6 +123,7 @@ export struct GameCard {
 
         EmuCoverArt({
           coverKey: this.coverKey,
+          coverUrl: this.coverUrl,
           variant: 'recent'
         })
           .width('100%')
@@ -202,6 +204,7 @@ export struct GameCard {
 
         EmuCoverArt({
           coverKey: this.coverKey,
+          coverUrl: this.coverUrl,
           variant: 'list'
         })
           .width('100%')

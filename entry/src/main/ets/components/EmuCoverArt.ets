@@ -2,6 +2,7 @@
 export struct EmuCoverArt {
   @Prop coverKey: string = ''
   @Prop variant: string = 'recent'
+  @Prop coverUrl: string = ''
 
   private isCyberCover(): boolean {
     return this.coverKey === 'metroid_fusion' || this.coverKey === 'aria_of_sorrow'
@@ -43,7 +44,14 @@ export struct EmuCoverArt {
 
   build() {
     Stack() {
-      if (this.coverKey === 'metroid_fusion' || this.coverKey === 'aria_of_sorrow') {
+      // Priority 1: Use coverUrl if provided (M1.3 dynamic cover art)
+      if (this.coverUrl && this.coverUrl.length > 0) {
+        Image(this.coverUrl)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+          .alt($r('app.media.cover_metroid_fusion'))
+      } else if (this.coverKey === 'metroid_fusion' || this.coverKey === 'aria_of_sorrow') {
         Image($r('app.media.cover_metroid_fusion'))
           .width('100%')
           .height('100%')

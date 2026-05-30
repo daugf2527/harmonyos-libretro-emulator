@@ -14,6 +14,7 @@ export interface LibraryRecord {
   platform: string
   coverColor: string
   coverKey: string
+  coverUrl?: string
   romFile: string
   preferredCoreId: string
   fileName: string
