@@ -51,7 +51,11 @@
 
 **当前状态**:
 - ✅ Phase 3.1: 审计完成，识别出双 Repository 架构问题
-- ❌ Phase 3.2-3.7: 实施阻塞
+- ✅ Phase 3.2: 添加 3 个可选字段完成（releaseYear/publisher/genre）
+- ✅ Phase 3.4: Platform 标签完整化完成（补全 N64）
+- ✅ Phase 3.5: Last-played 排序已存在
+- ❌ Phase 3.3: Cover art 下载/缓存（需 UI 大改）
+- ❌ Phase 3.6: 搜索/筛选（需 UI 大改）
 
 **建议**:
 1. **Option A (推荐)**: 跳过 Phase 3 实施，直接进入 Phase 4 (M1 closure 文档)
@@ -87,7 +91,7 @@
 **当前状态**:
 - ✅ Phase 5.1: deprecated/legacy 已符合规范，无需清理
 - ✅ Phase 5.2: 无 first-party TODO/FIXME，已符合规范
-- ❌ Phase 5.3: 实施阻塞
+- ✅ Phase 5.3: 最小化测试完成（31 个单元测试，全部通过）
 
 **建议**:
 1. **Option A (推荐)**: 跳过 Phase 5.3，标记为 M2 里程碑（质量保障门禁）
