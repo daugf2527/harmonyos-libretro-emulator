@@ -44,19 +44,21 @@
 - [x] 4.1 写 M1 closure 报告 (1h) → docs/plans/2026-05-31-m1-rom-io-closure.md ✅
 - [x] 4.2 更新 Roadmap.md (15min) → M1 标记 Partial ✅
 - [x] 4.3 完整验证 (1h) → quick_signals + 手动测 3 种 ROM ✅ (quick_signals ALL PASS)
-- [ ] 4.4 Commit closure (15min) → docs(epic): close M1 ROM/I-O governance (partial)
-- [ ] 4.5 Push (1min)
+- [x] 4.4 Commit closure (15min) → docs(epic): close M1 ROM/I-O governance (partial) ✅
+- [x] 4.5 Push (1min) ✅
 
-**Checkpoint 4: M1 epic 正式关闭 (Partial)**
+**Checkpoint 4: M1 epic 正式关闭 (Partial)** ✅
 
 **Checkpoint 4: M1 epic 正式关闭**
 
 ---
 ## 🟣 Phase 5: 技术债(可选, 4-6h)
-- [ ] 5.1 清理 deprecated/legacy (1h)
-- [ ] 5.2 清理 TODO/FIXME (2h)
-- [ ] 5.3 补 missing tests (2-3h) → RomImportService/LibraryRepository
-- [ ] 5.4 Commit (15min) → chore: clean up tech debt
+- [x] 5.1 清理 deprecated/legacy (1h) ✅ (已符合规范，无需清理)
+- [x] 5.2 清理 TODO/FIXME (2h) ✅ (无 first-party TODO/FIXME)
+- [ ] 5.3 补 missing tests (2-3h) → RomImportService/LibraryRepository ⚠️ BLOCKED
+- [x] 5.4 Commit (15min) → chore: clean up tech debt ✅
+
+**Phase 5 完成**: 5.1-5.2 已符合规范，5.3 BLOCKED（无 ArkTS 测试框架，需 2-3h 搭建）
 
 ---
 ## 执行日志

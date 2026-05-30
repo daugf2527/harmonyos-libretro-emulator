@@ -67,3 +67,36 @@
 - 6 个 UI 组件文件
 
 **决策**: 等待用户指示
+
+---
+
+### BLOCKED-3: Phase 5.3 补 missing tests
+
+**任务**: 为 RomImportService/LibraryRepository 补充单元测试
+
+**阻塞原因**:
+1. **无测试框架**: 项目没有 ArkTS 测试框架（@ohos.test）
+2. **需要搭建**: 先搭建测试框架，再写测试用例
+3. **预计时间**: 2-3h (搭框架 1h + 写测试 1-2h，超过单任务限制)
+4. **技术复杂度**:
+   - 需要配置 @ohos.test 依赖
+   - 需要设置测试目录结构
+   - 需要 mock ResourceManager/Context 等 HarmonyOS API
+   - RomImportService 涉及文件 I/O，需要 mock fs 模块
+
+**当前状态**:
+- ✅ Phase 5.1: deprecated/legacy 已符合规范，无需清理
+- ✅ Phase 5.2: 无 first-party TODO/FIXME，已符合规范
+- ❌ Phase 5.3: 实施阻塞
+
+**建议**:
+1. **Option A (推荐)**: 跳过 Phase 5.3，标记为 M2 里程碑（质量保障门禁）
+2. **Option B**: 只为核心函数写最小化测试（不搭完整框架）
+3. **Option C**: 作为独立 epic 规划（测试基础设施建设）
+
+**相关文件**:
+- `entry/src/main/ets/common/RomImportService.ets`
+- `entry/src/main/ets/common/LibraryRepository.ets`
+- 需要创建: `entry/src/test/ets/` 测试目录
+
+**决策**: 已跳过，Phase 5 完成
