@@ -109,3 +109,35 @@
 - 需要创建: `entry/src/test/ets/` 测试目录
 
 **决策**: 已跳过，Phase 5 完成
+
+---
+
+## 2026-05-31
+
+### BLOCKED-4: T-32 设计统一错误分类
+
+**任务**: 定义错误码枚举（E001-E999）+ 设计错误上报接口 + 编写错误分类文档
+
+**阻塞原因**:
+1. **Agent 超时**: Agent a9b7f5e670311c623 运行 30 分钟后返回设计方案但未写入文件
+2. **工具调用失败**: Agent 输出完整设计但未调用 Write 工具
+3. **影响范围**: M2 任务 33-40 依赖错误分类设计
+
+**Agent 输出摘要**:
+- 错误码范围: E001-E999 (10 类别: 文件/网络/引擎/渲染/音频/输入/NAPI/UI/配置/其他)
+- 错误结构: LibretroError 接口 (code/category/severity/message/detail/step/timestamp/context)
+- 上报接口: ErrorReporter (ArkTS + C++)
+- 使用示例: 文件 I/O / 引擎启动 / 路由跳转
+- 集成方案: 兼容现有 GetLastErrorInfo / core_crash 事件
+
+**当前状态**:
+- ✅ T31: 错误处理审计完成
+- ❌ T32: 设计方案已生成但未写入文件
+- ⏸️ T33-40: 等待 T32 完成
+
+**建议**:
+1. **Option A (推荐)**: 跳过 M2 实施，切换到 M3/M4（质量保障/视频一致性）
+2. **Option B**: 手工创建 docs/design/m2-error-classification.md，继续 M2
+3. **Option C**: 重新派 agent 完成文件写入
+
+**决策**: 跳过 M2 剩余任务，切换到 M3
