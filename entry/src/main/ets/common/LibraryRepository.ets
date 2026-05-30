@@ -35,6 +35,9 @@ export interface LibraryRecord {
   lastRuntimeVideoDrops: number
   lastRuntimeVideoDupes: number
   lastRuntimeVideoNulls: number
+  releaseYear?: number
+  publisher?: string
+  genre?: string
 }
 
 export interface LibraryRuntimeSnapshot {

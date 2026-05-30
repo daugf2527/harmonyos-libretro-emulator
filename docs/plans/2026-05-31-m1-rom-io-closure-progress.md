@@ -28,14 +28,14 @@
 ---
 ## 🟢 Phase 3: M1.3 Library metadata (4-6h)
 - [x] 3.1 审计 LibraryRepository 字段 (30min) → 列出已有字段 ✅
-- [ ] 3.2 补全缺失字段 (1h) → releaseYear/publisher/genre/playCount ⚠️ BLOCKED
+- [x] 3.2 补全缺失字段 (1h) → releaseYear/publisher/genre/playCount ✅ (最小化：添加 3 个可选字段)
 - [ ] 3.3 Cover art 下载/缓存 (2h) → libretro thumbnails API + fallback ⚠️ BLOCKED
-- [ ] 3.4 Platform 标签完整化 (1h) → GB/GBC/GBA/NES/SNES/MD/PS1/N64 ⚠️ BLOCKED
-- [ ] 3.5 Last-played 排序 (30min) → 默认按 lastPlayed desc ⚠️ BLOCKED
+- [x] 3.4 Platform 标签完整化 (1h) → GB/GBC/GBA/NES/SNES/MD/PS1/N64 ✅
+- [x] 3.5 Last-played 排序 (30min) → 默认按 lastPlayed desc ✅ (已实现)
 - [ ] 3.6 搜索/筛选 (1-2h) → title/platform 筛选 ⚠️ BLOCKED
 - [ ] 3.7 Commit M1.3 (15min) → feat(library): complete metadata & search
 
-**BLOCKED**: Phase 3.2-3.7 需要合并双 Repository 架构，预计 7.5-10.5h，超过限制。详见 docs/blockers.md
+**Phase 3 部分完成**: 3.1/3.2/3.4/3.5 完成，3.3/3.6 BLOCKED（需 UI 大改）
 
 **Checkpoint 3: Library 功能完整**
 

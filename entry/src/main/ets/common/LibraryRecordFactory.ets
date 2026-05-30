@@ -110,6 +110,11 @@ function resolvePlatform(fileName: string): string {
     case 'ids':
     case 'dsi':
       return 'NDS'
+    case 'n64':
+    case 'z64':
+    case 'v64':
+    case 'rom':
+      return 'N64'
     case 'cue':
     case 'toc':
     case 'ccd':
