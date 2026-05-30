@@ -6,15 +6,15 @@
 - [x] 1.1 审查 8 个脏改动 diff (30min) → 确认功能意图 ✅
 - [x] 1.2 补完未完成功能 (2-3h) → 无 TODO/FIXME ✅ (审查确认无未完成功能)
 - [x] 1.3 quick_signals 验证 (30s) → ALL PASS ✅
-- [ ] 1.4 Commit 脏改动 (30min) → git status 干净
+- [x] 1.4 Commit 脏改动 (30min) → git status 干净 ✅
 - [x] 1.5 清理 trailing whitespace (15min) → git diff --check 无输出 ✅
 
-**Checkpoint 1: 工作区干净**
+**Checkpoint 1: 工作区干净** ✅
 
 ---
 ## 🟡 Phase 2: M1.2 ROM 沙盒统一 (6-8h)
-- [ ] 2.1 审计当前 ROM 路径 (1h) → 列出 3 种来源路径
-- [ ] 2.2 设计统一沙盒策略 (1h) → 内置→filesDir/roms/builtin, 下载→imported, CUE→同目录
+- [x] 2.1 审计当前 ROM 路径 (1h) → 列出 3 种来源路径 ✅
+- [x] 2.2 设计统一沙盒策略 (1h) → 内置→filesDir/roms/builtin, 下载→imported, CUE→同目录 ✅
 - [ ] 2.3 实现内置 ROM 按需解包 (2-3h) → rawfile→filesDir, 只解包一次
 - [ ] 2.4 实现下载 ROM 拷贝 (1h) → picker→filesDir/roms/imported
 - [ ] 2.5 CUE 多文件依赖 (1-2h) → .cue+.bin 同目录, libretro core 能找到
