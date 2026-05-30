@@ -78,6 +78,41 @@ function getLatestRuntimeRecord(records: LibraryRecord[]): LibraryRecord | undef
   return runtimeRecords[0]
 }
 
+export function hasLibraryTelemetryData(records: LibraryRecord[]): boolean {
+  return getLatestRuntimeRecord(records) !== undefined
+}
+
+export function getLastPlayedLibraryRecord(records: LibraryRecord[]): LibraryRecord | undefined {
+  return getLatestRuntimeRecord(records)
+}
+
+export function formatLastPlayedRelative(timestampMs: number): string {
+  if (!Number.isFinite(timestampMs) || timestampMs <= 0) {
+    return ''
+  }
+  const deltaSec = Math.max(0, Math.floor((Date.now() - timestampMs) / 1000))
+  if (deltaSec < 60) {
+    return '刚刚'
+  }
+  const minutes = Math.floor(deltaSec / 60)
+  if (minutes < 60) {
+    return `${minutes} 分钟前`
+  }
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) {
+    return `${hours} 小时前`
+  }
+  const days = Math.floor(hours / 24)
+  if (days < 30) {
+    return `${days} 天前`
+  }
+  const months = Math.floor(days / 30)
+  if (months < 12) {
+    return `${months} 个月前`
+  }
+  return `${Math.floor(months / 12)} 年前`
+}
+
 function toPercent(value: number): number {
   const safeValue = Math.max(0, Number(value) || 0)
   return safeValue <= 1 ? safeValue * 100 : safeValue

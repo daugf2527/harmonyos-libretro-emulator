@@ -28,7 +28,10 @@ import {
   buildLibraryRecordsFromSources
 } from '../common/LibraryRecordFactory'
 import {
-  getLibraryTelemetryCells
+  formatLastPlayedRelative,
+  getLastPlayedLibraryRecord,
+  getLibraryTelemetryCells,
+  hasLibraryTelemetryData
 } from '../common/LibraryRuntimeTelemetryPresenter'
 import {
   LibrarySavePurgeResult,
@@ -133,6 +136,11 @@ struct LibraryPage {
   private cachedFilteredRecentGames: LibraryRecord[] = []
   private cachedSearchResults: LibraryRecord[] = []
   private cachedDisplayPlatformFilters: string[] = []
+  @State private hasLastPlayed: boolean = false
+  @State private lastPlayedTitle: string = ''
+  @State private lastPlayedPlatform: string = ''
+  @State private lastPlayedRelative: string = ''
+  private lastPlayedRecord: LibraryRecord | undefined = undefined
   aboutToAppear(): void {
     this.pageActive = true
     void this.refreshLibraryGames()
@@ -273,7 +281,22 @@ struct LibraryPage {
     if (this.selectedPlatform !== 'ALL' && !platforms.includes(this.selectedPlatform)) {
       this.selectedPlatform = 'ALL'
     }
+    this.refreshLastPlayedChip()
     this.recomputeFilteredCaches()
+  }
+
+  private refreshLastPlayedChip(): void {
+    const record = getLastPlayedLibraryRecord(this.allGames)
+    if (record && record.preferredCoreId.length > 0 && record.romFile.length > 0) {
+      this.lastPlayedRecord = record
+      this.lastPlayedTitle = record.title
+      this.lastPlayedPlatform = record.platform
+      this.lastPlayedRelative = formatLastPlayedRelative(record.lastRuntimeUpdatedAt)
+      this.hasLastPlayed = true
+    } else {
+      this.lastPlayedRecord = undefined
+      this.hasLastPlayed = false
+    }
   }
 
   private getDisplayPlatformFilters(): string[] {
@@ -707,6 +730,61 @@ struct LibraryPage {
   }
 
   @Builder
+  private LastPlayedChip() {
+    Row({ space: 12 }) {
+      Text('▶')
+        .fontSize(18)
+        .fontColor(EmuColors.primary)
+        .fontWeight(FontWeight.Bold)
+
+      Column({ space: 3 }) {
+        Row({ space: 6 }) {
+          Text('继续')
+            .fontSize(9)
+            .fontColor('#000000')
+            .fontWeight(FontWeight.Bold)
+            .letterSpacing(1.6)
+            .padding({ left: 6, right: 6, top: 2, bottom: 2 })
+            .backgroundColor(EmuColors.primary)
+            .borderRadius(2)
+
+          Text('CONTINUE')
+            .fontSize(9)
+            .fontColor(EmuColors.primary)
+            .fontFamily('monospace')
+            .letterSpacing(1.6)
+            .opacity(0.7)
+        }
+
+        Text(`${this.lastPlayedTitle} · ${this.lastPlayedPlatform} · ${this.lastPlayedRelative}`)
+          .fontSize(13)
+          .fontColor(EmuColors.onSurface)
+          .fontWeight(FontWeight.Medium)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
+
+      Text('›')
+        .fontSize(22)
+        .fontColor(EmuColors.primary)
+        .opacity(0.7)
+    }
+    .width('100%')
+    .padding({ left: 18, right: 18, top: 12, bottom: 12 })
+    .backgroundColor('#0F1A0F')
+    .border({ width: 0.5, color: '#5500FF41', style: BorderStyle.Solid })
+    .borderRadius(8)
+    .alignItems(VerticalAlign.Center)
+    .onClick(() => {
+      if (this.lastPlayedRecord) {
+        this.openGame(this.lastPlayedRecord as LibraryRecord)
+      }
+    })
+  }
+
+  @Builder
   private SearchAndTelemetry() {
     LibrarySearchPanel({
       keyword: this.searchKeyword,
@@ -714,6 +792,7 @@ struct LibraryPage {
       showSearchResults: this.showSearchResults,
       searchResults: this.searchResults,
       telemetryCells: getLibraryTelemetryCells(this.allGames),
+      showTelemetry: hasLibraryTelemetryData(this.allGames),
       platforms: this.getDisplayPlatformFilters(),
       selectedPlatform: this.selectedPlatform,
       onKeywordChange: (value: string) => {
@@ -753,6 +832,10 @@ struct LibraryPage {
     Scroll(this.scroller) {
       Column({ space: 28 }) {
         this.PullRefreshArea()
+
+        if (this.hasLastPlayed) {
+          this.LastPlayedChip()
+        }
 
         this.SearchAndTelemetry()
 

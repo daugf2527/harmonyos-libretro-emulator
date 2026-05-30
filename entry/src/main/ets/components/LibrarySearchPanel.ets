@@ -16,6 +16,7 @@ export struct LibrarySearchPanel {
   @Prop spinnerAngle: number = 0
   @Prop searchResults: LibraryRecord[] = []
   @Prop telemetryCells: EmuTelemetryCellItem[] = []
+  @Prop showTelemetry: boolean = true
   @Prop platforms: string[] = ['ALL']
   onKeywordChange?: (value: string) => void
   onSearchResultLaunch?: (item: LibraryRecord) => void
@@ -67,9 +68,11 @@ export struct LibrarySearchPanel {
         this.SearchResults()
       }
 
-      EmuTelemetryPanel({
-        cells: this.telemetryCells
-      })
+      if (this.showTelemetry) {
+        EmuTelemetryPanel({
+          cells: this.telemetryCells
+        })
+      }
 
       PlatformChipBar({
         items: this.platforms,
