@@ -651,6 +651,13 @@ void LibretroEngine::Resume() {
   }
 }
 
+void LibretroEngine::Cancel() {
+  LOGF(LOG_INFO, "[NEW] Cancel called");
+  if (!messageQueue_.Push({MessageType::Cancel, {}})) {
+    LOGF(LOG_WARN, "[NEW] Cancel dropped: message queue closed");
+  }
+}
+
 bool LibretroEngine::LoadCore(const std::string &corePath) {
   std::lock_guard<std::recursive_mutex> lock(controlMutex_);
   if (IsMessagePathTooLong(corePath)) {
@@ -1332,6 +1339,35 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     stopRequested_.store(true);
     UnloadGameIfNeeded("stop");
     TransitionTo(EngineState::STOPPING);
+    break;
+  case MessageType::Cancel:
+    LOGF(LOG_INFO, "[NEW] Message: Cancel Received");
+    // Cancel 只在 STARTING/LOADING 状态有效，直接 Reset 回 INIT
+    {
+      EngineState currentState = state_.load();
+      if (currentState == EngineState::STARTING ||
+          currentState == EngineState::LOADING ||
+          currentState == EngineState::CORE_LOADED) {
+        LOGF(LOG_INFO, "[NEW] Cancel: resetting from state=%{public}d",
+             static_cast<int>(currentState));
+        UnloadGameIfNeeded("cancel");
+        if (coreLoader_.IsLoaded()) {
+          if (diskController_) {
+            diskController_->ClearCallbacks();
+          }
+          if (coreLoader_.GetDeinit()) {
+            coreLoader_.GetDeinit()();
+          }
+          coreLoader_.UnloadCore();
+        }
+        envState_.ResetCoreState();
+        Reset();
+        TransitionTo(EngineState::INIT);
+      } else {
+        LOGF(LOG_WARN, "[NEW] Cancel ignored: state=%{public}d",
+             static_cast<int>(currentState));
+      }
+    }
     break;
   case MessageType::LoadCore:
     if (!(state_.load() == EngineState::INIT ||

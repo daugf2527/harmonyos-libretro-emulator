@@ -144,6 +144,7 @@ public:
   bool Stop();
   void Pause();
   void Resume();
+  void Cancel();
 
   /**
    * @brief 统一重置引擎状态（解决重入问题）

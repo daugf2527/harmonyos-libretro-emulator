@@ -447,8 +447,15 @@ static void EnsureLastErrorIfEmpty(const std::string &reason,
 static void RecoverAfterSwitchFailure(uint32_t timeoutMs, uint64_t token) {
   auto preservedError = GetEngine()->GetLastErrorInfo();
   if (!IsLatestSwitchToken(token)) {
+    LOGF(LOG_WARN,
+         "[NEW] RecoverAfterSwitchFailure: stale token, skip recovery (token=%llu)",
+         static_cast<unsigned long long>(token));
     return;
   }
+  LOGF(LOG_INFO,
+       "[NEW] RecoverAfterSwitchFailure: starting recovery (reason=%s, step=%s)",
+       preservedError.reason.c_str(), preservedError.step.c_str());
+
   const bool stopped = GetEngine()->Stop();
   auto stopError = GetEngine()->GetLastErrorInfo();
   if (stopError.reason.empty() && !preservedError.reason.empty()) {
@@ -459,8 +466,16 @@ static void RecoverAfterSwitchFailure(uint32_t timeoutMs, uint64_t token) {
          "[NEW] RecoverAfterSwitchFailure: stop timeout, skip reset to avoid lifecycle overlap");
     return;
   }
-  (void)GetEngine()->WaitForState(EngineState::STOPPED, timeoutMs);
+
+  const bool reachedStopped = GetEngine()->WaitForState(EngineState::STOPPED, timeoutMs);
+  if (!reachedStopped) {
+    LOGF(LOG_WARN,
+         "[NEW] RecoverAfterSwitchFailure: timeout waiting STOPPED, proceeding with Reset anyway");
+  }
+
   GetEngine()->Reset();
+  LOGF(LOG_INFO, "[NEW] RecoverAfterSwitchFailure: Reset() completed, engine back to INIT");
+
   if (!stopError.reason.empty()) {
     GetEngine()->SetLastErrorInfo(stopError.reason, stopError.step,
                                   stopError.message);
@@ -771,6 +786,33 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+static napi_value CancelSwitch(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  LOGF(LOG_INFO, "[NEW] CancelSwitch called");
+
+  // 递增 switch_token 使所有等待中的 switch 请求失效
+  const uint64_t newToken = switch_token.fetch_add(1) + 1;
+  LOGF(LOG_INFO, "[NEW] CancelSwitch: incremented token to %{public}llu",
+       static_cast<unsigned long long>(newToken));
+
+  // 释放当前持有的 switch token（如果有）
+  {
+    std::lock_guard<std::mutex> lock(switch_mutex);
+    if (active_switch_token != 0) {
+      LOGF(LOG_INFO, "[NEW] CancelSwitch: releasing active token %{public}llu",
+           static_cast<unsigned long long>(active_switch_token));
+      active_switch_token = 0;
+      switch_cond.notify_all();
+    }
+  }
+
+  // 向 Engine 发送 Cancel 消息
+  GetEngine()->Cancel();
+
+  return MakeBool(env, true);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value InitEventBridge(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
@@ -945,6 +987,7 @@ void RegisterLifecycleNapi(napi_env env, napi_value exports) {
       {"refactoredLoadCore", nullptr, LoadCore, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredLoadRom", nullptr, LoadRom, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSwitchGameAsync", nullptr, SwitchGameAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredCancelSwitch", nullptr, CancelSwitch, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetRawFileList", nullptr, GetRawFileList, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetRawFileListAsync", nullptr, GetRawFileListAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredInitEventBridge", nullptr, InitEventBridge, nullptr, nullptr, nullptr, napi_default, nullptr},

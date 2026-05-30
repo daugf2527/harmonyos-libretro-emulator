@@ -25,6 +25,7 @@ enum class MessageType {
   Pause,      // 暂停请求
   Resume,     // 恢复请求
   Stop,       // 停止请求
+  Cancel,     // 取消 Switch 请求
   WindowCreated,   // 窗口已创建
   WindowDestroyed, // 窗口已销毁
   WindowRebind,    // 兼容旧链路的遗留消息（新链路请使用 WindowCreated+generation）

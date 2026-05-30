@@ -19,6 +19,7 @@ interface RuntimeSessionNapi {
     timeoutMs: number,
     token?: number
   ): Promise<boolean>
+  refactoredCancelSwitch(): boolean
   refactoredPauseEngine(): boolean
   refactoredResumeEngine(): boolean
   refactoredSaveState(): ArrayBuffer | null
@@ -93,6 +94,10 @@ export class RuntimeSessionController {
       request.timeoutMs,
       request.token
     )
+  }
+
+  cancelSwitch(): boolean {
+    return nativeApi.refactoredCancelSwitch()
   }
 
   formatLastError(prefix: string): string {

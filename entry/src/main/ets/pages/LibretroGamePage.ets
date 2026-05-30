@@ -83,6 +83,7 @@ interface ResolutionPreset {
 interface PendingSwitch {
   coreIndex: number;
   romIndex: number;
+  retryCount: number;
 }
 
 interface PerfDisplayState {
@@ -130,6 +131,7 @@ struct LibretroGamePage {
   private pendingStart: boolean = false;
   private switchToken: number = 0;
   private pendingSwitch: PendingSwitch | undefined = undefined;
+  private readonly maxSwitchRetries: number = 2;
   private pageActive: boolean = false;
   private romListRefreshToken: number = 0;
   private lastStartOrSwitchAtMs: number = 0;
@@ -694,6 +696,25 @@ struct LibretroGamePage {
           }
         })
 
+      // 取消按钮：仅在 switching=true 时显示
+      if (this.switching) {
+        Button('取消')
+          .width(60)
+          .height(40)
+          .fontSize(EmuTypography.base)
+          .fontColor(EmuColors.error)
+          .backgroundColor('#CC000000')
+          .border({ width: 0.5, color: '#33FF4444', style: BorderStyle.Solid })
+          .borderRadius(4)
+          .margin({ left: 18, top: 100 })
+          .onClick(() => {
+            LogHelper.info('LibretroGame', 'Engine', 'Cancel switch requested');
+            runtimeSessionController.cancelSwitch();
+            this.switching = false;
+            this.switchError = '';
+          })
+      }
+
       if (this.gamePaused) {
         RuntimePauseOverlay({
           processText: this.getRuntimeProcessText(),
@@ -775,7 +796,8 @@ struct LibretroGamePage {
     if (this.switching) {
       this.pendingSwitch = {
         coreIndex: this.selectedCoreIndex,
-        romIndex: this.selectedRomIndex
+        romIndex: this.selectedRomIndex,
+        retryCount: 0
       };
       LogHelper.warn('LibretroGame', 'Engine', '切换中，记录待切换请求');
       return;
@@ -910,6 +932,34 @@ struct LibretroGamePage {
       if (this.pendingSwitch) {
         const pending = this.pendingSwitch;
         this.pendingSwitch = undefined;
+
+        // 如果当前切换失败且 pending 是同一个请求的重试，检查重试次数
+        if (!success &&
+            pending.coreIndex === this.selectedCoreIndex &&
+            pending.romIndex === this.selectedRomIndex) {
+          if (pending.retryCount >= this.maxSwitchRetries) {
+            LogHelper.error(
+              'LibretroGame',
+              'Engine',
+              `切换失败且已达最大重试次数 (${this.maxSwitchRetries})，放弃重试`
+            );
+            this.switchError = `切换失败: ${this.switchError || '未知错误'} (已重试 ${pending.retryCount} 次)`;
+            return;
+          }
+          // 增加重试计数
+          this.pendingSwitch = {
+            coreIndex: pending.coreIndex,
+            romIndex: pending.romIndex,
+            retryCount: pending.retryCount + 1
+          };
+          LogHelper.warn(
+            'LibretroGame',
+            'Engine',
+            `切换失败，准备重试 (${pending.retryCount + 1}/${this.maxSwitchRetries})`
+          );
+        }
+
+        // 执行 pending 切换
         this.selectedCoreIndex = pending.coreIndex;
         this.updateRomOptions();
         const availableRoms = this.getAvailableRoms();
