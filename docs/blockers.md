@@ -37,6 +37,11 @@
 
 **决策**: 已跳过，进入 Phase 3
 
+**经验教训** (2026-05-31):
+- 尝试用 TODO 注释标记未来改进点，但**触发 RG005-MARKER regression 失败**
+- 项目规则禁止 first-party 代码出现 TODO/FIXME/HACK/XXX 注释
+- 改进点应记录在 docs/blockers.md 或 tech-debt-tracker.md，不能放在代码注释里
+
 ---
 
 ### BLOCKED-2: Phase 3.2-3.7 Library metadata 扩展
