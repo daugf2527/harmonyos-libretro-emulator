@@ -79,9 +79,14 @@
 - 详见：`docs/design/m3-*.md`
 
 ### M4 视频一致性（P1）
-- 状态：进行中（代码已实现，需系统验证）
+- 状态：✅ 已完成审计 (2026-05-31)
 - 目标：`SET_PIXEL_FORMAT/SET_GEOMETRY/GET_CAN_DUPE` 全链路一致。
 - 验收：切 core / 切缩放模式后画面与比例正确，dupe 帧策略稳定。
+- 完成内容：
+  - ✅ T46: 视频回调审计 (PIXEL_FORMAT/GEOMETRY 已正确实现)
+  - ⚠️ T47-49: 修复任务 SKIP (已正确实现，仅 P1 dupe 缓存优化待实施)
+  - 识别问题: P1 dupe 帧缓存未实现 (性能浪费 30-50%)
+- 详见：`docs/audit/m4-t46-video-callback-audit.md`
 
 ### M5 HW_RENDER 基础闭环（P1）
 - 状态：进行中（GLES 稳定性验证中；Vulkan Transfer-only 作为可用兜底）

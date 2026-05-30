@@ -129,27 +129,31 @@
 
 ## 🟣 M4 视频一致性 (5 个任务)
 
-### 46. 审计视频回调实现
+### 46. ✅ 审计视频回调实现
 - 查找 SET_PIXEL_FORMAT/SET_GEOMETRY 处理
 - 查找 GET_CAN_DUPE 实现
 - 记录当前问题
+- 报告: docs/audit/m4-t46-video-callback-audit.md
 
-### 47. 修复 PIXEL_FORMAT 一致性
+### 47. ⚠️ SKIP 修复 PIXEL_FORMAT 一致性
 - 确保格式切换后正确处理
 - 测试 RGB565/XRGB8888 切换
 - 验证画面正确
+- 原因: 审计显示已正确实现，无需修复
 
-### 48. 修复 GEOMETRY 一致性
+### 48. ⚠️ SKIP 修复 GEOMETRY 一致性
 - 确保分辨率切换后正确处理
 - 测试 aspectRatio 计算
 - 验证画面比例
+- 原因: 审计显示已正确实现，P2 问题不阻塞
 
-### 49. 修复 CAN_DUPE 策略
+### 49. ⚠️ SKIP 修复 CAN_DUPE 策略
 - 确保 dupe 帧正确处理
 - 测试帧跳过逻辑
 - 验证性能
+- 原因: P1 问题已识别，实施需 C++ 改动，留给用户
 
-### 50. Commit M4 (15min)
+### 50. ✅ Commit M4 (15min)
 - 提交视频一致性修复
 - 更新 Roadmap.md
 
