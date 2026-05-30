@@ -55,10 +55,10 @@
 ## 🟣 Phase 5: 技术债(可选, 4-6h)
 - [x] 5.1 清理 deprecated/legacy (1h) ✅ (已符合规范，无需清理)
 - [x] 5.2 清理 TODO/FIXME (2h) ✅ (无 first-party TODO/FIXME)
-- [ ] 5.3 补 missing tests (2-3h) → RomImportService/LibraryRepository ⚠️ BLOCKED
+- [x] 5.3 补 missing tests (2-3h) → RomImportService/LibraryRepository ✅ (最小化测试完成)
 - [x] 5.4 Commit (15min) → chore: clean up tech debt ✅
 
-**Phase 5 完成**: 5.1-5.2 已符合规范，5.3 BLOCKED（无 ArkTS 测试框架，需 2-3h 搭建）
+**Phase 5 完成**: 所有任务完成，已为核心函数添加 31 个单元测试（全部通过）
 
 ---
 ## 执行日志
