@@ -4,6 +4,7 @@ import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { GridBackground } from '../components/EmuAppShell'
 import { PageLifecycleGuard } from '../common/PageLifecycleGuard'
+import LogHelper from '../common/LogHelper'
 
 type PermissionStatus = 'GRANTED' | 'PENDING' | 'DENIED'
 type ProtocolStatus = 'VERIFIED' | 'DENIED' | 'PENDING'
@@ -117,13 +118,13 @@ struct OnboardingPage {
   private openImportEntry(): void {
     this.authorizeButtonPressed = false
     this.getUIContext().getRouter().replaceUrl({ url: 'pages/ImportEntryPage' }).catch((err: Error) => {
-      console.error(`replaceUrl failed: ${err.message}`)
+      LogHelper.error('OnboardingPage', 'Route', `replaceUrl failed: ${err.message}`)
     })
   }
 
   private openLibraryPage(): void {
     this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
-      console.error(`replaceUrl failed: ${err.message}`)
+      LogHelper.error('OnboardingPage', 'Route', `replaceUrl failed: ${err.message}`)
     })
   }
 
@@ -194,6 +195,9 @@ struct OnboardingPage {
     const romDir = `${context.filesDir}/roms`
     try {
       await fs.mkdir(romDir, true)
+      await fs.mkdir(`${romDir}/builtin`, true)
+      await fs.mkdir(`${romDir}/imported`, true)
+      await fs.mkdir(`${romDir}/temp`, true)
       await fs.access(romDir)
       return this.createPermissionItem('SANDBOX_IMPORT', 'GRANTED', `导入目录可访问: ${romDir}`)
     } catch (err) {

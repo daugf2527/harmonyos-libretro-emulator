@@ -13,6 +13,7 @@
  * limitations under the License.
  */
 import { EmuTypography } from '../common/EmuUiTokens'
+import LogHelper from '../common/LogHelper'
 
 @Entry
 @Component
@@ -30,7 +31,7 @@ struct Index {
               this.getUIContext().getRouter().pushUrl({
                 url: 'pages/ImportEntryPage'
               }).catch((err: Error) => {
-                console.error(`[Index] Router error: ${err.message}`);
+                LogHelper.error('Index', 'Route', `Router error: ${err.message}`);
               });
             })
         }
@@ -49,7 +50,7 @@ struct Index {
               this.getUIContext().getRouter().pushUrl({
                 url: 'pages/OnboardingPage'
               }).catch((err: Error) => {
-                console.error(`[Index] Router error: ${err.message}`);
+                LogHelper.error('Index', 'Route', `Router error: ${err.message}`);
               });
             })
         }
@@ -69,7 +70,7 @@ struct Index {
               this.getUIContext().getRouter().pushUrl({
                 url: 'pages/ImportTaskOverlayPage'
               }).catch((err: Error) => {
-                console.error(`[Index] Router error: ${err.message}`);
+                LogHelper.error('Index', 'Route', `Router error: ${err.message}`);
               });
             })
         }
@@ -88,7 +89,7 @@ struct Index {
               this.getUIContext().getRouter().pushUrl({
                 url: 'pages/LibraryPage'
               }).catch((err: Error) => {
-                console.error(`[Index] Router error: ${err.message}`);
+                LogHelper.error('Index', 'Route', `Router error: ${err.message}`);
               });
             })
         }

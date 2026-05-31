@@ -5,6 +5,7 @@ import { EmuIcon } from '../components/EmuIcon'
 import { consumePendingImportUris } from '../common/ImportTaskBridge'
 import { EmuColors, EmuStateColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuButton, EmuButtonKind, EmuButtonShape, EmuButtonSize } from '../components/EmuButton'
+import LogHelper from '../common/LogHelper'
 import {
   importRomUris,
   inspectRomImportConflicts,
@@ -607,7 +608,7 @@ struct ImportTaskOverlayPage {
 
   private replaceUrl(url: string): void {
     this.getUIContext().getRouter().replaceUrl({ url: url }).catch((err: Error) => {
-      console.error(`[ImportTaskOverlayPage] replaceUrl failed: ${err.message}`)
+      LogHelper.error('ImportTaskOverlayPage', 'Route', `replaceUrl failed: ${err.message}`)
     })
   }
 
@@ -618,12 +619,12 @@ struct ImportTaskOverlayPage {
     }
     if (key === 'library') {
       this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[ImportTaskOverlayPage] replaceUrl ${route} failed: ${err.message}`)
+        LogHelper.error('ImportTaskOverlayPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
       })
       return
     }
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[ImportTaskOverlayPage] pushUrl ${route} failed: ${err.message}`)
+      LogHelper.error('ImportTaskOverlayPage', 'Route', `pushUrl ${route} failed: ${err.message}`)
     })
   }
 

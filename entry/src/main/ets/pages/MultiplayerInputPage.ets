@@ -5,6 +5,7 @@ import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import { InputDeviceInfo } from '../common/InputPortRouting'
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
+import LogHelper from '../common/LogHelper'
 
 interface ControllerSlotItem {
   id: string
@@ -174,13 +175,13 @@ struct MultiplayerInputPage {
       return
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-      console.error(`[MultiplayerInputPage] replaceUrl ${route} failed: ${err.message}`)
+      LogHelper.error('MultiplayerInputPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
   private openInputLayoutEditor(): void {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/InputLayoutPage' }).catch((err: Error) => {
-      console.error(`[MultiplayerInputPage] pushUrl InputLayoutPage failed: ${err.message}`)
+      LogHelper.error('MultiplayerInputPage', 'Route', `pushUrl InputLayoutPage failed: ${err.message}`)
     })
   }
 

@@ -2,6 +2,7 @@ import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../comp
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
+import LogHelper from '../common/LogHelper'
 
 @Component
 struct ShaderSliderRow {
@@ -97,12 +98,12 @@ struct ShaderPreviewPage {
     }
     if (key === 'library') {
       this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[ShaderPreviewPage] replaceUrl ${route} failed: ${err.message}`)
+        LogHelper.error('ShaderPreviewPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
       })
       return
     }
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[ShaderPreviewPage] pushUrl ${route} failed: ${err.message}`)
+      LogHelper.error('ShaderPreviewPage', 'Route', `pushUrl ${route} failed: ${err.message}`)
     })
   }
 

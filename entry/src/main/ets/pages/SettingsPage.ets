@@ -6,6 +6,7 @@ import { BarChartBackground, BarChartItem, EmuHeaderBar, EmuPrecisionGridBackdro
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import { loadInputLayoutProfile } from '../common/InputLayoutRepository'
 import { runtimeRenderSettingsController } from '../common/RuntimeRenderSettingsController'
+import LogHelper from '../common/LogHelper'
 import {
   createDefaultRuntimeRenderSettingsProfile,
   describeRenderMode,
@@ -140,13 +141,13 @@ struct SettingsPage {
       return
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-      console.error(`[SettingsPage] replaceUrl ${route} failed: ${err.message}`)
+      LogHelper.error('SettingsPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
   private openPage(url: string, label: string): void {
     this.getUIContext().getRouter().pushUrl({ url: url }).catch((err: Error) => {
-      console.error(`[SettingsPage] pushUrl ${label} failed: ${err.message}`)
+      LogHelper.error('SettingsPage', 'Route', `pushUrl ${label} failed: ${err.message}`)
     })
   }
 
