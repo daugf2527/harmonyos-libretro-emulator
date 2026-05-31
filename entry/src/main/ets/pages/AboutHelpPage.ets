@@ -3,6 +3,7 @@ import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
+import LogHelper from '../common/LogHelper'
 
 interface HelpItem {
   id: string
@@ -29,7 +30,7 @@ struct AboutHelpPage {
       return
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-      console.error(`[AboutHelpPage] replaceUrl ${route} failed: ${err.message}`)
+      LogHelper.error('AboutHelpPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
     })
   }
 

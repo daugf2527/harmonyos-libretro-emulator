@@ -3,6 +3,7 @@ import { fileIo as fs } from '@kit.CoreFileKit'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
+import LogHelper from '../common/LogHelper'
 import {
   buildCoreFirmwareDependencyState,
   CoreFirmwareDependencyState,
@@ -168,7 +169,7 @@ struct CoreManagerPage {
       return
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-      console.error(`[CoreManagerPage] replaceUrl ${route} failed: ${err.message}`)
+      LogHelper.error('CoreManagerPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
     })
   }
 

@@ -7,6 +7,7 @@ import { setPendingImportUris } from '../common/ImportTaskBridge'
 import { EmuColors } from '../common/EmuUiTokens'
 import { pickRomUris } from '../common/RomImportService'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
+import LogHelper from '../common/LogHelper'
 
 interface ImportParticle {
   x: number
@@ -98,7 +99,7 @@ struct ImportEntryPage {
       return
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-      console.error(`[ImportEntryPage] replaceUrl ${route} failed: ${err.message}`)
+      LogHelper.error('ImportEntryPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
@@ -106,7 +107,7 @@ struct ImportEntryPage {
     this.pageActive = true
     if (this.hasGames) {
       this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
-        console.error(`[ImportEntryPage] replaceUrl failed: ${err.message}`)
+        LogHelper.error('ImportEntryPage', 'Route', `replaceUrl failed: ${err.message}`)
       })
     }
   }
@@ -159,7 +160,7 @@ struct ImportEntryPage {
 
     setPendingImportUris(uris)
     this.getUIContext().getRouter().pushUrl({ url: 'pages/ImportTaskOverlayPage' }).catch((err: Error) => {
-      console.error(`[ImportEntryPage] pushUrl failed: ${err.message}`)
+      LogHelper.error('ImportEntryPage', 'Route', `pushUrl failed: ${err.message}`)
     })
   }
 

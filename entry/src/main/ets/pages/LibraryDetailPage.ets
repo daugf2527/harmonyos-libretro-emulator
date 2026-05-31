@@ -423,7 +423,7 @@ struct LibraryDetailPage {
       return
     }
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[LibraryDetailPage] pushUrl ${route} failed: ${err.message}`)
+      LogHelper.error('LibraryDetailPage', 'Route', `pushUrl ${route} failed: ${err.message}`)
     })
   }
 

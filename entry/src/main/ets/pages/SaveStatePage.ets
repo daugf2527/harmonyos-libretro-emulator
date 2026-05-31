@@ -292,12 +292,12 @@ struct SaveStatePage {
     }
     if (key === 'library') {
       this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-        console.error(`[SaveStatePage] replaceUrl ${route} failed: ${err.message}`)
+        LogHelper.error('SaveStatePage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
       })
       return
     }
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
-      console.error(`[SaveStatePage] pushUrl ${route} failed: ${err.message}`)
+      LogHelper.error('SaveStatePage', 'Route', `pushUrl ${route} failed: ${err.message}`)
     })
   }
 

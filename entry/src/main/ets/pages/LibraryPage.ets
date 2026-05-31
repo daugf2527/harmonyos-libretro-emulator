@@ -353,7 +353,7 @@ struct LibraryPage {
         autoStart: true
       }
     }).catch((err: Error) => {
-      console.error(`[LibraryPage] 跳转游戏页失败: ${err.message}`)
+      LogHelper.error('LibraryPage', 'Route', `跳转游戏页失败: ${err.message}`)
     })
   }
 
@@ -498,7 +498,7 @@ struct LibraryPage {
     }
     this.suspendBeforeRoute()
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-      console.error(`[LibraryPage] replaceUrl ${route} failed: ${err.message}`)
+      LogHelper.error('LibraryPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
     })
   }
 

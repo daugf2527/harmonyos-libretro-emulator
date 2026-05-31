@@ -360,7 +360,7 @@ struct InputLayoutPage {
   private onBottomNavClick(key: string): void {
     if (key === 'input') {
       this.getUIContext().getRouter().replaceUrl({ url: 'pages/MultiplayerInputPage' }).catch((err: Error) => {
-        console.error(`[InputLayoutPage] replaceUrl MultiplayerInputPage failed: ${err.message}`)
+        LogHelper.error('InputLayoutPage', 'Route', `replaceUrl MultiplayerInputPage failed: ${err.message}`)
       })
       return
     }
@@ -369,7 +369,7 @@ struct InputLayoutPage {
       return
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
-      console.error(`[InputLayoutPage] replaceUrl ${route} failed: ${err.message}`)
+      LogHelper.error('InputLayoutPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
     })
   }
 
