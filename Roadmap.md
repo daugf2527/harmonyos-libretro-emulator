@@ -27,7 +27,7 @@
 
 ### 输入
 - ~~输入快照”analog”入口未打通~~（✅ 已修复：NAPI `refactoredSendAnalog` + ArkTS 链路完整）
-- Input Mapper 缺失：无法自定义键位
+- ~~Input Mapper 缺失~~（✅ 已实现：InputMappingRepository + InputMappingService + NAPI 动态映射表，2026-05-31）
 
 ### 渲染
 - ~~GLES PBO 缺失~~（⚠️ 已实现但因驱动兼容性禁用，当前直接上传稳定可用，优化项见 P2）
@@ -52,16 +52,13 @@
 - 详见：`docs/audit/m0-*.md`
 
 ### M1 ROM/I-O 治理（P0）
-- 状态：部分完成 (Phase 1 完成，Phase 2-3 设计完成但实施 BLOCKED)
+- 状态：✅ 已完成 (2026-05-31)
 - 目标：内置 ROM 按需解包到沙盒；下载 ROM 统一拷贝到沙盒并校验；CUE/多文件依赖稳定。
 - 验收：need_fullpath/no-game/大 ROM/CUE 场景可稳定启动且不阻塞 UI 线程。
 - 完成内容：
   - ✅ Phase 1: UI 优化与代码收口 (GameCard 性能优化、文档过滤、布局修正)
-  - ✅ Phase 2 设计: ROM 沙盒统一策略 (builtin/imported/temp 目录结构)
-  - ✅ Phase 3 审计: Library metadata 双 Repository 架构分析
-- 待完成：
-  - ⚠️ Phase 2 实施: C++/ArkTS 跨层改动 (预计 2-3h，建议作为 M1.2 epic)
-  - ⚠️ Phase 3 实施: 双 Repository 合并 (预计 7.5-10.5h，建议作为 M1.3 epic)
+  - ✅ Phase 2: ROM 沙盒统一策略实施 (builtin/imported/temp 目录结构，file_security + temp_file_manager + OnboardingPage)
+  - ✅ Phase 3: Library metadata 双 Repository 合并 (GameMetadataRepository → LibraryRepository，LibraryDetailPresenter/MetadataEditPage/LibraryDetailPage 更新)
 - 详见：`docs/plans/2026-05-31-m1-rom-io-closure.md`
 
 ### M2 可观测性与错误治理（P1）
