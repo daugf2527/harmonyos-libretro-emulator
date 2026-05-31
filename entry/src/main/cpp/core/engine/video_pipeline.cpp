@@ -1402,7 +1402,15 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
   };
 
   if (!data) {
-    return Finish(RenderResult::RENDERED); // Null frame is considered "rendered" (no-op)
+    // Dupe frame: reuse last frame cache if available
+    if (!lastFrame_.empty() && lastFrameWidth_ > 0 && lastFrameHeight_ > 0) {
+      data = lastFrame_.data();
+      width = lastFrameWidth_;
+      height = lastFrameHeight_;
+      pitch = lastFramePitch_;
+    } else {
+      return Finish(RenderResult::RENDERED); // No cache, treat as no-op
+    }
   }
 
   ScalingMode mode = scaling_mode_.load();
@@ -1466,6 +1474,28 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
   }
 
   if (result != RenderResult::DROPPED) {
+    // Save frame cache for dupe frame reuse (only for non-HW frames)
+    if (data != RETRO_HW_FRAME_BUFFER_VALID && data != nullptr) {
+      const size_t bytes_per_pixel = (pixel_format_ == RETRO_PIXEL_FORMAT_XRGB8888) ? 4 : 2;
+      const size_t row_bytes = width * bytes_per_pixel;
+      const size_t total_bytes = height * row_bytes;
+
+      if (lastFrame_.size() != total_bytes) {
+        lastFrame_.resize(total_bytes);
+      }
+
+      // Copy frame data row by row (pitch may differ from width * bpp)
+      const uint8_t *src = static_cast<const uint8_t *>(data);
+      uint8_t *dst = lastFrame_.data();
+      for (unsigned y = 0; y < height; ++y) {
+        std::memcpy(dst + y * row_bytes, src + y * pitch, row_bytes);
+      }
+
+      lastFrameWidth_ = width;
+      lastFrameHeight_ = height;
+      lastFramePitch_ = row_bytes; // Store normalized pitch (width * bpp)
+    }
+
     if (mode == ScalingMode::GLES_SCALING) {
       SetRenderModeState(RenderModeState::GLES_READY);
     } else if (mode == ScalingMode::HARDWARE_SCALING) {
