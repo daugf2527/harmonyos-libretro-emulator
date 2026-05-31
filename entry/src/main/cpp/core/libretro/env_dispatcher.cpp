@@ -1301,9 +1301,13 @@ bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data) {
                             *fmt == ::RETRO_PIXEL_FORMAT_RGB565 ||
                             *fmt == ::RETRO_PIXEL_FORMAT_0RGB1555);
     if (!supported) {
+      LOGF(LOG_WARN, "SET_PIXEL_FORMAT: unsupported format=%{public}d", static_cast<int>(*fmt));
       return false;
     }
     state.SetPixelFormat(*fmt);
+    const char *formatName = (*fmt == ::RETRO_PIXEL_FORMAT_XRGB8888) ? "XRGB8888" :
+                             (*fmt == ::RETRO_PIXEL_FORMAT_RGB565) ? "RGB565" : "0RGB1555";
+    LOGF(LOG_INFO, "SET_PIXEL_FORMAT: format=%{public}d (%{public}s)", static_cast<int>(*fmt), formatName);
     return true;
   }
 
