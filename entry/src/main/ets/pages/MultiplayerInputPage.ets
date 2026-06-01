@@ -6,6 +6,7 @@ import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import { InputDeviceInfo } from '../common/InputPortRouting'
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
 import LogHelper from '../common/LogHelper'
+import { display } from '@kit.ArkUI'
 
 interface ControllerSlotItem {
   id: string
@@ -49,6 +50,16 @@ struct MultiplayerInputPage {
   @State private inputLogTitleText: string = '等待输入'
   @State private inputLogDetailText: string = '刷新设备后可查看当前外接手柄状态'
   private readonly navItems = createEmuBottomNavItems('input')
+
+  // 折叠屏状态
+  @State private foldStatus: display.FoldStatus = display.FoldStatus.FOLD_STATUS_UNKNOWN
+  @State private displayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+  private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    this.foldStatus = data
+  }
+  private displayModeListener: (data: display.FoldDisplayMode) => void = (data: display.FoldDisplayMode) => {
+    this.displayMode = data
+  }
 
   private readonly lobbyRooms: LobbyRoomItem[] = [
     {
@@ -100,6 +111,25 @@ struct MultiplayerInputPage {
 
   aboutToAppear(): void {
     void this.refreshDevices()  // Audit C-F5: async fire-and-forget; yields main thread before NAPI call
+
+    // 注册折叠态监听
+    try {
+      this.foldStatus = display.getFoldStatus()
+      this.displayMode = display.getFoldDisplayMode()
+      display.on('foldStatusChange', this.foldStatusListener)
+      display.on('foldDisplayModeChange', this.displayModeListener)
+    } catch (err) {
+      LogHelper.error('MultiplayerInputPage', 'FoldableInit', `Failed to init foldable: ${err}`)
+    }
+  }
+
+  aboutToDisappear(): void {
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+      display.off('foldDisplayModeChange', this.displayModeListener)
+    } catch (err) {
+      LogHelper.error('MultiplayerInputPage', 'FoldableCleanup', `Failed to cleanup foldable: ${err}`)
+    }
   }
 
   private buildControllerSlots(): ControllerSlotItem[] {
@@ -550,6 +580,145 @@ struct MultiplayerInputPage {
     .justifyContent(FlexAlign.End)
   }
 
+  // 判断当前折叠态
+  private isTripleFoldExpanded(): boolean {
+    // 三折态全展开（G态）：FoldStatus.EXPANDED + DisplayMode.FULL
+    return this.foldStatus === display.FoldStatus.FOLD_STATUS_EXPANDED &&
+      this.displayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL
+  }
+
+  private isDoubleFoldExpanded(): boolean {
+    // 双折态展开（M态）：FoldStatus.HALF_FOLDED 或 DisplayMode.MAIN
+    return this.foldStatus === display.FoldStatus.FOLD_STATUS_HALF_FOLDED ||
+      this.displayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_MAIN ||
+      (this.foldStatus === display.FoldStatus.FOLD_STATUS_EXPANDED &&
+        this.displayMode !== display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL)
+  }
+
+  // 单折态布局（F态）
+  @Builder
+  private SingleFoldLayout() {
+    Scroll() {
+      Column({ space: 22 }) {
+        Column({ space: 14 }) {
+          ForEach(this.controllerSlots, (item: ControllerSlotItem) => {
+            this.ControllerCard(item)
+          }, (item: ControllerSlotItem) => item.id)
+        }
+        .width('100%')
+
+        this.LobbySection()
+
+        Column({ space: 14 }) {
+          this.TelemetrySection()
+          this.InputLogSection()
+        }
+        .width('100%')
+
+        this.ActionStrip()
+      }
+      .width('100%')
+      .constraintSize({ maxWidth: 780 })
+      .padding({ left: 24, right: 24, top: 24, bottom: 32 })
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .scrollBar(BarState.Off)
+  }
+
+  // 双折态布局（M态）
+  @Builder
+  private DoubleFoldLayout() {
+    Row({ space: 0 }) {
+      // 左侧：玩家列表（40%）
+      Scroll() {
+        Column({ space: 14 }) {
+          ForEach(this.controllerSlots, (item: ControllerSlotItem) => {
+            this.ControllerCard(item)
+          }, (item: ControllerSlotItem) => item.id)
+
+          this.LobbySection()
+
+          this.ActionStrip()
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20, top: 24, bottom: 32 })
+      }
+      .width('40%')
+      .height('100%')
+      .scrollBar(BarState.Auto)
+      .backgroundColor(EmuColors.background)
+
+      // 右侧：设备分配 + 测试面板（60%）
+      Scroll() {
+        Column({ space: 14 }) {
+          this.TelemetrySection()
+          this.InputLogSection()
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20, top: 24, bottom: 32 })
+      }
+      .width('60%')
+      .height('100%')
+      .scrollBar(BarState.Auto)
+      .backgroundColor(EmuColors.surfaceContainerLowest)
+    }
+    .width('100%')
+    .layoutWeight(1)
+  }
+
+  // 三折态布局（G态）
+  @Builder
+  private TripleFoldLayout() {
+    Row({ space: 0 }) {
+      // 左侧：玩家列表（25%）
+      Scroll() {
+        Column({ space: 14 }) {
+          ForEach(this.controllerSlots, (item: ControllerSlotItem) => {
+            this.ControllerCard(item)
+          }, (item: ControllerSlotItem) => item.id)
+
+          this.ActionStrip()
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 24, bottom: 32 })
+      }
+      .width('25%')
+      .height('100%')
+      .scrollBar(BarState.Auto)
+      .backgroundColor(EmuColors.background)
+
+      // 中间：设备分配（50%）
+      Scroll() {
+        Column({ space: 14 }) {
+          this.LobbySection()
+          this.TelemetrySection()
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20, top: 24, bottom: 32 })
+      }
+      .width('50%')
+      .height('100%')
+      .scrollBar(BarState.Auto)
+      .backgroundColor(EmuColors.surfaceContainerLowest)
+
+      // 右侧：输入测试面板（25%）
+      Scroll() {
+        Column({ space: 14 }) {
+          this.InputLogSection()
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 24, bottom: 32 })
+      }
+      .width('25%')
+      .height('100%')
+      .scrollBar(BarState.Auto)
+      .backgroundColor(EmuColors.surfaceContainer)
+    }
+    .width('100%')
+    .layoutWeight(1)
+  }
+
   build() {
     Column() {
       EmuHeaderBar({
@@ -565,32 +734,17 @@ struct MultiplayerInputPage {
         }
       })
 
-      Scroll() {
-        Column({ space: 22 }) {
-          Column({ space: 14 }) {
-            ForEach(this.controllerSlots, (item: ControllerSlotItem) => {
-              this.ControllerCard(item)
-            }, (item: ControllerSlotItem) => item.id)
-          }
-          .width('100%')
-
-          this.LobbySection()
-
-          Column({ space: 14 }) {
-            this.TelemetrySection()
-            this.InputLogSection()
-          }
-          .width('100%')
-
-          this.ActionStrip()
-        }
-        .width('100%')
-        .constraintSize({ maxWidth: 780 })
-        .padding({ left: 24, right: 24, top: 24, bottom: 32 })
+      // 根据折叠态选择布局
+      if (this.isTripleFoldExpanded()) {
+        // 三折态全展开（G态）
+        this.TripleFoldLayout()
+      } else if (this.isDoubleFoldExpanded()) {
+        // 双折态展开（M态）
+        this.DoubleFoldLayout()
+      } else {
+        // 单折态/折叠态（F态）
+        this.SingleFoldLayout()
       }
-      .width('100%')
-      .layoutWeight(1)
-      .scrollBar(BarState.Off)
 
       EmuBottomNav({
         items: this.navItems,

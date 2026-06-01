@@ -32,7 +32,8 @@ export async function loadRuntimeRenderSettingsProfile(
     if (!text || text.length === 0) {
       return createDefaultRuntimeRenderSettingsProfile()
     }
-    return normalizeRuntimeRenderSettingsProfile(JSON.parse(text) as RuntimeRenderSettingsProfile)
+    const parsed = JSON.parse(text) as Partial<RuntimeRenderSettingsProfile> | null
+    return normalizeRuntimeRenderSettingsProfile(parsed)
   } catch (_err) {
     return createDefaultRuntimeRenderSettingsProfile()
   }
@@ -72,14 +73,14 @@ export async function saveRuntimeRenderSettingsProfile(
 }
 
 export function normalizeRuntimeRenderSettingsProfile(
-  profile: RuntimeRenderSettingsProfile
+  profile: Partial<RuntimeRenderSettingsProfile> | null | undefined
 ): RuntimeRenderSettingsProfile {
   return {
     version: RUNTIME_RENDER_SETTINGS_VERSION,
-    scalingMode: clampRenderMode(profile.scalingMode),
-    softwareMaxPresetIndex: clampSoftwarePresetIndex(profile.softwareMaxPresetIndex),
-    hwRenderAllowed: Boolean(profile.hwRenderAllowed),
-    updatedAt: Number(profile.updatedAt) || 0
+    scalingMode: clampRenderMode(profile?.scalingMode),
+    softwareMaxPresetIndex: clampSoftwarePresetIndex(profile?.softwareMaxPresetIndex),
+    hwRenderAllowed: profile?.hwRenderAllowed !== false,
+    updatedAt: Number(profile?.updatedAt) || 0
   }
 }
 
@@ -105,7 +106,7 @@ export function describeSoftwareResolutionPreset(index: number): string {
   return '1280x720'
 }
 
-function clampRenderMode(mode: number): number {
+function clampRenderMode(mode: number | undefined): number {
   const safeMode = Math.floor(Number(mode) || 0)
   if (safeMode < 0) {
     return 0
@@ -116,7 +117,7 @@ function clampRenderMode(mode: number): number {
   return safeMode
 }
 
-function clampSoftwarePresetIndex(index: number): number {
+function clampSoftwarePresetIndex(index: number | undefined): number {
   const safeIndex = Math.floor(Number(index) || 0)
   if (safeIndex < 0) {
     return 0

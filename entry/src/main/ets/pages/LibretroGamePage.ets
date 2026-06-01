@@ -9,6 +9,8 @@ import { EmuColors, EmuTypography } from '../common/EmuUiTokens';
 import { RuntimeHudMetric } from '../components/RuntimeTopHudBar';
 import { RuntimePauseOverlay } from '../components/RuntimePauseOverlay';
 import { RuntimeVirtualControllerLayer } from '../components/RuntimeVirtualControllerLayer';
+import { SingleModeLayout, DualModeLayout, TripleModeLayout } from '../components/FoldableLayouts';
+import { ErrorCodeUtils, EngineErrorCodes, FileErrorCodes } from '../common/ErrorCodes';
 import {
   createDefaultPortAssignments,
   InputSourceType,
@@ -103,6 +105,8 @@ struct LibretroGamePage {
   @State gamePaused: boolean = false;
   @State switching: boolean = false;
   @State switchError: string = '';
+  @State switchProgress: number = 0;
+  @State switchProgressText: string = '';
   @State selectedCoreIndex: number = 0;
   @State selectedRomIndex: number = 0;
   @State selectedPortIndex: number = 0;
@@ -120,11 +124,15 @@ struct LibretroGamePage {
   // handleGeometryUpdate 会写入真实值（如 2048 ≈ 0.81 竖屏、GBA 1.5 横屏）。
   @State private gameAspectRatio: number = 0;
   @State runtimeSaveStatusText: string = '存档就绪';
+  // 折叠屏适配状态
+  @State currentFoldMode: 'single' | 'dual' | 'triple' = 'single';
+  @State screenWidth: number = 0;
+  @State screenHeight: number = 0;
   private runtimeInputLayoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons;
   // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS mask:bit N = RETRO_DEVICE_ID_JOYPAD_N 被
   // 当前 core 声明使用,0 = core 未上报(用 fallback 全键集)。@State 触发子组件 re-render。
   @State private runtimeInputDescriptorMask: number = 0;
-  
+
   // 使用包含 "new_arch" 的 ID 以触发 C++ 侧的新引擎逻辑
   private xComponentId: string = 'new_arch_game_xcomponent';
   private eventScope: EventHubScope | undefined = undefined;
@@ -155,7 +163,7 @@ struct LibretroGamePage {
     { label: 'LAT', value: '--' },
     { label: 'CORE', value: '--' }
   ];
-  
+
   aboutToAppear() {
     this.pageActive = true;
     this.eventScope = LibretroEventHub.getInstance().createScope();
@@ -182,7 +190,7 @@ struct LibretroGamePage {
     void this.loadRuntimeRenderSettings();
     this.refreshHudMetricsCache();
   }
-  
+
   aboutToDisappear() {
     this.romListRefreshToken += 1;
     this.pageActive = false;
@@ -229,6 +237,9 @@ struct LibretroGamePage {
     } catch (err) {
       const message = (err as Error).message || String(err);
       LogHelper.warn('LibretroGame', 'Input', `读取本地输入布局失败: ${message}`);
+      // 使用错误码提供更友好的提示
+      const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_READ_ERROR.numericCode);
+      LogHelper.info('LibretroGame', 'Input', `错误提示: ${userMsg}`);
       this.runtimeInputLayoutButtons = createDefaultInputLayoutProfile().buttons;
     }
   }
@@ -478,11 +489,11 @@ struct LibretroGamePage {
     this.inputFocusText = state.inputFocusText;
     this.uiInputDebugText = state.uiInputDebugText;
   }
-  
+
   updateRomOptions() {
     this.selectedRomIndex = 0;
   }
-  
+
   // 获取当前核心可用的 ROM（缓存结果，避免重复 filter）
   getAvailableRoms(): RuntimeRomConfig[] {
     if (this.selectedCoreIndex === this.availableRomsCacheCoreIndex && this.roms === this.availableRomsCacheRef) {
@@ -515,6 +526,9 @@ struct LibretroGamePage {
     } catch (err) {
       const msg = (err as Error).message || String(err);
       LogHelper.error('LibretroGame', 'ROM', `扫描 ROM 列表失败: ${msg}`);
+      // 使用错误码提供具体错误信息
+      const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_LIST_ERROR.numericCode);
+      LogHelper.warn('LibretroGame', 'ROM', `用户提示: ${userMsg}`);
     }
 
     if (refreshToken !== this.romListRefreshToken) {
@@ -603,79 +617,69 @@ struct LibretroGamePage {
     return this.hudMetricsCache;
   }
 
+  // 折叠态检测：根据屏幕宽高比判断折叠态
+  private detectFoldMode(width: number, height: number): void {
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+    const aspectRatio = width / height;
+    // 折叠态判断阈值（基于华为折叠屏设备实测数据）
+    // 单折态（竖屏）：宽高比 < 1.2
+    // 双折态（半展开）：1.2 <= 宽高比 < 2.0
+    // 三折态（全展开）：宽高比 >= 2.0
+    let newMode: 'single' | 'dual' | 'triple' = 'single';
+    if (aspectRatio >= 2.0) {
+      newMode = 'triple';
+    } else if (aspectRatio >= 1.2) {
+      newMode = 'dual';
+    } else {
+      newMode = 'single';
+    }
+    if (newMode !== this.currentFoldMode) {
+      LogHelper.info('LibretroGame', 'Foldable', `折叠态切换: ${this.currentFoldMode} -> ${newMode} (${width}x${height}, AR=${aspectRatio.toFixed(2)})`);
+      this.currentFoldMode = newMode;
+    }
+  }
+
   build() {
     Stack({ alignContent: Alignment.TopStart }) {
-      // 主体：上下分屏。游戏区在顶部，虚拟手柄在底部。
-      // 用 Column + layoutWeight 物理切分，避免虚拟手柄叠在游戏画面上造成
-      // 灰蒙感，也让 XComponent surface 高度直接对应游戏可视区，避免下半
-      // 被按键 shroud 浪费像素。
-      Column() {
-        // 游戏画面舞台 — 顶部 62%。Stack 提供黑边背景，XComponent 按
-        // gameAspectRatio 居中显示（2048 竖屏 ~0.81、GBA 横屏 1.5 等），
-        // 不再被强行拉成全屏比例。
-        Stack({ alignContent: Alignment.Center }) {
-          XComponent({
-            id: this.xComponentId,
-            type: XComponentType.SURFACE,
-            libraryname: 'entry'
-          })
-            .aspectRatio(this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3)
-            .constraintSize({ maxWidth: '100%', maxHeight: '100%' })
-            .focusable(true)
-            .focusOnTouch(true)
-            .onTouch((event) => {
-              this.inputDebugTracker.recordTouch(Number(event.type));
-            })
-            .onMouse((event) => {
-              this.inputDebugTracker.recordMouse(Number(event.action));
-            })
-            .onKeyEvent((event) => {
-              if (!event) {
-                return;
-              }
-              this.inputDebugTracker.recordKey(Number(event.type));
-            })
-            .onLoad(() => {
-              LogHelper.info(
-                'LibretroGame',
-                'UI',
-                `XComponent 加载完成 (New Arch) id=${this.xComponentId}`
-              );
-            })
-            .onDestroy(() => {
-              LogHelper.info(
-                'LibretroGame',
-                'UI',
-                `XComponent 销毁 (New Arch) id=${this.xComponentId}`
-              );
-            })
-        }
-        .width('100%')
-        .layoutWeight(this.gameRunning && !this.gamePaused && !this.hideVirtualController ? 65 : 100)
-        .backgroundColor(Color.Black)
-
-        // 虚拟按键区 — 底部 35%(仅运行时显示)
-        if (this.gameRunning && !this.gamePaused && !this.hideVirtualController) {
-          Column() {
-            RuntimeVirtualControllerLayer({
-              buttons: this.runtimeInputLayoutButtons,
-              layoutWidth: this.runtimeInputLayoutWidth,
-              layoutHeight: this.runtimeInputLayoutHeight,
-              inputDescriptorMask: this.runtimeInputDescriptorMask,
-              onButtonChange: (keyId: number, pressed: boolean) => {
-                this.setButton(keyId, pressed);
-              },
-              onAnalogChange: (index: number, x: number, y: number) => {
-                this.setAnalog(index, x, y);
-              }
-            })
+      // 根据折叠态选择布局
+      if (this.currentFoldMode === 'single') {
+        // 单折态：原有布局（上下分屏）
+        this.SingleFoldLayout()
+      } else if (this.currentFoldMode === 'dual') {
+        // 双折态：Digital GameBoy 布局
+        DualModeLayout({
+          xComponentId: this.xComponentId,
+          screenAspectRatio: this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3,
+          onKeyPress: (keyId: number, pressed: boolean) => {
+            this.setButton(keyId, pressed);
+          },
+          onReset: () => {
+            void this.startOrSwitchGame(true);
+          },
+          onStop: () => {
+            this.stopGame();
           }
-          .width('100%')
-          .layoutWeight(35)
-        }
+        })
+      } else {
+        // 三折态：Switch Layout 布局
+        TripleModeLayout({
+          xComponentId: this.xComponentId,
+          screenAspectRatio: this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3,
+          fps: this.perfDisplay.coreFps,
+          cpuUsage: 0,
+          onKeyPress: (keyId: number, pressed: boolean) => {
+            this.setButton(keyId, pressed);
+          },
+          onReset: () => {
+            void this.startOrSwitchGame(true);
+          },
+          onStop: () => {
+            this.stopGame();
+          }
+        })
       }
-      .width('100%')
-      .height('100%')
 
       // 左上角系统菜单按钮：运行中显示暂停图标，点击触发 PauseOverlay；未运行时按 MENU 返回上一页。
       Button(this.gameRunning ? '⏸' : 'MENU')
@@ -698,21 +702,46 @@ struct LibretroGamePage {
 
       // 取消按钮：仅在 switching=true 时显示
       if (this.switching) {
-        Button('取消')
-          .width(60)
-          .height(40)
-          .fontSize(EmuTypography.base)
-          .fontColor(EmuColors.error)
+        Column({ space: 12 }) {
+          // 进度条
+          Column({ space: 8 }) {
+            Text(this.switchProgressText)
+              .fontSize(14)
+              .fontColor(EmuColors.onSurface)
+              .fontWeight(FontWeight.Medium)
+
+            Progress({ value: this.switchProgress, total: 100, type: ProgressType.Linear })
+              .width(200)
+              .height(4)
+              .color(EmuColors.primary)
+              .backgroundColor('#33FFFFFF')
+
+            Text(`${this.switchProgress}%`)
+              .fontSize(12)
+              .fontColor('#FF9D9E9E')
+              .fontFamily('monospace')
+          }
+          .padding(16)
           .backgroundColor('#CC000000')
-          .border({ width: 0.5, color: '#33FF4444', style: BorderStyle.Solid })
-          .borderRadius(4)
-          .margin({ left: 18, top: 100 })
-          .onClick(() => {
-            LogHelper.info('LibretroGame', 'Engine', 'Cancel switch requested');
-            runtimeSessionController.cancelSwitch();
-            this.switching = false;
-            this.switchError = '';
-          })
+          .border({ width: 0.5, color: '#33FFFFFF', style: BorderStyle.Solid })
+          .borderRadius(8)
+
+          Button('取消')
+            .width(60)
+            .height(40)
+            .fontSize(EmuTypography.md)
+            .fontColor(EmuColors.error)
+            .backgroundColor('#CC000000')
+            .border({ width: 0.5, color: '#33FF4444', style: BorderStyle.Solid })
+            .borderRadius(4)
+            .onClick(() => {
+              LogHelper.info('LibretroGame', 'Engine', 'Cancel switch requested');
+              runtimeSessionController.cancelSwitch();
+              this.switching = false;
+              this.switchError = '';
+            })
+        }
+        .margin({ left: 18, top: 100 })
       }
 
       if (this.gamePaused) {
@@ -739,6 +768,16 @@ struct LibretroGamePage {
     .width('100%')
     .height('100%')
     .backgroundColor(Color.Black)
+    .onAreaChange((oldValue: Area, newValue: Area) => {
+      // 监听屏幕尺寸变化，检测折叠态
+      const width = Number(newValue.width);
+      const height = Number(newValue.height);
+      if (width !== this.screenWidth || height !== this.screenHeight) {
+        this.screenWidth = width;
+        this.screenHeight = height;
+        this.detectFoldMode(width, height);
+      }
+    })
   }
 
   @Builder
@@ -782,6 +821,81 @@ struct LibretroGamePage {
     .padding({ left: 32, right: 32 })
   }
 
+  @Builder
+  private SingleFoldLayout() {
+    // 主体：上下分屏。游戏区在顶部，虚拟手柄在底部。
+    // 用 Column + layoutWeight 物理切分，避免虚拟手柄叠在游戏画面上造成
+    // 灰蒙感，也让 XComponent surface 高度直接对应游戏可视区，避免下半
+    // 被按键 shroud 浪费像素。
+    Column() {
+      // 游戏画面舞台 — 顶部 62%。Stack 提供黑边背景，XComponent 按
+      // gameAspectRatio 居中显示（2048 竖屏 ~0.81、GBA 横屏 1.5 等），
+      // 不再被强行拉成全屏比例。
+      Stack({ alignContent: Alignment.Center }) {
+        XComponent({
+          id: this.xComponentId,
+          type: XComponentType.SURFACE,
+          libraryname: 'entry'
+        })
+          .aspectRatio(this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3)
+          .constraintSize({ maxWidth: '100%', maxHeight: '100%' })
+          .focusable(true)
+          .focusOnTouch(true)
+          .onTouch((event) => {
+            this.inputDebugTracker.recordTouch(Number(event.type));
+          })
+          .onMouse((event) => {
+            this.inputDebugTracker.recordMouse(Number(event.action));
+          })
+          .onKeyEvent((event) => {
+            if (!event) {
+              return;
+            }
+            this.inputDebugTracker.recordKey(Number(event.type));
+          })
+          .onLoad(() => {
+            LogHelper.info(
+              'LibretroGame',
+              'UI',
+              `XComponent 加载完成 (New Arch) id=${this.xComponentId}`
+            );
+          })
+          .onDestroy(() => {
+            LogHelper.info(
+              'LibretroGame',
+              'UI',
+              `XComponent 销毁 (New Arch) id=${this.xComponentId}`
+            );
+          })
+      }
+      .width('100%')
+      .layoutWeight(this.gameRunning && !this.gamePaused && !this.hideVirtualController ? 65 : 100)
+      .backgroundColor(Color.Black)
+
+      // 虚拟按键区 — 底部 35%(仅运行时显示)
+      if (this.gameRunning && !this.gamePaused && !this.hideVirtualController) {
+        Column() {
+          RuntimeVirtualControllerLayer({
+            buttons: this.runtimeInputLayoutButtons,
+            layoutWidth: this.runtimeInputLayoutWidth,
+            layoutHeight: this.runtimeInputLayoutHeight,
+            inputDescriptorMask: this.runtimeInputDescriptorMask,
+            onButtonChange: (keyId: number, pressed: boolean) => {
+              this.setButton(keyId, pressed);
+            },
+            onAnalogChange: (index: number, x: number, y: number) => {
+              this.setAnalog(index, x, y);
+            }
+          })
+        }
+        .width('100%')
+        .layoutWeight(35)
+      }
+    }
+    .width('100%')
+    .height('100%')
+  }
+
   // 设置按键状态 (新架构)
   setButton(buttonId: number, pressed: boolean) {
     sendRuntimeButton(this.portAssignments, this.selectedPortIndex, buttonId, pressed);
@@ -790,7 +904,7 @@ struct LibretroGamePage {
   setAnalog(index: number, x: number, y: number) {
     sendRuntimeAnalog(this.portAssignments, this.selectedPortIndex, index, x, y);
   }
-  
+
   // 开始/切换游戏 (新架构流程)
   async startOrSwitchGame(forceImmediate: boolean = false) {
     if (this.switching) {
@@ -803,10 +917,12 @@ struct LibretroGamePage {
       return;
     }
     this.switching = true;
+    this.switchProgress = 0;
+    this.switchProgressText = '准备切换...';
     const core = this.cores[this.selectedCoreIndex];
     const availableRoms = this.getAvailableRoms();
     const rom = availableRoms[this.selectedRomIndex];
-    
+
     if (!core || !rom) {
       LogHelper.error('LibretroGame', 'Core', '核心或 ROM 无效');
       this.switching = false;
@@ -838,7 +954,7 @@ struct LibretroGamePage {
     if (!this.isCurrentSwitchTask(token)) {
       return;
     }
-    
+
     LogHelper.info(
       'LibretroGame',
       'Engine',
@@ -852,14 +968,14 @@ struct LibretroGamePage {
       const context = this.getUIContext().getHostContext() as
         common.UIAbilityContext;
       if (!context) throw new Error('获取 Context 失败');
-      
+
       const filesDir = context.filesDir;
       const bundleCodeDir = context.bundleCodeDir;
       const resMgr = context.resourceManager;
       const timeoutMs = 5000;
 
       runtimeSessionController.clearLastError();
-      
+
       const corePath = await resolveRuntimeCorePath(bundleCodeDir, core.soFile);
       if (!this.isCurrentSwitchTask(token)) {
         return;
@@ -885,7 +1001,11 @@ struct LibretroGamePage {
         filesDir,
         timeoutMs,
         token,
-        resourceManager: resolved.useResMgr ? resMgr : undefined
+        resourceManager: resolved.useResMgr ? resMgr : undefined,
+        progressCallback: (progress: number, message: string) => {
+          this.switchProgress = progress;
+          this.switchProgressText = message;
+        }
       });
       if (!this.isCurrentSwitchTask(token)) {
         return;
@@ -893,7 +1013,7 @@ struct LibretroGamePage {
       if (!ok) {
         throw new Error(runtimeSessionController.formatLastError('SwitchGame'));
       }
-      
+
       this.currentCore = core.name;
       this.currentRom = rom.name;
       this.gameRunning = true;
@@ -915,11 +1035,24 @@ struct LibretroGamePage {
       if (!this.isCurrentSwitchTask(token)) {
         return;
       }
-      this.switchError = e.message || String(e);
+      // 使用错误码系统提供具体错误信息
+      const rawMessage = (e as Error).message || String(e);
+      let errorCode = EngineErrorCodes.ENGINE_START_FAILED;
+
+      // 根据错误消息推断具体错误类型
+      if (rawMessage.includes('Core') || rawMessage.includes('核心')) {
+        errorCode = EngineErrorCodes.CORE_LOAD_FAILED;
+      } else if (rawMessage.includes('ROM') || rawMessage.includes('游戏')) {
+        errorCode = EngineErrorCodes.ROM_LOAD_FAILED;
+      }
+
+      const userMsg = ErrorCodeUtils.getUserMessage(errorCode.numericCode);
+      this.switchError = userMsg;
+
       LogHelper.error(
         'LibretroGame',
         'Engine',
-        `启动异常: ${this.switchError}`
+        `启动异常 [${errorCode.code}]: ${rawMessage}`
       );
     } finally {
       if (!this.isCurrentSwitchTask(token)) {
@@ -978,7 +1111,7 @@ struct LibretroGamePage {
       LogHelper.info('LibretroGame', 'Engine', '游戏已暂停');
     }
   }
-  
+
   // 继续游戏
   resumeGame() {
     if (this.gameRunning && this.gamePaused) {
@@ -987,7 +1120,7 @@ struct LibretroGamePage {
       LogHelper.info('LibretroGame', 'Engine', '游戏已继续');
     }
   }
-  
+
   // 停止游戏
   stopGame() {
     if (this.gameRunning || this.gamePaused) {

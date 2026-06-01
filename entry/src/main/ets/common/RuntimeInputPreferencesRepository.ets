@@ -30,7 +30,8 @@ export async function loadRuntimeInputPreferencesProfile(
     if (!text || text.length === 0) {
       return createDefaultRuntimeInputPreferencesProfile()
     }
-    return normalizeRuntimeInputPreferencesProfile(JSON.parse(text) as RuntimeInputPreferencesProfile)
+    const parsed = JSON.parse(text) as Partial<RuntimeInputPreferencesProfile> | null
+    return normalizeRuntimeInputPreferencesProfile(parsed)
   } catch (_err) {
     return createDefaultRuntimeInputPreferencesProfile()
   }
@@ -69,13 +70,13 @@ export async function saveRuntimeInputPreferencesProfile(
 }
 
 export function normalizeRuntimeInputPreferencesProfile(
-  profile: RuntimeInputPreferencesProfile
+  profile: Partial<RuntimeInputPreferencesProfile> | null | undefined
 ): RuntimeInputPreferencesProfile {
   return {
     version: RUNTIME_INPUT_PREFS_VERSION,
-    hideVirtualController: Boolean(profile.hideVirtualController),
-    hideUndeclaredKeys: Boolean(profile.hideUndeclaredKeys),
-    updatedAt: Number(profile.updatedAt) || 0
+    hideVirtualController: Boolean(profile?.hideVirtualController),
+    hideUndeclaredKeys: Boolean(profile?.hideUndeclaredKeys),
+    updatedAt: Number(profile?.updatedAt) || 0
   }
 }
 

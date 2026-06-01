@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { fileIo as fs, picker } from '@kit.CoreFileKit'
+import { display } from '@kit.ArkUI'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { GridBackground } from '../components/EmuAppShell'
@@ -69,15 +70,31 @@ struct OnboardingPage {
   ]
   @State private protocolStatus: ProtocolStatus = 'PENDING'
   @State private protocolDetailText: string = '正在检查导入前置条件'
+  @State private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
+  private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    this.updateFoldDisplayMode()
+  }
 
   aboutToAppear() {
     this.lifecycle.activate()
+    this.updateFoldDisplayMode()
+    display.on('foldStatusChange', this.foldStatusListener)
     void this.refreshImportReadiness()
   }
 
   aboutToDisappear() {
+    display.off('foldStatusChange', this.foldStatusListener)
     this.lifecycle.deactivate()
+  }
+
+  private updateFoldDisplayMode(): void {
+    try {
+      this.foldDisplayMode = display.getFoldDisplayMode()
+    } catch (err) {
+      LogHelper.error('OnboardingPage', 'FoldDetect', `getFoldDisplayMode failed: ${(err as Error).message}`)
+      this.foldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+    }
   }
 
   private switchToStep2(): void {
@@ -258,13 +275,97 @@ struct OnboardingPage {
     }
   }
 
+  private getResponsiveIconSize(): number {
+    if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+      return 48
+    }
+    return 40
+  }
+
+  private getResponsiveSpacing(base: number): number {
+    if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+      return base
+    }
+    return Math.max(24, Math.floor(base * 0.72))
+  }
+
+  private getResponsiveTitleSize(): number {
+    if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+      return EmuTypography.display
+    }
+    return EmuTypography.xxl
+  }
+
+  private getResponsiveBodySize(): number {
+    if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+      return EmuTypography.lg
+    }
+    return EmuTypography.md
+  }
+
+  private getResponsiveLineHeight(): number {
+    if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+      return 26
+    }
+    return 22
+  }
+
+  private getResponsiveMaxWidth(): number {
+    if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+      return 520
+    }
+    return 420
+  }
+
   build() {
     Column() {
       this.Header()
 
-      Stack() {
-        GridBackground({ gridSize: 40, lineColor: '#1A484848', lineWidth: 0.5 })
+      if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+        this.FullDisplayLayout()
+      } else {
+        this.CompactLayout()
+      }
 
+      this.Footer()
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor(Colors.background)
+    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+  }
+
+  @Builder
+  private CompactLayout() {
+    Stack() {
+      GridBackground({ gridSize: 40, lineColor: '#1A484848', lineWidth: 0.5 })
+
+      Column() {
+        if (this.currentStep === 1) {
+          this.Step1Content()
+        } else {
+          this.Step2Content()
+        }
+      }
+      .width('100%')
+      .constraintSize({ maxWidth: 560 })
+      .justifyContent(FlexAlign.Center)
+      .alignItems(HorizontalAlign.Center)
+      .opacity(this.stepOpacity)
+      .translate({ y: this.stepOffsetY })
+      .align(Alignment.Center)
+    }
+    .width('100%')
+    .layoutWeight(1)
+    .padding({ left: 32, right: 32 })
+  }
+
+  @Builder
+  private FullDisplayLayout() {
+    Stack() {
+      GridBackground({ gridSize: 40, lineColor: '#1A484848', lineWidth: 0.5 })
+
+      Row() {
         Column() {
           if (this.currentStep === 1) {
             this.Step1Content()
@@ -273,23 +374,19 @@ struct OnboardingPage {
           }
         }
         .width('100%')
-        .constraintSize({ maxWidth: 560 })
+        .constraintSize({ maxWidth: 720 })
         .justifyContent(FlexAlign.Center)
         .alignItems(HorizontalAlign.Center)
         .opacity(this.stepOpacity)
         .translate({ y: this.stepOffsetY })
-        .align(Alignment.Center)
       }
       .width('100%')
-      .layoutWeight(1)
-      .padding({ left: 32, right: 32 })
-
-      this.Footer()
+      .justifyContent(FlexAlign.Center)
+      .alignItems(VerticalAlign.Center)
     }
     .width('100%')
-    .height('100%')
-    .backgroundColor(Colors.background)
-    .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .layoutWeight(1)
+    .padding({ left: 64, right: 64 })
   }
 
   @Builder
@@ -345,7 +442,7 @@ struct OnboardingPage {
 
         EmuIcon({
           name: 'sports_esports',
-          iconSize: 52
+          iconSize: this.getResponsiveIconSize()
         })
 
         Row()
@@ -366,12 +463,12 @@ struct OnboardingPage {
       .width('26%')
       .constraintSize({ minWidth: 88, maxWidth: 112 })
       .aspectRatio(1)
-      .margin({ bottom: 48 })
+      .margin({ bottom: this.getResponsiveSpacing(48) })
 
       // Title + subtitle
       Column({ space: 16 }) {
         Text('一键找回你的童年游戏')
-          .fontSize(34)
+          .fontSize(this.getResponsiveTitleSize())
           .fontWeight(FontWeight.Medium)
           .fontColor(Colors.onSurface)
           .textAlign(TextAlign.Center)
@@ -379,16 +476,16 @@ struct OnboardingPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         Text('为本地 ROM / ISO 建立游戏库，保留 Core、Shader、存档等模拟器工作流。')
-          .fontSize(EmuTypography.lg)
+          .fontSize(this.getResponsiveBodySize())
           .fontColor('#CCABABAB')
-          .lineHeight(28)
+          .lineHeight(this.getResponsiveLineHeight())
           .textAlign(TextAlign.Center)
           .maxLines(3)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .constraintSize({ maxWidth: 420 })
+          .constraintSize({ maxWidth: this.getResponsiveMaxWidth() })
       }
       .width('100%')
-      .margin({ bottom: 64 })
+      .margin({ bottom: this.getResponsiveSpacing(64) })
 
       // CTA button
       Button({ type: ButtonType.Normal }) {
@@ -431,7 +528,7 @@ struct OnboardingPage {
       .backgroundColor(this.startButtonPressed ? Colors.surfaceContainerHighest : Color.Transparent)
       .border({ width: 1, color: Colors.outline, style: BorderStyle.Solid })
       .borderRadius(6)
-      .margin({ bottom: 96 })
+      .margin({ bottom: this.getResponsiveSpacing(96) })
       .onTouch((event: TouchEvent) => this.onStartButtonTouch(event))
       .onClick(() => this.switchToStep2())
 

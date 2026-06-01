@@ -1,5 +1,5 @@
 import testNapi from 'libentry.so';
-import type resourceManager from '@ohos.resourceManager';
+import type { resourceManager } from '@kit.LocalizationKit';
 import LogHelper from './LogHelper';
 import { EngineErrorInfo, EngineState } from './LibretroEventHub';
 

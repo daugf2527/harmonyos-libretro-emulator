@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit'
+import { display } from '@kit.ArkUI'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuButton, EmuButtonKind, EmuButtonSize, EmuButtonShape } from '../components/EmuButton'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
@@ -103,6 +104,20 @@ struct LinearSettingRow {
   }
 }
 
+// 折叠态枚举
+enum FoldableMode {
+  SINGLE = 'single',  // 单折态（F态）
+  DUAL = 'dual',      // 双折态（M态）
+  TRIPLE = 'triple'   // 三折态（G态）
+}
+
+// 设置分组
+interface SettingGroup {
+  id: string
+  label: string
+  icon: string
+}
+
 @Entry
 @Component
 struct SettingsPage {
@@ -124,10 +139,22 @@ struct SettingsPage {
   @State private inputPreferences: RuntimeInputPreferencesProfile = createDefaultRuntimeInputPreferencesProfile()
   @State private advancedStatusText: string = '运行时设置尚未读取'
   @State private runtimeApplyStatusText: string = '尚未执行运行时写入'
+  @State private foldableMode: FoldableMode = FoldableMode.SINGLE
+  @State private activeGroup: string = 'video'  // 当前选中的设置分组
   private pageActive: boolean = false
   private refreshToken: number = 0
+  private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    this.updateFoldableMode(data)
+  }
 
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
+
+  private readonly settingGroups: SettingGroup[] = [
+    { id: 'video', label: '画面设置', icon: '🎮' },
+    { id: 'audio', label: '音频音量', icon: '🔊' },
+    { id: 'input', label: '输入设备', icon: '🎯' },
+    { id: 'system', label: '系统信息', icon: '📊' }
+  ]
 
   private readonly aspectOptions: SettingOptionItem[] = [
     { key: '4:3', label: '4:3', isActive: true },
@@ -211,12 +238,42 @@ struct SettingsPage {
 
   aboutToAppear(): void {
     this.pageActive = true
+    this.detectFoldableMode()
+    display.on('foldStatusChange', this.foldStatusListener)
     void this.refreshPageData()
   }
 
   aboutToDisappear(): void {
     this.pageActive = false
     this.refreshToken += 1
+    display.off('foldStatusChange', this.foldStatusListener)
+  }
+
+  private detectFoldableMode(): void {
+    try {
+      const foldStatus = display.getFoldStatus()
+      this.updateFoldableMode(foldStatus)
+    } catch (err) {
+      LogHelper.error('SettingsPage', 'Fold', `获取折叠状态失败: ${err}`)
+      this.foldableMode = FoldableMode.SINGLE
+    }
+  }
+
+  private updateFoldableMode(foldStatus: display.FoldStatus): void {
+    switch (foldStatus) {
+      case display.FoldStatus.FOLD_STATUS_EXPANDED:
+        this.foldableMode = FoldableMode.DUAL
+        break
+      case display.FoldStatus.FOLD_STATUS_FOLDED:
+        this.foldableMode = FoldableMode.SINGLE
+        break
+      case display.FoldStatus.FOLD_STATUS_HALF_FOLDED:
+        this.foldableMode = FoldableMode.TRIPLE
+        break
+      default:
+        this.foldableMode = FoldableMode.SINGLE
+    }
+    LogHelper.info('SettingsPage', 'Fold', `折叠态切换: ${this.foldableMode}`)
   }
 
   private beginRefresh(): number {
@@ -470,6 +527,36 @@ struct SettingsPage {
       return nextBar
     })
     this.telemetryBars = mappedBars
+  }
+
+  @Builder
+  private TabItemCompact(key: string, title: string, code: string) {
+    Column({ space: 6 }) {
+      Text(title)
+        .fontSize(EmuTypography.md)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.activeTab === key ? EmuColors.primary : '#88757575')
+
+      Text(code)
+        .fontSize(EmuTypography.xs)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(this.activeTab === key ? '#B3ABABAB' : '#666666')
+        .letterSpacing(1.2)
+    }
+    .width('100%')
+    .height(72)
+    .padding({ left: 12, right: 12 })
+    .justifyContent(FlexAlign.Center)
+    .backgroundColor(this.activeTab === key ? EmuColors.surfaceContainerHighest : 'transparent')
+    .borderRadius(8)
+    .border({
+      width: this.activeTab === key ? 2 : 0,
+      color: EmuColors.primary,
+      style: BorderStyle.Solid
+    })
+    .onClick(() => {
+      this.activeTab = key
+    })
   }
 
   @Builder
@@ -860,41 +947,109 @@ struct SettingsPage {
   }
 
   @Builder
-  private BasicSettings() {
-    Column({ space: 34 }) {
-      Column({ space: 18 }) {
-        this.SectionTitle('画面设置', 'VIDEO_PROCESSING')
+  private GroupNavigationPanel() {
+    Column({ space: 12 }) {
+      Text('设置分类')
+        .fontSize(EmuTypography.sm)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#88757575')
+        .width('100%')
+        .padding({ left: 16, bottom: 8 })
 
-        Column({ space: 12 }) {
-          Text('画面比例 aspect_ratio')
-            .fontSize(EmuTypography.sm)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#9AABABAB')
-          this.SegmentedAspectControl()
+      ForEach(this.settingGroups, (group: SettingGroup) => {
+        Row({ space: 12 }) {
+          Text(group.icon)
+            .fontSize(20)
+
+          Text(group.label)
+            .fontSize(EmuTypography.md)
+            .fontWeight(this.activeGroup === group.id ? FontWeight.Bold : FontWeight.Normal)
+            .fontColor(this.activeGroup === group.id ? EmuColors.primary : EmuColors.onSurface)
         }
         .width('100%')
+        .height(56)
+        .padding({ left: 16, right: 16 })
+        .backgroundColor(this.activeGroup === group.id ? EmuColors.surfaceContainerHighest : 'transparent')
+        .borderRadius(8)
+        .onClick(() => {
+          this.activeGroup = group.id
+        })
+      }, (group: SettingGroup) => group.id)
+    }
+    .width('100%')
+    .padding(12)
+  }
 
-        this.LinearSettingBlock('CRT 复古扫描线强度', 'scanline_intensity', this.scanlineIntensity, this.onScanlineIntensityChange)
+  @Builder
+  private SettingsDetailPanel() {
+    Scroll() {
+      Column({ space: 34 }) {
+        if (this.isBasicTab()) {
+          if (this.activeGroup === 'video' || this.foldableMode === FoldableMode.SINGLE) {
+            this.VideoSettings()
+          }
+          if (this.activeGroup === 'input' || this.foldableMode === FoldableMode.SINGLE) {
+            this.InputSettings()
+          }
+          if (this.activeGroup === 'audio' || this.foldableMode === FoldableMode.SINGLE) {
+            this.AudioSettings()
+          }
+          if (this.activeGroup === 'system' || this.foldableMode === FoldableMode.SINGLE) {
+            this.SystemSettings()
+          }
+        } else {
+          this.AdvancedSettings()
+        }
+      }
+      .width('100%')
+      .padding({ left: 24, right: 24, top: 24, bottom: 34 })
+    }
+    .layoutWeight(1)
+    .width('100%')
+  }
+
+  @Builder
+  private VideoSettings() {
+    Column({ space: 18 }) {
+      this.SectionTitle('画面设置', 'VIDEO_PROCESSING')
+
+      Column({ space: 12 }) {
+        Text('画面比例 aspect_ratio')
+          .fontSize(EmuTypography.sm)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#9AABABAB')
+        this.SegmentedAspectControl()
       }
       .width('100%')
 
-      Column({ space: 18 }) {
-        this.SectionTitle('输入设备', 'INPUT_INTERFACE')
-        this.InputDeviceCard()
-      }
-      .width('100%')
+      this.LinearSettingBlock('CRT 复古扫描线强度', 'scanline_intensity', this.scanlineIntensity, this.onScanlineIntensityChange)
+    }
+    .width('100%')
+  }
 
-      Column({ space: 18 }) {
-        this.SectionTitle('音频音量', 'AUDIO_VOLUME')
-        this.LinearSettingBlock('主音量', 'master_volume', this.masterVolume, this.onMasterVolumeChange)
-      }
-      .width('100%')
+  @Builder
+  private InputSettings() {
+    Column({ space: 18 }) {
+      this.SectionTitle('输入设备', 'INPUT_INTERFACE')
+      this.InputDeviceCard()
+    }
+    .width('100%')
+  }
 
-      Column({ space: 18 }) {
-        this.SectionTitle('最近一次运行摘要', 'LAST_RUNTIME')
-        this.TelemetryPanel()
-      }
-      .width('100%')
+  @Builder
+  private AudioSettings() {
+    Column({ space: 18 }) {
+      this.SectionTitle('音频音量', 'AUDIO_VOLUME')
+      this.LinearSettingBlock('主音量', 'master_volume', this.masterVolume, this.onMasterVolumeChange)
+    }
+    .width('100%')
+  }
+
+  @Builder
+  private SystemSettings() {
+    Column({ space: 18 }) {
+      this.SectionTitle('最近一次运行摘要', 'LAST_RUNTIME')
+      this.TelemetryPanel()
     }
     .width('100%')
   }
@@ -1002,18 +1157,73 @@ struct SettingsPage {
         rightIconSize: 20
       })
 
-      Scroll() {
-        Column({ space: 34 }) {
-          this.TabHeader()
-          if (this.isBasicTab()) {
-            this.BasicSettings()
-          } else {
-            this.AdvancedSettings()
+      Column({ space: 0 }) {
+        this.TabHeader()
+
+        if (this.foldableMode === FoldableMode.SINGLE) {
+          // 单折态（F态）：单栏布局
+          this.SettingsDetailPanel()
+        } else if (this.foldableMode === FoldableMode.DUAL) {
+          // 双折态（M态）：左侧导航（30%）+ 右侧详情（70%）
+          Row() {
+            Column() {
+              this.GroupNavigationPanel()
+            }
+              .width('30%')
+              .height('100%')
+              .backgroundColor(EmuColors.surfaceContainer)
+              .border({ width: { right: 0.5 }, color: '#26333333', style: BorderStyle.Solid })
+
+            Column() {
+              this.SettingsDetailPanel()
+            }
+              .width('70%')
           }
+          .layoutWeight(1)
+          .width('100%')
+        } else {
+          // 三折态（G态）：左侧一级分类（20%）+ 中间二级分类（30%）+ 右侧详情（50%）
+          Row() {
+            // 左侧：Tab 切换（基础/高级）
+            Column({ space: 12 }) {
+              Text('设置类型')
+                .fontSize(EmuTypography.sm)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#88757575')
+                .width('100%')
+                .padding({ left: 16, bottom: 8 })
+
+              Column({ space: 8 }) {
+                this.TabItemCompact('basic', '基础设置', 'BASIC')
+                this.TabItemCompact('advanced', '高级设置', 'ADVANCED')
+              }
+              .width('100%')
+              .padding({ left: 12, right: 12 })
+            }
+            .width('20%')
+            .height('100%')
+            .padding({ top: 12 })
+            .backgroundColor(EmuColors.surfaceContainerLow)
+            .border({ width: { right: 0.5 }, color: '#26333333', style: BorderStyle.Solid })
+
+            // 中间：分组导航
+            Column() {
+              this.GroupNavigationPanel()
+            }
+              .width('30%')
+              .height('100%')
+              .backgroundColor(EmuColors.surfaceContainer)
+              .border({ width: { right: 0.5 }, color: '#26333333', style: BorderStyle.Solid })
+
+            // 右侧：详情
+            Column() {
+              this.SettingsDetailPanel()
+            }
+              .width('50%')
+          }
+          .layoutWeight(1)
+          .width('100%')
         }
-        .width('100%')
-        .constraintSize({ maxWidth: 460 })
-        .padding({ left: 24, right: 24, bottom: 34 })
       }
       .layoutWeight(1)
       .width('100%')

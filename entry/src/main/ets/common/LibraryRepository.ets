@@ -1,7 +1,7 @@
 import { common } from '@kit.AbilityKit'
 import { BusinessError } from '@kit.BasicServicesKit'
 import { fileIo as fs } from '@kit.CoreFileKit'
-import relationalStore from '@ohos.data.relationalStore'
+import { relationalStore } from '@kit.ArkData'
 import LogHelper from './LogHelper'
 
 export type LibrarySourceType = 'BUNDLED' | 'IMPORTED'
@@ -50,6 +50,14 @@ export interface LibraryRuntimeSnapshot {
   videoDrops: number
   videoDupes: number
   videoNulls: number
+}
+
+export interface LibraryMetadataPatch {
+  title?: string
+  publisher?: string
+  releaseYear?: number
+  platform?: string
+  coverKey?: string
 }
 
 interface LibraryIndexDocument {
@@ -354,24 +362,18 @@ export async function upsertLibraryRecord(
 ): Promise<void> {
   const records = await loadLibraryIndex(context)
   const nextRecords: LibraryRecord[] = []
+  const now = Date.now()
   let updated = false
   records.forEach((item: LibraryRecord) => {
     if (item.romFile === record.romFile) {
-      nextRecords.push({
-        ...record,
-        updatedAt: Date.now()
-      })
+      nextRecords.push(copyLibraryRecord(record, record.createdAt, now))
       updated = true
     } else {
       nextRecords.push(item)
     }
   })
   if (!updated) {
-    nextRecords.push({
-      ...record,
-      createdAt: record.createdAt || Date.now(),
-      updatedAt: Date.now()
-    })
+    nextRecords.push(copyLibraryRecord(record, record.createdAt || now, now))
   }
   await saveLibraryIndex(context, nextRecords)
 }
@@ -379,13 +381,7 @@ export async function upsertLibraryRecord(
 export async function updateLibraryRecordMetadata(
   context: common.UIAbilityContext,
   romFile: string,
-  metadata: {
-    title?: string
-    publisher?: string
-    releaseYear?: number
-    platform?: string
-    coverKey?: string
-  }
+  metadata: LibraryMetadataPatch
 ): Promise<LibraryRecord | undefined> {
   const records = await loadLibraryIndex(context)
   let targetRecord: LibraryRecord | undefined = undefined
@@ -393,15 +389,12 @@ export async function updateLibraryRecordMetadata(
     if (record.romFile !== romFile) {
       return record
     }
-    const nextRecord: LibraryRecord = {
-      ...record,
-      title: metadata.title !== undefined ? metadata.title : record.title,
-      publisher: metadata.publisher !== undefined ? metadata.publisher : record.publisher,
-      releaseYear: metadata.releaseYear !== undefined ? metadata.releaseYear : record.releaseYear,
-      platform: metadata.platform !== undefined ? metadata.platform : record.platform,
-      coverKey: metadata.coverKey !== undefined ? metadata.coverKey : record.coverKey,
-      updatedAt: Date.now()
-    }
+    const nextRecord: LibraryRecord = copyLibraryRecord(record, record.createdAt, Date.now())
+    nextRecord.title = metadata.title !== undefined ? metadata.title : record.title
+    nextRecord.publisher = metadata.publisher !== undefined ? metadata.publisher : record.publisher
+    nextRecord.releaseYear = metadata.releaseYear !== undefined ? metadata.releaseYear : record.releaseYear
+    nextRecord.platform = metadata.platform !== undefined ? metadata.platform : record.platform
+    nextRecord.coverKey = metadata.coverKey !== undefined ? metadata.coverKey : record.coverKey
     targetRecord = nextRecord
     return nextRecord
   })
@@ -461,6 +454,42 @@ export async function updateLibraryRecordCover(
   }
   await saveLibraryIndex(context, nextRecords)
   return targetRecord
+}
+
+function copyLibraryRecord(record: LibraryRecord, createdAt: number, updatedAt: number): LibraryRecord {
+  return {
+    id: record.id,
+    title: record.title,
+    subtitle: record.subtitle,
+    platform: record.platform,
+    coverColor: record.coverColor,
+    coverKey: record.coverKey,
+    coverUrl: record.coverUrl,
+    romFile: record.romFile,
+    preferredCoreId: record.preferredCoreId,
+    fileName: record.fileName,
+    sourceType: record.sourceType,
+    status: record.status,
+    createdAt: createdAt,
+    importedAt: record.importedAt,
+    updatedAt: updatedAt,
+    lastSeenAt: record.lastSeenAt,
+    lastPlayedAt: record.lastPlayedAt,
+    playCount: record.playCount,
+    totalPlayTimeMs: record.totalPlayTimeMs,
+    lastSessionDurationMs: record.lastSessionDurationMs,
+    lastRuntimeUpdatedAt: record.lastRuntimeUpdatedAt,
+    lastRuntimeFps: record.lastRuntimeFps,
+    lastRuntimeAudioBufferUsage: record.lastRuntimeAudioBufferUsage,
+    lastRuntimeAudioUnderruns: record.lastRuntimeAudioUnderruns,
+    lastRuntimeAudioOverruns: record.lastRuntimeAudioOverruns,
+    lastRuntimeVideoDrops: record.lastRuntimeVideoDrops,
+    lastRuntimeVideoDupes: record.lastRuntimeVideoDupes,
+    lastRuntimeVideoNulls: record.lastRuntimeVideoNulls,
+    releaseYear: record.releaseYear,
+    publisher: record.publisher,
+    genre: record.genre
+  }
 }
 
 async function loadLibraryIndex(context: common.UIAbilityContext): Promise<LibraryRecord[]> {
@@ -747,8 +776,8 @@ async function loadLibraryIndexFromJson(filesDir: string): Promise<LibraryRecord
     if (!text || text.length === 0) {
       return []
     }
-    const parsed = JSON.parse(text) as LibraryIndexDocument
-    if (!parsed.records || parsed.records.length === 0) {
+    const parsed = JSON.parse(text) as Partial<LibraryIndexDocument> | null
+    if (!parsed?.records || parsed.records.length === 0) {
       return []
     }
     return parsed.records.map((record: LibraryRecord) => normalizeRecord(record))

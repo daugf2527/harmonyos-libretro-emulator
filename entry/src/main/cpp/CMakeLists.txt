@@ -100,6 +100,7 @@ set(APP_NAPI_SOURCES
     app/napi/engine_state_napi.cpp
     app/napi/engine_disk_napi.cpp
     app/napi/engine_query_napi.cpp
+    app/napi/input_mapping_napi.cpp
 )
 
 add_library(entry SHARED
@@ -193,18 +194,18 @@ target_link_libraries(entry PUBLIC libqos.so)
 
 # ========== 三方 .so 库打包配置 (华为官方方案) ==========
 # 参考: https://gitee.com/harmonyos_samples/NativeSoIntegration
-# 
+#
 # Phase 3.1: 使用 dlopen 动态加载 Libretro 核心
-# 
+#
 # 重要: 不要在编译时链接 libretro_2048.so!
 # 原因: 编译时链接会让 libentry.so 依赖 libretro_2048.so,
 #       导致加载 libentry.so 时报错 "No such file or directory"
-# 
+#
 # 正确做法:
 # 1. 将 libretro_2048.so 放在 entry/libs/arm64-v8a/ 目录
 # 2. 构建系统会自动将其打包到 HAP 中
 # 3. 运行时通过 dlopen() 动态加载
-# 
+#
 # 不需要任何 target_link_libraries 配置!
 
 # ========== NEON SIMD 优化配置 (华为官方方案) ==========

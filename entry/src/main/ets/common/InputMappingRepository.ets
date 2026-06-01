@@ -46,17 +46,31 @@ export async function loadInputMappingProfile(
     if (!text || text.length === 0) {
       return createDefaultInputMappingProfile()
     }
-    const parsed = JSON.parse(text) as InputMappingProfile
+    const parsed = JSON.parse(text) as Partial<InputMappingProfile> | null
     return {
       version: MAPPING_VERSION,
-      name: parsed.name || 'default',
-      mappings: parsed.mappings || []
+      name: parsed?.name || 'default',
+      mappings: normalizeMappings(parsed?.mappings)
     }
   } catch (err) {
     const message = (err as Error).message || String(err)
     LogHelper.info('InputMappingRepository', 'Load', `加载配置失败，使用默认: ${message}`)
     return createDefaultInputMappingProfile()
   }
+}
+
+function normalizeMappings(mappings: KeyMapping[] | undefined): KeyMapping[] {
+  if (!mappings) {
+    return []
+  }
+  return mappings
+    .filter((item: KeyMapping) => item.keyCode.length > 0)
+    .map((item: KeyMapping): KeyMapping => {
+      return {
+        keyCode: item.keyCode,
+        joypadId: Math.max(0, Math.min(15, Math.floor(Number(item.joypadId) || 0)))
+      }
+    })
 }
 
 export async function saveInputMappingProfile(
@@ -71,7 +85,15 @@ export async function saveInputMappingProfile(
   }
   const path = buildMappingPath(context.filesDir)
   const text = JSON.stringify(profile, null, 2)
-  await fs.writeText(path, text)
+  let file: fs.File | undefined = undefined
+  try {
+    file = await fs.open(path, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
+    await fs.write(file.fd, text)
+  } finally {
+    if (file) {
+      await fs.close(file.fd)
+    }
+  }
   LogHelper.info('InputMappingRepository', 'Save', `配置已保存: ${profile.mappings.length} 个映射`)
 }
 

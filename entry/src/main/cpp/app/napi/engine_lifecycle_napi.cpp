@@ -3,6 +3,8 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <rawfile/raw_dir.h>
 #include <rawfile/raw_file_manager.h>
 
@@ -159,18 +161,14 @@ static napi_value GetRawFileList(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[2];
   if (!GetArgs(env, info, 1, 2, args, &argc, "GetRawFileList")) {
-    napi_value empty;
-    napi_create_array(env, &empty);
-    return empty;
+    return BuildStringArray(env, {});
   }
 
   char dir[256] = "roms";
   if (argc >= 2) {
     if (!GetStringArg(env, args[1], dir, sizeof(dir), "GetRawFileList",
                       "dir")) {
-      napi_value empty;
-      napi_create_array(env, &empty);
-      return empty;
+      return BuildStringArray(env, {});
     }
   }
 
@@ -178,9 +176,7 @@ static napi_value GetRawFileList(napi_env env, napi_callback_info info) {
       OH_ResourceManager_InitNativeResourceManager(env, args[0]);
   if (!mgr) {
     LOGF(LOG_ERROR, "[NEW] GetRawFileList: init resource manager failed");
-    napi_value empty;
-    napi_create_array(env, &empty);
-    return empty;
+    return BuildStringArray(env, {});
   }
 
   std::vector<std::string> files;
@@ -218,9 +214,10 @@ static void CompleteGetRawFileListAsync(napi_env env, napi_status status,
     LOGF(LOG_ERROR,
          "[NEW] GetRawFileListAsync work failed: status=%{public}d",
          static_cast<int>(status));
-    napi_value errMsg;
-    napi_create_string_utf8(env, "async_work_failed", NAPI_AUTO_LENGTH, &errMsg);
-    napi_reject_deferred(env, ctx->deferred, errMsg);
+    napi_value errMsg = MakeString(env, "async_work_failed");
+    if (errMsg) {
+      (void)RejectDeferredChecked(env, ctx->deferred, errMsg);
+    }
     if (ctx->work) {
       napi_delete_async_work(env, ctx->work);
       ctx->work = nullptr;
@@ -234,7 +231,9 @@ static void CompleteGetRawFileListAsync(napi_env env, napi_status status,
   }
 
   napi_value result = BuildStringArray(env, ctx->files);
-  napi_resolve_deferred(env, ctx->deferred, result);
+  if (result) {
+    (void)ResolveDeferredChecked(env, ctx->deferred, result);
+  }
 
   if (ctx->work) {
     napi_delete_async_work(env, ctx->work);
@@ -274,12 +273,28 @@ static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
   ctx->mgr = mgr;
   ctx->dir = dir;
 
-  napi_value promise;
-  napi_create_promise(env, &ctx->deferred, &promise);
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok ||
+      !ctx->deferred) {
+    OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
+    delete ctx;
+    napi_throw_error(env, nullptr, "Failed to create rawfile list promise");
+    return nullptr;
+  }
 
-  napi_value resourceName;
-  napi_create_string_utf8(env, "GetRawFileListAsync", NAPI_AUTO_LENGTH,
-                          &resourceName);
+  napi_value resourceName = MakeString(env, "GetRawFileListAsync");
+  if (!resourceName) {
+    napi_value empty = BuildStringArray(env, {});
+    if (empty) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, empty);
+    }
+    if (ctx->mgr) {
+      OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
+      ctx->mgr = nullptr;
+    }
+    delete ctx;
+    return promise;
+  }
   napi_status createStatus =
       napi_create_async_work(env, nullptr, resourceName,
                              ExecuteGetRawFileListAsync,
@@ -287,7 +302,9 @@ static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] GetRawFileListAsync create work failed");
     napi_value empty = BuildStringArray(env, {});
-    napi_resolve_deferred(env, ctx->deferred, empty);
+    if (empty) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, empty);
+    }
     if (ctx->mgr) {
       OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
       ctx->mgr = nullptr;
@@ -302,7 +319,9 @@ static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
     napi_value empty = BuildStringArray(env, {});
-    napi_resolve_deferred(env, ctx->deferred, empty);
+    if (empty) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, empty);
+    }
     if (ctx->mgr) {
       OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
       ctx->mgr = nullptr;
@@ -319,7 +338,19 @@ static napi_value StartEngine(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] StartEngine called");
   bool success = GetEngine()->Start();
-  return MakeBool(env, success);
+
+  if (!success) {
+    auto errorInfo = GetEngine()->GetLastErrorInfo();
+    const char *message = errorInfo.message.empty()
+        ? "Engine start failed"
+        : errorInfo.message.c_str();
+
+    // 错误码 3020: ENGINE_START_FAILED
+    LOGF(LOG_ERROR, "[NEW] StartEngine failed: %{public}s", message);
+    return MakeErrorResult(env, false, 3020, message);
+  }
+
+  return MakeErrorResult(env, true);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -328,17 +359,30 @@ static napi_value LoadCore(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[1];
   if (!GetArgs(env, info, 1, 1, args, &argc, "LoadCore")) {
-    return MakeBool(env, false);
+    return MakeErrorResult(env, false, 8001, "Invalid argument count");
   }
 
   char path[1024];
   if (!GetStringArg(env, args[0], path, sizeof(path), "LoadCore", "path")) {
-    return MakeBool(env, false);
+    return MakeErrorResult(env, false, 8002, "Invalid path argument type");
   }
 
   LOGF(LOG_INFO, " [NEW] LoadCore: %{public}s", path);
   const bool ok = GetEngine()->LoadCore(path);
-  return MakeBool(env, ok);
+
+  if (!ok) {
+    // 获取引擎的详细错误信息
+    auto errorInfo = GetEngine()->GetLastErrorInfo();
+    const char *message = errorInfo.message.empty()
+        ? "Core load failed"
+        : errorInfo.message.c_str();
+
+    // 错误码 3001: CORE_LOAD_FAILED
+    LOGF(LOG_ERROR, "[NEW] LoadCore failed: %{public}s", message);
+    return MakeErrorResult(env, false, 3001, message);
+  }
+
+  return MakeErrorResult(env, true);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -347,13 +391,13 @@ static napi_value LoadRom(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[2];
   if (!GetArgs(env, info, 1, 2, args, &argc, "LoadRom")) {
-    return MakeBool(env, false);
+    return MakeErrorResult(env, false, 8001, "Invalid argument count");
   }
 
   char path[1024];
   if (!GetStringArgAllowEmpty(env, args[0], path, sizeof(path), "LoadRom",
                               "path")) {
-    return MakeBool(env, false);
+    return MakeErrorResult(env, false, 8002, "Invalid path argument type");
   }
   std::string romPath(path);
 
@@ -362,13 +406,41 @@ static napi_value LoadRom(napi_env env, napi_callback_info info) {
   std::shared_ptr<std::vector<uint8_t>> romData = nullptr;
   if (!LoadRomDataFromRawfileIfNeeded(env, romPath, (argc >= 2) ? args[1] : nullptr,
                                       std::string(), romPath, romData)) {
-    return MakeBool(env, false);
+    // LoadRomDataFromRawfileIfNeeded 已经设置了 LastErrorInfo
+    auto errorInfo = GetEngine()->GetLastErrorInfo();
+    const char *message = errorInfo.message.empty()
+        ? "ROM rawfile processing failed"
+        : errorInfo.message.c_str();
+
+    // 错误码 3010: ROM_LOAD_FAILED
+    LOGF(LOG_ERROR, "[NEW] LoadRom rawfile failed: %{public}s", message);
+    return MakeErrorResult(env, false, 3010, message);
   }
 
   const bool ok = GetEngine()->LoadGame(romPath, romData);
-  return MakeBool(env, ok);
+
+  if (!ok) {
+    auto errorInfo = GetEngine()->GetLastErrorInfo();
+    const char *message = errorInfo.message.empty()
+        ? "ROM load failed"
+        : errorInfo.message.c_str();
+
+    // 错误码 3010: ROM_LOAD_FAILED
+    LOGF(LOG_ERROR, "[NEW] LoadRom failed: %{public}s", message);
+    return MakeErrorResult(env, false, 3010, message);
+  }
+
+  return MakeErrorResult(env, true);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
+
+enum class SwitchProgress {
+  STOPPING_CURRENT = 20,    // 正在停止当前游戏
+  LOADING_CORE = 40,        // 正在加载核心
+  LOADING_ROM = 60,         // 正在加载 ROM
+  STARTING_GAME = 80,       // 正在启动游戏
+  COMPLETED = 100           // 完成
+};
 
 struct SwitchGameAsyncContext {
   napi_deferred deferred = nullptr;
@@ -381,7 +453,103 @@ struct SwitchGameAsyncContext {
   uint64_t token = 0;
   uint64_t callerToken = 0;
   bool result = false;
+  int errorCode = 0;  // 新增：错误码
+  std::string errorMessage;  // 新增：错误消息
+  napi_threadsafe_function progressTsfn = nullptr;  // 进度回调 TSFN
 };
+
+static size_t GetFileSize(const std::string &path) {
+  struct stat st;
+  if (stat(path.c_str(), &st) == 0) {
+    return static_cast<size_t>(st.st_size);
+  }
+  return 0;
+}
+
+static uint32_t CalculateCoreLoadTimeout(const std::string &corePath) {
+  size_t coreSize = GetFileSize(corePath);
+  if (coreSize > 10 * 1024 * 1024) {  // >10MB
+    return 15000;  // 15 秒
+  } else if (coreSize > 5 * 1024 * 1024) {  // >5MB
+    return 10000;  // 10 秒
+  } else {
+    return 5000;   // 5 秒
+  }
+}
+
+static uint32_t CalculateGameLoadTimeout(const std::string &romPath,
+                                         const std::shared_ptr<std::vector<uint8_t>> &romData) {
+  size_t romSize = 0;
+  if (romData && !romData->empty()) {
+    romSize = romData->size();
+  } else {
+    romSize = GetFileSize(romPath);
+  }
+
+  if (romSize > 50 * 1024 * 1024) {  // >50MB
+    return 15000;  // 15 秒
+  } else if (romSize > 10 * 1024 * 1024) {  // >10MB
+    return 10000;  // 10 秒
+  } else {
+    return 5000;   // 5 秒
+  }
+}
+
+struct ProgressCallbackData {
+  int progress;
+  std::string message;
+};
+
+static void CallProgressTsfn(napi_env env, napi_value js_callback, void* context, void* data) {
+  if (env == nullptr || js_callback == nullptr) {
+    return;
+  }
+
+  auto* progressData = static_cast<ProgressCallbackData*>(data);
+  if (!progressData) {
+    return;
+  }
+
+  napi_value argv[2] = {
+      MakeInt32(env, progressData->progress),
+      MakeString(env, progressData->message),
+  };
+  if (!argv[0] || !argv[1]) {
+    delete progressData;
+    return;
+  }
+
+  napi_value global = nullptr;
+  if (napi_get_global(env, &global) != napi_ok) {
+    delete progressData;
+    return;
+  }
+  napi_value result = nullptr;
+  napi_status callStatus =
+      napi_call_function(env, global, js_callback, 2, argv, &result);
+  if (callStatus == napi_pending_exception) {
+    napi_value exception = nullptr;
+    napi_get_and_clear_last_exception(env, &exception);
+    LOGF(LOG_WARN, "[NEW] Switch progress callback threw; exception cleared");
+  }
+
+  delete progressData;
+}
+
+static void NotifyProgress(SwitchGameAsyncContext* ctx, SwitchProgress progress, const char* message) {
+  if (!ctx || !ctx->progressTsfn) {
+    return;
+  }
+
+  auto* data = new ProgressCallbackData{static_cast<int>(progress), message};
+  napi_status status = napi_call_threadsafe_function(
+      ctx->progressTsfn, data, napi_tsfn_nonblocking);
+
+  if (status != napi_ok) {
+    delete data;
+    LOGF(LOG_WARN, "[NEW] NotifyProgress failed: status=%{public}d", static_cast<int>(status));
+  }
+}
 
 static bool IsLatestSwitchToken(uint64_t token) {
   return switch_token.load() == token;
@@ -532,21 +700,32 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
 
   GetEngine()->ClearLastErrorInfo();
 
+  // 计算动态超时
+  const uint32_t stopTimeout = 5000;  // Stop 固定 5 秒
+  const uint32_t coreLoadTimeout = CalculateCoreLoadTimeout(ctx->corePath);
+  const uint32_t gameLoadTimeout = CalculateGameLoadTimeout(ctx->romPath, ctx->romData);
+
+  LOGF(LOG_INFO, "[NEW] Switch timeouts: stop=%{public}u, core=%{public}u, game=%{public}u",
+       stopTimeout, coreLoadTimeout, gameLoadTimeout);
+
+  // 1. Stop 当前游戏
   const EngineState currentState = GetEngine()->GetState();
   if (currentState != EngineState::INIT &&
       currentState != EngineState::STOPPED) {
+    NotifyProgress(ctx, SwitchProgress::STOPPING_CURRENT, "正在停止当前游戏...");
+
     if (!GetEngine()->Stop()) {
       EnsureLastErrorIfEmpty("switch_stop_failed", "Stop",
                              "Stop() returned false before switch");
-      RecoverAfterStopRequestFailure(ctx->timeoutMs, ctx->token);
+      RecoverAfterStopRequestFailure(stopTimeout, ctx->token);
       ctx->result = false;
       return;
     }
-    if (!WaitForStateWithToken(EngineState::STOPPED, ctx->timeoutMs,
+    if (!WaitForStateWithToken(EngineState::STOPPED, stopTimeout,
                                ctx->token)) {
       EnsureLastErrorIfEmpty("switch_wait_stopped_timeout", "WaitForState",
                              "timeout waiting STOPPED before switch");
-      RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
+      RecoverAfterSwitchFailure(stopTimeout, ctx->token);
       ctx->result = false;
       return;
     }
@@ -562,7 +741,7 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
   if (!GetEngine()->Start()) {
     EnsureLastErrorIfEmpty("switch_start_failed", "Start",
                            "Start() returned false");
-    RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
+    RecoverAfterSwitchFailure(stopTimeout, ctx->token);
     ctx->result = false;
     return;
   }
@@ -570,7 +749,7 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
   if (!GetEngine()->SetFilesDir(ctx->filesDir)) {
     EnsureLastErrorIfEmpty("switch_set_files_dir_failed", "SetFilesDir",
                            "SetFilesDir() returned false");
-    RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
+    RecoverAfterSwitchFailure(stopTimeout, ctx->token);
     ctx->result = false;
     return;
   }
@@ -582,18 +761,21 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
     return;
   }
 
+  // 2. LoadCore
+  NotifyProgress(ctx, SwitchProgress::LOADING_CORE, "正在加载核心...");
+
   if (!GetEngine()->LoadCore(ctx->corePath)) {
     EnsureLastErrorIfEmpty("switch_load_core_failed", "LoadCore",
                            "LoadCore() returned false");
-    RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
+    RecoverAfterSwitchFailure(coreLoadTimeout, ctx->token);
     ctx->result = false;
     return;
   }
-  if (!WaitForStateWithToken(EngineState::CORE_LOADED, ctx->timeoutMs,
+  if (!WaitForStateWithToken(EngineState::CORE_LOADED, coreLoadTimeout,
                              ctx->token)) {
     EnsureLastErrorIfEmpty("switch_wait_core_loaded_timeout", "WaitForState",
                            "timeout waiting CORE_LOADED");
-    RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
+    RecoverAfterSwitchFailure(coreLoadTimeout, ctx->token);
     ctx->result = false;
     return;
   }
@@ -605,23 +787,35 @@ static void ExecuteSwitchGame(napi_env env, void *data) {
     return;
   }
 
+  // 3. LoadGame
+  NotifyProgress(ctx, SwitchProgress::LOADING_ROM, "正在加载 ROM...");
+
   if (!GetEngine()->LoadGame(ctx->romPath, ctx->romData)) {
     EnsureLastErrorIfEmpty("switch_load_game_failed", "LoadGame",
                            "LoadGame() returned false");
-    RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
-    ctx->result = false;
-    return;
-  }
-  if (!WaitForStateWithToken(EngineState::RUNNING, ctx->timeoutMs,
-                             ctx->token)) {
-    EnsureLastErrorIfEmpty("switch_wait_running_timeout", "WaitForState",
-                           "timeout waiting RUNNING");
-    RecoverAfterSwitchFailure(ctx->timeoutMs, ctx->token);
+    RecoverAfterSwitchFailure(gameLoadTimeout, ctx->token);
     ctx->result = false;
     return;
   }
 
+  // 4. 等待 RUNNING
+  NotifyProgress(ctx, SwitchProgress::STARTING_GAME, "正在启动游戏...");
+
+  if (!WaitForStateWithToken(EngineState::RUNNING, gameLoadTimeout,
+                             ctx->token)) {
+    EnsureLastErrorIfEmpty("switch_wait_running_timeout", "WaitForState",
+                           "timeout waiting RUNNING");
+    RecoverAfterSwitchFailure(gameLoadTimeout, ctx->token);
+    ctx->result = false;
+    return;
+  }
+
+  // 5. 完成
+  NotifyProgress(ctx, SwitchProgress::COMPLETED, "完成");
+
   ctx->result = true;
+  ctx->errorCode = 0;
+  ctx->errorMessage.clear();
 }
 
 static void CompleteSwitchGame(napi_env env, napi_status status, void *data) {
@@ -637,9 +831,40 @@ static void CompleteSwitchGame(napi_env env, napi_status status, void *data) {
     ctx->result = false;
   }
 
-  napi_value result;
-  napi_get_boolean(env, ctx->result, &result);
-  napi_resolve_deferred(env, ctx->deferred, result);
+  // 如果失败，从引擎获取错误信息
+  if (!ctx->result) {
+    auto errorInfo = GetEngine()->GetLastErrorInfo();
+
+    // 根据 reason 映射错误码
+    if (errorInfo.reason.find("load_core") != std::string::npos) {
+      ctx->errorCode = 3001;  // CORE_LOAD_FAILED
+    } else if (errorInfo.reason.find("load_game") != std::string::npos) {
+      ctx->errorCode = 3010;  // ROM_LOAD_FAILED
+    } else if (errorInfo.reason.find("start") != std::string::npos) {
+      ctx->errorCode = 3020;  // ENGINE_START_FAILED
+    } else if (errorInfo.reason.find("cancelled") != std::string::npos) {
+      ctx->errorCode = 3022;  // STATE_TRANSITION_FAILED
+    } else {
+      ctx->errorCode = 3022;  // STATE_TRANSITION_FAILED (通用)
+    }
+
+    ctx->errorMessage = errorInfo.message.empty()
+        ? "Switch game failed"
+        : errorInfo.message;
+  }
+
+  // 返回结构化错误对象
+  napi_value result = MakeErrorResult(env, ctx->result, ctx->errorCode,
+                                      ctx->errorMessage.empty() ? nullptr : ctx->errorMessage.c_str());
+  if (result) {
+    (void)ResolveDeferredChecked(env, ctx->deferred, result);
+  }
+
+  // 清理 TSFN
+  if (ctx->progressTsfn) {
+    napi_release_threadsafe_function(ctx->progressTsfn, napi_tsfn_release);
+    ctx->progressTsfn = nullptr;
+  }
 
   napi_delete_async_work(env, ctx->work);
   delete ctx;
@@ -648,8 +873,8 @@ static void CompleteSwitchGame(napi_env env, napi_status status, void *data) {
 static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
-  napi_value args[6];
-  if (!GetArgs(env, info, 3, 6, args, &argc, "SwitchGameAsync")) {
+  napi_value args[7];  // 增加一个参数位用于进度回调
+  if (!GetArgs(env, info, 3, 7, args, &argc, "SwitchGameAsync")) {
     return MakeResolvedPromise(env, false);
   }
 
@@ -675,19 +900,25 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   uint32_t timeoutMs = 5000;
   uint64_t token = 0;
   uint64_t callerToken = 0;
+  napi_value progressCallback = nullptr;
   int timeoutIndex = -1;
   int tokenIndex = -1;
+  int progressIndex = -1;
 
   if (argc >= 4) {
     napi_valuetype arg3Type = napi_undefined;
-    napi_typeof(env, args[3], &arg3Type);
+    if (napi_typeof(env, args[3], &arg3Type) != napi_ok) {
+      return MakeResolvedPromise(env, false);
+    }
     if (arg3Type == napi_object) {
       resMgrValue = args[3];
       timeoutIndex = 4;
       tokenIndex = 5;
+      progressIndex = 6;
     } else if (arg3Type == napi_number) {
       timeoutIndex = 3;
       tokenIndex = 4;
+      progressIndex = 5;
     }
   }
 
@@ -710,6 +941,17 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     }
     if (tokenValue > 0) {
       callerToken = static_cast<uint64_t>(tokenValue);
+    }
+  }
+
+  // 解析进度回调
+  if (progressIndex >= 0 && argc > static_cast<size_t>(progressIndex)) {
+    napi_valuetype callbackType = napi_undefined;
+    if (napi_typeof(env, args[progressIndex], &callbackType) != napi_ok) {
+      return MakeResolvedPromise(env, false);
+    }
+    if (callbackType == napi_function) {
+      progressCallback = args[progressIndex];
     }
   }
 
@@ -746,12 +988,47 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   ctx->timeoutMs = timeoutMs;
   ctx->token = token;
 
-  napi_value promise;
-  napi_create_promise(env, &ctx->deferred, &promise);
+  // 创建 TSFN 用于进度回调
+  if (progressCallback) {
+    napi_value tsfnName = MakeString(env, "SwitchProgressCallback");
+    napi_status tsfnStatus = napi_invalid_arg;
+    if (tsfnName) {
+      tsfnStatus = napi_create_threadsafe_function(
+          env, progressCallback, nullptr, tsfnName, 0, 1, nullptr, nullptr,
+          nullptr, CallProgressTsfn, &ctx->progressTsfn);
+    }
+    if (!tsfnName || tsfnStatus != napi_ok) {
+      LOGF(LOG_WARN, "[NEW] Failed to create progress TSFN: status=%{public}d",
+           static_cast<int>(tsfnStatus));
+      ctx->progressTsfn = nullptr;
+    }
+  }
 
-  napi_value resourceName;
-  napi_create_string_utf8(env, "SwitchGameAsync", NAPI_AUTO_LENGTH,
-                          &resourceName);
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok ||
+      !ctx->deferred) {
+    if (ctx->progressTsfn) {
+      napi_release_threadsafe_function(ctx->progressTsfn, napi_tsfn_release);
+      ctx->progressTsfn = nullptr;
+    }
+    delete ctx;
+    napi_throw_error(env, nullptr, "Failed to create switch promise");
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "SwitchGameAsync");
+  if (!resourceName) {
+    if (ctx->progressTsfn) {
+      napi_release_threadsafe_function(ctx->progressTsfn, napi_tsfn_release);
+      ctx->progressTsfn = nullptr;
+    }
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
+    delete ctx;
+    return promise;
+  }
   napi_status createStatus = napi_create_async_work(
       env, nullptr, resourceName, ExecuteSwitchGame,
       CompleteSwitchGame, ctx, &ctx->work);
@@ -760,9 +1037,14 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     GetEngine()->SetLastErrorInfo("switch_async_create_failed",
                                   "SwitchGameAsync",
                                   "napi_create_async_work failed");
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    if (ctx->progressTsfn) {
+      napi_release_threadsafe_function(ctx->progressTsfn, napi_tsfn_release);
+      ctx->progressTsfn = nullptr;
+    }
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
     delete ctx;
     return promise;
   }
@@ -773,11 +1055,16 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     GetEngine()->SetLastErrorInfo("switch_async_queue_failed",
                                   "SwitchGameAsync",
                                   "napi_queue_async_work failed");
+    if (ctx->progressTsfn) {
+      napi_release_threadsafe_function(ctx->progressTsfn, napi_tsfn_release);
+      ctx->progressTsfn = nullptr;
+    }
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
     delete ctx;
     return promise;
   }
@@ -873,18 +1160,19 @@ static void CompleteStopEngineAsync(napi_env env, napi_status status,
     GetEngine()->SetLastErrorInfo("stop_async_work_failed",
                                   "StopEngineAsync",
                                   "StopEngineAsync complete callback status was not napi_ok");
-    napi_value errMsg;
-    napi_create_string_utf8(env, "stop_async_work_failed", NAPI_AUTO_LENGTH,
-                            &errMsg);
-    napi_reject_deferred(env, ctx->deferred, errMsg);
+    napi_value errMsg = MakeString(env, "stop_async_work_failed");
+    if (errMsg) {
+      (void)RejectDeferredChecked(env, ctx->deferred, errMsg);
+    }
   } else {
     if (!ctx->stopped) {
       LOGF(LOG_WARN,
            "[NEW] StopEngineAsync completed with stop timeout/failure");
     }
-    napi_value result;
-    napi_get_boolean(env, ctx->stopped, &result);
-    napi_resolve_deferred(env, ctx->deferred, result);
+    napi_value result = MakeBool(env, ctx->stopped);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
   }
 
   if (ctx->work) {
@@ -904,12 +1192,25 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
 
   auto *ctx = new StopEngineAsyncContext();
 
-  napi_value promise;
-  napi_create_promise(env, &ctx->deferred, &promise);
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok ||
+      !ctx->deferred) {
+    stop_in_progress.store(false);
+    delete ctx;
+    napi_throw_error(env, nullptr, "Failed to create stop promise");
+    return nullptr;
+  }
 
-  napi_value resourceName;
-  napi_create_string_utf8(env, "StopEngineAsyncWork", NAPI_AUTO_LENGTH,
-                          &resourceName);
+  napi_value resourceName = MakeString(env, "StopEngineAsyncWork");
+  if (!resourceName) {
+    stop_in_progress.store(false);
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
+    delete ctx;
+    return promise;
+  }
   napi_status createStatus =
       napi_create_async_work(env, nullptr, resourceName, ExecuteStopEngineAsync,
                              CompleteStopEngineAsync, ctx, &ctx->work);
@@ -919,9 +1220,10 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
                                   "StopEngineAsync",
                                   "napi_create_async_work failed");
     stop_in_progress.store(false);
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
     delete ctx;
     return promise;
   }
@@ -935,9 +1237,10 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
     stop_in_progress.store(false);
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
     delete ctx;
     return promise;
   }

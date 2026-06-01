@@ -3,6 +3,7 @@ import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import {
   getLibraryRecordByRomFile,
+  LibraryMetadataPatch,
   LibraryRecord,
   updateLibraryRecordMetadata
 } from '../common/LibraryRepository'
@@ -103,13 +104,8 @@ struct MetadataEditPage {
       return
     }
     try {
-      await updateLibraryRecordMetadata(context, this.romFile, {
-        title: this.titleText.trim(),
-        publisher: this.publisherText.trim(),
-        releaseYear: this.parseReleaseYear(),
-        platform: this.platformText.trim(),
-        coverKey: this.coverKeyText.trim()
-      })
+      const patchInput: LibraryMetadataPatch = this.buildMetadataPatchInput()
+      await updateLibraryRecordMetadata(context, this.romFile, patchInput)
       if (!this.isCurrentPageTask(token)) {
         return
       }
@@ -130,6 +126,16 @@ struct MetadataEditPage {
       return 0
     }
     return Math.floor(year)
+  }
+
+  private buildMetadataPatchInput(): LibraryMetadataPatch {
+    return {
+      title: this.titleText.trim(),
+      publisher: this.publisherText.trim(),
+      releaseYear: this.parseReleaseYear(),
+      platform: this.platformText.trim(),
+      coverKey: this.coverKeyText.trim()
+    }
   }
 
   private returnToDetail(): void {

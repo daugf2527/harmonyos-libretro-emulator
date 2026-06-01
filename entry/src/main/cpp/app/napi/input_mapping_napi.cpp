@@ -68,7 +68,10 @@ static int ParseKeyCode(const std::string &keyCodeStr) {
 static napi_value SetInputKeyMapping(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value args[1] = {nullptr};
-  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  if (napi_get_cb_info(env, info, &argc, args, nullptr, nullptr) != napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to read arguments");
+    return nullptr;
+  }
 
   if (argc < 1) {
     napi_throw_error(env, nullptr, "Missing argument: mappingMap");
@@ -77,7 +80,10 @@ static napi_value SetInputKeyMapping(napi_env env, napi_callback_info info) {
 
   // 检查参数是否为对象
   napi_valuetype valueType;
-  napi_typeof(env, args[0], &valueType);
+  if (napi_typeof(env, args[0], &valueType) != napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to read argument type");
+    return nullptr;
+  }
   if (valueType != napi_object) {
     napi_throw_error(env, nullptr, "Argument must be an object");
     return nullptr;
@@ -85,28 +91,48 @@ static napi_value SetInputKeyMapping(napi_env env, napi_callback_info info) {
 
   // 遍历对象属性
   napi_value propertyNames = nullptr;
-  napi_get_property_names(env, args[0], &propertyNames);
+  if (napi_get_property_names(env, args[0], &propertyNames) != napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to read mapping keys");
+    return nullptr;
+  }
 
   uint32_t propertyCount = 0;
-  napi_get_array_length(env, propertyNames, &propertyCount);
+  if (napi_get_array_length(env, propertyNames, &propertyCount) != napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to read mapping key count");
+    return nullptr;
+  }
 
   std::unordered_map<int, int> mappings;
   for (uint32_t i = 0; i < propertyCount; i++) {
     napi_value propertyName = nullptr;
-    napi_get_element(env, propertyNames, i, &propertyName);
+    if (napi_get_element(env, propertyNames, i, &propertyName) != napi_ok) {
+      continue;
+    }
 
     // 获取键名（KeyCode 字符串）
     size_t keyStrLen = 0;
-    napi_get_value_string_utf8(env, propertyName, nullptr, 0, &keyStrLen);
+    if (napi_get_value_string_utf8(env, propertyName, nullptr, 0,
+                                   &keyStrLen) != napi_ok) {
+      continue;
+    }
     std::string keyCodeStr;
+    keyCodeStr.resize(keyStrLen + 1);
+    if (napi_get_value_string_utf8(env, propertyName, &keyCodeStr[0],
+                                   keyCodeStr.size(), &keyStrLen) != napi_ok) {
+      continue;
+    }
     keyCodeStr.resize(keyStrLen);
-    napi_get_value_string_utf8(env, propertyName, &keyCodeStr[0], keyStrLen + 1, &keyStrLen);
 
     // 获取值（Joypad ID）
     napi_value propertyValue = nullptr;
-    napi_get_property(env, args[0], propertyName, &propertyValue);
+    if (napi_get_property(env, args[0], propertyName, &propertyValue) !=
+        napi_ok) {
+      continue;
+    }
     int32_t joypadId = 0;
-    napi_get_value_int32(env, propertyValue, &joypadId);
+    if (napi_get_value_int32(env, propertyValue, &joypadId) != napi_ok) {
+      continue;
+    }
 
     // 转换 KeyCode 字符串为枚举值
     int keyCode = ParseKeyCode(keyCodeStr);
@@ -121,7 +147,9 @@ static napi_value SetInputKeyMapping(napi_env env, napi_callback_info info) {
   UpdateInputKeyMapping(mappings);
 
   napi_value result = nullptr;
-  napi_get_undefined(env, &result);
+  if (napi_get_undefined(env, &result) != napi_ok) {
+    return nullptr;
+  }
   return result;
 }
 
@@ -132,6 +160,14 @@ void RegisterInputMappingNapi(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
     {"setInputKeyMapping", nullptr, SetInputKeyMapping, nullptr, nullptr, nullptr, napi_default, nullptr}
   };
-  napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
+  napi_status status =
+      napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]),
+                             desc);
+  if (status != napi_ok) {
+    LOGF(LOG_ERROR,
+         "RegisterInputMappingNapi: napi_define_properties failed: %{public}d",
+         status);
+    return;
+  }
   LOGF(LOG_INFO, "Input mapping NAPI registered");
 }

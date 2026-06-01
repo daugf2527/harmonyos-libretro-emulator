@@ -25,15 +25,20 @@ bool TempFileManager::Initialize() {
     if (!common::EnsureDirExists(filesDir_)) {
         return false;
     }
-    // Create roms/builtin for persistent built-in ROM storage
+    // Create roms subdirectories for ROM sandbox (M1 Phase 2)
     if (!common::EnsureDirExists(filesDir_ + "/roms")) {
         return false;
     }
     if (!common::EnsureDirExists(filesDir_ + "/roms/builtin")) {
         return false;
     }
-    // Keep temp_roms for backward compatibility during migration
-    return common::EnsureDirExists(filesDir_ + "/temp_roms");
+    if (!common::EnsureDirExists(filesDir_ + "/roms/imported")) {
+        return false;
+    }
+    if (!common::EnsureDirExists(filesDir_ + "/roms/temp")) {
+        return false;
+    }
+    return true;
 }
 
 bool TempFileManager::WriteTempRom(const std::string& rawfilePath, const std::vector<uint8_t>& data, std::string& outTempPath) {
@@ -80,7 +85,7 @@ bool TempFileManager::WriteDependencyFile(const std::string& relativePath, const
     }
 
     std::string fullPath = parentTempDir + "/" + relativePath;
-    
+
     // Ensure parent directory of the dependency exists (handling subdirectories in relativePath)
     size_t lastSlash = fullPath.find_last_of('/');
     if (lastSlash == std::string::npos) {
@@ -97,7 +102,7 @@ bool TempFileManager::WriteDependencyFile(const std::string& relativePath, const
         LOGF(LOG_INFO, "Wrote dependency file: %{public}s", fullPath.c_str());
         return true;
     }
-    
+
     LOGF(LOG_ERROR, "Failed to write dependency file: %{public}s", fullPath.c_str());
     return false;
 }

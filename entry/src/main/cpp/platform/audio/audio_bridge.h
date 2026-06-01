@@ -75,6 +75,8 @@ public:
   size_t GetBufferedFrames() const;
   size_t GetMinBufferFrames() const { return min_buffer_frames_.load(); }
   void GetBufferStats(size_t &underruns, size_t &overruns) const;
+  void GetCallbackDiag(uint64_t &callbackCount, uint64_t &framesRead,
+                       int64_t &lastCallbackMs) const;
   void ResetBufferStats();
 
   void SetMinimumLatencyMs(unsigned latency_ms);
@@ -91,8 +93,8 @@ private:
   // --- DRC Constants ---
   static constexpr float kDrcLowThreshold = 0.40f;
   static constexpr float kDrcHighThreshold = 0.60f;
-  static constexpr double kDrcStep = 0.0005;
-  static constexpr double kDrcMaxSkew = 1.005;
+  static constexpr double kDrcStep = 0.001;
+  static constexpr double kDrcMaxSkew = 1.015;
   static constexpr double kDrcMinSkew = 0.995;
   static constexpr int kDrcUpdateIntervalMs = 50;
 
@@ -131,6 +133,14 @@ private:
   int process_audio_diag_log_count_{0};
   int process_audio_gap_log_count_{0};
   int process_audio_slow_log_count_{0};
+  std::chrono::steady_clock::time_point diag_window_start_{};
+  uint64_t diag_calls_{0};
+  uint64_t diag_in_frames_{0};
+  uint64_t diag_out_frames_{0};
+  uint64_t diag_write_failures_{0};
+  uint64_t diag_blocking_calls_{0};
+  int32_t diag_max_dt_ms_{0};
+  std::atomic<size_t> last_rebuffer_underruns_{0};
 
   std::vector<int16_t> resample_out_buf_;
 

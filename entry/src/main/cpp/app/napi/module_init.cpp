@@ -33,6 +33,9 @@
 // 通用 Libretro (重构引擎) NAPI 声明
 extern void RegisterLibretroRefactoredNapi(napi_env env, napi_value exports);
 
+// Input Mapper NAPI 声明
+extern void RegisterInputMappingNapi(napi_env env, napi_value exports);
+
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
   LOGF(LOG_INFO, "========== libentry.so Init START ==========");
@@ -57,6 +60,11 @@ static napi_value Init(napi_env env, napi_value exports) {
   LOGF(LOG_INFO, "Registering Libretro Refactored interfaces...");
   RegisterLibretroRefactoredNapi(env, exports);
   LOGF(LOG_INFO, "Libretro Refactored interfaces registered");
+
+  // 注册 Input Mapper 接口
+  LOGF(LOG_INFO, "Registering Input Mapping interfaces...");
+  RegisterInputMappingNapi(env, exports);
+  LOGF(LOG_INFO, "Input Mapping interfaces registered");
 
   LOGF(LOG_INFO, "========== libentry.so Init COMPLETE ==========");
   return exports;

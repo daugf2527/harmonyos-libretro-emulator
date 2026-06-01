@@ -1181,18 +1181,104 @@ void LibretroEngine::GameLoop() {
         const double safeTargetFps = (targetFps_ > 0.0) ? targetFps_ : 60.0;
         const int64_t targetFrameUs =
             static_cast<int64_t>(1000000.0 / safeTargetFps);
-        const auto frameEnd = std::chrono::steady_clock::now();
+        auto frameEnd = std::chrono::steady_clock::now();
         const int64_t elapsedUs =
             std::chrono::duration_cast<std::chrono::microseconds>(
                 frameEnd - frameStart)
                 .count();
-        if (elapsedUs < targetFrameUs) {
-          const int64_t remainingUs = targetFrameUs - elapsedUs;
-          if (remainingUs > 200) {
-            std::this_thread::sleep_for(
-                std::chrono::microseconds(remainingUs - 100));
-          }
+        if (engineDiagWindowStart_.time_since_epoch().count() == 0) {
+          engineDiagWindowStart_ = frameStart;
         }
+        engineDiagFrames_++;
+        if (elapsedUs > engineDiagMaxFrameUs_) {
+          engineDiagMaxFrameUs_ = elapsedUs;
+        }
+        const int64_t lastRetroMs =
+            lastRetroRunMs_.load(std::memory_order_relaxed);
+        if (lastRetroMs > engineDiagMaxRetroMs_) {
+          engineDiagMaxRetroMs_ = lastRetroMs;
+        }
+        if (elapsedUs > targetFrameUs) {
+          engineDiagOverBudgetFrames_++;
+        }
+        const auto engineDiagElapsedMs =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                frameEnd - engineDiagWindowStart_)
+                .count();
+        if (engineDiagElapsedMs >= 1000) {
+          auto *audioBridge = AudioBridge::GetInstance();
+          int audioUsagePercent = -1;
+          int audioSyncMode = -1;
+          int audioPlaying = 0;
+          uint64_t audioCallbackCount = 0;
+          uint64_t audioCallbackFramesRead = 0;
+          int64_t audioCallbackAgeMs = -1;
+          const char *audioRunState = "none";
+          if (audioBridge) {
+            audioUsagePercent = static_cast<int>(
+                audioBridge->GetBufferUsage() * 100.0f + 0.5f);
+            audioSyncMode = static_cast<int>(audioBridge->GetSyncMode());
+            audioPlaying = audioBridge->IsPlaying() ? 1 : 0;
+            audioRunState =
+                AudioBridge::AudioRunStateToString(audioBridge->GetRunState());
+            uint64_t callbackCount = 0;
+            uint64_t callbackFramesRead = 0;
+            int64_t lastCallbackMs = 0;
+            audioBridge->GetCallbackDiag(callbackCount, callbackFramesRead,
+                                         lastCallbackMs);
+            audioCallbackCount = callbackCount;
+            audioCallbackFramesRead = callbackFramesRead;
+            if (lastCallbackMs > 0) {
+              const int64_t nowMs =
+                  std::chrono::duration_cast<std::chrono::milliseconds>(
+                      frameEnd.time_since_epoch())
+                      .count();
+              audioCallbackAgeMs = nowMs - lastCallbackMs;
+            }
+          }
+          LOGF(LOG_INFO,
+               "%{public}s engine_window: ms=%{public}lld, frames=%{public}llu, "
+               "fps_x100=%{public}d, target_x100=%{public}d, "
+               "over_budget=%{public}llu, max_frame_us=%{public}lld, "
+               "max_retro_ms=%{public}lld, audio_usage=%{public}d%%, "
+               "audio_state=%{public}s, audio_playing=%{public}d, "
+               "sync_mode=%{public}d, audio_cb_count=%{public}llu, "
+               "audio_cb_read_frames=%{public}llu, audio_cb_age_ms=%{public}lld",
+               kAudioChainPrefix, static_cast<long long>(engineDiagElapsedMs),
+               static_cast<unsigned long long>(engineDiagFrames_),
+               static_cast<int>(engineDiagFrames_ * 100000.0 /
+                                static_cast<double>(engineDiagElapsedMs)),
+               static_cast<int>(safeTargetFps * 100.0),
+               static_cast<unsigned long long>(engineDiagOverBudgetFrames_),
+               static_cast<long long>(engineDiagMaxFrameUs_),
+               static_cast<long long>(engineDiagMaxRetroMs_), audioUsagePercent,
+               audioRunState, audioPlaying, audioSyncMode,
+               static_cast<unsigned long long>(audioCallbackCount),
+               static_cast<unsigned long long>(audioCallbackFramesRead),
+               static_cast<long long>(audioCallbackAgeMs));
+          engineDiagWindowStart_ = frameEnd;
+          engineDiagFrames_ = 0;
+          engineDiagMaxFrameUs_ = 0;
+          engineDiagMaxRetroMs_ = 0;
+          engineDiagOverBudgetFrames_ = 0;
+        }
+        const auto frameInterval = std::chrono::microseconds(targetFrameUs);
+        if (nextFrameDeadline_.time_since_epoch().count() == 0 ||
+            frameStart > nextFrameDeadline_ + frameInterval) {
+          nextFrameDeadline_ = frameStart + frameInterval;
+        } else {
+          nextFrameDeadline_ += frameInterval;
+        }
+        auto sleepNow = std::chrono::steady_clock::now();
+        while (sleepNow + std::chrono::microseconds(1500) <
+               nextFrameDeadline_) {
+          std::this_thread::sleep_for(std::chrono::microseconds(500));
+          sleepNow = std::chrono::steady_clock::now();
+        }
+        while (std::chrono::steady_clock::now() < nextFrameDeadline_) {
+          std::this_thread::yield();
+        }
+        frameEnd = std::chrono::steady_clock::now();
 
         // 3. 上报 FPS
         auto now = std::chrono::steady_clock::now();
@@ -2611,6 +2697,7 @@ void LibretroEngine::TransitionTo(EngineState newState) {
   }
   LOGF(LOG_INFO, "State Transition: -> %{public}d",
        static_cast<int>(newState));
+  nextFrameDeadline_ = std::chrono::steady_clock::time_point{};
 
   // 通知 ArkTS 侧状态变更
   char payload[64];

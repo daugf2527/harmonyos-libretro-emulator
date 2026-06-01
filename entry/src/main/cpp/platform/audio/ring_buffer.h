@@ -66,6 +66,13 @@ public:
                  const std::atomic<bool> &running);
 
   /**
+   * @brief 有上限的阻塞写入
+   * @param timeout_ms 最大等待时间；超时返回 false，避免生产线程永久卡住
+   */
+  bool WriteWaitFor(const int16_t *data, size_t samples,
+                    const std::atomic<bool> &running, int timeout_ms);
+
+  /**
    * @brief 非阻塞读取
    * @param data 输出缓冲区
    * @param samples 期望读取的采样点数
@@ -79,6 +86,12 @@ public:
    */
   size_t ReadWait(int16_t *data, size_t samples,
                   const std::atomic<bool> &running);
+
+  /**
+   * @brief 有上限的阻塞读取；超时后读取当前可用数据，不足由调用方补静音
+   */
+  size_t ReadWaitFor(int16_t *data, size_t samples,
+                     const std::atomic<bool> &running, int timeout_ms);
 
   size_t AvailableRead() const;
   size_t AvailableWrite() const;

@@ -145,20 +145,16 @@ static napi_value ListInputDevices(napi_env env, napi_callback_info info) {
     napi_value obj = nullptr;
     if (napi_create_object(env, &obj) != napi_ok) { return nullptr; }
 
-    napi_value val = nullptr;
-    if (napi_create_string_utf8(env, devices[i].deviceId.c_str(),
-                                NAPI_AUTO_LENGTH, &val) != napi_ok) { return nullptr; }
-    napi_set_named_property(env, obj, "deviceId", val);
-
-    if (napi_create_int32(env, static_cast<int32_t>(devices[i].sourceType),
-                          &val) != napi_ok) { return nullptr; }
-    napi_set_named_property(env, obj, "sourceType", val);
-
-    if (napi_create_string_utf8(env, devices[i].name.c_str(), NAPI_AUTO_LENGTH,
-                                &val) != napi_ok) { return nullptr; }
-    napi_set_named_property(env, obj, "name", val);
-
-    napi_set_element(env, array, i, obj);
+    if (!SetNamedPropertyChecked(env, obj, "deviceId",
+                                 MakeString(env, devices[i].deviceId)) ||
+        !SetNamedPropertyChecked(
+            env, obj, "sourceType",
+            MakeInt32(env, static_cast<int32_t>(devices[i].sourceType))) ||
+        !SetNamedPropertyChecked(env, obj, "name",
+                                 MakeString(env, devices[i].name)) ||
+        !SetElementChecked(env, array, static_cast<uint32_t>(i), obj)) {
+      return nullptr;
+    }
   }
 
   return array;
@@ -227,9 +223,7 @@ static napi_value GetInputDescriptorMask(napi_env env, napi_callback_info info) 
   NAPI_TRY_CATCH_BEGIN
   auto *engine = GetEngine();
   uint16_t mask = engine ? engine->GetInputDescriptorMask() : 0;
-  napi_value result = nullptr;
-  napi_create_uint32(env, static_cast<uint32_t>(mask), &result);
-  return result;
+  return MakeUint32(env, static_cast<uint32_t>(mask));
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 

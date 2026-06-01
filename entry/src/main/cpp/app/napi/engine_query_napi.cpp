@@ -6,10 +6,7 @@ static napi_value GetEngineState(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   libretro::EngineState state = GetEngine()->GetState();
   int32_t stateValue = static_cast<int32_t>(state);
-
-  napi_value result;
-  napi_create_int32(env, stateValue, &result);
-  return result;
+  return MakeInt32(env, stateValue);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -68,13 +65,15 @@ static void CompleteWaitForState(napi_env env, napi_status status, void *data) {
 
   // Audit T1-F1: guard napi_cancelled — calling napi_get_boolean/napi_resolve_deferred on cancelled env is UB
   if (status != napi_ok) {
-    napi_value reason;
-    napi_get_undefined(env, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
   } else {
-    napi_value result;
-    napi_get_boolean(env, ctx->result, &result);
-    napi_resolve_deferred(env, ctx->deferred, result);
+    napi_value result = MakeBool(env, ctx->result);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
   }
 
   napi_delete_async_work(env, ctx->work);
@@ -119,29 +118,31 @@ static napi_value WaitForEngineStateAsync(napi_env env,
     return MakeResolvedPromise(env, false);
   }
 
-  napi_value resourceName;
-  if (napi_create_string_utf8(env, "WaitForEngineStateAsync", NAPI_AUTO_LENGTH,
-                              &resourceName) != napi_ok) {
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+  napi_value resourceName = MakeString(env, "WaitForEngineStateAsync");
+  if (!resourceName) {
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
     delete ctx;
     return promise;
   }
 
   if (napi_create_async_work(env, nullptr, resourceName, ExecuteWaitForState,
                              CompleteWaitForState, ctx, &ctx->work) != napi_ok) {
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
     delete ctx;
     return promise;
   }
   if (napi_queue_async_work(env, ctx->work) != napi_ok) {
     napi_delete_async_work(env, ctx->work);
-    napi_value falseVal;
-    napi_get_boolean(env, false, &falseVal);
-    napi_resolve_deferred(env, ctx->deferred, falseVal);
+    napi_value falseVal = MakeBool(env, false);
+    if (falseVal) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    }
     delete ctx;
     return promise;
   }
@@ -153,20 +154,15 @@ static napi_value WaitForEngineStateAsync(napi_env env,
 static napi_value GetLastErrorInfo(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   const auto err = GetEngine()->GetLastErrorInfo();
-  napi_value result;
-  napi_create_object(env, &result);
-
-  napi_value reason;
-  napi_create_string_utf8(env, err.reason.c_str(), NAPI_AUTO_LENGTH, &reason);
-  napi_set_named_property(env, result, "reason", reason);
-
-  napi_value step;
-  napi_create_string_utf8(env, err.step.c_str(), NAPI_AUTO_LENGTH, &step);
-  napi_set_named_property(env, result, "step", step);
-
-  napi_value message;
-  napi_create_string_utf8(env, err.message.c_str(), NAPI_AUTO_LENGTH, &message);
-  napi_set_named_property(env, result, "message", message);
+  napi_value result = MakeObject(env);
+  if (!SetNamedPropertyChecked(env, result, "reason",
+                               MakeString(env, err.reason)) ||
+      !SetNamedPropertyChecked(env, result, "step",
+                               MakeString(env, err.step)) ||
+      !SetNamedPropertyChecked(env, result, "message",
+                               MakeString(env, err.message))) {
+    return nullptr;
+  }
 
   return result;
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -201,27 +197,21 @@ static napi_value SetFilesDir(napi_env env, napi_callback_info info) {
 static napi_value HasCoreLoaded(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   bool loaded = GetEngine()->HasCoreLoaded();
-  napi_value result;
-  napi_get_boolean(env, loaded, &result);
-  return result;
+  return MakeBool(env, loaded);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
 static napi_value HasGameLoaded(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   bool loaded = GetEngine()->HasGameLoaded();
-  napi_value result;
-  napi_get_boolean(env, loaded, &result);
-  return result;
+  return MakeBool(env, loaded);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
 static napi_value GetRegion(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   unsigned region = GetEngine()->GetRegion();
-  napi_value result;
-  napi_create_uint32(env, region, &result);
-  return result;
+  return MakeUint32(env, region);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -229,21 +219,17 @@ static napi_value GetAVInfo(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   auto *engine = GetEngine();
 
-  napi_value obj;
-  napi_create_object(env, &obj);
-
-  napi_value val;
-  napi_create_uint32(env, engine->GetVideoWidth(), &val);
-  napi_set_named_property(env, obj, "videoWidth", val);
-
-  napi_create_uint32(env, engine->GetVideoHeight(), &val);
-  napi_set_named_property(env, obj, "videoHeight", val);
-
-  napi_create_double(env, engine->GetFps(), &val);
-  napi_set_named_property(env, obj, "fps", val);
-
-  napi_create_double(env, engine->GetAudioSampleRate(), &val);
-  napi_set_named_property(env, obj, "audioSampleRate", val);
+  napi_value obj = MakeObject(env);
+  if (!SetNamedPropertyChecked(env, obj, "videoWidth",
+                               MakeUint32(env, engine->GetVideoWidth())) ||
+      !SetNamedPropertyChecked(env, obj, "videoHeight",
+                               MakeUint32(env, engine->GetVideoHeight())) ||
+      !SetNamedPropertyChecked(env, obj, "fps",
+                               MakeDouble(env, engine->GetFps())) ||
+      !SetNamedPropertyChecked(env, obj, "audioSampleRate",
+                               MakeDouble(env, engine->GetAudioSampleRate()))) {
+    return nullptr;
+  }
 
   return obj;
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -253,13 +239,14 @@ static napi_value GetStats(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   auto stats = GetEngine()->GetStats();
 
-  napi_value obj;
-  napi_create_object(env, &obj);
+  napi_value obj = MakeObject(env);
 
-  napi_value val;
-  #define SET_STAT(name) \
-    napi_create_int64(env, static_cast<int64_t>(stats.name), &val); \
-    napi_set_named_property(env, obj, #name, val)
+  #define SET_STAT(name)                                                   \
+    if (!SetNamedPropertyChecked(env, obj, #name,                           \
+                                 MakeInt64(env, static_cast<int64_t>(       \
+                                                    stats.name)))) {        \
+      return nullptr;                                                       \
+    }
 
   SET_STAT(videoRefreshCalls);
   SET_STAT(videoNullFrames);
@@ -296,21 +283,31 @@ static napi_value GetStats(napi_env env, napi_callback_info info) {
 
   auto *audioBridge = libretro::AudioBridge::GetInstance();
   if (audioBridge) {
-    napi_create_double(env, audioBridge->GetBufferUsage(), &val);
-    napi_set_named_property(env, obj, "audioBufferUsage", val);
+    if (!SetNamedPropertyChecked(env, obj, "audioBufferUsage",
+                                 MakeDouble(env,
+                                            audioBridge->GetBufferUsage()))) {
+      return nullptr;
+    }
 
     size_t underruns = 0, overruns = 0;
     audioBridge->GetBufferStats(underruns, overruns);
-    napi_create_int64(env, static_cast<int64_t>(underruns), &val);
-    napi_set_named_property(env, obj, "audioUnderruns", val);
-    napi_create_int64(env, static_cast<int64_t>(overruns), &val);
-    napi_set_named_property(env, obj, "audioOverruns", val);
+    if (!SetNamedPropertyChecked(env, obj, "audioUnderruns",
+                                 MakeInt64(env,
+                                           static_cast<int64_t>(underruns))) ||
+        !SetNamedPropertyChecked(env, obj, "audioOverruns",
+                                 MakeInt64(env,
+                                           static_cast<int64_t>(overruns)))) {
+      return nullptr;
+    }
   } else {
-    napi_create_double(env, 0.0, &val);
-    napi_set_named_property(env, obj, "audioBufferUsage", val);
-    napi_create_int64(env, 0, &val);
-    napi_set_named_property(env, obj, "audioUnderruns", val);
-    napi_set_named_property(env, obj, "audioOverruns", val);
+    if (!SetNamedPropertyChecked(env, obj, "audioBufferUsage",
+                                 MakeDouble(env, 0.0)) ||
+        !SetNamedPropertyChecked(env, obj, "audioUnderruns",
+                                 MakeInt64(env, 0)) ||
+        !SetNamedPropertyChecked(env, obj, "audioOverruns",
+                                 MakeInt64(env, 0))) {
+      return nullptr;
+    }
   }
 
   #undef SET_STAT
@@ -332,28 +329,28 @@ static napi_value GetInputDebugStats(napi_env env, napi_callback_info info) {
   NewArchInputStats stats;
   PluginManager::GetInstance()->GetNewArchInputStats(stats);
 
-  napi_value obj;
-  napi_create_object(env, &obj);
-
-  napi_value val;
-  napi_create_int64(env, static_cast<int64_t>(stats.touchCount), &val);
-  napi_set_named_property(env, obj, "touchCount", val);
-  napi_create_int64(env, static_cast<int64_t>(stats.mouseCount), &val);
-  napi_set_named_property(env, obj, "mouseCount", val);
-  napi_create_int64(env, static_cast<int64_t>(stats.keyCount), &val);
-  napi_set_named_property(env, obj, "keyCount", val);
-
-  napi_get_boolean(env, stats.hasFocus, &val);
-  napi_set_named_property(env, obj, "hasFocus", val);
-  napi_get_boolean(env, stats.mouseDown, &val);
-  napi_set_named_property(env, obj, "mouseDown", val);
-
-  napi_create_int32(env, stats.lastTouchType, &val);
-  napi_set_named_property(env, obj, "lastTouchType", val);
-  napi_create_int32(env, stats.lastMouseAction, &val);
-  napi_set_named_property(env, obj, "lastMouseAction", val);
-  napi_create_int32(env, stats.lastKeyAction, &val);
-  napi_set_named_property(env, obj, "lastKeyAction", val);
+  napi_value obj = MakeObject(env);
+  if (!SetNamedPropertyChecked(env, obj, "touchCount",
+                               MakeInt64(env, static_cast<int64_t>(
+                                                  stats.touchCount))) ||
+      !SetNamedPropertyChecked(env, obj, "mouseCount",
+                               MakeInt64(env, static_cast<int64_t>(
+                                                  stats.mouseCount))) ||
+      !SetNamedPropertyChecked(env, obj, "keyCount",
+                               MakeInt64(env, static_cast<int64_t>(
+                                                  stats.keyCount))) ||
+      !SetNamedPropertyChecked(env, obj, "hasFocus",
+                               MakeBool(env, stats.hasFocus)) ||
+      !SetNamedPropertyChecked(env, obj, "mouseDown",
+                               MakeBool(env, stats.mouseDown)) ||
+      !SetNamedPropertyChecked(env, obj, "lastTouchType",
+                               MakeInt32(env, stats.lastTouchType)) ||
+      !SetNamedPropertyChecked(env, obj, "lastMouseAction",
+                               MakeInt32(env, stats.lastMouseAction)) ||
+      !SetNamedPropertyChecked(env, obj, "lastKeyAction",
+                               MakeInt32(env, stats.lastKeyAction))) {
+    return nullptr;
+  }
 
   return obj;
   NAPI_TRY_CATCH_END(env, nullptr)

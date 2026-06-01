@@ -2,6 +2,8 @@ import testNapi from 'libentry.so'
 import { resourceManager } from '@kit.LocalizationKit'
 import { EngineErrorInfo } from './LibretroEventHub'
 
+export type SwitchProgressCallback = (progress: number, message: string) => void
+
 interface RuntimeSessionNapi {
   refactoredStopEngineAsync(): Promise<boolean>
   refactoredSwitchGameAsync(
@@ -10,14 +12,16 @@ interface RuntimeSessionNapi {
     filesDir: string,
     resMgr: resourceManager.ResourceManager,
     timeoutMs: number,
-    token?: number
+    token?: number,
+    progressCallback?: SwitchProgressCallback
   ): Promise<boolean>
   refactoredSwitchGameAsync(
     corePath: string,
     romPath: string,
     filesDir: string,
     timeoutMs: number,
-    token?: number
+    token?: number,
+    progressCallback?: SwitchProgressCallback
   ): Promise<boolean>
   refactoredCancelSwitch(): boolean
   refactoredPauseEngine(): boolean
@@ -37,6 +41,7 @@ export interface RuntimeSwitchRequest {
   timeoutMs: number
   token: number
   resourceManager?: resourceManager.ResourceManager
+  progressCallback?: SwitchProgressCallback
 }
 
 const nativeApi = testNapi as RuntimeSessionNapi
@@ -84,7 +89,8 @@ export class RuntimeSessionController {
         request.filesDir,
         request.resourceManager,
         request.timeoutMs,
-        request.token
+        request.token,
+        request.progressCallback
       )
     }
     return nativeApi.refactoredSwitchGameAsync(
@@ -92,7 +98,8 @@ export class RuntimeSessionController {
       request.romPath,
       request.filesDir,
       request.timeoutMs,
-      request.token
+      request.token,
+      request.progressCallback
     )
   }
 

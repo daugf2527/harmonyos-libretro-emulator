@@ -7,6 +7,7 @@
 import testNapi from 'libentry.so';
 import { deviceInfo } from '@kit.BasicServicesKit';
 import { EmuTypography } from '../common/EmuUiTokens'
+import LogHelper from '../common/LogHelper';
 
 interface CoreConfig {
   id: string;
@@ -224,7 +225,7 @@ struct CoreLoaderTest {
   aboutToAppear() {
     // 获取沙箱路径 (官方推荐方式)
     let bundleCodeDir = this.getUIContext().getHostContext()!.bundleCodeDir;
-    
+
     // deviceInfo.abiList 可能是多 ABI 字符串，不能只做全等判断。
     const rawAbiList = String(deviceInfo.abiList ?? '').toLowerCase();
     let abiPath = rawAbiList.indexOf('x86_64') >= 0 ? 'x86_64' : 'arm64';
@@ -235,10 +236,10 @@ struct CoreLoaderTest {
       return { value: core.name };
     });
     this.updateCorePath();
-    
-    console.info(`[CoreLoaderTest] Bundle code dir: ${bundleCodeDir}`);
-    console.info(`[CoreLoaderTest] ABI: ${abiPath}`);
-    console.info(`[CoreLoaderTest] Core path: ${this.corePath}`);
+
+    LogHelper.info('CoreLoaderTest', 'Init', `Bundle code dir: ${bundleCodeDir}`);
+    LogHelper.info('CoreLoaderTest', 'Init', `ABI: ${abiPath}`);
+    LogHelper.info('CoreLoaderTest', 'Init', `Core path: ${this.corePath}`);
   }
 
   build() {
@@ -285,7 +286,7 @@ struct CoreLoaderTest {
           .fontWeight(FontWeight.Bold)
           .alignSelf(ItemAlign.Start)
           .margin({ left: 20, bottom: 10 })
-        
+
         Text(this.corePath)
           .fontSize(EmuTypography.sm)
           .fontColor(Color.Gray)
@@ -317,11 +318,11 @@ struct CoreLoaderTest {
           .fontWeight(FontWeight.Bold)
           .alignSelf(ItemAlign.Start)
           .margin({ bottom: 10 })
-        
+
         Scroll() {
           Text(this.testResult)
             .fontSize(EmuTypography.md)
-            .fontColor(this.testResult.startsWith('Success') ? Color.Green : 
+            .fontColor(this.testResult.startsWith('Success') ? Color.Green :
                       this.testResult.startsWith('Failed') ? Color.Red : Color.Black)
             .width('100%')
             .maxLines(20)
@@ -353,27 +354,27 @@ struct CoreLoaderTest {
    * 运行 CoreLoader 测试
    */
   private async runTest() {
-    console.info('[CoreLoaderTest] Starting test...');
+    LogHelper.info('CoreLoaderTest', 'Test', 'Starting test...');
     this.isLoading = true;
     this.testResult = '正在测试...\n请查看日志输出';
 
     try {
       // 调用 Native 侧的测试函数 (传递沙箱路径)
-      console.info(`[CoreLoaderTest] Calling testCoreLoader with path: ${this.corePath}`);
+      LogHelper.info('CoreLoaderTest', 'Test', `Calling testCoreLoader with path: ${this.corePath}`);
       let result = await nativeApi.testCoreLoader(this.corePath);
 
-      console.info(`[CoreLoaderTest] Test result: ${result}`);
+      LogHelper.info('CoreLoaderTest', 'Test', `Test result: ${result}`);
       this.testResult = result;
-      
+
       // 根据结果显示提示
       if (result.startsWith('Success')) {
-        console.info('[CoreLoaderTest] Test PASSED');
+        LogHelper.info('CoreLoaderTest', 'Test', 'Test PASSED');
       } else {
-        console.error('[CoreLoaderTest] Test FAILED');
+        LogHelper.error('CoreLoaderTest', 'Test', 'Test FAILED');
       }
     } catch (error) {
       let errorMsg = `Exception: ${error}`;
-      console.error(`[CoreLoaderTest] ${errorMsg}`);
+      LogHelper.error('CoreLoaderTest', 'Test', errorMsg);
       this.testResult = `Failed: ${errorMsg}`;
     } finally {
       this.isLoading = false;

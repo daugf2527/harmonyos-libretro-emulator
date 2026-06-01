@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+import type { resourceManager } from '@kit.LocalizationKit';
+
 // Phase 3.1 - CoreLoader 测试接口
 export const testCoreLoader: (corePath: string) => string;
 
@@ -28,12 +30,15 @@ export const refactoredResetEngine: () => boolean;
 export const refactoredPauseEngine: () => boolean;
 export const refactoredResumeEngine: () => boolean;
 export const refactoredLoadCore: (corePath: string) => boolean;
-export const refactoredLoadRom: (romPath: string, resMgr?: object) => boolean;
+export const refactoredLoadRom: (
+  romPath: string,
+  resMgr?: resourceManager.ResourceManager
+) => boolean;
 export function refactoredSwitchGameAsync(
   corePath: string,
   romPath: string,
   filesDir: string,
-  resMgr?: object,
+  resMgr?: resourceManager.ResourceManager,
   timeoutMs?: number,
   token?: number
 ): Promise<boolean>;
@@ -44,8 +49,14 @@ export function refactoredSwitchGameAsync(
   timeoutMs?: number,
   token?: number
 ): Promise<boolean>;
-export const refactoredGetRawFileList: (resMgr: object, dir?: string) => Array<string>;
-export const refactoredGetRawFileListAsync: (resMgr: object, dir?: string) => Promise<Array<string>>;
+export const refactoredGetRawFileList: (
+  resMgr: resourceManager.ResourceManager,
+  dir?: string
+) => Array<string>;
+export const refactoredGetRawFileListAsync: (
+  resMgr: resourceManager.ResourceManager,
+  dir?: string
+) => Promise<Array<string>>;
 export const refactoredInitEventBridge: (callback: (data: RefactoredEvent) => void) => boolean;
 export const refactoredSendInput: (port: number, id: number, pressed: boolean) => boolean;
 export const refactoredSendAnalog: (port: number, index: number, id: number, value: number) => boolean;
@@ -65,6 +76,7 @@ export const refactoredSendSensor: (port: number, id: number, value: number) => 
 export const refactoredGetState: () => number;
 export const refactoredWaitForState: (state: number, timeoutMs?: number) => boolean;
 export const refactoredWaitForStateAsync: (state: number, timeoutMs?: number) => Promise<boolean>;
+export const refactoredCancelSwitch: () => boolean;
 export interface EngineErrorInfo {
   reason: string;
   step: string;
@@ -153,6 +165,7 @@ export interface InputDebugStats {
   lastKeyAction: number;
 }
 export const refactoredGetInputDebugStats: () => InputDebugStats;
+export const setInputKeyMapping: (mappingMap: Record<string, number>) => boolean;
 
 // Controller/Region
 export const refactoredSetControllerPortDevice: (port: number, device: number) => boolean;

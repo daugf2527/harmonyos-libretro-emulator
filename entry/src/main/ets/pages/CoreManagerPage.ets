@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { fileIo as fs } from '@kit.CoreFileKit'
+import { display } from '@kit.ArkUI'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
@@ -38,18 +39,34 @@ struct CoreManagerPage {
   @State private firmwareFilesText: string = 'system/ 尚未扫描'
   @State private firmwareDirectoryText: string = 'filesDir/system'
   @State private remoteUpdateText: string = '当前构建未配置远端 core / firmware 仓库'
+  @State private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private pageActive: boolean = false
   private coreRefreshToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
+  private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    this.updateFoldDisplayMode()
+  }
 
   aboutToAppear(): void {
     this.pageActive = true
+    this.updateFoldDisplayMode()
+    display.on('foldStatusChange', this.foldStatusListener)
     void this.refreshCoreStatus()
   }
 
   aboutToDisappear(): void {
     this.pageActive = false
     this.coreRefreshToken += 1
+    display.off('foldStatusChange', this.foldStatusListener)
+  }
+
+  private updateFoldDisplayMode(): void {
+    try {
+      this.foldDisplayMode = display.getFoldDisplayMode()
+    } catch (err) {
+      LogHelper.error('CoreManagerPage', 'Fold', `getFoldDisplayMode failed: ${err}`)
+      this.foldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+    }
   }
 
   private beginCoreRefresh(): number {
@@ -314,56 +331,14 @@ struct CoreManagerPage {
         rightIconSize: 18
       })
 
-      Scroll() {
-        Column({ space: 24 }) {
-          Row() {
-            Text('内存占用')
-              .fontSize(EmuTypography.xs)
-                            .fontColor(EmuColors.onSurfaceVariant)
-              .letterSpacing(2)
-            Text(this.statusText)
-              .fontSize(EmuTypography.xs)
-                            .fontColor(EmuColors.primary)
-          }
-          .width('100%')
-          .justifyContent(FlexAlign.SpaceBetween)
-
-          this.MemoryFootprint()
-
-          Text('已识别核心')
-            .fontSize(EmuTypography.xs)
-                        .fontColor(EmuColors.onSurfaceVariant)
-            .letterSpacing(2)
-            .width('100%')
-
-          Text('本页只展示本地已打包 core 与 filesDir/system 下的固件依赖状态；远端更新、在线固件库当前未接入。')
-            .fontSize(EmuTypography.xs)
-            .fontColor(EmuColors.onSurfaceVariant)
-            .width('100%')
-
-          Column({ space: 1 }) {
-            ForEach(this.coreItems, (item: ManagedCoreItem) => {
-              this.CoreRow(item)
-            }, (item: ManagedCoreItem) => item.id)
-          }
-          .width('100%')
-          .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-
-          if (this.selectedCoreId.length > 0) {
-            Text(this.buildSelectedCoreFirmwareText())
-              .fontSize(EmuTypography.xs)
-              .fontColor(EmuColors.onSurfaceVariant)
-              .width('100%')
-          }
-
-          this.KernelLog()
-        }
-        .width('100%')
-        .constraintSize({ maxWidth: 920 })
-        .padding({ left: 20, right: 20, top: 28, bottom: 32 })
+      if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+        this.DualModeLayout()
+      } else if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_MAIN ||
+        this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_SUB) {
+        this.TripleModeLayout()
+      } else {
+        this.SingleModeLayout()
       }
-      .layoutWeight(1)
-      .width('100%')
 
       EmuBottomNav({
         items: this.navItems,
@@ -391,5 +366,416 @@ struct CoreManagerPage {
       return `${currentItem.name}: 当前未配置额外固件依赖`
     }
     return `${currentItem.name}: ${currentItem.firmwareDetail} / ${currentItem.firmwareFoundText} / ${currentItem.firmwareMissingText}`
+  }
+
+  @Builder
+  private SingleModeLayout() {
+    Scroll() {
+      Column({ space: 24 }) {
+        Row() {
+          Text('内存占用')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .letterSpacing(2)
+          Text(this.statusText)
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.primary)
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.SpaceBetween)
+
+        this.MemoryFootprint()
+
+        Text('已识别核心')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(2)
+          .width('100%')
+
+        Text('本页只展示本地已打包 core 与 filesDir/system 下的固件依赖状态；远端更新、在线固件库当前未接入。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
+
+        Column({ space: 1 }) {
+          ForEach(this.coreItems, (item: ManagedCoreItem) => {
+            this.CoreRow(item)
+          }, (item: ManagedCoreItem) => item.id)
+        }
+        .width('100%')
+        .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+
+        if (this.selectedCoreId.length > 0) {
+          Text(this.buildSelectedCoreFirmwareText())
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .width('100%')
+        }
+
+        this.KernelLog()
+      }
+      .width('100%')
+      .constraintSize({ maxWidth: 920 })
+      .padding({ left: 20, right: 20, top: 28, bottom: 32 })
+    }
+    .layoutWeight(1)
+    .width('100%')
+  }
+
+  @Builder
+  private DualModeLayout() {
+    Row() {
+      Scroll() {
+        Column({ space: 12 }) {
+          Text('已识别核心')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .letterSpacing(2)
+            .width('100%')
+
+          Column({ space: 1 }) {
+            ForEach(this.coreItems, (item: ManagedCoreItem) => {
+              this.CoreRowCompact(item)
+            }, (item: ManagedCoreItem) => item.id)
+          }
+          .width('100%')
+          .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 20, bottom: 20 })
+      }
+      .width('40%')
+      .height('100%')
+      .backgroundColor(EmuColors.surfaceContainerLowest)
+
+      Scroll() {
+        Column({ space: 20 }) {
+          Row() {
+            Text('内存占用')
+              .fontSize(EmuTypography.xs)
+              .fontColor(EmuColors.onSurfaceVariant)
+              .letterSpacing(2)
+            Text(this.statusText)
+              .fontSize(EmuTypography.xs)
+              .fontColor(EmuColors.primary)
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+
+          this.MemoryFootprint()
+
+          if (this.selectedCoreId.length > 0) {
+            this.CoreDetailPanel()
+          } else {
+            Column({ space: 12 }) {
+              Text('请从左侧选择核心查看详情')
+                .fontSize(EmuTypography.sm)
+                .fontColor(EmuColors.onSurfaceVariant)
+                .width('100%')
+                .textAlign(TextAlign.Center)
+                .padding(40)
+            }
+          }
+
+          this.KernelLog()
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20, top: 20, bottom: 20 })
+      }
+      .layoutWeight(1)
+      .height('100%')
+    }
+    .layoutWeight(1)
+    .width('100%')
+  }
+
+  @Builder
+  private TripleModeLayout() {
+    Row() {
+      Scroll() {
+        Column({ space: 12 }) {
+          Text('已识别核心')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .letterSpacing(2)
+            .width('100%')
+
+          Column({ space: 1 }) {
+            ForEach(this.coreItems, (item: ManagedCoreItem) => {
+              this.CoreRowCompact(item)
+            }, (item: ManagedCoreItem) => item.id)
+          }
+          .width('100%')
+          .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+        }
+        .width('100%')
+        .padding({ left: 16, right: 16, top: 20, bottom: 20 })
+      }
+      .width('30%')
+      .height('100%')
+      .backgroundColor(EmuColors.surfaceContainerLowest)
+
+      Scroll() {
+        Column({ space: 20 }) {
+          Row() {
+            Text('内存占用')
+              .fontSize(EmuTypography.xs)
+              .fontColor(EmuColors.onSurfaceVariant)
+              .letterSpacing(2)
+            Text(this.statusText)
+              .fontSize(EmuTypography.xs)
+              .fontColor(EmuColors.primary)
+          }
+          .width('100%')
+          .justifyContent(FlexAlign.SpaceBetween)
+
+          this.MemoryFootprint()
+
+          if (this.selectedCoreId.length > 0) {
+            this.CoreDetailPanel()
+          } else {
+            Column({ space: 12 }) {
+              Text('请从左侧选择核心查看详情')
+                .fontSize(EmuTypography.sm)
+                .fontColor(EmuColors.onSurfaceVariant)
+                .width('100%')
+                .textAlign(TextAlign.Center)
+                .padding(40)
+            }
+          }
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20, top: 20, bottom: 20 })
+      }
+      .width('40%')
+      .height('100%')
+
+      Scroll() {
+        Column({ space: 20 }) {
+          Text('固件依赖状态')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .letterSpacing(2)
+            .width('100%')
+
+          if (this.selectedCoreId.length > 0) {
+            this.FirmwareStatusPanel()
+          } else {
+            Column({ space: 12 }) {
+              Text('选择核心后显示固件依赖')
+                .fontSize(EmuTypography.sm)
+                .fontColor(EmuColors.onSurfaceVariant)
+                .width('100%')
+                .textAlign(TextAlign.Center)
+                .padding(40)
+            }
+          }
+
+          this.KernelLog()
+        }
+        .width('100%')
+        .padding({ left: 20, right: 20, top: 20, bottom: 20 })
+      }
+      .width('30%')
+      .height('100%')
+    }
+    .layoutWeight(1)
+    .width('100%')
+  }
+
+  @Builder
+  private CoreRowCompact(item: ManagedCoreItem) {
+    Column({ space: 8 }) {
+      Row({ space: 10 }) {
+        EmuIcon({
+          name: item.installed ? 'memory' : 'developer_board',
+          iconSize: 18,
+          tone: item.installed ? 'primary' : 'muted'
+        })
+
+        Text(item.name)
+          .fontSize(14)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(EmuColors.onSurface)
+          .layoutWeight(1)
+
+        Text(item.status)
+          .fontSize(9)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(item.installed ? EmuColors.primary : EmuColors.error)
+          .padding({ left: 6, right: 6, top: 3, bottom: 3 })
+          .border({ width: 0.5, color: item.installed ? EmuColors.primary : EmuColors.error, style: BorderStyle.Solid })
+      }
+      .width('100%')
+
+      Text(`${item.platform} | ${item.soFile}`)
+        .fontSize(9)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor(this.selectedCoreId === item.id ? '#1800FF41' : EmuColors.surfaceContainerLowest)
+    .border({ width: { bottom: 0.5 }, color: '#33484848', style: BorderStyle.Solid })
+    .onClick(() => {
+      this.selectedCoreId = item.id
+    })
+  }
+
+  @Builder
+  private CoreDetailPanel() {
+    ForEach(this.getSelectedCoreItems(), (currentItem: ManagedCoreItem) => {
+      this.CoreDetailContent(currentItem)
+    }, (currentItem: ManagedCoreItem) => currentItem.id)
+  }
+
+  @Builder
+  private CoreDetailContent(currentItem: ManagedCoreItem) {
+    Column({ space: 16 }) {
+      Text('核心详情')
+        .fontSize(EmuTypography.xs)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .letterSpacing(2)
+        .width('100%')
+
+      Column({ space: 12 }) {
+        Row({ space: 12 }) {
+          EmuIcon({
+            name: currentItem.installed ? 'memory' : 'developer_board',
+            iconSize: 32,
+            tone: currentItem.installed ? 'primary' : 'muted'
+          })
+
+          Column({ space: 6 }) {
+            Text(currentItem.name)
+              .fontSize(18)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(EmuColors.onSurface)
+
+            Text(currentItem.platform)
+              .fontSize(12)
+              .fontColor(EmuColors.onSurfaceVariant)
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+        }
+        .width('100%')
+
+        Row({ space: 8 }) {
+          Text('状态:')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+          Text(currentItem.status)
+            .fontSize(EmuTypography.sm)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(currentItem.installed ? EmuColors.primary : EmuColors.error)
+        }
+        .width('100%')
+
+        Row({ space: 8 }) {
+          Text('文件:')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+          Text(currentItem.soFile)
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurface)
+            .layoutWeight(1)
+        }
+        .width('100%')
+
+        Row({ space: 8 }) {
+          Text('固件:')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+          Text(currentItem.firmwareStatus)
+            .fontSize(EmuTypography.sm)
+            .fontColor(currentItem.hasFirmwareDependencies ? EmuColors.primary : EmuColors.onSurfaceVariant)
+        }
+        .width('100%')
+
+        if (currentItem.hasFirmwareDependencies) {
+          Column({ space: 8 }) {
+            Text(currentItem.firmwareDetail)
+              .fontSize(EmuTypography.xs)
+              .fontColor(EmuColors.onSurfaceVariant)
+              .width('100%')
+          }
+          .width('100%')
+        }
+      }
+      .width('100%')
+      .padding(16)
+      .backgroundColor(EmuColors.surfaceContainerLowest)
+      .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+    }
+  }
+
+  @Builder
+  private FirmwareStatusPanel() {
+    ForEach(this.getSelectedCoreItems(), (currentItem: ManagedCoreItem) => {
+      this.FirmwareStatusContent(currentItem)
+    }, (currentItem: ManagedCoreItem) => currentItem.id)
+  }
+
+  @Builder
+  private FirmwareStatusContent(currentItem: ManagedCoreItem) {
+    Column({ space: 16 }) {
+      if (currentItem.hasFirmwareDependencies) {
+        Column({ space: 12 }) {
+          Text('已找到文件')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.primary)
+            .letterSpacing(2)
+            .width('100%')
+
+          Text(currentItem.firmwareFoundText)
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .width('100%')
+
+          Text('缺失文件')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.error)
+            .letterSpacing(2)
+            .width('100%')
+            .margin({ top: 12 })
+
+          Text(currentItem.firmwareMissingText)
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .width('100%')
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(EmuColors.surfaceContainerLowest)
+        .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+      } else {
+        Column({ space: 12 }) {
+          Text('当前核心无固件依赖')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding(20)
+        }
+        .width('100%')
+        .padding(16)
+        .backgroundColor(EmuColors.surfaceContainerLowest)
+        .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+      }
+    }
+  }
+
+  private getSelectedCoreItems(): ManagedCoreItem[] {
+    const items: ManagedCoreItem[] = []
+    for (let index = 0; index < this.coreItems.length; index += 1) {
+      const item = this.coreItems[index]
+      if (item.id === this.selectedCoreId) {
+        items.push(item)
+      }
+    }
+    return items
   }
 }

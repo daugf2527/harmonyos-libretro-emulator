@@ -1,8 +1,10 @@
 import testNapi from 'libentry.so'
 import { common } from '@kit.AbilityKit'
+import { display } from '@kit.ArkUI'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
+import { ErrorCodeUtils, EngineErrorCodes, FileErrorCodes } from '../common/ErrorCodes'
 import {
   deleteSaveStateItem,
   listSaveStateItems,
@@ -46,21 +48,29 @@ struct SaveStatePage {
   @State private syncStatusText: string = 'LOCAL_ARCHIVE'
   @State private loading: boolean = false
   @State private currentRomFile: string = ''
+  @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
+  @State private selectedSaveItem: SaveSlotItem | null = null
   private toastTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
   private readonly coverColors: string[] = ['#274530', '#27405E', '#4A3628', '#39364A']
+  private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    this.detectFoldMode()
+  }
 
   aboutToAppear(): void {
     this.pageActive = true
     this.currentRomFile = this.resolveCurrentRomFile()
+    display.on('foldStatusChange', this.foldStatusListener)
+    this.detectFoldMode()
     void this.refreshSaveItems()
   }
 
   aboutToDisappear(): void {
     this.pageActive = false
     this.pageTaskToken += 1
+    display.off('foldStatusChange', this.foldStatusListener)
     if (this.toastTimer !== -1) {
       clearTimeout(this.toastTimer)
       this.toastTimer = -1
@@ -92,6 +102,27 @@ struct SaveStatePage {
     return ''
   }
 
+  private detectFoldMode(): void {
+    try {
+      const foldStatus = display.getFoldStatus()
+      const displayClass = display.getFoldDisplayMode()
+
+      // 根据折叠状态和显示模式判断折叠态
+      if (foldStatus === display.FoldStatus.FOLD_STATUS_FOLDED) {
+        this.currentFoldMode = 'single'
+      } else if (foldStatus === display.FoldStatus.FOLD_STATUS_HALF_FOLDED) {
+        this.currentFoldMode = 'dual'
+      } else if (displayClass === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+        this.currentFoldMode = 'triple'
+      } else {
+        this.currentFoldMode = 'dual'
+      }
+    } catch (err) {
+      // 非折叠屏设备，默认单折态
+      this.currentFoldMode = 'single'
+    }
+  }
+
   private async refreshSaveItems(): Promise<void> {
     const token = this.beginPageTask()
     const context = this.getContext()
@@ -119,6 +150,9 @@ struct SaveStatePage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.warn('SaveStatePage', 'Save', `读取存档目录失败: ${message}`)
+      // 使用错误码提供用户友好的错误消息
+      const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_LIST_ERROR.numericCode)
+      LogHelper.info('SaveStatePage', 'Save', `错误提示: ${userMsg}`)
       this.saveItems = []
       this.syncStatusText = 'NO_SAVE_ARCHIVE'
     }
@@ -230,7 +264,9 @@ struct SaveStatePage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('SaveStatePage', 'Save', `删除存档失败: ${message}`)
-      this.showToastMessage('SAVE_DELETE_FAILED')
+      // 使用错误码提供具体错误信息
+      const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_WRITE_ERROR.numericCode)
+      this.showToastMessage(userMsg)
     }
   }
 
@@ -263,7 +299,9 @@ struct SaveStatePage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('SaveStatePage', 'Save', `写入即时存档失败: ${message}`)
-      this.showToastMessage('SAVE_STATE_FAILED')
+      // 使用错误码提供具体错误信息
+      const userMsg = ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_SAVE_FAILED.numericCode)
+      this.showToastMessage(userMsg)
     }
   }
 
@@ -281,7 +319,9 @@ struct SaveStatePage {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('SaveStatePage', 'Save', `读取即时存档失败: ${message}`)
-      this.showToastMessage('LOAD_STATE_FAILED')
+      // 使用错误码提供具体错误信息
+      const userMsg = ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_LOAD_FAILED.numericCode)
+      this.showToastMessage(userMsg)
     }
   }
 
@@ -299,6 +339,16 @@ struct SaveStatePage {
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('SaveStatePage', 'Route', `pushUrl ${route} failed: ${err.message}`)
     })
+  }
+
+  private onSaveItemClick(item: SaveSlotItem): void {
+    if (this.currentFoldMode === 'single') {
+      // 单折态：直接加载存档
+      void this.loadSave(item.fileName)
+    } else {
+      // 双折态/三折态：选中存档，显示详情
+      this.selectedSaveItem = item
+    }
   }
 
   @Builder
@@ -477,11 +527,11 @@ struct SaveStatePage {
       .width('100%')
       .height(96)
       .padding({ left: item.isActive ? 18 : 24, right: 24 })
-      .backgroundColor(EmuColors.surfaceContainerLowest)
+      .backgroundColor(this.selectedSaveItem?.id === item.id ? '#1A1A1A' : EmuColors.surfaceContainerLowest)
       .border({ width: { bottom: 0.5 }, color: '#262626', style: BorderStyle.Solid })
       .translate({ x: item.isActive ? -184 : 0 })
       .onClick(() => {
-        void this.loadSave(item.fileName)
+        this.onSaveItemClick(item)
       })
     }
     .width('100%')
@@ -651,26 +701,237 @@ struct SaveStatePage {
     .margin({ bottom: 96 })
   }
 
-  build() {
-    Stack() {
-      Column() {
-        this.SaveHeader()
-        this.TelemetryStrip()
-        this.ArchiveList()
+  @Builder
+  private SaveDetailPanel() {
+    if (!this.selectedSaveItem) {
+      this.EmptySaveDetailPanel()
+    } else {
+      ForEach(this.getSelectedSaveItems(), (item: SaveSlotItem) => {
+        this.SelectedSaveDetailPanel(item)
+      }, (item: SaveSlotItem) => item.id)
+    }
+  }
 
-        EmuBottomNav({
-          items: this.navItems,
-          activeFontColor: EmuColors.primary,
-          inactiveFontColor: '#FF666666',
-          indicatorStyle: 'dot',
-          panelBackgroundColor: '#FF000000',
-          onItemClick: (key: string) => {
-            this.onBottomNavClick(key)
-          }
-        })
+  @Builder
+  private EmptySaveDetailPanel() {
+    Column({ space: 16 }) {
+      Text('▣')
+        .fontSize(46)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .opacity(0.48)
+
+      Text('SELECT A SAVE SLOT')
+        .fontSize(EmuTypography.sm)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .letterSpacing(4)
+        .opacity(0.48)
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  @Builder
+  private SelectedSaveDetailPanel(item: SaveSlotItem) {
+    Column({ space: 24 }) {
+      // 存档预览图（占位）
+      Stack() {
+        Row()
+          .width('100%')
+          .height('100%')
+          .backgroundColor(item.coverColor)
+          .opacity(0.72)
+
+        Column({ space: 8 }) {
+          Text('PREVIEW')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .letterSpacing(2)
+
+          Text('No Screenshot')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .opacity(0.6)
+        }
+        .justifyContent(FlexAlign.Center)
       }
       .width('100%')
-      .height('100%')
+      .aspectRatio(1.5)
+      .borderRadius(8)
+      .border({ width: 0.5, color: '#4D484848', style: BorderStyle.Solid })
+
+      // 存档详情
+      Column({ space: 16 }) {
+        this.DetailRow('File Name', this.normalizeTitle(item.fileName))
+        this.DetailRow('Slot', item.slotLabel)
+        this.DetailRow('Size', this.getSaveItemSizeText(item))
+        this.DetailRow('Created', item.durationLabel)
+        this.DetailRow('ROM', this.currentRomFile.length > 0 ? this.currentRomFile : 'Unknown')
+      }
+      .width('100%')
+      .padding(16)
+      .backgroundColor('#0E0E0E')
+      .borderRadius(8)
+      .border({ width: 0.5, color: '#262626', style: BorderStyle.Solid })
+
+      // 操作按钮
+      Column({ space: 12 }) {
+        Button('Load Save')
+          .width('100%')
+          .height(48)
+          .fontSize(EmuTypography.md)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#004C0C')
+          .backgroundColor(EmuColors.primary)
+          .onClick(() => {
+            void this.loadSave(item.fileName)
+          })
+
+        Button('Delete Save')
+          .width('100%')
+          .height(48)
+          .fontSize(EmuTypography.md)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#450900')
+          .backgroundColor(EmuColors.error)
+          .onClick(() => {
+            this.requestDelete(item.fileName)
+          })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .height('100%')
+    .padding(24)
+  }
+
+  private getSelectedSaveItems(): SaveSlotItem[] {
+    const items: SaveSlotItem[] = []
+    if (!this.selectedSaveItem) {
+      return items
+    }
+    items.push(this.selectedSaveItem)
+    return items
+  }
+
+  private getSaveItemSizeText(item: SaveSlotItem): string {
+    const parts = item.detail.split('|')
+    if (parts.length < 2) {
+      return this.formatBytes(0)
+    }
+    return this.formatBytes(Number(parts[1].trim() || '0'))
+  }
+
+  @Builder
+  private DetailRow(label: string, value: string) {
+    Row() {
+      Text(label)
+        .fontSize(EmuTypography.xs)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .width(80)
+
+      Text(value)
+        .fontSize(EmuTypography.sm)
+        .fontColor(EmuColors.onSurface)
+        .layoutWeight(1)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+  }
+
+  @Builder
+  private SaveOperationsPanel() {
+    Column({ space: 24 }) {
+      // 快速操作
+      Column({ space: 12 }) {
+        Text('QUICK ACTIONS')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(2)
+
+        Button('Create New Save')
+          .width('100%')
+          .height(48)
+          .fontSize(EmuTypography.md)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#004C0C')
+          .backgroundColor(EmuColors.primary)
+          .onClick(() => {
+            void this.quickSave()
+          })
+
+        Button('Refresh List')
+          .width('100%')
+          .height(48)
+          .fontSize(EmuTypography.sm)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .backgroundColor(EmuColors.surfaceContainerHigh)
+          .onClick(() => {
+            void this.refreshSaveItems()
+          })
+      }
+      .width('100%')
+      .padding(16)
+      .backgroundColor('#0E0E0E')
+      .borderRadius(8)
+      .border({ width: 0.5, color: '#262626', style: BorderStyle.Solid })
+
+      // 存档预览（如果有选中）
+      ForEach(this.getSelectedSaveItems(), (item: SaveSlotItem) => {
+        this.SavePreviewPanel(item)
+      }, (item: SaveSlotItem) => item.id)
+    }
+    .width('100%')
+    .height('100%')
+    .padding(24)
+  }
+
+  @Builder
+  private SavePreviewPanel(item: SaveSlotItem) {
+    Stack() {
+      Row()
+        .width('100%')
+        .height('100%')
+        .backgroundColor(item.coverColor)
+        .opacity(0.72)
+
+      Column({ space: 8 }) {
+        Text('PREVIEW')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(2)
+
+        Text(this.normalizeTitle(item.fileName))
+          .fontSize(EmuTypography.sm)
+          .fontColor(EmuColors.onSurface)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textAlign(TextAlign.Center)
+      }
+      .width('80%')
+      .justifyContent(FlexAlign.Center)
+    }
+    .width('100%')
+    .aspectRatio(1.2)
+    .borderRadius(8)
+    .border({ width: 0.5, color: '#4D484848', style: BorderStyle.Solid })
+  }
+
+  build() {
+    Stack() {
+      if (this.currentFoldMode === 'single') {
+        // 单折态：保持原有布局
+        this.SingleFoldLayout()
+      } else if (this.currentFoldMode === 'dual') {
+        // 双折态：左侧列表 40%，右侧详情 60%
+        this.DualFoldLayout()
+      } else {
+        // 三折态：左侧列表 30%，中间详情 40%，右侧操作 30%
+        this.TripleFoldLayout()
+      }
 
       if (this.showDeleteConfirm) {
         this.DeleteModal()
@@ -684,5 +945,118 @@ struct SaveStatePage {
     .height('100%')
     .backgroundColor(EmuColors.background)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+  }
+
+  @Builder
+  private SingleFoldLayout() {
+    Column() {
+      this.SaveHeader()
+      this.TelemetryStrip()
+      this.ArchiveList()
+
+      EmuBottomNav({
+        items: this.navItems,
+        activeFontColor: EmuColors.primary,
+        inactiveFontColor: '#FF666666',
+        indicatorStyle: 'dot',
+        panelBackgroundColor: '#FF000000',
+        onItemClick: (key: string) => {
+          this.onBottomNavClick(key)
+        }
+      })
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  private DualFoldLayout() {
+    Column() {
+      this.SaveHeader()
+      this.TelemetryStrip()
+
+      Row() {
+        // 左侧：存档列表（40%）
+        Column() {
+          this.ArchiveList()
+        }
+        .width('40%')
+        .height('100%')
+        .border({ width: { right: 0.5 }, color: '#262626', style: BorderStyle.Solid })
+
+        // 右侧：存档详情（60%）
+        Column() {
+          this.SaveDetailPanel()
+        }
+        .width('60%')
+        .height('100%')
+        .backgroundColor('#0C0C0C')
+      }
+      .layoutWeight(1)
+      .width('100%')
+
+      EmuBottomNav({
+        items: this.navItems,
+        activeFontColor: EmuColors.primary,
+        inactiveFontColor: '#FF666666',
+        indicatorStyle: 'dot',
+        panelBackgroundColor: '#FF000000',
+        onItemClick: (key: string) => {
+          this.onBottomNavClick(key)
+        }
+      })
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
+  private TripleFoldLayout() {
+    Column() {
+      this.SaveHeader()
+      this.TelemetryStrip()
+
+      Row() {
+        // 左侧：存档列表（30%）
+        Column() {
+          this.ArchiveList()
+        }
+        .width('30%')
+        .height('100%')
+        .border({ width: { right: 0.5 }, color: '#262626', style: BorderStyle.Solid })
+
+        // 中间：存档详情（40%）
+        Column() {
+          this.SaveDetailPanel()
+        }
+        .width('40%')
+        .height('100%')
+        .backgroundColor('#0C0C0C')
+        .border({ width: { right: 0.5 }, color: '#262626', style: BorderStyle.Solid })
+
+        // 右侧：操作按钮（30%）
+        Column() {
+          this.SaveOperationsPanel()
+        }
+        .width('30%')
+        .height('100%')
+        .backgroundColor('#0E0E0E')
+      }
+      .layoutWeight(1)
+      .width('100%')
+
+      EmuBottomNav({
+        items: this.navItems,
+        activeFontColor: EmuColors.primary,
+        inactiveFontColor: '#FF666666',
+        indicatorStyle: 'dot',
+        panelBackgroundColor: '#FF000000',
+        onItemClick: (key: string) => {
+          this.onBottomNavClick(key)
+        }
+      })
+    }
+    .width('100%')
+    .height('100%')
   }
 }

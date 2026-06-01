@@ -16,6 +16,20 @@ struct ThrottleRule {
   bool coalesce = false;
 };
 
+bool CreateString(napi_env env, const std::string &value, napi_value *out) {
+  return napi_create_string_utf8(env, value.c_str(), NAPI_AUTO_LENGTH, out) ==
+         napi_ok;
+}
+
+bool SetStringProperty(napi_env env, napi_value object, const char *name,
+                       const std::string &value) {
+  napi_value jsValue = nullptr;
+  if (!CreateString(env, value, &jsValue)) {
+    return false;
+  }
+  return napi_set_named_property(env, object, name, jsValue) == napi_ok;
+}
+
 // Map Enum to String
 static const char* GetEventName(EventBridge::EventType event) {
     switch (event) {
@@ -80,9 +94,12 @@ bool EventBridge::Initialize(napi_env env, napi_value callback) {
     tsfn_ = nullptr;
   }
 
-  napi_value resource_name;
-  napi_create_string_utf8(env, "LibretroEventBridge", NAPI_AUTO_LENGTH,
-                          &resource_name);
+  napi_value resource_name = nullptr;
+  if (napi_create_string_utf8(env, "LibretroEventBridge", NAPI_AUTO_LENGTH,
+                              &resource_name) != napi_ok) {
+    LOGF(LOG_ERROR, "Failed to create TSFN resource name");
+    return false;
+  }
 
   // 创建 TSFN
   // context: nullptr, max_queue_size: 256
@@ -201,22 +218,22 @@ void EventBridge::CallJsHandler(napi_env env, napi_value js_cb, void *context,
   if (!eventData)
     return;
 
-  // 构造传回 JS 的对象 { event: string, payload: any/string }
-  napi_value result;
-  napi_create_object(env, &result);
-
-  napi_value event_name, event_payload;
-  napi_create_string_utf8(env, eventData->event.c_str(), NAPI_AUTO_LENGTH,
-                          &event_name);
-  napi_create_string_utf8(env, eventData->payload.c_str(), NAPI_AUTO_LENGTH,
-                          &event_payload);
-
-  napi_set_named_property(env, result, "event", event_name);
-  napi_set_named_property(env, result, "payload", event_payload);
+  // 构造传回 JS 的对象 { event: string, payload: string }
+  napi_value result = nullptr;
+  if (napi_create_object(env, &result) != napi_ok ||
+      !SetStringProperty(env, result, "event", eventData->event) ||
+      !SetStringProperty(env, result, "payload", eventData->payload)) {
+    LOGF(LOG_WARN, "EventBridge failed to build JS event object");
+    delete eventData;
+    return;
+  }
 
   // 调用 JS 回调
-  napi_value undefined;
-  napi_get_undefined(env, &undefined);
+  napi_value undefined = nullptr;
+  if (napi_get_undefined(env, &undefined) != napi_ok) {
+    delete eventData;
+    return;
+  }
   napi_status call_status = napi_call_function(env, undefined, js_cb, 1, &result, nullptr);
   if (call_status == napi_pending_exception) {  // Audit A-F5: clear JS exception to prevent NAPI state corruption
     napi_value exception;

@@ -90,6 +90,63 @@ static bool GetStringArg(napi_env env, napi_value arg, std::string &out,
   return true;
 }
 
+static napi_value MakeString(napi_env env, const std::string &value) {
+  napi_value result = nullptr;
+  if (napi_create_string_utf8(env, value.c_str(), NAPI_AUTO_LENGTH, &result) !=
+      napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to create string value");
+    return nullptr;
+  }
+  return result;
+}
+
+static napi_value MakeString(napi_env env, const char *value) {
+  return MakeString(env, std::string(value ? value : ""));
+}
+
+static bool ResolveDeferredChecked(napi_env env, napi_deferred deferred,
+                                   napi_value value) {
+  if (!deferred || !value) {
+    napi_throw_error(env, nullptr, "Invalid promise resolution value");
+    return false;
+  }
+  if (napi_resolve_deferred(env, deferred, value) != napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to resolve promise");
+    return false;
+  }
+  return true;
+}
+
+static bool RejectDeferredChecked(napi_env env, napi_deferred deferred,
+                                  napi_value reason) {
+  if (!deferred || !reason) {
+    napi_throw_error(env, nullptr, "Invalid promise rejection reason");
+    return false;
+  }
+  if (napi_reject_deferred(env, deferred, reason) != napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to reject promise");
+    return false;
+  }
+  return true;
+}
+
+static napi_value MakeResolvedStringPromise(napi_env env, const char *message) {
+  napi_deferred deferred = nullptr;
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &deferred, &promise) != napi_ok || !deferred) {
+    napi_throw_error(env, nullptr, "Failed to create promise");
+    return nullptr;
+  }
+  napi_value str = MakeString(env, message);
+  if (!str) {
+    return nullptr;
+  }
+  if (!ResolveDeferredChecked(env, deferred, str)) {
+    return nullptr;
+  }
+  return promise;
+}
+
 static bool MapVaddrToOffset64(const Elf64_Phdr *phdrs, uint16_t phnum,
                                Elf64_Addr vaddr, size_t &out_offset) {
   for (uint16_t i = 0; i < phnum; ++i) {
@@ -535,13 +592,19 @@ static void CompleteTestCoreLoader(napi_env env, napi_status status, void *data)
 
   // Audit T1-F6: guard napi_cancelled — reject deferred to prevent hung ArkTS Promise
   if (status != napi_ok) {
-    napi_value reason;
-    napi_get_undefined(env, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = nullptr;
+    if (napi_get_undefined(env, &reason) != napi_ok) {
+      delete ctx;
+      return;
+    }
+    (void)RejectDeferredChecked(env, ctx->deferred, reason);
   } else {
-    napi_value result;
-    napi_create_string_utf8(env, ctx->resultMessage.c_str(), NAPI_AUTO_LENGTH, &result);
-    napi_resolve_deferred(env, ctx->deferred, result);
+    napi_value result = MakeString(env, ctx->resultMessage);
+    if (!result) {
+      delete ctx;
+      return;
+    }
+    (void)ResolveDeferredChecked(env, ctx->deferred, result);
   }
 
   if (ctx->work) {
@@ -565,28 +628,18 @@ static napi_value TestCoreLoader(napi_env env, napi_callback_info info) {
   // Audit T1-F6: offload dlopen/GetApiVersion/GetSystemInfo to worker thread
   size_t argc = 1;
   napi_value argv[1] = {nullptr};
-  napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr);
-
-  auto makeEarlyPromise = [&](const char *msg) -> napi_value {
-    napi_value promise;
-    napi_deferred deferred;
-    if (napi_create_promise(env, &deferred, &promise) != napi_ok) {
-      return nullptr;
-    }
-    napi_value str;
-    napi_create_string_utf8(env, msg, NAPI_AUTO_LENGTH, &str);
-    napi_resolve_deferred(env, deferred, str);
-    return promise;
-  };
+  if (napi_get_cb_info(env, info, &argc, argv, nullptr, nullptr) != napi_ok) {
+    return MakeResolvedStringPromise(env, "Error: Failed to read arguments");
+  }
 
   if (argc < 1) {
     LOGF(LOG_ERROR, "Missing parameter: corePath");
-    return makeEarlyPromise("Error: Missing corePath parameter");
+    return MakeResolvedStringPromise(env, "Error: Missing corePath parameter");
   }
 
   std::string corePath;
   if (!GetStringArg(env, argv[0], corePath, "TestCoreLoader", "corePath")) {
-    return makeEarlyPromise("Error: Invalid corePath parameter");
+    return MakeResolvedStringPromise(env, "Error: Invalid corePath parameter");
   }
 
   LOGF(LOG_INFO, "Received corePath from ArkTS: %{public}s", corePath.c_str());
@@ -594,7 +647,8 @@ static napi_value TestCoreLoader(napi_env env, napi_callback_info info) {
   if (!security::ValidateCorePath(corePath)) {
     LOGF(LOG_ERROR, "Security: Core path validation failed in TestCoreLoader: %{public}s",
          corePath.c_str());
-    return makeEarlyPromise("Error: Core path not in allowed directories");
+    return MakeResolvedStringPromise(env,
+                                     "Error: Core path not in allowed directories");
   }
 
   auto *ctx = new TestCoreLoaderAsyncCtx();
@@ -606,17 +660,25 @@ static napi_value TestCoreLoader(napi_env env, napi_callback_info info) {
     return nullptr;
   }
 
-  napi_value resourceName;
-  napi_create_string_utf8(env, "TestCoreLoader", NAPI_AUTO_LENGTH, &resourceName);
+  napi_value resourceName = MakeString(env, "TestCoreLoader");
+  if (!resourceName) {
+    napi_value errStr = MakeString(env, "Error: async work creation failed");
+    if (errStr) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, errStr);
+    }
+    delete ctx;
+    return promise;
+  }
 
   napi_status createStatus = napi_create_async_work(
       env, nullptr, resourceName, ExecuteTestCoreLoader, CompleteTestCoreLoader,
       ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] TestCoreLoader create work failed");
-    napi_value errStr;
-    napi_create_string_utf8(env, "Error: async work creation failed", NAPI_AUTO_LENGTH, &errStr);
-    napi_resolve_deferred(env, ctx->deferred, errStr);
+    napi_value errStr = MakeString(env, "Error: async work creation failed");
+    if (errStr) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, errStr);
+    }
     delete ctx;
     return promise;
   }
@@ -626,9 +688,10 @@ static napi_value TestCoreLoader(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] TestCoreLoader queue work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value errStr;
-    napi_create_string_utf8(env, "Error: async work queue failed", NAPI_AUTO_LENGTH, &errStr);
-    napi_resolve_deferred(env, ctx->deferred, errStr);
+    napi_value errStr = MakeString(env, "Error: async work queue failed");
+    if (errStr) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, errStr);
+    }
     delete ctx;
     return promise;
   }

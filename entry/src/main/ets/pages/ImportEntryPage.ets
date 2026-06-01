@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit'
+import { display } from '@kit.ArkUI'
 import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuBottomNav } from '../components/EmuBottomNav'
@@ -89,9 +90,13 @@ struct ImportEntryPage {
   @State private scanStatusText: string = '正在扫描本地文件...'
   @State private importButtonPressed: boolean = false
   @State private particleBoosted: boolean = false
+  @State private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private scanTimer: number = -1
   private pageActive: boolean = false
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('library')
+  private foldDisplayModeListener: (mode: display.FoldDisplayMode) => void = (mode: display.FoldDisplayMode) => {
+    this.foldDisplayMode = mode
+  }
 
   private onBottomNavClick(key: string): void {
     const route = getEmuBottomNavTargetRoute(key, 'library')
@@ -105,6 +110,12 @@ struct ImportEntryPage {
 
   aboutToAppear(): void {
     this.pageActive = true
+    try {
+      this.foldDisplayMode = display.getFoldDisplayMode()
+    } catch (err) {
+      LogHelper.error('ImportEntryPage', 'FoldDetect', `getFoldDisplayMode failed: ${err}`)
+    }
+    display.on('foldDisplayModeChange', this.foldDisplayModeListener)
     if (this.hasGames) {
       this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
         LogHelper.error('ImportEntryPage', 'Route', `replaceUrl failed: ${err.message}`)
@@ -115,6 +126,7 @@ struct ImportEntryPage {
   aboutToDisappear(): void {
     this.pageActive = false
     this.stopScan()
+    display.off('foldDisplayModeChange', this.foldDisplayModeListener)
   }
 
   private stopScan(): void {
@@ -195,6 +207,156 @@ struct ImportEntryPage {
     .justifyContent(FlexAlign.Center)
   }
 
+  @Builder
+  private InstructionPanel() {
+    Column({ space: 24 }) {
+      Text('导入说明')
+        .fontSize(20)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(EmuColors.onSurface)
+
+      Column({ space: 16 }) {
+        this.InstructionItem('1', '支持格式', 'ROM、ISO、ZIP 等常见游戏镜像格式')
+        this.InstructionItem('2', '文件来源', '请确保导入的游戏文件来源合法')
+        this.InstructionItem('3', '存储位置', '文件将被复制到应用沙箱目录')
+        this.InstructionItem('4', '核心匹配', '系统将自动匹配合适的模拟器核心')
+      }
+    }
+    .width('100%')
+    .padding(24)
+    .backgroundColor('#0A0A0A')
+    .borderRadius(8)
+    .border({ width: 1, color: '#2A2A2A' })
+  }
+
+  @Builder
+  private InstructionItem(number: string, title: string, description: string) {
+    Row({ space: 16 }) {
+      Text(number)
+        .fontSize(16)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(EmuColors.primary)
+        .width(32)
+        .height(32)
+        .textAlign(TextAlign.Center)
+        .borderRadius(16)
+        .backgroundColor('#1A1A1A')
+        .border({ width: 1, color: EmuColors.primary })
+
+      Column({ space: 4 }) {
+        Text(title)
+          .fontSize(15)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(EmuColors.onSurface)
+
+        Text(description)
+          .fontSize(13)
+          .fontColor('#ABABAB')
+          .lineHeight(20)
+      }
+      .alignItems(HorizontalAlign.Start)
+      .layoutWeight(1)
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+  }
+
+  @Builder
+  private PreviewPanel() {
+    Column({ space: 16 }) {
+      Text('导入预览')
+        .fontSize(18)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(EmuColors.onSurface)
+
+      Column({ space: 12 }) {
+        this.PreviewItem('支持的平台', '30+')
+        this.PreviewItem('已导入游戏', '0')
+        this.PreviewItem('可用核心', '12')
+      }
+    }
+    .width('100%')
+    .padding(20)
+    .backgroundColor('#0A0A0A')
+    .borderRadius(8)
+    .border({ width: 1, color: '#2A2A2A' })
+  }
+
+  @Builder
+  private PreviewItem(label: string, value: string) {
+    Row() {
+      Text(label)
+        .fontSize(14)
+        .fontColor('#ABABAB')
+        .layoutWeight(1)
+
+      Text(value)
+        .fontSize(16)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(EmuColors.primary)
+    }
+    .width('100%')
+    .padding({ top: 8, bottom: 8 })
+    .borderRadius(4)
+    .backgroundColor('#0F0F0F')
+  }
+
+  @Builder
+  private FoldedLayout() {
+    Column() {
+      this.MainContent()
+    }
+    .width('100%')
+    .constraintSize({ maxWidth: 448 })
+  }
+
+  @Builder
+  private HalfFoldedLayout() {
+    Row({ space: 24 }) {
+      Column() {
+        this.MainContent()
+      }
+      .width('40%')
+
+      Column() {
+        Blank()
+        this.InstructionPanel()
+        Blank()
+      }
+      .width('60%')
+      .layoutWeight(1)
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+  }
+
+  @Builder
+  private FullyUnfoldedLayout() {
+    Row({ space: 20 }) {
+      Column() {
+        this.MainContent()
+      }
+      .width('30%')
+
+      Column() {
+        Blank()
+        this.InstructionPanel()
+        Blank()
+      }
+      .width('40%')
+      .layoutWeight(1)
+
+      Column() {
+        Blank()
+        this.PreviewPanel()
+        Blank()
+      }
+      .width('30%')
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+  }
+
   build() {
     Column() {
       EmuHeaderBar({
@@ -226,10 +388,16 @@ struct ImportEntryPage {
           })
 
         Column() {
-          this.MainContent()
+          if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+            this.FullyUnfoldedLayout()
+          } else if (this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_MAIN ||
+                     this.foldDisplayMode === display.FoldDisplayMode.FOLD_DISPLAY_MODE_SUB) {
+            this.HalfFoldedLayout()
+          } else {
+            this.FoldedLayout()
+          }
         }
         .width('100%')
-        .constraintSize({ maxWidth: 448 })
       }
       .layoutWeight(1)
       .width('100%')

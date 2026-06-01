@@ -16,9 +16,10 @@ import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import LogHelper from '../common/LogHelper';
 import { LibretroEventHub } from '../common/LibretroEventHub';
+import { getInputMappingService } from '../common/InputMappingService';
 
 // REMOVED: import testNapi from 'libentry.so' — eager load caused ~157 MB native
-// allocations (168 MB RSS) before any page rendered.  The static constructors in
+// allocations (168 MB RSS) before page rendering.  The static constructors in
 // libentry.so (LibretroEngine, VideoPipeline, AudioBridge, InputManager, etc.)
 // made malloc slow under memory pressure, causing APP_INPUT_BLOCK ANRs on
 // lightweight pages like OnboardingPage.
@@ -35,6 +36,14 @@ export default class EntryAbility extends UIAbility {
       LogHelper.info('EntryAbility', 'EventHub', `EventHub start: ok=${ok}`);
     } catch (e) {
       LogHelper.warn('EntryAbility', 'EventHub', 'EventHub start failed');
+    }
+
+    // Initialize Input Mapping Service (does not trigger libentry.so load)
+    try {
+      void getInputMappingService().initialize(this.context);
+      LogHelper.info('EntryAbility', 'InputMapping', 'Input Mapping Service initialized');
+    } catch (e) {
+      LogHelper.warn('EntryAbility', 'InputMapping', 'Input Mapping Service init failed');
     }
   }
 

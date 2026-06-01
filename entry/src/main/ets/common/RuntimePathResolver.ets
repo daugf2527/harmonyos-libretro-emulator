@@ -1,6 +1,6 @@
 import { deviceInfo } from '@kit.BasicServicesKit'
 import { resourceManager } from '@kit.LocalizationKit'
-import fs from '@ohos.file.fs'
+import { fileIo as fs } from '@kit.CoreFileKit'
 import LogHelper from './LogHelper'
 
 export interface RuntimeRomPathResolution {

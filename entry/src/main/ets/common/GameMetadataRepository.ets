@@ -65,9 +65,9 @@ async function loadMetadataDocument(context: common.UIAbilityContext): Promise<G
     if (!text || text.length === 0) {
       return createEmptyMetadataDocument()
     }
-    const parsed = JSON.parse(text) as GameMetadataDocument
+    const parsed = JSON.parse(text) as Partial<GameMetadataDocument> | null
     const records: GameMetadataRecord[] = []
-    if (parsed.records) {
+    if (parsed?.records) {
       parsed.records.forEach((record: GameMetadataRecord) => {
         records.push(normalizeMetadataRecord(record))
       })
@@ -114,7 +114,7 @@ function createEmptyMetadataDocument(): GameMetadataDocument {
   }
 }
 
-function normalizeMetadataRecord(record: GameMetadataRecord): GameMetadataRecord {
+function normalizeMetadataRecord(record: Partial<GameMetadataRecord>): GameMetadataRecord {
   return {
     romFile: normalizeText(record.romFile),
     title: normalizeText(record.title),
@@ -126,21 +126,21 @@ function normalizeMetadataRecord(record: GameMetadataRecord): GameMetadataRecord
   }
 }
 
-function normalizeText(value: string): string {
+function normalizeText(value: string | undefined): string {
   if (!value || value.length === 0) {
     return ''
   }
   return value.trim()
 }
 
-function normalizeNumber(value: number): number {
+function normalizeNumber(value: number | undefined): number {
   if (!Number.isFinite(value) || value <= 0) {
     return 0
   }
   return Math.floor(value)
 }
 
-function normalizeKey(value: string): string {
+function normalizeKey(value: string | undefined): string {
   return normalizeText(value).toLowerCase()
 }
 

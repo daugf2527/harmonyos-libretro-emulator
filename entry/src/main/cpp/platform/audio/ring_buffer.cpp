@@ -173,7 +173,7 @@ bool RingBuffer::WriteWait(const int16_t *data, size_t samples,
   write_wait_block_logs_++;
 
   auto wait_start = std::chrono::steady_clock::now();
-  
+
   // 等待条件：有足够空间 OR 停止运行
   // 注意：我们在 wait 中必须重新加载 atomic 变量
   cv_not_full_.wait(lock, [&]() {
@@ -204,7 +204,7 @@ bool RingBuffer::WriteWait(const int16_t *data, size_t samples,
   WriteDataInternal(data, samples, curr_head);
   head_.v.store(curr_head + samples, std::memory_order_release);
   writer_waiting_.store(false, std::memory_order_relaxed);
-  
+
   lock.unlock(); // 尽早释放锁
 
   if (reader_waiting_.load(std::memory_order_relaxed)) {
@@ -219,6 +219,80 @@ bool RingBuffer::WriteWait(const int16_t *data, size_t samples,
            kAudioChainPrefix, (long long)waited_ms);
     }
     write_wait_resume_logs_++;
+  }
+
+  return true;
+}
+
+bool RingBuffer::WriteWaitFor(const int16_t *data, size_t samples,
+                              const std::atomic<bool> &running,
+                              int timeout_ms) {
+  if (!data || samples == 0)
+    return false;
+
+  const size_t head = head_.v.load(std::memory_order_relaxed);
+  const size_t tail = tail_.v.load(std::memory_order_acquire);
+
+  if (samples <= capacity_ - (head - tail)) {
+    WriteDataInternal(data, samples, head);
+    head_.v.store(head + samples, std::memory_order_release);
+
+    if (reader_waiting_.load(std::memory_order_relaxed)) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      cv_not_empty_.notify_one();
+    }
+    return true;
+  }
+
+  std::unique_lock<std::mutex> lock(mutex_);
+  writer_waiting_.store(true, std::memory_order_relaxed);
+
+  if (write_wait_block_logs_ < 3 || (write_wait_block_logs_ % 250) == 0) {
+    size_t free = capacity_ - (head - tail);
+    LOGF(LOG_INFO,
+         "%{public}s [WriteWait] bounded blocking: need=%{public}zu, "
+         "free=%{public}zu, timeout_ms=%{public}d",
+         kAudioChainPrefix, samples, free, timeout_ms);
+  }
+  write_wait_block_logs_++;
+
+  auto wait_start = std::chrono::steady_clock::now();
+  const bool ready = cv_not_full_.wait_for(
+      lock, std::chrono::milliseconds(timeout_ms), [&]() {
+        if (!running.load(std::memory_order_relaxed))
+          return true;
+        const size_t curr_head = head_.v.load(std::memory_order_relaxed);
+        const size_t curr_tail = tail_.v.load(std::memory_order_acquire);
+        return samples <= capacity_ - (curr_head - curr_tail);
+      });
+
+  auto waited_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+                       std::chrono::steady_clock::now() - wait_start)
+                       .count();
+
+  if (!ready || !running.load(std::memory_order_relaxed)) {
+    writer_waiting_.store(false, std::memory_order_relaxed);
+    if (write_wait_resume_logs_ < 3 || (write_wait_resume_logs_ % 250) == 0) {
+      LOGF(LOG_WARN,
+           "%{public}s [WriteWait] bounded wait exit: ready=%{public}d, "
+           "running=%{public}d, waited=%{public}lld ms",
+           kAudioChainPrefix, ready ? 1 : 0,
+           running.load(std::memory_order_relaxed) ? 1 : 0,
+           (long long)waited_ms);
+    }
+    write_wait_resume_logs_++;
+    return false;
+  }
+
+  const size_t curr_head = head_.v.load(std::memory_order_relaxed);
+  WriteDataInternal(data, samples, curr_head);
+  head_.v.store(curr_head + samples, std::memory_order_release);
+  writer_waiting_.store(false, std::memory_order_relaxed);
+  lock.unlock();
+
+  if (reader_waiting_.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> notify_lock(mutex_);
+    cv_not_empty_.notify_one();
   }
 
   return true;
@@ -340,6 +414,69 @@ size_t RingBuffer::ReadWait(int16_t *data, size_t samples,
   }
 
   return samples;
+}
+
+size_t RingBuffer::ReadWaitFor(int16_t *data, size_t samples,
+                               const std::atomic<bool> &running,
+                               int timeout_ms) {
+  if (!data || samples == 0)
+    return 0;
+
+  const size_t tail = tail_.v.load(std::memory_order_relaxed);
+  const size_t head = head_.v.load(std::memory_order_acquire);
+
+  if (head - tail >= samples) {
+    ReadDataInternal(data, samples, tail);
+    tail_.v.store(tail + samples, std::memory_order_release);
+
+    if (writer_waiting_.load(std::memory_order_relaxed)) {
+      std::lock_guard<std::mutex> lock(mutex_);
+      cv_not_full_.notify_one();
+    }
+    return samples;
+  }
+
+  if (timeout_ms > 0 && running.load(std::memory_order_relaxed)) {
+    std::unique_lock<std::mutex> lock(mutex_);
+    reader_waiting_.store(true, std::memory_order_relaxed);
+    cv_not_empty_.wait_for(lock, std::chrono::milliseconds(timeout_ms), [&]() {
+      if (!running.load(std::memory_order_relaxed))
+        return true;
+      const size_t curr_tail = tail_.v.load(std::memory_order_relaxed);
+      const size_t curr_head = head_.v.load(std::memory_order_acquire);
+      return curr_head - curr_tail >= samples;
+    });
+    reader_waiting_.store(false, std::memory_order_relaxed);
+  }
+
+  const size_t curr_tail = tail_.v.load(std::memory_order_relaxed);
+  const size_t curr_head = head_.v.load(std::memory_order_acquire);
+  const size_t size = curr_head - curr_tail;
+  const size_t to_read = std::min(samples, size);
+
+  if (to_read == 0)
+    return 0;
+
+  ReadDataInternal(data, to_read, curr_tail);
+  tail_.v.store(curr_tail + to_read, std::memory_order_release);
+
+  if (writer_waiting_.load(std::memory_order_relaxed)) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    cv_not_full_.notify_one();
+  }
+
+  if (to_read < samples) {
+    const size_t underrun =
+        underrun_count_.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (underrun <= 3 || (underrun % 250) == 0) {
+      LOGF(LOG_WARN,
+           "%{public}s RingBuffer underrun: need=%{public}zu, got=%{public}zu, "
+           "size=%{public}zu, cap=%{public}zu",
+           kAudioChainPrefix, samples, to_read, size, capacity_);
+    }
+  }
+
+  return to_read;
 }
 
 size_t RingBuffer::AvailableRead() const {

@@ -408,6 +408,12 @@ private:
   std::atomic<int64_t> lastAudioStatusEmitUs_{0};
   size_t lastAudioUnderruns_{0};
   size_t lastAudioOverruns_{0};
+  std::chrono::steady_clock::time_point engineDiagWindowStart_{};
+  std::chrono::steady_clock::time_point nextFrameDeadline_{};
+  uint64_t engineDiagFrames_{0};
+  int64_t engineDiagMaxFrameUs_{0};
+  int64_t engineDiagMaxRetroMs_{0};
+  uint64_t engineDiagOverBudgetFrames_{0};
   std::atomic<bool> hw_render_enabled_{false};
   std::atomic<bool> render_thread_enabled_{true};
   std::atomic<bool> native_vsync_enabled_{true};

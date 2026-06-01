@@ -32,6 +32,7 @@ namespace libretro {
 namespace {
 constexpr const char *kAudioChainPrefix = "[AUD][CHAIN]";
 constexpr const char *kAudioDiagPrefix = "[AUDIO_DIAG]";
+constexpr int kAudioCallbackReadWaitMs = 2;
 
 class CallbackGuard {
 public:
@@ -141,7 +142,7 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
   // 注意：OHAudio Native API (API 11/12) 的 Builder 中似乎没有 SetVolume 接口
   // 音量通常在 Renderer 创建后通过 OH_AudioRenderer_SetVolume 设置
   // 或者在 ArkTS 层管理音量
-  
+
   // 低时延模式 (游戏音频推荐) -> 改为 NORMAL 以增强抗卡顿能力
   // 用户反馈长时间运行后卡顿，FAST 模式下 100ms 的调度延迟会导致音频断续
   OH_AudioStreamBuilder_SetLatencyMode(builder_, AUDIOSTREAM_LATENCY_MODE_NORMAL);
@@ -149,9 +150,9 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
   // 音频流类型: 游戏音效
   OH_AudioStreamBuilder_SetRendererInfo(builder_, AUDIOSTREAM_USAGE_GAME);
 
-  // 设置回调帧大小: 20ms (增加缓冲粒度，减少回调频率)
-  // 32768Hz -> ~655 frames, 44100Hz -> ~882 frames
-  int32_t frame_size = sample_rate_ / 50;
+  // 设置回调帧大小: 10ms。20ms 粒度在调度抖动时单次拉取过大，
+  // 容易把低水位 RingBuffer 读穿。
+  int32_t frame_size = sample_rate_ / 100;
   result = OH_AudioStreamBuilder_SetFrameSizeInCallback(builder_, frame_size);
   if (result != AUDIOSTREAM_SUCCESS) {
     LOGF(LOG_ERROR,
@@ -161,7 +162,7 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
     return false;
   }
   LOGF(LOG_INFO,
-       "%{public}s Set frame size in callback: %{public}d frames (20ms)",
+       "%{public}s Set frame size in callback: %{public}d frames (10ms)",
        kAudioChainPrefix, frame_size);
   const int32_t bytes_per_frame =
       static_cast<int32_t>(sizeof(int16_t)) * channel_count_;
@@ -171,15 +172,11 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
        kAudioChainPrefix, kAudioDiagPrefix, sample_rate_, channel_count_,
        frame_size, bytes_per_frame);
 
-  // 3. 设置回调函数
-  // Audit T3-F5: only register the API 12+ write-data callback. Previously the legacy
-  // `OH_AudioStreamBuilder_SetRendererCallback` slot was also unconditionally set,
-  // which is fragile — on devices where the OS honours both slots, the ring buffer
-  // would be drained twice per render cycle (silent half-amplitude artifact).
-  // Project compileSdkVersion targets API 12+, so the legacy slot is no longer needed.
-  // Interrupt callback is registered separately via SetRendererInterruptCallback below.
+  // 3. 设置写数据回调。HarmonyOS 6.0.2(API22) 使用专用 write-data
+  // callback，避免 legacy callback 与新版 callback 的优先级差异。
   OH_AudioRenderer_OnWriteDataCallback writeDataCb = OnWriteDataCallback;
-  result = OH_AudioStreamBuilder_SetRendererWriteDataCallback(builder_, writeDataCb, this);
+  result = OH_AudioStreamBuilder_SetRendererWriteDataCallback(
+      builder_, writeDataCb, this);
   if (result != AUDIOSTREAM_SUCCESS) {
     LOGF(LOG_ERROR,
          "%{public}s Failed to set renderer write data callback: %{public}d",
@@ -188,11 +185,8 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
     return false;
   }
 
-  // Register interrupt-event callback only (no write-data slot here, see T3-F5).
-  OH_AudioRenderer_Callbacks interruptOnly;
-  memset(&interruptOnly, 0, sizeof(OH_AudioRenderer_Callbacks));
-  interruptOnly.OH_AudioRenderer_OnInterruptEvent = OnInterruptEvent;
-  result = OH_AudioStreamBuilder_SetRendererCallback(builder_, interruptOnly, this);
+  result = OH_AudioStreamBuilder_SetRendererInterruptCallback(
+      builder_, OnInterruptEvent, this);
   if (result != AUDIOSTREAM_SUCCESS) {
     LOGF(LOG_ERROR,
          "%{public}s Failed to set renderer interrupt callback: %{public}d",
@@ -210,7 +204,7 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
     Cleanup();
     return false;
   }
-  
+
   // 设置音量为 1.0
   OH_AudioRenderer_SetVolume(renderer_, 1.0f);
 
@@ -373,6 +367,13 @@ bool AudioPlayer::IsPlaying() const {
   return is_playing_;
 }
 
+void AudioPlayer::GetCallbackDiag(uint64_t &callbackCount, uint64_t &framesRead,
+                                  int64_t &lastCallbackMs) const {
+  callbackCount = total_callback_count_.load(std::memory_order_relaxed);
+  framesRead = total_callback_frames_read_.load(std::memory_order_relaxed);
+  lastCallbackMs = last_callback_ms_.load(std::memory_order_relaxed);
+}
+
 bool AudioPlayer::PauseFromInterrupt() {
   OH_AudioRenderer *renderer = nullptr;
   {
@@ -433,7 +434,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   if (player->running_ && !player->running_->load()) {
     int log_count = ++player->callback_invalid_log_count_;
     if (log_count <= 3 || (log_count % 120) == 0) {
-      LOGF(LOG_INFO, "%{public}s %{public}s [API12] running=false -> INVALID",
+      LOGF(LOG_INFO, "%{public}s %{public}s [API22] running=false -> INVALID",
            kAudioChainPrefix, kAudioDiagPrefix);
     }
     return AUDIO_DATA_CALLBACK_RESULT_INVALID;
@@ -515,6 +516,11 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
 
   // [DEBUG] 记录回调时间间隔（使用成员变量避免多线程数据竞争）
   auto current_time = std::chrono::steady_clock::now();
+  const int64_t current_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          current_time.time_since_epoch())
+          .count();
+  player->last_callback_ms_.store(current_ms, std::memory_order_relaxed);
   long long delta_ms = 0;
   if (player->callback_log_count_ > 0) {
     delta_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -524,21 +530,34 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   player->callback_last_time_ = current_time;
 
   // 非阻塞拉取：数据不足时由 RingBuffer 填充静音，保证回调及时返回
-  // [Fix] API12 建议：如果数据不足，返回 INVALID 让系统处理（通常是重试或静音），而不是手动填静音
+  // 如果数据不足，先短暂等待；仍不足时用静音补齐，保证回调及时返回。
   // 但为了保持平滑，我们尝试 ReadWait（带极短超时或无超时），如果还是不足，才 VALID + 静音
   // 考虑到 RingBuffer::Read 已经是非阻塞的，我们在这里做个策略选择：
   // 1. 尝试读取
   size_t samples_needed = static_cast<size_t>(frames_needed) * player->channel_count_;
-  size_t samples_read = player->ring_buffer_->Read(
-      static_cast<int16_t *>(audioData), samples_needed);
-  
+  size_t samples_read = player->running_
+                            ? player->ring_buffer_->ReadWaitFor(
+                                  static_cast<int16_t *>(audioData),
+                                  samples_needed, *player->running_,
+                                  kAudioCallbackReadWaitMs)
+                            : player->ring_buffer_->Read(
+                                  static_cast<int16_t *>(audioData),
+                                  samples_needed);
+
   size_t frames_read = samples_read / player->channel_count_;
+  player->total_callback_count_.fetch_add(1, std::memory_order_relaxed);
+  player->total_callback_frames_read_.fetch_add(frames_read,
+                                                std::memory_order_relaxed);
 
   size_t underruns = 0;
   size_t overruns = 0;
   if (player->ring_buffer_) {
     player->ring_buffer_->GetStats(underruns, overruns);
   }
+  float usage_snapshot =
+      player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
+  int32_t usage_snapshot_percent =
+      static_cast<int32_t>(usage_snapshot * 100.0f + 0.5f);
   const size_t frames_needed_sz = static_cast<size_t>(frames_needed);
   const size_t missing_frames =
       (frames_read < frames_needed_sz) ? (frames_needed_sz - frames_read) : 0;
@@ -548,8 +567,8 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
       size_t bytes_read = frames_read * bytes_per_frame;
       size_t bytes_missing = (frames_needed - frames_read) * bytes_per_frame;
       std::memset(static_cast<uint8_t *>(audioData) + bytes_read, 0, bytes_missing);
-      
-      // [Fix] 记录欠载，但在 API12 中如果严重欠载（例如读取为 0），可以考虑返回 INVALID
+
+      // 记录欠载；严重欠载时仍返回 VALID，避免音频线程进入异常恢复抖动。
       // 不过为了稳健性，目前仍返回 VALID，只是打个警告日志（限流）
       // 线上难以定位问题是因为缺乏 INVALID 信号？
       // 我们可以引入一个阈值，比如连续欠载 N 次后返回 INVALID
@@ -558,16 +577,15 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   if (missing_frames > 0) {
     int log_count = ++player->callback_underrun_log_count_;
     if (log_count <= 5 || (log_count % 120) == 0) {
-      float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
-      int32_t usage_percent = static_cast<int32_t>(usage * 100.0f + 0.5f);
       LOGF(LOG_WARN,
-           "%{public}s %{public}s [API12] underrun: need=%{public}d "
+           "%{public}s %{public}s [API22] underrun: need=%{public}d "
            "read=%{public}d miss=%{public}d size=%{public}d bytes "
            "usage=%{public}d%% underruns=%{public}d overruns=%{public}d "
            "running=%{public}d wg=%{public}d",
            kAudioChainPrefix, kAudioDiagPrefix, frames_needed,
            static_cast<int32_t>(frames_read),
-           static_cast<int32_t>(missing_frames), audioDataSize, usage_percent,
+           static_cast<int32_t>(missing_frames), audioDataSize,
+           usage_snapshot_percent,
            static_cast<int32_t>(underruns), static_cast<int32_t>(overruns),
            (player->running_ && player->running_->load()) ? 1 : 0,
            workgroup_started ? 1 : 0);
@@ -579,7 +597,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
     if (jitter_count <= 3 || (jitter_count % 120) == 0) {
       float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
       LOGF(LOG_WARN,
-           "%{public}s [API12] callback jitter: dt=%{public}lld ms, "
+           "%{public}s [API22] callback jitter: dt=%{public}lld ms, "
            "frames=%{public}d read=%{public}zu (usage=%{public}.1f%%)",
            kAudioChainPrefix, (long long)delta_ms, frames_needed, frames_read,
            usage * 100.0f);
@@ -612,11 +630,65 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   int32_t cost_us = static_cast<int32_t>(
       std::chrono::duration_cast<std::chrono::microseconds>(cb_end - cb_start)
           .count());
+  {
+    if (player->diag_window_start_.time_since_epoch().count() == 0) {
+      player->diag_window_start_ = cb_end;
+    }
+    player->diag_callbacks_++;
+    player->diag_frames_needed_ += static_cast<uint64_t>(frames_needed_sz);
+    player->diag_frames_read_ += static_cast<uint64_t>(frames_read);
+    player->diag_missing_frames_ += static_cast<uint64_t>(missing_frames);
+    if (delta_ms > player->diag_max_delta_ms_) {
+      player->diag_max_delta_ms_ = delta_ms;
+    }
+    if (cost_us > player->diag_max_cost_us_) {
+      player->diag_max_cost_us_ = cost_us;
+    }
+    if (usage_snapshot_percent < player->diag_min_usage_percent_) {
+      player->diag_min_usage_percent_ = usage_snapshot_percent;
+    }
+    if (usage_snapshot_percent > player->diag_max_usage_percent_) {
+      player->diag_max_usage_percent_ = usage_snapshot_percent;
+    }
+    const auto diag_elapsed_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            cb_end - player->diag_window_start_)
+            .count();
+    if (diag_elapsed_ms >= 1000) {
+      LOGF(LOG_INFO,
+           "%{public}s %{public}s [API22] callback_window: ms=%{public}lld, "
+           "callbacks=%{public}llu, need_frames=%{public}llu, "
+           "read_frames=%{public}llu, miss_frames=%{public}llu, "
+           "max_dt_ms=%{public}lld, max_cost_us=%{public}d, "
+           "usage_range=%{public}d%%-%{public}d%%, underruns=%{public}d, "
+           "overruns=%{public}d, wg=%{public}d",
+           kAudioChainPrefix, kAudioDiagPrefix,
+           static_cast<long long>(diag_elapsed_ms),
+           static_cast<unsigned long long>(player->diag_callbacks_),
+           static_cast<unsigned long long>(player->diag_frames_needed_),
+           static_cast<unsigned long long>(player->diag_frames_read_),
+           static_cast<unsigned long long>(player->diag_missing_frames_),
+           static_cast<long long>(player->diag_max_delta_ms_),
+           player->diag_max_cost_us_, player->diag_min_usage_percent_,
+           player->diag_max_usage_percent_, static_cast<int32_t>(underruns),
+           static_cast<int32_t>(overruns), workgroup_started ? 1 : 0);
+      player->diag_window_start_ = cb_end;
+      player->diag_callbacks_ = 0;
+      player->diag_frames_needed_ = 0;
+      player->diag_frames_read_ = 0;
+      player->diag_missing_frames_ = 0;
+      player->diag_invalid_callbacks_ = 0;
+      player->diag_max_delta_ms_ = 0;
+      player->diag_max_cost_us_ = 0;
+      player->diag_min_usage_percent_ = 100;
+      player->diag_max_usage_percent_ = 0;
+    }
+  }
   if (cost_us > 2000) {
     int log_count = ++player->callback_cost_log_count_;
     if (log_count <= 3 || (log_count % 120) == 0) {
       LOGF(LOG_WARN,
-           "%{public}s %{public}s [API12] callback slow: cost=%{public}d us, "
+           "%{public}s %{public}s [API22] callback slow: cost=%{public}d us, "
            "dt=%{public}lld ms, frames=%{public}d, read=%{public}d",
            kAudioChainPrefix, kAudioDiagPrefix, cost_us, (long long)delta_ms,
            frames_needed, static_cast<int32_t>(frames_read));
@@ -640,7 +712,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   if (player->callback_log_count_ <= 5 || (player->callback_log_count_ % 250) == 0) {
     float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
     LOGF(LOG_INFO,
-        "%{public}s [API12] dt=%{public}lld ms, frames=%{public}d "
+        "%{public}s [API22] dt=%{public}lld ms, frames=%{public}d "
         "read=%{public}zu (signal=%{public}d, usage=%{public}.1f%%) -> VALID",
         kAudioChainPrefix, (long long)delta_ms, frames_needed, frames_read,
         has_sound, usage * 100.0f);
@@ -651,7 +723,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
     float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
     int32_t usage_percent = static_cast<int32_t>(usage * 100.0f + 0.5f);
     LOGF(LOG_INFO,
-         "%{public}s %{public}s [API12] size=%{public}d bytes, "
+         "%{public}s %{public}s [API22] size=%{public}d bytes, "
          "bytes_per_frame=%{public}d, need=%{public}d, read=%{public}d, "
          "miss=%{public}d, usage=%{public}d%%, underruns=%{public}d, "
          "overruns=%{public}d, cost=%{public}d us, running=%{public}d",
@@ -665,188 +737,18 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   return AUDIO_DATA_CALLBACK_RESULT_VALID;
 }
 
-// OHAudio 回调: 写入数据 (API 11 兼容)
-int32_t AudioPlayer::OnWriteDataLegacy(OH_AudioRenderer *renderer,
-                                       void *userData,
-                                       void *audioData,
-                                       int32_t audioDataSize) {
-  auto *player = static_cast<AudioPlayer *>(userData);
-  auto cb_start = std::chrono::steady_clock::now();
-  if (!player || !player->ring_buffer_ || !audioData || audioDataSize <= 0) {
-    return 0;
-  }
-  CallbackGuard callbackGuard(player);
-  if (!callbackGuard.IsActive()) {
-    std::memset(audioData, 0, static_cast<size_t>(audioDataSize));
-    return audioDataSize;
-  }
-
-  if (player->running_ && !player->running_->load()) {
-    std::memset(audioData, 0, static_cast<size_t>(audioDataSize));
-    return audioDataSize;
-  }
-
-  int32_t bytes_per_sample = sizeof(int16_t);
-  int32_t bytes_per_frame = bytes_per_sample * player->channel_count_;
-  if (bytes_per_frame <= 0) {
-    std::memset(audioData, 0, static_cast<size_t>(audioDataSize));
-    return audioDataSize;
-  }
-
-  int32_t frames_needed = audioDataSize / bytes_per_frame;
-  if (frames_needed <= 0) {
-    std::memset(audioData, 0, static_cast<size_t>(audioDataSize));
-    return audioDataSize;
-  }
-  const int32_t bytes_filled = frames_needed * bytes_per_frame;
-  const int32_t tail_bytes = audioDataSize - bytes_filled;
-
-  bool workgroup_started = false;
-  if (!player->workgroup_disabled_.load(std::memory_order_relaxed)) {
-    std::lock_guard<std::mutex> lock(player->state_mutex_);
-    if (player->workgroup_ && player->workgroup_token_ == 0) {
-      OH_AudioCommon_Result add_result = OH_AudioWorkgroup_AddCurrentThread(
-          player->workgroup_, &player->workgroup_token_);
-      if (add_result == AUDIOCOMMON_RESULT_SUCCESS &&
-          player->workgroup_token_ > 0) {
-        LOGF(LOG_INFO,
-             "%{public}s Audio workgroup thread added (token: %{public}d)",
-             kAudioChainPrefix, player->workgroup_token_);
-      } else {
-        bool expected = false;
-        if (player->workgroup_disabled_.compare_exchange_strong(
-                expected, true, std::memory_order_relaxed)) {
-          LOGF(LOG_WARN,
-               "%{public}s Audio workgroup disabled: AddCurrentThread failed (%{public}d)",
-               kAudioChainPrefix, add_result);
-        }
-        player->workgroup_token_ = -1;
-      }
-    }
-  }
-
-  if (!player->workgroup_disabled_.load(std::memory_order_relaxed)) {
-    std::lock_guard<std::mutex> lock(player->state_mutex_);
-    if (player->workgroup_ && player->workgroup_token_ > 0) {
-      timespec ts{};
-      clock_gettime(CLOCK_MONOTONIC, &ts);
-      uint64_t start_ns = static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL +
-                          static_cast<uint64_t>(ts.tv_nsec);
-      uint64_t work_ns =
-          (static_cast<uint64_t>(frames_needed) * 1000000000ULL +
-           static_cast<uint64_t>(player->sample_rate_) - 1ULL) /
-          static_cast<uint64_t>(player->sample_rate_);
-      if (work_ns < 1) {
-        work_ns = 1;
-      }
-      OH_AudioCommon_Result start_result =
-          OH_AudioWorkgroup_Start(player->workgroup_, start_ns,
-                                  start_ns + work_ns);
-      workgroup_started = (start_result == AUDIOCOMMON_RESULT_SUCCESS);
-      if (!workgroup_started) {
-        bool expected = false;
-        if (player->workgroup_disabled_.compare_exchange_strong(
-                expected, true, std::memory_order_relaxed)) {
-          LOGF(LOG_WARN,
-               "%{public}s Audio workgroup disabled: Start failed (%{public}d)",
-               kAudioChainPrefix, start_result);
-        }
-      }
-    }
-  }
-
-  // 非阻塞读取：数据不足时由 RingBuffer 填充静音
-  size_t samples_needed = static_cast<size_t>(frames_needed) * player->channel_count_;
-  size_t samples_read = player->ring_buffer_->Read(
-      static_cast<int16_t *>(audioData), samples_needed);
-
-  size_t frames_read = samples_read / player->channel_count_;
-  
-  // LockFreeRingBuffer::Read 不自动填充静音，需手动处理
-  if (frames_read < frames_needed) {
-      size_t bytes_read = frames_read * bytes_per_frame;
-      size_t bytes_missing = (frames_needed - frames_read) * bytes_per_frame;
-      std::memset(static_cast<uint8_t *>(audioData) + bytes_read, 0, bytes_missing);
-  }
-
-  if (tail_bytes > 0) {
-    std::memset(static_cast<uint8_t *>(audioData) + bytes_filled, 0,
-                static_cast<size_t>(tail_bytes));
-  }
-
-  if (workgroup_started &&
-      !player->workgroup_disabled_.load(std::memory_order_relaxed)) {
-    std::lock_guard<std::mutex> lock(player->state_mutex_);
-    if (player->workgroup_) {
-      OH_AudioCommon_Result stop_result =
-          OH_AudioWorkgroup_Stop(player->workgroup_);
-      if (stop_result != AUDIOCOMMON_RESULT_SUCCESS) {
-        bool expected = false;
-        if (player->workgroup_disabled_.compare_exchange_strong(
-                expected, true, std::memory_order_relaxed)) {
-          LOGF(LOG_WARN,
-               "%{public}s Audio workgroup disabled: Stop failed (%{public}d)",
-               kAudioChainPrefix, stop_result);
-        }
-      }
-    }
-  }
-  // 正常路径限流日志（使用成员变量避免多线程数据竞争）
-  player->legacy_cb11_log_count_++;
-  if (frames_read > 0 &&
-      (player->legacy_cb11_log_count_ <= 5 ||
-       (player->legacy_cb11_log_count_ % 250) == 0)) {
-    float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
-    LOGF(LOG_INFO,
-         "%{public}s [API11] frames=%{public}d read=%{public}zu "
-         "(usage=%{public}.1f%%) -> return=%{public}d bytes",
-         kAudioChainPrefix, frames_needed, frames_read, usage * 100.0f,
-         audioDataSize);
-  }
-  player->legacy_diag_log_count_++;
-  if (player->legacy_diag_log_count_ <= 5 ||
-      (player->legacy_diag_log_count_ % 250) == 0) {
-    size_t underruns = 0;
-    size_t overruns = 0;
-    if (player->ring_buffer_) {
-      player->ring_buffer_->GetStats(underruns, overruns);
-    }
-    float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
-    int32_t usage_percent = static_cast<int32_t>(usage * 100.0f + 0.5f);
-    auto cb_end = std::chrono::steady_clock::now();
-    int32_t cost_us = static_cast<int32_t>(
-        std::chrono::duration_cast<std::chrono::microseconds>(cb_end - cb_start)
-            .count());
-    const size_t frames_needed_sz = static_cast<size_t>(frames_needed);
-    const size_t missing_frames =
-        (frames_read < frames_needed_sz) ? (frames_needed_sz - frames_read) : 0;
-    LOGF(LOG_INFO,
-         "%{public}s %{public}s [API11] size=%{public}d bytes, "
-         "bytes_per_frame=%{public}d, need=%{public}d, read=%{public}d, "
-         "miss=%{public}d, usage=%{public}d%%, underruns=%{public}d, "
-         "overruns=%{public}d, cost=%{public}d us",
-         kAudioChainPrefix, kAudioDiagPrefix, audioDataSize, bytes_per_frame,
-         frames_needed, static_cast<int32_t>(frames_read),
-         static_cast<int32_t>(missing_frames), usage_percent,
-         static_cast<int32_t>(underruns), static_cast<int32_t>(overruns),
-         cost_us);
-  }
-  return audioDataSize;
-}
-
 // OHAudio 回调: 音频中断事件
-int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
-                                      void *userData,
-                                      OH_AudioInterrupt_ForceType type,
-                                      OH_AudioInterrupt_Hint hint) {
+void AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer, void *userData,
+                                   OH_AudioInterrupt_ForceType type,
+                                   OH_AudioInterrupt_Hint hint) {
   (void)renderer;
   auto *player = static_cast<AudioPlayer *>(userData);
   if (!player) {
-    return 0;
+    return;
   }
   CallbackGuard callbackGuard(player);
   if (!callbackGuard.IsActive()) {
-    return 0;
+    return;
   }
 
   // 记录中断事件
@@ -910,7 +812,7 @@ int32_t AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer,
     break;
   }
 
-  return 0;
+  return;
 }
 
 void AudioPlayer::Cleanup() {

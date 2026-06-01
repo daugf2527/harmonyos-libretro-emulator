@@ -26,9 +26,7 @@ static napi_value DiskControlGetEjectState(napi_env env, napi_callback_info info
 static napi_value DiskControlGetImageIndex(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   unsigned index = GetEngine()->DiskControlGetImageIndex();
-  napi_value result;
-  napi_create_uint32(env, index, &result);
-  return result;
+  return MakeUint32(env, index);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -54,9 +52,7 @@ static napi_value DiskControlSetImageIndex(napi_env env, napi_callback_info info
 static napi_value DiskControlGetNumImages(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   unsigned num = GetEngine()->DiskControlGetNumImages();
-  napi_value result;
-  napi_create_uint32(env, num, &result);
-  return result;
+  return MakeUint32(env, num);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 

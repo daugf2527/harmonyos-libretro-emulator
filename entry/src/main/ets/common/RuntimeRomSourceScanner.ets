@@ -1,12 +1,13 @@
 import testNapi from 'libentry.so'
 import { common } from '@kit.AbilityKit'
+import type { resourceManager } from '@kit.LocalizationKit'
 import { LibraryRomFileSource } from './LibraryRecordFactory'
 import LogHelper from './LogHelper'
 import { listSandboxRomFiles } from './RomImportService'
 import { RuntimeRomSourceItem } from './RuntimeRomCatalog'
 
 interface RuntimeRomSourceNapi {
-  refactoredGetRawFileListAsync(resMgr: object, dir?: string): Promise<string[]>
+  refactoredGetRawFileListAsync(resMgr: resourceManager.ResourceManager, dir?: string): Promise<string[]>
 }
 
 interface BundledRomEntry {

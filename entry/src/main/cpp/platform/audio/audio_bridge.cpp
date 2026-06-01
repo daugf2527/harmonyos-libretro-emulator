@@ -33,6 +33,7 @@ namespace libretro {
 namespace {
 constexpr const char *kAudioChainPrefix = "[AUD][CHAIN]";
 constexpr const char *kAudioDiagPrefix = "[AUDIO_DIAG]";
+constexpr int kAudioProducerMaxBlockMs = 8;
 }
 
 const char *AudioBridge::AudioRunStateToString(AudioRunState state) {
@@ -188,6 +189,7 @@ bool AudioBridge::Start() {
   // 清空缓冲区统计
   if (ring_buffer_) {
     ring_buffer_->ResetStats();
+    last_rebuffer_underruns_.store(0, std::memory_order_relaxed);
 
     // 检查缓冲区当前水位 (Samples -> Frames)
     // RingBuffer::AvailableRead 返回的是 samples
@@ -275,7 +277,7 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
       SetRunState(AudioRunState::RUNNING, "interrupt_processed_playing");
     }
   }
-  
+
   // 1.5 Bypass 重采样 (如果采样率相同)
   // 注意:不能仅用 resampler_.GetRatio() == 1.0 判断,因为 DRC 在 1.0 附近微调时
   // ratio 与 1.0 浮点相等的概率不稳定,bypass 与否会跳变。
@@ -306,7 +308,7 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
       return 0;
     }
   }
-  
+
   // 关键修复：使用 shared_ptr 延长生命周期，防止 Reset/Stop 在其他线程销毁它
   std::shared_ptr<RingBuffer> buffer_ref = ring_buffer_;
   const bool buffering_snapshot = buffering_;
@@ -350,7 +352,8 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
   if (buffer_ref) {
     auto write_start = std::chrono::steady_clock::now();
     if (should_block) {
-      success = buffer_ref->WriteWait(out_buf_data, samples_to_write, running_);
+      success = buffer_ref->WriteWaitFor(out_buf_data, samples_to_write,
+                                         running_, kAudioProducerMaxBlockMs);
     } else {
       success = buffer_ref->Write(out_buf_data, samples_to_write);
     }
@@ -372,6 +375,76 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
     }
   }
   float usage_after = buffer_ref ? buffer_ref->GetUsage() : 0.0f;
+  {
+    auto diag_now = std::chrono::steady_clock::now();
+    if (diag_window_start_.time_since_epoch().count() == 0) {
+      diag_window_start_ = diag_now;
+    }
+    diag_calls_++;
+    diag_in_frames_ += frames;
+    diag_out_frames_ += out_frames;
+    if (should_block) {
+      diag_blocking_calls_++;
+    }
+    if (!success) {
+      diag_write_failures_++;
+    }
+    if (dt_ms > diag_max_dt_ms_) {
+      diag_max_dt_ms_ = dt_ms;
+    }
+    const auto diag_elapsed_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            diag_now - diag_window_start_)
+            .count();
+    if (diag_elapsed_ms >= 1000) {
+      const int32_t usage_before_percent =
+          static_cast<int32_t>(usage_before * 100.0f + 0.5f);
+      const int32_t usage_after_percent =
+          static_cast<int32_t>(usage_after * 100.0f + 0.5f);
+      uint64_t callback_count = 0;
+      uint64_t callback_frames_read = 0;
+      int64_t last_callback_ms = 0;
+      if (audio_player_) {
+        audio_player_->GetCallbackDiag(callback_count, callback_frames_read,
+                                       last_callback_ms);
+      }
+      int64_t callback_age_ms = -1;
+      if (last_callback_ms > 0) {
+        const int64_t now_ms =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                diag_now.time_since_epoch())
+                .count();
+        callback_age_ms = now_ms - last_callback_ms;
+      }
+      LOGF(LOG_INFO,
+           "%{public}s %{public}s producer_window: ms=%{public}lld, "
+           "calls=%{public}llu, in_frames=%{public}llu, "
+           "out_frames=%{public}llu, write_fail=%{public}llu, "
+           "blocking_calls=%{public}llu, max_gap_ms=%{public}d, "
+           "usage=%{public}d%%->%{public}d%%, run_state=%{public}s, "
+           "cb_count=%{public}llu, cb_read_frames=%{public}llu, "
+           "cb_age_ms=%{public}lld",
+           kAudioChainPrefix, kAudioDiagPrefix,
+           static_cast<long long>(diag_elapsed_ms),
+           static_cast<unsigned long long>(diag_calls_),
+           static_cast<unsigned long long>(diag_in_frames_),
+           static_cast<unsigned long long>(diag_out_frames_),
+           static_cast<unsigned long long>(diag_write_failures_),
+           static_cast<unsigned long long>(diag_blocking_calls_),
+           diag_max_dt_ms_, usage_before_percent, usage_after_percent,
+           AudioRunStateToString(GetRunState()),
+           static_cast<unsigned long long>(callback_count),
+           static_cast<unsigned long long>(callback_frames_read),
+           static_cast<long long>(callback_age_ms));
+      diag_window_start_ = diag_now;
+      diag_calls_ = 0;
+      diag_in_frames_ = 0;
+      diag_out_frames_ = 0;
+      diag_write_failures_ = 0;
+      diag_blocking_calls_ = 0;
+      diag_max_dt_ms_ = 0;
+    }
+  }
   if (!success) {
     recover_streak_ = std::min<uint32_t>(recover_streak_ + 1, 100);
     SetRunState(AudioRunState::RECOVERING, "producer_write_failed");
@@ -386,6 +459,33 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
       SetRunState(AudioRunState::BUFFERING, "producer_buffering");
     } else {
       SetRunState(AudioRunState::RUNNING, "producer_success");
+    }
+  }
+
+  if (success && started_snapshot && !buffering_snapshot && buffer_ref) {
+    const size_t min_frames = min_buffer_frames_.load();
+    const size_t available_frames = buffer_ref->AvailableRead() / 2;
+    size_t underruns = 0;
+    size_t overruns = 0;
+    buffer_ref->GetStats(underruns, overruns);
+    const size_t last_rebuffer_underruns =
+        last_rebuffer_underruns_.load(std::memory_order_relaxed);
+    if (underruns > last_rebuffer_underruns && available_frames < min_frames) {
+      std::lock_guard<std::mutex> guard(mutex_);
+      if (audio_player_ && !buffering_ && audio_player_->IsPlaying()) {
+        const bool paused = audio_player_->Pause();
+        last_rebuffer_underruns_.store(underruns, std::memory_order_relaxed);
+        if (paused) {
+          buffering_ = true;
+          SetRunState(AudioRunState::BUFFERING, "runtime_underrun_rebuffer");
+        }
+        LOGF(LOG_WARN,
+             "%{public}s Runtime rebuffer after underrun: paused=%{public}d, "
+             "available=%{public}zu frames, min=%{public}zu frames, "
+             "underruns=%{public}zu, overruns=%{public}zu",
+             kAudioChainPrefix, paused ? 1 : 0, available_frames, min_frames,
+             underruns, overruns);
+      }
     }
   }
 
@@ -449,7 +549,7 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
       } else if (usage > kDrcHighThreshold) {
         skew = std::max(skew - kDrcStep, static_cast<double>(kDrcMinSkew));
       }
-      
+
       // 更新 Ratio 需要加锁,因为 Reset() 可能在另一线程重置 Resampler。
       // 原实现注释承认"风险可控"但实际是数据竞争 UB,这里恢复加锁。
       if (skew != drc_skew_.load()) {
@@ -538,9 +638,9 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   // 使用新的 RingBuffer (传入 Samples)
   ring_buffer_ = std::make_unique<RingBuffer>(buffer_capacity_samples);
 
-  // 设定最小缓冲帧数 (100ms)。
-  // 120ms 在部分场景会抬高低水位阈值，诱发过度跳帧；回退到 100ms 平衡延迟与稳定性。
-  default_min_buffer_frames_.store(output_sample_rate_ / 10);
+  // 设定最小缓冲帧数 (200ms)。OHAudio NORMAL 模式下单次回调约 20ms，
+  // 100ms 水位在系统调度抖动时容易读穿，导致持续 underrun。
+  default_min_buffer_frames_.store(output_sample_rate_ / 5);
   min_buffer_frames_.store(default_min_buffer_frames_.load());
   minimum_latency_ms_.store(0);
 
@@ -563,6 +663,7 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   is_started_ = false;
   buffering_ = false;
   running_.store(true, std::memory_order_release);
+  last_rebuffer_underruns_.store(0, std::memory_order_relaxed);
   recover_streak_ = 0;
   SetRunState(AudioRunState::INIT, "initialize_success");
 
@@ -592,6 +693,7 @@ bool AudioBridge::Reset(int32_t sample_rate) {
       recover_streak_ = 0;
       if (ring_buffer_) {
         ring_buffer_->ResetStats();
+        last_rebuffer_underruns_.store(0, std::memory_order_relaxed);
         // 清空旧数据，重新缓冲
         ring_buffer_->Clear();
       }
@@ -751,6 +853,20 @@ void AudioBridge::GetBufferStats(size_t &underruns, size_t &overruns) const {
   }
 
   ring_buffer_->GetStats(underruns, overruns);
+}
+
+void AudioBridge::GetCallbackDiag(uint64_t &callbackCount, uint64_t &framesRead,
+                                  int64_t &lastCallbackMs) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  callbackCount = 0;
+  framesRead = 0;
+  lastCallbackMs = 0;
+
+  if (!initialized_ || !audio_player_) {
+    return;
+  }
+
+  audio_player_->GetCallbackDiag(callbackCount, framesRead, lastCallbackMs);
 }
 
 void AudioBridge::ResetBufferStats() {

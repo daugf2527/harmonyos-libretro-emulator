@@ -8,6 +8,7 @@ import { LibrarySearchPanel } from '../components/LibrarySearchPanel'
 import { EmuColors } from '../common/EmuUiTokens'
 import { setPendingLibraryLaunchRequest } from '../common/LibraryLaunchBridge'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
+import { ErrorCodeUtils, FileErrorCodes } from '../common/ErrorCodes'
 import {
   buildRecentLibraryRecords,
   getReadyLibraryRecords,
@@ -140,6 +141,9 @@ struct LibraryPage {
   @State private lastPlayedPlatform: string = ''
   @State private lastPlayedRelative: string = ''
   private lastPlayedRecord: LibraryRecord | undefined = undefined
+  // 折叠屏适配状态
+  @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
+  @State private selectedGameForDetail: LibraryRecord | undefined = undefined
   aboutToAppear(): void {
     this.pageActive = true
     void this.refreshLibraryGames()
@@ -250,7 +254,9 @@ struct LibraryPage {
         return
       }
       if (showToast) {
-        this.showToastMessage('刷新失败 LIB_SCAN_ERROR')
+        // 使用错误码提供用户友好的错误消息
+        const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_LIST_ERROR.numericCode)
+        this.showToastMessage(userMsg)
       }
       return
     }
@@ -539,7 +545,13 @@ struct LibraryPage {
     if (eventType === TouchType.Up) {
       this.clearLongPressTimer()
       if (!this.cardLongPressed && !this.cardTouchMoved) {
-        this.openGame(item)
+        // 双折态/三折态：点击显示详情
+        if (this.currentFoldMode === 'dual' || this.currentFoldMode === 'triple') {
+          this.selectedGameForDetail = item
+        } else {
+          // 单折态：直接启动游戏
+          this.openGame(item)
+        }
       }
       this.cardLongPressed = false
       this.cardTouchMoved = false
@@ -572,6 +584,10 @@ struct LibraryPage {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryPage', 'Delete', `删除文件失败: ${message}`)
+      // 使用错误码提供具体错误信息
+      const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_WRITE_ERROR.numericCode)
+      this.showToastMessage(userMsg)
+      return
     }
     if (!this.isCurrentPageAction(actionToken)) {
       return
@@ -650,6 +666,12 @@ struct LibraryPage {
   }
 
   private openDetails(item: LibraryRecord): void {
+    // 双折态/三折态：在右侧显示详情，不跳转
+    if (this.currentFoldMode === 'dual' || this.currentFoldMode === 'triple') {
+      this.selectedGameForDetail = item
+      return
+    }
+    // 单折态：跳转到详情页
     setPendingLibraryDetailRequest({
       romFile: item.romFile
     })
@@ -662,6 +684,34 @@ struct LibraryPage {
       LogHelper.error('LibraryPage', 'Route', `跳转详情页失败: ${err.message}`)
       this.showToastMessage('详情页打开失败 DETAIL_ROUTE_FAIL')
     })
+  }
+
+  // 折叠态检测：根据屏幕宽高比判断折叠态
+  private detectFoldMode(width: number, height: number): void {
+    if (width <= 0 || height <= 0) {
+      return
+    }
+    const aspectRatio = width / height
+    // 折叠态判断阈值（基于华为折叠屏设备实测数据）
+    // 单折态（竖屏）：宽高比 < 1.2
+    // 双折态（半展开）：1.2 <= 宽高比 < 2.0
+    // 三折态（全展开）：宽高比 >= 2.0
+    let newMode: 'single' | 'dual' | 'triple' = 'single'
+    if (aspectRatio >= 2.0) {
+      newMode = 'triple'
+    } else if (aspectRatio >= 1.2) {
+      newMode = 'dual'
+    } else {
+      newMode = 'single'
+    }
+    if (newMode !== this.currentFoldMode) {
+      LogHelper.info('LibraryPage', 'Foldable', `折叠态切换: ${this.currentFoldMode} -> ${newMode} (${width}x${height}, AR=${aspectRatio.toFixed(2)})`)
+      this.currentFoldMode = newMode
+      // 切换到单折态时清除详情选择
+      if (newMode === 'single') {
+        this.selectedGameForDetail = undefined
+      }
+    }
   }
 
   private deleteFromContext(): void {
@@ -796,7 +846,12 @@ struct LibraryPage {
         this.searchKeyword = item.title
         this.recomputeFilteredCaches()
         this.hideSearchResults()
-        this.openGame(item)
+        // 双折态/三折态：显示详情
+        if (this.currentFoldMode === 'dual' || this.currentFoldMode === 'triple') {
+          this.selectedGameForDetail = item
+        } else {
+          this.openGame(item)
+        }
       },
       onPlatformChange: (value: string) => {
         this.selectedPlatform = value
@@ -853,6 +908,217 @@ struct LibraryPage {
   }
 
   @Builder
+  private GameDetailPanel() {
+    if (!this.selectedGameForDetail) {
+      this.EmptyGameDetailPanel()
+    } else {
+      ForEach(this.getSelectedGameDetailItems(), (game: LibraryRecord) => {
+        this.SelectedGameDetailPanel(game)
+      }, (game: LibraryRecord) => game.id)
+    }
+  }
+
+  @Builder
+  private EmptyGameDetailPanel() {
+    // 空状态：提示选择游戏
+    Column() {
+      Text('选择游戏查看详情')
+        .fontSize(14)
+        .fontColor('#666666')
+        .fontFamily('monospace')
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .backgroundColor('#0A0A0A')
+  }
+
+  @Builder
+  private SelectedGameDetailPanel(game: LibraryRecord) {
+    Column({ space: 16 }) {
+      // 封面区域
+      Stack() {
+        Column()
+          .width('100%')
+          .height(200)
+          .backgroundColor(game.coverColor || this.coverPalette[0])
+          .borderRadius(8)
+
+        if (game.coverKey && game.coverKey.length > 0) {
+          Image($r(`app.media.${game.coverKey}`))
+            .width('100%')
+            .height(200)
+            .objectFit(ImageFit.Cover)
+            .borderRadius(8)
+        }
+      }
+
+      // 标题与平台
+      Column({ space: 8 }) {
+        Text(game.title)
+          .fontSize(18)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurface)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+        Text(game.platform)
+          .fontSize(12)
+          .fontColor(EmuColors.primary)
+          .fontFamily('monospace')
+          .letterSpacing(1.2)
+      }
+      .width('100%')
+      .alignItems(HorizontalAlign.Start)
+
+      // 元数据
+      Column({ space: 12 }) {
+        if (game.fileName.length > 0) {
+          this.DetailRow('文件名', game.fileName)
+        }
+        if (game.preferredCoreId.length > 0) {
+          this.DetailRow('核心', game.preferredCoreId)
+        }
+        if (this.getGamePlayTimeText(game).length > 0) {
+          this.DetailRow('游玩时长', this.getGamePlayTimeText(game))
+        }
+      }
+      .width('100%')
+
+      // 操作按钮
+      Column({ space: 12 }) {
+        Button('启动游戏')
+          .width('100%')
+          .height(44)
+          .fontSize(14)
+          .fontWeight(FontWeight.Bold)
+          .backgroundColor(EmuColors.primary)
+          .fontColor('#000000')
+          .onClick(() => {
+            this.openGame(game)
+          })
+
+        Button('查看完整详情')
+          .width('100%')
+          .height(44)
+          .fontSize(14)
+          .backgroundColor('#1A1A1A')
+          .fontColor(EmuColors.primary)
+          .border({ width: 1, color: EmuColors.primary })
+          .onClick(() => {
+            setPendingLibraryDetailRequest({
+              romFile: game.romFile
+            })
+            this.getUIContext().getRouter().pushUrl({
+              url: 'pages/LibraryDetailPage',
+              params: {
+                romFile: game.romFile
+              }
+            }).catch((err: Error) => {
+              LogHelper.error('LibraryPage', 'Route', `跳转详情页失败: ${err.message}`)
+            })
+          })
+      }
+      .width('100%')
+      .margin({ top: 12 })
+    }
+    .width('100%')
+    .height('100%')
+    .padding(24)
+    .backgroundColor('#0A0A0A')
+    .border({ width: { left: 0.5 }, color: '#333333' })
+  }
+
+  private getGamePlayTimeText(game: LibraryRecord): string {
+    const items: LibraryRecord[] = [game]
+    if (!hasLibraryTelemetryData(items)) {
+      return ''
+    }
+    const cells = getLibraryTelemetryCells(items)
+    if (cells.length === 0) {
+      return ''
+    }
+    return cells[0].value
+  }
+
+  private getSelectedGameDetailItems(): LibraryRecord[] {
+    const items: LibraryRecord[] = []
+    if (!this.selectedGameForDetail) {
+      return items
+    }
+    items.push(this.selectedGameForDetail)
+    return items
+  }
+
+  @Builder
+  private DetailRow(label: string, value: string) {
+    Row() {
+      Text(label)
+        .fontSize(11)
+        .fontColor('#666666')
+        .fontFamily('monospace')
+        .width(80)
+
+      Text(value)
+        .fontSize(11)
+        .fontColor(EmuColors.onSurface)
+        .fontFamily('monospace')
+        .layoutWeight(1)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .alignItems(VerticalAlign.Top)
+  }
+
+  @Builder
+  private PlatformFilterPanel() {
+    Column({ space: 12 }) {
+      Text('平台筛选')
+        .fontSize(12)
+        .fontColor(EmuColors.primary)
+        .fontFamily('monospace')
+        .letterSpacing(1.2)
+        .margin({ bottom: 8 })
+
+      Column({ space: 8 }) {
+        ForEach(this.getPlatformFilterItems(), (platform: string) => {
+          Row() {
+            Text(platform === 'ALL' ? '全部' : platform)
+              .fontSize(13)
+              .fontColor(this.selectedPlatform === platform ? EmuColors.primary : '#666666')
+              .fontWeight(this.selectedPlatform === platform ? FontWeight.Bold : FontWeight.Normal)
+          }
+          .width('100%')
+          .height(36)
+          .padding({ left: 12, right: 12 })
+          .backgroundColor(this.selectedPlatform === platform ? '#1A1A1A' : 'transparent')
+          .borderRadius(4)
+          .onClick(() => {
+            this.selectedPlatform = platform
+            this.recomputeFilteredCaches()
+          })
+        }, (platform: string) => platform)
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .height('100%')
+    .padding(16)
+    .backgroundColor('#0A0A0A')
+    .border({ width: { right: 0.5 }, color: '#333333' })
+  }
+
+  private getPlatformFilterItems(): string[] {
+    const items: string[] = ['ALL']
+    for (let index = 0; index < this.cachedDisplayPlatformFilters.length; index += 1) {
+      items.push(this.cachedDisplayPlatformFilters[index])
+    }
+    return items
+  }
+
+  @Builder
   private SuccessToast() {
     Row({ space: 8 }) {
       Row()
@@ -889,17 +1155,68 @@ struct LibraryPage {
         })
 
         Row() {
-          Column() {
-            this.MainContent()
+          // 根据折叠态选择布局
+          if (this.currentFoldMode === 'single') {
+            // 单折态：单栏布局
+            Column() {
+              this.MainContent()
+            }
+            .width('100%')
+            .height('100%')
+            .constraintSize({ maxWidth: 460 })
+          } else if (this.currentFoldMode === 'dual') {
+            // 双折态：左侧游戏列表（40%），右侧游戏详情（60%）
+            Row() {
+              Column() {
+                this.MainContent()
+              }
+              .width('40%')
+              .height('100%')
+
+              Column() {
+                this.GameDetailPanel()
+              }
+              .width('60%')
+              .height('100%')
+            }
+            .width('100%')
+            .height('100%')
+          } else {
+            // 三折态：左侧平台筛选（20%），中间游戏列表（50%），右侧游戏详情（30%）
+            Row() {
+              Column() {
+                this.PlatformFilterPanel()
+              }
+              .width('20%')
+              .height('100%')
+
+              Column() {
+                this.MainContent()
+              }
+              .width('50%')
+              .height('100%')
+
+              Column() {
+                this.GameDetailPanel()
+              }
+              .width('30%')
+              .height('100%')
+            }
+            .width('100%')
+            .height('100%')
           }
-          .width('100%')
-          .height('100%')
-          .constraintSize({ maxWidth: 460 })
         }
         .layoutWeight(1)
         .width('100%')
-        .padding({ left: 24, right: 24 })
+        .padding({ left: this.currentFoldMode === 'single' ? 24 : 0, right: this.currentFoldMode === 'single' ? 24 : 0 })
         .justifyContent(FlexAlign.Center)
+        .onAreaChange((oldValue: Area, newValue: Area) => {
+          const width = Number(newValue.width)
+          const height = Number(newValue.height)
+          if (width > 0 && height > 0) {
+            this.detectFoldMode(width, height)
+          }
+        })
 
         EmuBottomNav({
           items: this.navItems,

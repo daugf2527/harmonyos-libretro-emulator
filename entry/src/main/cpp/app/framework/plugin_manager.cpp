@@ -214,43 +214,35 @@ static bool ResolvePortForDevice(const std::string &deviceId,
   return inputMgr->ResolvePortForDevice(deviceId, sourceType, outPort);
 }
 
+std::mutex &KeyMappingMutex() {
+  static std::mutex *m = new std::mutex();
+  return *m;
+}
+
+std::unordered_map<int, int> &KeyMappingTable() {
+  static std::unordered_map<int, int> *m = new std::unordered_map<int, int>({
+    {static_cast<int>(KEY_DPAD_UP),    RETRO_DEVICE_ID_JOYPAD_UP},
+    {static_cast<int>(KEY_DPAD_DOWN),  RETRO_DEVICE_ID_JOYPAD_DOWN},
+    {static_cast<int>(KEY_DPAD_LEFT),  RETRO_DEVICE_ID_JOYPAD_LEFT},
+    {static_cast<int>(KEY_DPAD_RIGHT), RETRO_DEVICE_ID_JOYPAD_RIGHT},
+    {static_cast<int>(KEY_ENTER),      RETRO_DEVICE_ID_JOYPAD_START},
+    {static_cast<int>(KEY_SPACE),      RETRO_DEVICE_ID_JOYPAD_SELECT},
+    {static_cast<int>(KEY_ESCAPE),     RETRO_DEVICE_ID_JOYPAD_B},
+    {static_cast<int>(KEY_Z),          RETRO_DEVICE_ID_JOYPAD_B},
+    {static_cast<int>(KEY_X),          RETRO_DEVICE_ID_JOYPAD_A},
+    {static_cast<int>(KEY_A),          RETRO_DEVICE_ID_JOYPAD_Y},
+    {static_cast<int>(KEY_S),          RETRO_DEVICE_ID_JOYPAD_X},
+  });
+  return *m;
+}
+
 static bool MapKeyCodeToJoypad(OH_NativeXComponent_KeyCode code, int &outId) {
-  switch (code) {
-  case KEY_DPAD_UP:
-    outId = RETRO_DEVICE_ID_JOYPAD_UP;
+  std::lock_guard<std::mutex> lock(KeyMappingMutex());
+  const auto &table = KeyMappingTable();
+  auto it = table.find(static_cast<int>(code));
+  if (it != table.end()) {
+    outId = it->second;
     return true;
-  case KEY_DPAD_DOWN:
-    outId = RETRO_DEVICE_ID_JOYPAD_DOWN;
-    return true;
-  case KEY_DPAD_LEFT:
-    outId = RETRO_DEVICE_ID_JOYPAD_LEFT;
-    return true;
-  case KEY_DPAD_RIGHT:
-    outId = RETRO_DEVICE_ID_JOYPAD_RIGHT;
-    return true;
-  case KEY_ENTER:
-    outId = RETRO_DEVICE_ID_JOYPAD_START;
-    return true;
-  case KEY_SPACE:
-    outId = RETRO_DEVICE_ID_JOYPAD_SELECT;
-    return true;
-  case KEY_ESCAPE:
-    outId = RETRO_DEVICE_ID_JOYPAD_B;
-    return true;
-  case KEY_Z:
-    outId = RETRO_DEVICE_ID_JOYPAD_B;
-    return true;
-  case KEY_X:
-    outId = RETRO_DEVICE_ID_JOYPAD_A;
-    return true;
-  case KEY_A:
-    outId = RETRO_DEVICE_ID_JOYPAD_Y;
-    return true;
-  case KEY_S:
-    outId = RETRO_DEVICE_ID_JOYPAD_X;
-    return true;
-  default:
-    break;
   }
   return false;
 }
@@ -728,4 +720,12 @@ bool PluginManager::GetNewArchInputStats(NewArchInputStats &out) const {
   out.lastMouseAction = LastMouseAction().load();
   out.lastKeyAction = LastKeyAction().load();
   return true;
+}
+
+void UpdateInputKeyMapping(const std::unordered_map<int, int> &mappings) {
+  std::lock_guard<std::mutex> lock(KeyMappingMutex());
+  auto &table = KeyMappingTable();
+  table = mappings;
+  LOGF(LOG_INFO, "UpdateInputKeyMapping: %{public}zu entries applied",
+       mappings.size());
 }

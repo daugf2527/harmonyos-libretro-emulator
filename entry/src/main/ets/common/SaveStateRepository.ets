@@ -162,9 +162,9 @@ async function loadManifest(context: common.UIAbilityContext): Promise<SaveState
     if (!text || text.length === 0) {
       return createEmptyManifest()
     }
-    const parsed = JSON.parse(text) as SaveStateManifestDocument
+    const parsed = JSON.parse(text) as Partial<SaveStateManifestDocument> | null
     const items: SaveStateManifestItem[] = []
-    if (parsed.items) {
+    if (parsed?.items) {
       parsed.items.forEach((item: SaveStateManifestItem) => {
         items.push(normalizeManifestItem(item))
       })

@@ -1,4 +1,4 @@
-import hilog from '@ohos.hilog';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 
 export default class LogHelper {
   static info(tag: string, flow: string, message: string, domain: number = 0xD003): void {

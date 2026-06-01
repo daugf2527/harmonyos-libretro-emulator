@@ -101,7 +101,7 @@ export async function loadInputLayoutProfile(context: common.UIAbilityContext): 
     if (!text || text.length === 0) {
       return createDefaultInputLayoutProfile()
     }
-    const parsed = JSON.parse(text) as InputLayoutProfile
+    const parsed = JSON.parse(text) as Partial<InputLayoutProfile> | null
     return normalizeProfile(parsed)
   } catch (err) {
     const message = (err as Error).message || String(err)
@@ -146,9 +146,9 @@ export async function resetInputLayoutProfile(context: common.UIAbilityContext):
   return await saveInputLayoutProfile(context, profile)
 }
 
-function normalizeProfile(profile: InputLayoutProfile): InputLayoutProfile {
+function normalizeProfile(profile: Partial<InputLayoutProfile> | null | undefined): InputLayoutProfile {
   const buttons: InputLayoutButton[] = []
-  if (profile.buttons) {
+  if (profile?.buttons) {
     profile.buttons.forEach((button: InputLayoutButton) => {
       buttons.push(normalizeButton(button))
     })
@@ -158,13 +158,13 @@ function normalizeProfile(profile: InputLayoutProfile): InputLayoutProfile {
   }
   return {
     version: INPUT_LAYOUT_VERSION,
-    mode: normalizeText(profile.mode, 'RETRO_PAD_TOUCH'),
-    updatedAt: normalizeNumber(profile.updatedAt),
+    mode: normalizeText(profile?.mode, 'RETRO_PAD_TOUCH'),
+    updatedAt: normalizeNumber(profile?.updatedAt),
     buttons: buttons
   }
 }
 
-function normalizeButton(button: InputLayoutButton): InputLayoutButton {
+function normalizeButton(button: Partial<InputLayoutButton>): InputLayoutButton {
   const safeId = normalizeText(button.id, 'button')
   const fallbackRetroId = getDefaultRetroButtonId(safeId)
   return {
@@ -206,7 +206,7 @@ function localizeButtonLabel(buttonId: string, rawLabel: string): string {
   return rawLabel
 }
 
-function normalizeRetroButtonId(value: number, fallback: number): number {
+function normalizeRetroButtonId(value: number | undefined, fallback: number): number {
   if (!Number.isFinite(value)) {
     return fallback
   }
@@ -217,14 +217,14 @@ function normalizeRetroButtonId(value: number, fallback: number): number {
   return intValue
 }
 
-function normalizeText(value: string, fallback: string): string {
+function normalizeText(value: string | undefined, fallback: string): string {
   if (!value || value.trim().length === 0) {
     return fallback
   }
   return value.trim()
 }
 
-function normalizeNumber(value: number): number {
+function normalizeNumber(value: number | undefined): number {
   if (!Number.isFinite(value)) {
     return 0
   }

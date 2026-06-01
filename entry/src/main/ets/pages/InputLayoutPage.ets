@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit'
+import { display } from '@kit.ArkUI'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { EmuIcon } from '../components/EmuIcon'
@@ -51,6 +52,7 @@ struct InputLayoutPage {
   @State private selectedButtonId: string = 'a'
   @State private layoutStatusText: string = 'LOCAL_LAYOUT_READY'
   @State private layoutUpdatedAtText: string = 'NOT_SAVED'
+  @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
   private savedToastTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0
@@ -59,6 +61,9 @@ struct InputLayoutPage {
   private readonly editorLayoutWidth: number = 440
   private readonly editorLayoutHeight: number = 340
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('input')
+  private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    this.detectFoldMode()
+  }
   private readonly controllerCards: ControllerCardItem[] = [
     {
       id: 'p1',
@@ -92,12 +97,15 @@ struct InputLayoutPage {
 
   aboutToAppear(): void {
     this.pageActive = true
+    display.on('foldStatusChange', this.foldStatusListener)
+    this.detectFoldMode()
     void this.loadSavedLayout()
   }
 
   aboutToDisappear(): void {
     this.pageActive = false
     this.pageTaskToken += 1
+    display.off('foldStatusChange', this.foldStatusListener)
     if (this.savedToastTimer !== -1) {
       clearTimeout(this.savedToastTimer)
       this.savedToastTimer = -1
@@ -119,6 +127,27 @@ struct InputLayoutPage {
       return undefined
     }
     return context
+  }
+
+  private detectFoldMode(): void {
+    try {
+      const foldStatus = display.getFoldStatus()
+      const displayClass = display.getFoldDisplayMode()
+
+      // 根据折叠状态和显示模式判断折叠态
+      if (foldStatus === display.FoldStatus.FOLD_STATUS_FOLDED) {
+        this.currentFoldMode = 'single'
+      } else if (foldStatus === display.FoldStatus.FOLD_STATUS_HALF_FOLDED) {
+        this.currentFoldMode = 'dual'
+      } else if (displayClass === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
+        this.currentFoldMode = 'triple'
+      } else {
+        this.currentFoldMode = 'dual'
+      }
+    } catch (err) {
+      // 非折叠屏设备，默认单折态
+      this.currentFoldMode = 'single'
+    }
   }
 
   private async loadSavedLayout(): Promise<void> {
@@ -560,6 +589,317 @@ struct InputLayoutPage {
     .scrollBar(BarState.Off)
   }
 
+  // 单折态布局 (F态) - 保持现有垂直布局
+  @Builder
+  private SingleFoldLayout() {
+    if (this.isEditorMode()) {
+      this.EditorContent()
+    } else {
+      this.InputCenterContent()
+    }
+  }
+
+  // 双折态布局 (M态) - 左侧按钮列表 30%，右侧预览+编辑 70%
+  @Builder
+  private DualFoldLayout() {
+    Row() {
+      // 左侧：按钮列表 (30%)
+      Column({ space: 14 }) {
+        Text('输入设备')
+          .fontSize(EmuTypography.lg)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurface)
+          .padding({ left: 16, top: 16 })
+
+        Scroll() {
+          Column({ space: 14 }) {
+            ForEach(this.controllerCards, (item: ControllerCardItem) => {
+              this.ControllerCard(item)
+            }, (item: ControllerCardItem) => item.id)
+
+            this.NetplaySection()
+          }
+          .padding({ left: 16, right: 16, bottom: 16 })
+        }
+        .layoutWeight(1)
+        .scrollBar(BarState.Auto)
+      }
+      .width('30%')
+      .height('100%')
+      .backgroundColor(EmuColors.surfaceContainerLowest)
+      .border({ width: { right: 1 }, color: EmuMetrics.panelBorderColor, style: BorderStyle.Solid })
+
+      // 右侧：预览区 + 编辑面板 (70%)
+      Column() {
+        if (this.isEditorMode()) {
+          this.EditorContent()
+        } else {
+          // 非编辑模式显示提示
+          Column({ space: 16 }) {
+            EmuIcon({ name: 'settings_input_component', iconSize: 64, tone: 'muted' })
+            Text('点击右上角图标进入编辑模式')
+              .fontSize(EmuTypography.lg)
+              .fontColor(EmuColors.onSurfaceVariant)
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
+        }
+      }
+      .width('70%')
+      .height('100%')
+    }
+    .width('100%')
+    .layoutWeight(1)
+  }
+
+  // 三折态布局 (G态) - 左侧按钮列表 20%，中间预览区 50%，右侧属性编辑 30%
+  @Builder
+  private TripleFoldLayout() {
+    Row() {
+      // 左侧：按钮列表 (20%)
+      Column({ space: 14 }) {
+        Text('输入设备')
+          .fontSize(EmuTypography.md)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurface)
+          .padding({ left: 12, top: 12 })
+
+        Scroll() {
+          Column({ space: 12 }) {
+            ForEach(this.controllerCards, (item: ControllerCardItem) => {
+              this.CompactControllerCard(item)
+            }, (item: ControllerCardItem) => item.id)
+          }
+          .padding({ left: 12, right: 12, bottom: 12 })
+        }
+        .layoutWeight(1)
+        .scrollBar(BarState.Auto)
+      }
+      .width('20%')
+      .height('100%')
+      .backgroundColor(EmuColors.surfaceContainerLowest)
+      .border({ width: { right: 1 }, color: EmuMetrics.panelBorderColor, style: BorderStyle.Solid })
+
+      // 中间：预览区 (50%)
+      Column() {
+        if (this.isEditorMode()) {
+          Stack() {
+            EmuPrecisionGridBackdrop()
+              .opacity(0.08)
+
+            Column()
+              .width('100%')
+              .height('100%')
+              .linearGradient({
+                angle: 135,
+                colors: [[0x332D6C5A, 0.0], [0x11131313, 0.48], [0xDD000000, 1.0]]
+              })
+
+            Column() {
+              this.EditableButtonLayer()
+            }
+            .width('100%')
+            .height('100%')
+            .padding(24)
+            .justifyContent(FlexAlign.Center)
+
+            this.CalibrationMarkers()
+
+            if (this.savedToastVisible) {
+              Text('INPUT_LAYOUT_SAVED')
+                .fontSize(EmuTypography.xs)
+                .fontWeight(FontWeight.Bold)
+                .fontColor('#004C0C')
+                .letterSpacing(1.4)
+                .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+                .backgroundColor(EmuColors.primary)
+                .borderRadius(999)
+                .align(Alignment.Top)
+                .margin({ top: 26 })
+            }
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .backgroundColor(Color.Black)
+        } else {
+          Column({ space: 16 }) {
+            EmuIcon({ name: 'settings_input_component', iconSize: 64, tone: 'muted' })
+            Text('点击右上角图标进入编辑模式')
+              .fontSize(EmuTypography.lg)
+              .fontColor(EmuColors.onSurfaceVariant)
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
+        }
+      }
+      .width('50%')
+      .height('100%')
+      .border({ width: { right: 1 }, color: EmuMetrics.panelBorderColor, style: BorderStyle.Solid })
+
+      // 右侧：属性编辑面板 (30%)
+      Column({ space: 16 }) {
+        Text('按钮属性')
+          .fontSize(EmuTypography.md)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurface)
+          .padding({ left: 16, top: 16 })
+
+        if (this.isEditorMode()) {
+          Scroll() {
+            Column({ space: 16 }) {
+              this.PropertyPanel()
+              this.EditorActionButtons()
+            }
+            .padding({ left: 16, right: 16, bottom: 16 })
+          }
+          .layoutWeight(1)
+          .scrollBar(BarState.Auto)
+        } else {
+          Column({ space: 12 }) {
+            Text('进入编辑模式后可调整按钮属性')
+              .fontSize(EmuTypography.sm)
+              .fontColor(EmuColors.onSurfaceVariant)
+              .textAlign(TextAlign.Center)
+          }
+          .width('100%')
+          .layoutWeight(1)
+          .justifyContent(FlexAlign.Center)
+          .padding(16)
+        }
+      }
+      .width('30%')
+      .height('100%')
+      .backgroundColor(EmuColors.surfaceContainerLowest)
+    }
+    .width('100%')
+    .layoutWeight(1)
+  }
+
+  // 紧凑型控制器卡片 (用于三折态左侧栏)
+  @Builder
+  private CompactControllerCard(item: ControllerCardItem) {
+    Column({ space: 8 }) {
+      Row({ space: 6 }) {
+        Row()
+          .width(4)
+          .height(4)
+          .borderRadius(2)
+          .backgroundColor(item.status === 'READY' ? EmuColors.primary : EmuColors.outline)
+
+        Text(item.label)
+          .fontSize(10)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(1.2)
+      }
+      .alignItems(VerticalAlign.Center)
+
+      Text(item.name)
+        .fontSize(EmuTypography.sm)
+        .fontWeight(FontWeight.Medium)
+        .fontColor(EmuColors.onSurface)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+      Text(item.status)
+        .fontSize(10)
+        .fontColor(item.status === 'READY' ? EmuColors.primary : EmuColors.onSurfaceVariant)
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor(EmuColors.surfaceContainer)
+    .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
+    .alignItems(HorizontalAlign.Start)
+  }
+
+  // 属性编辑面板 (用于三折态右侧栏)
+  @Builder
+  private PropertyPanel() {
+    Column({ space: 12 }) {
+      this.PropertyRow('Resolution', `${this.editorLayoutWidth} X ${this.editorLayoutHeight}`)
+      this.PropertyRow('Latency', 'INPUT_QUEUE')
+      this.PropertyRow('Input Poll', this.layoutStatusText)
+      this.PropertyRow('Selected', this.selectedButtonId.toUpperCase())
+
+      Column({ space: 8 }) {
+        Text('Mapped')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
+
+        Select(this.getRetroSelectOptions())
+          .selected(this.getRetroOptionIndex())
+          .value(`RETRO_${this.getCurrentRetroLabel()}`)
+          .font({ size: 11 })
+          .selectedOptionFont({ size: 11 })
+          .optionFont({ size: 11 })
+          .optionWidth(200)
+          .fontColor(EmuColors.onSurface)
+          .backgroundColor('#22484848')
+          .borderRadius(4)
+          .height(32)
+          .width('100%')
+          .onSelect((index: number) => {
+            const opt = RETRO_BUTTON_OPTIONS[index]
+            if (opt) {
+              this.setSelectedButtonRetroId(opt.retroButtonId)
+            }
+          })
+      }
+      .width('100%')
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor('#22000000')
+    .border({ width: 0.5, color: '#55484848', style: BorderStyle.Solid })
+  }
+
+  @Builder
+  private PropertyRow(label: string, value: string) {
+    Row() {
+      Text(label)
+        .fontSize(EmuTypography.xs)
+        .fontColor(EmuColors.onSurfaceVariant)
+      Text(value)
+        .fontSize(EmuTypography.xs)
+        .fontColor(value === 'INPUT_QUEUE' || value === this.selectedButtonId.toUpperCase() ? EmuColors.primary : EmuColors.onSurface)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+    }
+    .width('100%')
+    .justifyContent(FlexAlign.SpaceBetween)
+  }
+
+  // 编辑操作按钮 (用于三折态右侧栏)
+  @Builder
+  private EditorActionButtons() {
+    Column({ space: 12 }) {
+      Button('保存布局')
+        .width('100%')
+        .height(44)
+        .fontSize(EmuTypography.md)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#004C0C')
+        .backgroundColor(EmuColors.primary)
+        .onClick(() => {
+          void this.saveCurrentLayout()
+        })
+
+      Button('重置布局')
+        .width('100%')
+        .height(44)
+        .fontSize(EmuTypography.md)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .backgroundColor(EmuColors.surfaceContainerHigh)
+        .onClick(() => {
+          void this.resetCurrentLayout()
+        })
+    }
+    .width('100%')
+  }
+
   @Builder
   private EditorTelemetry() {
     Column({ space: 8 }) {
@@ -980,13 +1320,16 @@ struct InputLayoutPage {
         })
       }
 
-      if (this.isEditorMode()) {
-        this.EditorContent()
+      // 根据折叠态渲染不同布局
+      if (this.currentFoldMode === 'single') {
+        this.SingleFoldLayout()
+      } else if (this.currentFoldMode === 'dual') {
+        this.DualFoldLayout()
       } else {
-        this.InputCenterContent()
+        this.TripleFoldLayout()
       }
 
-      if (!this.isEditorMode()) {
+      if (!this.isEditorMode() && this.currentFoldMode === 'single') {
         EmuBottomNav({
           items: this.navItems,
           activeFontColor: EmuColors.primary,

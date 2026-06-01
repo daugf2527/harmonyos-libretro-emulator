@@ -3,9 +3,7 @@
 static napi_value GetSaveStateSize(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t size = GetEngine()->GetSaveStateSize();
-  napi_value result;
-  napi_create_int64(env, static_cast<int64_t>(size), &result);
-  return result;
+  return MakeInt64(env, static_cast<int64_t>(size));
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -42,13 +40,15 @@ static void CompleteGetSaveStateSizeAsync(napi_env env, napi_status status, void
     return;
   }
   if (status != napi_ok) {
-    napi_value reason;
-    napi_get_undefined(env, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
   } else {
-    napi_value result;
-    napi_create_int64(env, static_cast<int64_t>(ctx->size), &result);
-    napi_resolve_deferred(env, ctx->deferred, result);
+    napi_value result = MakeInt64(env, static_cast<int64_t>(ctx->size));
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
   }
   if (ctx->work) {
     napi_delete_async_work(env, ctx->work);
@@ -65,16 +65,24 @@ static napi_value GetSaveStateSizeAsync(napi_env env, napi_callback_info info) {
     delete ctx;
     return nullptr;
   }
-  napi_value resourceName;
-  napi_create_string_utf8(env, "GetSaveStateSizeAsync", NAPI_AUTO_LENGTH, &resourceName);
+  napi_value resourceName = MakeString(env, "GetSaveStateSizeAsync");
+  if (!resourceName) {
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
   napi_status createStatus = napi_create_async_work(
       env, nullptr, resourceName, ExecuteGetSaveStateSizeAsync,
       CompleteGetSaveStateSizeAsync, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] GetSaveStateSizeAsync create work failed");
-    napi_value reason;
-    napi_create_string_utf8(env, "async_work_create_failed", NAPI_AUTO_LENGTH, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
     delete ctx;
     return promise;
   }
@@ -83,9 +91,10 @@ static napi_value GetSaveStateSizeAsync(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] GetSaveStateSizeAsync queue work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value reason;
-    napi_create_string_utf8(env, "async_work_queue_failed", NAPI_AUTO_LENGTH, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
     delete ctx;
     return promise;
   }
@@ -98,21 +107,23 @@ static napi_value SaveState(napi_env env, napi_callback_info info) {
   std::vector<uint8_t> data;
   bool ok = GetEngine()->SaveState(data);
   if (!ok || data.empty()) {
-    napi_value result;
-    napi_get_null(env, &result);
-    return result;
+    auto errorInfo = GetEngine()->GetLastErrorInfo();
+    const char *message = errorInfo.message.empty()
+        ? "Save state failed"
+        : errorInfo.message.c_str();
+
+    // 错误码 3031: SAVE_STATE_SAVE_FAILED
+    LOGF(LOG_ERROR, "[NEW] SaveState failed: %{public}s", message);
+    return MakeErrorResult(env, false, 3031, message);
   }
-  void *bufferData = nullptr;
-  napi_value arrayBuffer;
-  if (napi_create_arraybuffer(env, data.size(), &bufferData, &arrayBuffer) !=
-          napi_ok ||
-      !bufferData) {
+
+  // 成功时返回 ArrayBuffer（保持向后兼容）
+  napi_value arrayBuffer =
+      MakeArrayBufferFromBytes(env, data.data(), data.size());
+  if (!arrayBuffer) {
     LOGF(LOG_ERROR, "[NEW] SaveState failed to allocate ArrayBuffer");
-    napi_value result;
-    napi_get_null(env, &result);
-    return result;
+    return MakeErrorResult(env, false, 3031, "Failed to allocate ArrayBuffer");
   }
-  std::memcpy(bufferData, data.data(), data.size());
   return arrayBuffer;
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -144,21 +155,14 @@ static napi_value GetSRAM(napi_env env, napi_callback_info info) {
   std::vector<uint8_t> data;
   bool ok = GetEngine()->GetSRAM(data);
   if (!ok || data.empty()) {
-    napi_value result;
-    napi_get_null(env, &result);
-    return result;
+    return MakeNull(env);
   }
-  void *bufferData = nullptr;
-  napi_value arrayBuffer;
-  if (napi_create_arraybuffer(env, data.size(), &bufferData, &arrayBuffer) !=
-          napi_ok ||
-      !bufferData) {
+  napi_value arrayBuffer =
+      MakeArrayBufferFromBytes(env, data.data(), data.size());
+  if (!arrayBuffer) {
     LOGF(LOG_ERROR, "[NEW] GetSRAM failed to allocate ArrayBuffer");
-    napi_value result;
-    napi_get_null(env, &result);
-    return result;
+    return MakeNull(env);
   }
-  std::memcpy(bufferData, data.data(), data.size());
   return arrayBuffer;
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -230,9 +234,7 @@ static napi_value CheatSet(napi_env env, napi_callback_info info) {
 static napi_value GetCoreOptions(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   std::string j = GetEngine()->GetCoreOptionsJson();
-  napi_value result;
-  napi_create_string_utf8(env, j.c_str(), NAPI_AUTO_LENGTH, &result);
-  return result;
+  return MakeString(env, j);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -291,26 +293,26 @@ static void CompleteSaveStateAsync(napi_env env, napi_status status, void *data)
 
   // Audit T1-F2: cancel guard first; logical failures reject so ArkTS .catch() is reachable
   if (status != napi_ok) {
-    napi_value reason;
-    napi_get_undefined(env, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
   } else if (!ctx->ok || ctx->data.empty()) {
-    napi_value reason;
-    napi_create_string_utf8(env, "SaveState failed", NAPI_AUTO_LENGTH, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeString(env, "SaveState failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
   } else {
-    void *bufferData = nullptr;
-    napi_value arrayBuffer;
-    if (napi_create_arraybuffer(env, ctx->data.size(), &bufferData, &arrayBuffer) ==
-            napi_ok &&
-        bufferData) {
-      std::memcpy(bufferData, ctx->data.data(), ctx->data.size());
-      napi_resolve_deferred(env, ctx->deferred, arrayBuffer);
+    napi_value arrayBuffer =
+        MakeArrayBufferFromBytes(env, ctx->data.data(), ctx->data.size());
+    if (arrayBuffer) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, arrayBuffer);
     } else {
       LOGF(LOG_ERROR, "[NEW] SaveStateAsync failed to allocate ArrayBuffer");
-      napi_value reason;
-      napi_create_string_utf8(env, "SaveState ArrayBuffer alloc failed", NAPI_AUTO_LENGTH, &reason);
-      napi_reject_deferred(env, ctx->deferred, reason);
+      napi_value reason = MakeString(env, "SaveState ArrayBuffer alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -332,17 +334,25 @@ static napi_value SaveStateAsync(napi_env env, napi_callback_info info) {
     return nullptr;
   }
 
-  napi_value resourceName;
-  napi_create_string_utf8(env, "SaveStateAsync", NAPI_AUTO_LENGTH, &resourceName);
+  napi_value resourceName = MakeString(env, "SaveStateAsync");
+  if (!resourceName) {
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
 
   napi_status createStatus = napi_create_async_work(
       env, nullptr, resourceName, ExecuteSaveStateAsync,
       CompleteSaveStateAsync, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] SaveStateAsync create work failed");
-    napi_value reason;
-    napi_create_string_utf8(env, "async_work_create_failed", NAPI_AUTO_LENGTH, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
     delete ctx;
     return promise;
   }
@@ -352,9 +362,10 @@ static napi_value SaveStateAsync(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] SaveStateAsync queue work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value reason;
-    napi_create_string_utf8(env, "async_work_queue_failed", NAPI_AUTO_LENGTH, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
     delete ctx;
     return promise;
   }
@@ -399,16 +410,18 @@ static void CompleteLoadStateAsync(napi_env env, napi_status status, void *data)
 
   // Audit T1-F2: guard against napi_cancelled; napi_get_boolean/napi_resolve_deferred on cancelled env is UB
   if (status != napi_ok) {
-    napi_value reason;
-    napi_get_undefined(env, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
   } else {
     if (!ctx->ok) {
       LOGF(LOG_WARN, "[NEW] LoadStateAsync completed with failure: ok=false");
     }
-    napi_value result;
-    napi_get_boolean(env, ctx->ok, &result);
-    napi_resolve_deferred(env, ctx->deferred, result);
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
   }
 
   if (ctx->work) {
@@ -443,17 +456,25 @@ static napi_value LoadStateAsync(napi_env env, napi_callback_info info) {
     return nullptr;
   }
 
-  napi_value resourceName;
-  napi_create_string_utf8(env, "LoadStateAsync", NAPI_AUTO_LENGTH, &resourceName);
+  napi_value resourceName = MakeString(env, "LoadStateAsync");
+  if (!resourceName) {
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
 
   napi_status createStatus = napi_create_async_work(
       env, nullptr, resourceName, ExecuteLoadStateAsync,
       CompleteLoadStateAsync, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] LoadStateAsync create work failed");
-    napi_value reason;
-    napi_create_string_utf8(env, "async_work_create_failed", NAPI_AUTO_LENGTH, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
     delete ctx;
     return promise;
   }
@@ -463,9 +484,10 @@ static napi_value LoadStateAsync(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] LoadStateAsync queue work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value reason;
-    napi_create_string_utf8(env, "async_work_queue_failed", NAPI_AUTO_LENGTH, &reason);
-    napi_reject_deferred(env, ctx->deferred, reason);
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
     delete ctx;
     return promise;
   }

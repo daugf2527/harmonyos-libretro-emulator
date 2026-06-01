@@ -587,7 +587,7 @@ struct LibretroNewArchTestPage {
     const assignment = this.getPortAssignment(portId);
     return assignment.sourceType === InputSourceType.Virtual;
   }
-  
+
   private sendAnalog(index: number, x: number, y: number) {
     if (!this.isVirtualPortActive(this.selectedPortIndex)) {
       return;
@@ -788,9 +788,21 @@ struct LibretroNewArchTestPage {
 
   parseOptionsJson(s: string): CoreOptionItem[] {
   try {
-    const arr: CoreOptionItem[] = JSON.parse(s) as CoreOptionItem[];
-    if (Array.isArray(arr)) return arr;
-    return [];
+    const arr = JSON.parse(s) as Partial<CoreOptionItem>[] | null;
+    if (!Array.isArray(arr)) return [];
+    return arr.map((item: Partial<CoreOptionItem>): CoreOptionItem => {
+      return {
+        key: String(item.key ?? ''),
+        desc: String(item.desc ?? ''),
+        value: String(item.value ?? ''),
+        values: Array.isArray(item.values) ? item.values.map((value: Partial<CoreOptionValue>): CoreOptionValue => {
+          return {
+            value: String(value.value ?? ''),
+            label: String(value.label ?? '')
+          };
+        }) : []
+      };
+    }).filter((item: CoreOptionItem) => item.key.length > 0);
   } catch (_) {
     return [];
   }

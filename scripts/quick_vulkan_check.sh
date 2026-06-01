@@ -1,8 +1,40 @@
 #!/bin/bash
 # Vulkan 快速验证脚本
-# 用于快速检查 Vulkan 是否正常工作
+#
+# 用途: 快速检查 Vulkan 是否正常工作（15 秒验证）
+#
+# 用法:
+#   bash scripts/quick_vulkan_check.sh
+#
+# 前置条件:
+#   1. 设备已连接并开启 USB 调试（hdc list targets 可见）
+#   2. 应用已安装（com.libretro.emulator）
+#   3. 已加载支持 Vulkan 的核心（如 ParaLLEl N64）
+#
+# 验证流程:
+#   1. 检查设备连接
+#   2. 检查设备 Vulkan 支持（vulkaninfo）
+#   3. 清空旧日志
+#   4. 检查应用状态（未运行则提示启动）
+#   5. 等待 Vulkan 初始化（15 秒）
+#   6. 导出日志到 vulkan_quick_check_<timestamp>.log
+#   7. 检查 Vulkan 初始化（Presenter + HW Renderer）
+#   8. 检查错误（初始化/Acquire/Present/Swapchain）
+#   9. 检查降级事件
+#   10. 总结（通过/有问题/失败）
+#
+# 退出码:
+#   0 = 验证通过或有条件通过
+#   1 = 验证失败
+#
+# 示例:
+#   # 快速验证
+#   bash scripts/quick_vulkan_check.sh
+#
+#   # 验证失败后分析详细日志
+#   bash scripts/analyze_vulkan_logs.sh vulkan_quick_check_*.log
 
-set -e
+set -euo pipefail
 
 echo "=== Vulkan 快速验证 ==="
 echo ""
@@ -90,8 +122,10 @@ echo ""
 
 # 7. 检查初始化日志
 echo "7. 检查 Vulkan 初始化..."
-PRESENTER_INIT=$(grep -c "Vulkan presenter initialized" "$LOG_FILE" || echo "0")
-HW_RENDER_INIT=$(grep -c "\[Vulkan\] Hardware Renderer Initialized" "$LOG_FILE" || echo "0")
+PRESENTER_INIT=$(grep -c "Vulkan presenter initialized" "$LOG_FILE" || true)
+HW_RENDER_INIT=$(grep -c "\[Vulkan\] Hardware Renderer Initialized" "$LOG_FILE" || true)
+PRESENTER_INIT=${PRESENTER_INIT:-0}
+HW_RENDER_INIT=${HW_RENDER_INIT:-0}
 
 if [ "$PRESENTER_INIT" -gt 0 ] && [ "$HW_RENDER_INIT" -gt 0 ]; then
     print_success "Vulkan 初始化成功"
@@ -115,10 +149,14 @@ echo ""
 
 # 8. 检查错误日志
 echo "8. 检查错误..."
-INIT_FAIL=$(grep -c "hw_vk_context_init_failed\|hw_vk_presenter_init_failed" "$LOG_FILE" || echo "0")
-ACQUIRE_FAIL=$(grep -c "hw_vk_acquire_failed" "$LOG_FILE" || echo "0")
-PRESENT_FAIL=$(grep -c "hw_vk_present_failed" "$LOG_FILE" || echo "0")
-RECREATE_FAIL=$(grep -c "Vulkan swapchain recreate failed" "$LOG_FILE" || echo "0")
+INIT_FAIL=$(grep -c "hw_vk_context_init_failed\|hw_vk_presenter_init_failed" "$LOG_FILE" || true)
+ACQUIRE_FAIL=$(grep -c "hw_vk_acquire_failed" "$LOG_FILE" || true)
+PRESENT_FAIL=$(grep -c "hw_vk_present_failed" "$LOG_FILE" || true)
+RECREATE_FAIL=$(grep -c "Vulkan swapchain recreate failed" "$LOG_FILE" || true)
+INIT_FAIL=${INIT_FAIL:-0}
+ACQUIRE_FAIL=${ACQUIRE_FAIL:-0}
+PRESENT_FAIL=${PRESENT_FAIL:-0}
+RECREATE_FAIL=${RECREATE_FAIL:-0}
 
 TOTAL_ERRORS=$((INIT_FAIL + ACQUIRE_FAIL + PRESENT_FAIL + RECREATE_FAIL))
 
@@ -144,7 +182,8 @@ echo ""
 
 # 9. 检查降级事件
 echo "9. 检查降级事件..."
-DEGRADE=$(grep -c "Render degraded to software" "$LOG_FILE" || echo "0")
+DEGRADE=$(grep -c "Render degraded to software" "$LOG_FILE" || true)
+DEGRADE=${DEGRADE:-0}
 if [ $DEGRADE -eq 0 ]; then
     print_success "无降级事件"
 else

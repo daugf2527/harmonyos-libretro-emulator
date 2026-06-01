@@ -9,32 +9,32 @@
 export enum EmulatorType {
   // 方块游戏
   GAME_2048 = '2048',
-  
+
   // 任天堂掌机
   GAME_BOY = 'gb',           // Game Boy (1989)
   GAME_BOY_COLOR = 'gbc',    // Game Boy Color (1998)
   GAME_BOY_ADVANCE = 'gba',  // Game Boy Advance (2001)
-  
+
   // 任天堂家用机
   NES = 'nes',               // Nintendo Entertainment System (1983)
   SNES = 'snes',             // Super Nintendo (1990)
   N64 = 'n64',               // Nintendo 64 (1996)
-  
+
   // 双屏掌机
   NINTENDO_DS = 'nds',       // Nintendo DS (2004)
   NINTENDO_3DS = '3ds',      // Nintendo 3DS (2011)
-  
+
   // 世嘉
   SEGA_GENESIS = 'genesis',  // Sega Genesis / Mega Drive (1988)
   SEGA_GAME_GEAR = 'gg',     // Game Gear (1990)
-  
+
   // 索尼
   PSP = 'psp',               // PlayStation Portable (2004)
   PS1 = 'ps1',               // PlayStation 1 (1994)
-  
+
   // 街机
   ARCADE = 'arcade',         // MAME / FinalBurn Neo
-  
+
   // 其他
   ATARI_2600 = 'atari2600',  // Atari 2600 (1977)
   NEO_GEO_POCKET = 'ngp',    // Neo Geo Pocket (1998)
@@ -50,16 +50,16 @@ export interface EmulatorConfig {
   fullName: string;          // 完整名称
   manufacturer: string;      // 制造商
   releaseYear: number;       // 发行年份
-  
+
   // 屏幕配置
   aspectRatio: number;       // 屏幕比例 (宽:高)
   nativeWidth: number;       // 原生分辨率宽度
   nativeHeight: number;      // 原生分辨率高度
-  
+
   // 特性标记
   dualScreen: boolean;       // 是否双屏
   touchScreen: boolean;      // 是否支持触摸屏
-  
+
   // Libretro 核心信息
   coreLibrary: string;       // 推荐的 Libretro 核心库名称
   corePath?: string;         // 核心文件路径 (可选)
@@ -83,7 +83,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: true,
     coreLibrary: 'libretro_2048.so'
   },
-  
+
   // ==================== 任天堂掌机 ====================
   [EmulatorType.GAME_BOY]: {
     id: 'gb',
@@ -98,7 +98,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'gambatte_libretro.so'
   },
-  
+
   [EmulatorType.GAME_BOY_COLOR]: {
     id: 'gbc',
     name: 'Game Boy Color',
@@ -112,7 +112,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'gambatte_libretro.so'
   },
-  
+
   [EmulatorType.GAME_BOY_ADVANCE]: {
     id: 'gba',
     name: 'GBA',
@@ -126,7 +126,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'mgba_libretro.so'
   },
-  
+
   // ==================== 任天堂家用机 ====================
   [EmulatorType.NES]: {
     id: 'nes',
@@ -141,7 +141,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'fceumm_libretro.so'
   },
-  
+
   [EmulatorType.SNES]: {
     id: 'snes',
     name: 'SNES',
@@ -155,7 +155,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'snes9x_libretro.so'
   },
-  
+
   [EmulatorType.N64]: {
     id: 'n64',
     name: 'N64',
@@ -169,7 +169,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'mupen64plus_next_libretro.so'
   },
-  
+
   // ==================== 双屏掌机 ====================
   [EmulatorType.NINTENDO_DS]: {
     id: 'nds',
@@ -184,7 +184,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: true,         // 下屏触摸
     coreLibrary: 'desmume_libretro.so'
   },
-  
+
   [EmulatorType.NINTENDO_3DS]: {
     id: '3ds',
     name: '3DS',
@@ -198,7 +198,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: true,
     coreLibrary: 'citra_libretro.so'
   },
-  
+
   // ==================== 世嘉 ====================
   [EmulatorType.SEGA_GENESIS]: {
     id: 'genesis',
@@ -213,7 +213,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'genesis_plus_gx_libretro.so'
   },
-  
+
   [EmulatorType.SEGA_GAME_GEAR]: {
     id: 'gg',
     name: 'Game Gear',
@@ -227,7 +227,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'genesis_plus_gx_libretro.so'
   },
-  
+
   // ==================== 索尼 ====================
   [EmulatorType.PSP]: {
     id: 'psp',
@@ -242,7 +242,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'ppsspp_libretro.so'
   },
-  
+
   [EmulatorType.PS1]: {
     id: 'ps1',
     name: 'PS1',
@@ -256,7 +256,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'pcsx_rearmed_libretro.so'
   },
-  
+
   // ==================== 街机 ====================
   [EmulatorType.ARCADE]: {
     id: 'arcade',
@@ -271,7 +271,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'mame_libretro.so'
   },
-  
+
   // ==================== 其他 ====================
   [EmulatorType.ATARI_2600]: {
     id: 'atari2600',
@@ -286,7 +286,7 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
     touchScreen: false,
     coreLibrary: 'stella_libretro.so'
   },
-  
+
   [EmulatorType.NEO_GEO_POCKET]: {
     id: 'ngp',
     name: 'NGP',
@@ -302,6 +302,25 @@ export const EMULATOR_CONFIGS: Record<string, EmulatorConfig> = {
   }
 };
 
+export const EMULATOR_CONFIG_LIST: EmulatorConfig[] = [
+  EMULATOR_CONFIGS[EmulatorType.GAME_2048],
+  EMULATOR_CONFIGS[EmulatorType.GAME_BOY],
+  EMULATOR_CONFIGS[EmulatorType.GAME_BOY_COLOR],
+  EMULATOR_CONFIGS[EmulatorType.GAME_BOY_ADVANCE],
+  EMULATOR_CONFIGS[EmulatorType.NES],
+  EMULATOR_CONFIGS[EmulatorType.SNES],
+  EMULATOR_CONFIGS[EmulatorType.N64],
+  EMULATOR_CONFIGS[EmulatorType.NINTENDO_DS],
+  EMULATOR_CONFIGS[EmulatorType.NINTENDO_3DS],
+  EMULATOR_CONFIGS[EmulatorType.SEGA_GENESIS],
+  EMULATOR_CONFIGS[EmulatorType.SEGA_GAME_GEAR],
+  EMULATOR_CONFIGS[EmulatorType.PSP],
+  EMULATOR_CONFIGS[EmulatorType.PS1],
+  EMULATOR_CONFIGS[EmulatorType.ARCADE],
+  EMULATOR_CONFIGS[EmulatorType.ATARI_2600],
+  EMULATOR_CONFIGS[EmulatorType.NEO_GEO_POCKET]
+];
+
 /**
  * 工具函数: 根据 ID 获取配置
  */
@@ -313,21 +332,21 @@ export function getEmulatorConfig(id: string): EmulatorConfig | undefined {
  * 工具函数: 获取所有单屏模拟器
  */
 export function getSingleScreenEmulators(): EmulatorConfig[] {
-  return Object.values(EMULATOR_CONFIGS).filter(config => !config.dualScreen);
+  return EMULATOR_CONFIG_LIST.filter(config => !config.dualScreen);
 }
 
 /**
  * 工具函数: 获取所有双屏模拟器
  */
 export function getDualScreenEmulators(): EmulatorConfig[] {
-  return Object.values(EMULATOR_CONFIGS).filter(config => config.dualScreen);
+  return EMULATOR_CONFIG_LIST.filter(config => config.dualScreen);
 }
 
 /**
  * 工具函数: 按制造商分组
  */
 export function getEmulatorsByManufacturer(manufacturer: string): EmulatorConfig[] {
-  return Object.values(EMULATOR_CONFIGS).filter(config => config.manufacturer === manufacturer);
+  return EMULATOR_CONFIG_LIST.filter(config => config.manufacturer === manufacturer);
 }
 
 /**
@@ -335,6 +354,6 @@ export function getEmulatorsByManufacturer(manufacturer: string): EmulatorConfig
  */
 export function getAllManufacturers(): string[] {
   const manufacturers = new Set<string>();
-  Object.values(EMULATOR_CONFIGS).forEach(config => manufacturers.add(config.manufacturer));
+  EMULATOR_CONFIG_LIST.forEach(config => manufacturers.add(config.manufacturer));
   return Array.from(manufacturers).sort();
 }
