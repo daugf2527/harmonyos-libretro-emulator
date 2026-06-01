@@ -110,6 +110,28 @@
 | 状态 | open |
 | 备注 | `/gc` 2026-05-29 扫描 + web verify 核实上游规则;抽查 6 个全部用整体替换,无 mutation;项目当前仍在 V1 模式（无 `@ObservedV2`/`@ComponentV2` 关键字）;优先级 P3 = 不影响功能,V2 迁移时统一处理 |
 
+### D008 — NAPI error code 在 C++ 侧全是硬编码 magic number，无 enum/constexpr 定义
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-01 / 本会话质检 + working tree 未提交改动（M2 error code 落地） |
+| 位置 | `entry/src/main/cpp/app/napi/*.cpp`（`3001/3010/3020/3022/3031`/`8001/8002` 字面量散布，实测 3020 出现 4 次）；`entry/src/main/cpp/app/napi/engine_napi_common.h` 零个常量定义 |
+| 影响 | P2 — 错误码以裸字面量散落各 .cpp，改一个码需全仓 grep；`docs/napi-error-code-mapping.md`（145 行）定义了码段但 C++ 侧无对应 enum，文档与代码靠人肉同步易 drift；若与 ArkTS `ErrorCodes.ets` 的 numericCode 不一致，用户会看到错误码错乱 |
+| 拟修 | 在 `engine_napi_common.h` 加 `namespace EngineErrorCodes`/`NapiErrorCodes` 的 `constexpr int` 定义，替换各 .cpp 字面量。**先确认 SOT 在哪侧**：映射表称对端是 ArkTS `ErrorCodes.ets` 的 numericCode，若 ArkTS 侧已有常量则 C++ 侧 link 之、避免双源 |
+| 状态 | open |
+| 备注 | 2026-06-01 质检实地核实（读 napi-error-code-mapping.md + grep 字面量散布 + 确认 .h 无常量）；与 working tree 未提交的 M2 改动同源，建议随 M2 收口一起处理 |
+
+### D009 — M3「质量门禁」里程碑标 ✅ 但门禁脚本未落地
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-01 / 本会话质检 |
+| 位置 | `scripts/test/`（缺 matrix/compat 脚本）；设计文档 `docs/design/m3-automated-test-design.md` + `m3-core-compatibility-matrix.md` 已完整 |
+| 影响 | P1 — Roadmap 标 M3「✅ 已完成」，但 `scripts/test/` 无任何兼容矩阵/自动化测试脚本，发版前「必跑清单」无可执行产物，门禁名存实亡（"完成"的只有设计图纸） |
+| 拟修 | 二选一：(1) 按 `m3-automated-test-design.md` 3 层架构落地 Bash 层兼容矩阵跑测脚本；(2) 据实将 Roadmap M3 状态降级为「⚠️ 设计完成 / 门禁脚本落地 pending」 |
+| 状态 | open |
+| 备注 | 2026-06-01 质检实地核实（find scripts 无 matrix/compat）；与 Roadmap 账本对齐任务（`docs/plans/2026-06-01-verification-backlog-index.md`）联动 |
+
 ---
 
 ## 引用此文件的地方

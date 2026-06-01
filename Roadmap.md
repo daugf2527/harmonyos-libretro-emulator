@@ -41,7 +41,8 @@
 ## 近期里程碑（P0 / P1）
 
 ### M0 切换链路稳定化（P0）
-- 状态：✅ 已完成 (2026-05-31)
+- 状态：🟢 代码完成，真机验证 pending (2026-05-31)
+  > 代码落地 + quick_signals PASS；真机 6 场景待跑，依据 `docs/audit/m0-t29-verification-plan.md`。验证进度见 `docs/plans/2026-06-01-verification-backlog-index.md`。
 - 目标：Switch 单飞 + 可取消 + 失败恢复，UI 仅发起一次切换请求。
 - 验收：高频切换无崩溃、无状态错乱，失败后可自动回到 INIT 并处理最新请求。
 - 完成内容：
@@ -52,7 +53,8 @@
 - 详见：`docs/audit/m0-*.md`
 
 ### M1 ROM/I-O 治理（P0）
-- 状态：✅ 已完成 (2026-05-31)
+- 状态：🟢 代码完成，真机验证 pending (2026-05-31)
+  > 代码落地；need_fullpath/CUE/大 ROM 真机场景待跑，依据 `docs/plans/2026-05-31-m1-rom-io-closure.md` 验收段。
 - 目标：内置 ROM 按需解包到沙盒；下载 ROM 统一拷贝到沙盒并校验；CUE/多文件依赖稳定。
 - 验收：need_fullpath/no-game/大 ROM/CUE 场景可稳定启动且不阻塞 UI 线程。
 - 完成内容：
@@ -62,13 +64,14 @@
 - 详见：`docs/plans/2026-05-31-m1-rom-io-closure.md`
 
 ### M2 可观测性与错误治理（P1）
-- 状态：未开始
+- 状态：🟡 进行中（NAPI error code 已落地一部分，文档/代码待对齐）
 - 目标：统一错误分类、步骤码、耗时统计与关键日志上报。
 - 验收：每次启动/切换能定位失败阶段与原因，关键耗时可追踪。
-- 备注：原 P0 音频/帧率问题已修复，M2 降为 P1。
+- 备注：原 P0 音频/帧率问题已修复，M2 降为 P1。working tree 已加 ErrorCodes.ets/EngineSteps.ets + NAPI MakeErrorResult；error code 在 C++ 侧仍为硬编码 magic number，待抽常量（见 tech-debt D008）。
 
 ### M3 质量保障门禁（P0/P1）
-- 状态：✅ 已完成 (2026-05-31)
+- 状态：⚠️ 设计完成，门禁脚本落地 pending (2026-05-31)
+  > 兼容矩阵 + 自动化测试为**设计文档**，`scripts/test/` 无 matrix/compat 脚本落地，发布"必跑清单"暂无可执行产物（见 tech-debt D009）。
 - 目标：核心兼容矩阵 + ROM 类型矩阵 + 长时稳定性跑测。
 - 验收：发布前必跑清单与通过门槛明确。
 - 完成内容：
@@ -78,7 +81,8 @@
 - 详见：`docs/design/m3-*.md`
 
 ### M4 视频一致性（P1）
-- 状态：✅ 已完成 (2026-05-31)
+- 状态：🟢 代码完成（以代码审计为主），真机验证 pending (2026-05-31)
+  > 回调链路经代码审计确认；切 core/缩放模式后画面比例真机待验，建议随 M5 一起跑。
 - 目标：`SET_PIXEL_FORMAT/SET_GEOMETRY/GET_CAN_DUPE` 全链路一致。
 - 验收：切 core / 切缩放模式后画面与比例正确，dupe 帧策略稳定。
 - 完成内容：
