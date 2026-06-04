@@ -23,6 +23,16 @@ export interface RefactoredEvent {
   event: string;
   payload: string;
 }
+/**
+ * NAPI 结构化错误返回对象。
+ * 对应 C++ engine_napi_common.h 的 MakeErrorResult(env, success, errorCode, message)。
+ * 失败时 errorCode 对应 ets/common/ErrorCodes.ets 的 numericCode。
+ */
+export interface NapiErrorResult {
+  success: boolean;
+  errorCode?: number;
+  message?: string;
+}
 export const refactoredStartEngine: () => boolean;
 export const refactoredStopEngine: () => boolean;
 export function refactoredStopEngineAsync(): Promise<boolean>;
@@ -41,14 +51,14 @@ export function refactoredSwitchGameAsync(
   resMgr?: resourceManager.ResourceManager,
   timeoutMs?: number,
   token?: number
-): Promise<boolean>;
+): Promise<NapiErrorResult>;
 export function refactoredSwitchGameAsync(
   corePath: string,
   romPath: string,
   filesDir: string,
   timeoutMs?: number,
   token?: number
-): Promise<boolean>;
+): Promise<NapiErrorResult>;
 export const refactoredGetRawFileList: (
   resMgr: resourceManager.ResourceManager,
   dir?: string

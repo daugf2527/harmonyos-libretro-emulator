@@ -1,15 +1,6 @@
 #include "window_state_manager.h"
 #include <native_buffer/native_buffer.h>
 
-// Define SET_BUFFER_GEOMETRY if not available in SDK headers
-#ifndef SET_BUFFER_GEOMETRY
-#define SET_BUFFER_GEOMETRY 0
-#endif
-
-#ifndef SET_SWAP_INTERVAL
-#define SET_SWAP_INTERVAL 8
-#endif
-
 namespace libretro {
 
 void WindowStateManager::Reset() {

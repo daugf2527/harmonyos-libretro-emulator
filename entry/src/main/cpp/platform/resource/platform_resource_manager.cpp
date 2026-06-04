@@ -17,6 +17,7 @@
 #include <dirent.h>
 #include <fstream>
 #include <hilog/log.h>
+#include <rawfile/raw_file.h>
 #include <rawfile/raw_file_manager.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -28,9 +29,6 @@
 #undef LOG_FLOW
 #define LOG_FLOW "ROM"
 #include "common/log_prefix.h"
-
-// 如果有 rawfile 相关头文件需要引入
-// #include <rawfile/raw_file_manager.h>
 
 namespace libretro {
 
@@ -100,32 +98,34 @@ bool PlatformResourceManager::LoadRawFileUnlocked(
 
   // 2. 尝试从 RawFile 加载 (如果已初始化)
   if (native_mgr) {
-    RawFile *rawFile = OH_ResourceManager_OpenRawFile(native_mgr, path.c_str());
+    RawFile64 *rawFile = OH_ResourceManager_OpenRawFile64(native_mgr, path.c_str());
     if (!rawFile) {
-      LOGF(LOG_WARN, "OpenRawFile failed: %{public}s", path.c_str());
+      LOGF(LOG_WARN, "OpenRawFile64 failed: %{public}s", path.c_str());
     } else {
-      long sizeLong = OH_ResourceManager_GetRawFileSize(rawFile);
-      if (sizeLong <= 0) {
-        LOGF(LOG_ERROR, "Invalid rawfile size: %{public}ld (%{public}s)", sizeLong, path.c_str());
-        OH_ResourceManager_CloseRawFile(rawFile);
+      int64_t rawSize = OH_ResourceManager_GetRawFileSize64(rawFile);
+      if (rawSize <= 0) {
+        LOGF(LOG_ERROR, "Invalid rawfile size: %{public}lld (%{public}s)",
+             static_cast<long long>(rawSize), path.c_str());
+        OH_ResourceManager_CloseRawFile64(rawFile);
         return false;
       }
 
       constexpr size_t kMaxSize = 512ULL * 1024ULL * 1024ULL;
-      size_t size = static_cast<size_t>(sizeLong);
+      size_t size = static_cast<size_t>(rawSize);
       if (size > kMaxSize) {
         LOGF(LOG_ERROR, "Rawfile too large: %{public}zu (%{public}s)", size, path.c_str());
-        OH_ResourceManager_CloseRawFile(rawFile);
+        OH_ResourceManager_CloseRawFile64(rawFile);
         return false;
       }
 
       out_data.resize(size);
-      int readBytes =
-          OH_ResourceManager_ReadRawFile(rawFile, out_data.data(), size);
-      OH_ResourceManager_CloseRawFile(rawFile);
+      int64_t readBytes =
+          OH_ResourceManager_ReadRawFile64(rawFile, out_data.data(), static_cast<int64_t>(size));
+      OH_ResourceManager_CloseRawFile64(rawFile);
 
       if (readBytes < 0 || static_cast<size_t>(readBytes) != size) {
-        LOGF(LOG_ERROR, "ReadRawFile failed: %{public}d/%{public}zu (%{public}s)", readBytes, size, path.c_str());
+        LOGF(LOG_ERROR, "ReadRawFile64 failed: %{public}lld/%{public}zu (%{public}s)",
+             static_cast<long long>(readBytes), size, path.c_str());
         out_data.clear();
         return false;
       }

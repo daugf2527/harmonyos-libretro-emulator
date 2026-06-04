@@ -195,6 +195,26 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
     return false;
   }
 
+  result = OH_AudioStreamBuilder_SetRendererOutputDeviceChangeCallback(
+      builder_, OnOutputDeviceChange, this);
+  if (result != AUDIOSTREAM_SUCCESS) {
+    LOGF(LOG_ERROR,
+         "%{public}s Failed to set renderer output device callback: %{public}d",
+         kAudioChainPrefix, result);
+    Cleanup();
+    return false;
+  }
+
+  result = OH_AudioStreamBuilder_SetRendererErrorCallback(
+      builder_, OnRendererError, this);
+  if (result != AUDIOSTREAM_SUCCESS) {
+    LOGF(LOG_ERROR,
+         "%{public}s Failed to set renderer error callback: %{public}d",
+         kAudioChainPrefix, result);
+    Cleanup();
+    return false;
+  }
+
   // 4. 生成音频渲染器
   result = OH_AudioStreamBuilder_GenerateRenderer(builder_, &renderer_);
   if (result != AUDIOSTREAM_SUCCESS) {
@@ -813,6 +833,41 @@ void AudioPlayer::OnInterruptEvent(OH_AudioRenderer *renderer, void *userData,
   }
 
   return;
+}
+
+void AudioPlayer::OnOutputDeviceChange(
+    OH_AudioRenderer *renderer, void *userData,
+    OH_AudioStream_DeviceChangeReason reason) {
+  (void)renderer;
+  auto *player = static_cast<AudioPlayer *>(userData);
+  if (!player) {
+    return;
+  }
+  CallbackGuard callbackGuard(player);
+  if (!callbackGuard.IsActive()) {
+    return;
+  }
+
+  LOGF(LOG_INFO,
+       "%{public}s Audio output device changed: reason=%{public}d",
+       kAudioChainPrefix, static_cast<int32_t>(reason));
+}
+
+void AudioPlayer::OnRendererError(OH_AudioRenderer *renderer, void *userData,
+                                  OH_AudioStream_Result error) {
+  (void)renderer;
+  auto *player = static_cast<AudioPlayer *>(userData);
+  if (!player) {
+    return;
+  }
+  CallbackGuard callbackGuard(player);
+  if (!callbackGuard.IsActive()) {
+    return;
+  }
+
+  LOGF(LOG_ERROR, "%{public}s Audio renderer error: %{public}d",
+       kAudioChainPrefix, error);
+  player->pending_interrupt_stop_.store(true, std::memory_order_release);
 }
 
 void AudioPlayer::Cleanup() {

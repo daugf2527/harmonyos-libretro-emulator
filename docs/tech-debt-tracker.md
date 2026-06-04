@@ -115,11 +115,11 @@
 | Key | 值 |
 |---|---|
 | 引入 | 2026-06-01 / 本会话质检 + working tree 未提交改动（M2 error code 落地） |
-| 位置 | `entry/src/main/cpp/app/napi/*.cpp`（`3001/3010/3020/3022/3031`/`8001/8002` 字面量散布，实测 3020 出现 4 次）；`entry/src/main/cpp/app/napi/engine_napi_common.h` 零个常量定义 |
+| 位置 | `entry/src/main/cpp/app/napi/*.cpp`（原 `3001/3010/3020/3022/3031`/`8001/8002` 字面量散布）；`entry/src/main/cpp/app/napi/engine_napi_common.h` |
 | 影响 | P2 — 错误码以裸字面量散落各 .cpp，改一个码需全仓 grep；`docs/napi-error-code-mapping.md`（145 行）定义了码段但 C++ 侧无对应 enum，文档与代码靠人肉同步易 drift；若与 ArkTS `ErrorCodes.ets` 的 numericCode 不一致，用户会看到错误码错乱 |
-| 拟修 | 在 `engine_napi_common.h` 加 `namespace EngineErrorCodes`/`NapiErrorCodes` 的 `constexpr int` 定义，替换各 .cpp 字面量。**先确认 SOT 在哪侧**：映射表称对端是 ArkTS `ErrorCodes.ets` 的 numericCode，若 ArkTS 侧已有常量则 C++ 侧 link 之、避免双源 |
-| 状态 | open |
-| 备注 | 2026-06-01 质检实地核实（读 napi-error-code-mapping.md + grep 字面量散布 + 确认 .h 无常量）；与 working tree 未提交的 M2 改动同源，建议随 M2 收口一起处理 |
+| 拟修 | 已在 `engine_napi_common.h` 加 `namespace EngineErrorCodes`/`NapiErrorCodes` 的 `constexpr int` 定义，替换 `engine_lifecycle_napi.cpp` / `engine_state_napi.cpp` 调用点裸数字；ArkTS `ErrorCodes.ets` 仍是用户可见错误定义 SOT，C++ 常量作为 native 侧映射锚点。 |
+| 状态 | closed |
+| 备注 | 2026-06-02 收口：静态 grep 确认相关 `.cpp` 调用点不再直接传递 `3001/3010/3020/3022/3031/8001/8002` 给 `MakeErrorResult` 或 `ctx->errorCode`；未编译/未真机。 |
 
 ### D009 — M3「质量门禁」里程碑标 ✅ 但门禁脚本未落地
 
@@ -131,6 +131,28 @@
 | 拟修 | 二选一：(1) 按 `m3-automated-test-design.md` 3 层架构落地 Bash 层兼容矩阵跑测脚本；(2) 据实将 Roadmap M3 状态降级为「⚠️ 设计完成 / 门禁脚本落地 pending」 |
 | 状态 | open |
 | 备注 | 2026-06-01 质检实地核实（find scripts 无 matrix/compat）；与 Roadmap 账本对齐任务（`docs/plans/2026-06-01-verification-backlog-index.md`）联动 |
+
+### D010 — refactoredSwitchGameAsync 类型谎言掩盖 switch 失败误判 bug（已修）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-04 / 本会话质检 ARCH-1 测绘发现 |
+| 位置 | `entry/src/main/ets/pages/LibretroGamePage.ets:1013`（修前）；C++ 真值 `entry/src/main/cpp/app/napi/engine_lifecycle_napi.cpp:864` |
+| 影响 | P0 — C++ `CompleteSwitchGame` resolve 结构对象 `{success,errorCode,message}`，但 TS 声明谎报 `Promise<boolean>`，ArkTS `if(!ok)` 对 `{success:false}` 恒 false → 切换游戏**失败时 UI 假报成功（黑屏，引擎未启动）**；仅失败路径显现，故长期未被发现 |
+| 拟修 | 已修：接通 errorCode 跨层通道——新增 `NapiErrorResult` interface（ErrorCodes.ets + index.d.ts），`refactoredSwitchGameAsync`/`switchGame()` 返回类型改 `Promise<NapiErrorResult>`，`if(!ok)`→`if(!result.success)`，catch 改读 `result.errorCode`→`findByNumericCode`（字符串嗅探降级兜底） |
+| 状态 | fixed |
+| 备注 | 用户决策 ARCH-1 (a) 接通方案；详见 `docs/audit-report-2026-06-04.md` ARCH-1 接通实施段；**需 DevEco 真机验证**（坏 core/ROM 应正确报错而非黑屏）；ArkTS 自定义 Error 范式参照 `RomImportService.ets` 的 `ImportCanceledError` |
+
+### D011 — 同步 StartEngine/LoadCore/LoadRom 同类类型谎言致测试页假通过（已修）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-04 / D010 延伸排查发现 |
+| 位置 | `entry/src/main/ets/pages/TestGambatte.ets`（6 消费点）+ `LibretroNewArchTestPage.ets`（3 消费点）；C++ 真值 engine_lifecycle_napi.cpp:349-441 |
+| 影响 | P1 — 同步 `refactoredStartEngine/LoadCore/LoadRom` C++ 全 return `MakeErrorResult` 结构对象，但测试页局部 interface 声明 `boolean`，`if(!startOk)` 对 `{success:false}` 恒 false → **核心兼容性测试页无法检测引擎/core/rom 加载失败，测试假通过**（误导兼容性判断）。危害面限测试/诊断页，无生产用户路径（生产走已修的 switchGame） |
+| 拟修 | 已修：两测试页 interface 3 接口返回类型 `boolean`→`NapiErrorResult` + import；9 个消费点 `if(!xxOk)`→`if(!xxResult.success)`，log 打印同步改 `.success`。**未碰** dead code `LibretroSwitchCoordinator.ets`（无调用者）。**未碰** PauseEngine/ResumeEngine/SetFilesDir/SetScalingMode 等（C++ 侧实测为 `MakeBool` 真 boolean，`: boolean` 标注正确） |
+| 状态 | fixed |
+| 备注 | D010 同根（类型谎言）；边界经实物核对 `MakeErrorResult`(结构对象,3个) vs `MakeBool`(真boolean,其余)；同需 DevEco 真机验证；memory `feedback_napi_return_type_lie_hides_bug` |
 
 ---
 

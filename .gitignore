@@ -27,6 +27,7 @@ oh_modules/
 # .serena/: Serena MCP project metadata + LSP cache (per-machine, never commit)
 .serena/
 .firecrawl/
+.codegraph/
 codex
 codex-full-auto.cmd
 codex-full-auto.ps1

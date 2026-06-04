@@ -56,6 +56,22 @@ export interface ErrorCodeDefinition {
 }
 
 /**
+ * NAPI 结构化错误返回对象
+ *
+ * 对应 C++ engine_napi_common.h 的 MakeErrorResult(env, success, errorCode, message)。
+ * 失败时 errorCode 对应本文件各 *ErrorCodes 的 numericCode，可经
+ * ErrorCodeUtils.findByNumericCode(errorCode) 还原为用户文案。
+ */
+export interface NapiErrorResult {
+  /** 操作是否成功 */
+  success: boolean;
+  /** 失败时的数值错误码（成功时缺省） */
+  errorCode?: number;
+  /** 失败时的错误描述（成功时缺省） */
+  message?: string;
+}
+
+/**
  * 文件 I/O 错误码（1000-1999）
  *
  * 覆盖场景：ROM 读取、存档加载、配置文件读写、目录操作

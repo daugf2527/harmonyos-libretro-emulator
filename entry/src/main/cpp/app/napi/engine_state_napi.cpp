@@ -112,9 +112,9 @@ static napi_value SaveState(napi_env env, napi_callback_info info) {
         ? "Save state failed"
         : errorInfo.message.c_str();
 
-    // 错误码 3031: SAVE_STATE_SAVE_FAILED
     LOGF(LOG_ERROR, "[NEW] SaveState failed: %{public}s", message);
-    return MakeErrorResult(env, false, 3031, message);
+    return MakeErrorResult(env, false,
+                           EngineErrorCodes::SAVE_STATE_SAVE_FAILED, message);
   }
 
   // 成功时返回 ArrayBuffer（保持向后兼容）
@@ -122,7 +122,9 @@ static napi_value SaveState(napi_env env, napi_callback_info info) {
       MakeArrayBufferFromBytes(env, data.data(), data.size());
   if (!arrayBuffer) {
     LOGF(LOG_ERROR, "[NEW] SaveState failed to allocate ArrayBuffer");
-    return MakeErrorResult(env, false, 3031, "Failed to allocate ArrayBuffer");
+    return MakeErrorResult(env, false,
+                           EngineErrorCodes::SAVE_STATE_SAVE_FAILED,
+                           "Failed to allocate ArrayBuffer");
   }
   return arrayBuffer;
   NAPI_TRY_CATCH_END(env, nullptr)

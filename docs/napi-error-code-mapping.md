@@ -24,6 +24,8 @@ interface NapiErrorResult {
 | `refactoredSaveState` | `ArrayBuffer` (向后兼容) | 3031 | `EngineErrorCodes.SAVE_STATE_SAVE_FAILED` | 存档保存失败 |
 | `refactoredSwitchGameAsync` | `{ success: true }` | 3001/3010/3020/3022 | 多种错误码 | 游戏切换失败（根据失败阶段映射） |
 
+> **预留未接入**：`EngineErrorCodes.SRAM_LOAD_FAILED`(3032) 已在 C++ 定义，但 `GetSRAM`/`SetSRAM` 失败时返回 `null`/`false` 不带 errorCode，ArkTS 侧亦无 SRAM 调用——当前两侧皆为 dead constant，待未来 SRAM UI 接入时再激活（见 `docs/audit-report-2026-06-04.md` P3-1）。
+
 ### refactoredSwitchGameAsync 错误码映射逻辑
 
 `SwitchGameAsync` 是复合操作，根据失败阶段返回不同错误码：
@@ -97,6 +99,20 @@ if (!result.success) {
 `engine_napi_common.h` 新增：
 
 ```cpp
+namespace EngineErrorCodes {
+constexpr int CORE_LOAD_FAILED = 3001;
+constexpr int ROM_LOAD_FAILED = 3010;
+constexpr int ENGINE_START_FAILED = 3020;
+constexpr int STATE_TRANSITION_FAILED = 3022;
+constexpr int SAVE_STATE_SAVE_FAILED = 3031;
+constexpr int SRAM_LOAD_FAILED = 3032;
+}
+
+namespace NapiErrorCodes {
+constexpr int INVALID_ARGUMENT_COUNT = 8001;
+constexpr int INVALID_ARGUMENT_TYPE = 8002;
+}
+
 napi_value MakeErrorResult(napi_env env, bool success, int errorCode = 0,
                            const char *message = nullptr);
 ```
@@ -110,7 +126,7 @@ auto errorInfo = GetEngine()->GetLastErrorInfo();
 const char *message = errorInfo.message.empty()
     ? "Default error message"
     : errorInfo.message.c_str();
-return MakeErrorResult(env, false, 3001, message);
+return MakeErrorResult(env, false, EngineErrorCodes::CORE_LOAD_FAILED, message);
 ```
 
 ## 测试验证
@@ -137,6 +153,19 @@ bash scripts/check/quick_signals.sh
 - **NAPI 辅助函数**: `entry/src/main/cpp/app/napi/engine_napi_common.h`
 - **生命周期 NAPI**: `entry/src/main/cpp/app/napi/engine_lifecycle_napi.cpp`
 - **状态 NAPI**: `entry/src/main/cpp/app/napi/engine_state_napi.cpp`
+
+## 实现现状（2026-06-04 质检发现）
+
+> ⚠️ **上文「ArkTS 层迁移建议」小节描述的是设计意图，与当前实现存在 gap。**
+
+经 2026-06-04 全方位质检交叉验证（详见 `docs/audit-report-2026-06-04.md` ARCH-1）：
+
+- C++ `MakeErrorResult` 确实组装并回传 `{ success, errorCode, message }`。
+- **但 ArkTS 消费侧当前丢弃 `errorCode` 字段**：`LibretroGamePage.ets` 靠 `message.includes('Core'/'核心'/'ROM')` 字符串嗅探在前端二次推断错误码；`SaveStatePage.ets` 走 boolean/null 协议；NAPI 接口签名里也无结构体类型。
+- 因此 C++ 侧"补齐全部 14 个错误码"在当前架构下无功能收益——ArkTS 不读。C++ `EngineErrorCodes` 只覆盖实际回传的 6 个（其中 SRAM 为 dead），是合理的按需子集。
+- **待决策（ARCH-1）**：
+  - (a) **接通**：ArkTS 改为消费 `errorCode` 并按码分支 → 则需补齐 C++ 常量 + 加 CI 防漂移校验才有意义；
+  - (b) **承认现状**：确认 ArkTS-local 字符串映射为既定架构，将 C++ `errorCode` 标注为"诊断日志用途、非契约"，降低两侧同步压力。
 
 ## 后续工作
 

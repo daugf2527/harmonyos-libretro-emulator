@@ -45,7 +45,7 @@ struct SaveStatePage {
   @State private showDeleteConfirm: boolean = false
   @State private toastMessage: string = ''
   @State private showToast: boolean = false
-  @State private syncStatusText: string = 'LOCAL_ARCHIVE'
+  @State private syncStatusText: string = '本地存档'
   @State private loading: boolean = false
   @State private currentRomFile: string = ''
   @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
@@ -128,7 +128,7 @@ struct SaveStatePage {
     const context = this.getContext()
     if (!context) {
       this.saveItems = []
-      this.syncStatusText = 'CONTEXT_MISSING'
+      this.syncStatusText = '无法访问上下文'
       return
     }
     this.loading = true
@@ -154,7 +154,7 @@ struct SaveStatePage {
       const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_LIST_ERROR.numericCode)
       LogHelper.info('SaveStatePage', 'Save', `错误提示: ${userMsg}`)
       this.saveItems = []
-      this.syncStatusText = 'NO_SAVE_ARCHIVE'
+      this.syncStatusText = '暂无存档'
     }
     if (!this.isCurrentPageTask(token)) {
       return
@@ -177,9 +177,9 @@ struct SaveStatePage {
 
   private buildSaveStatusText(count: number): string {
     if (count > 0) {
-      return this.currentRomFile.length > 0 ? 'LOCAL_ROM_INDEX_READY' : 'LOCAL_INDEX_READY'
+      return this.currentRomFile.length > 0 ? '当前游戏存档已就绪' : '本地存档索引已就绪'
     }
-    return this.currentRomFile.length > 0 ? 'NO_SAVE_FOR_CURRENT_ROM' : 'NO_SAVE_ARCHIVE'
+    return this.currentRomFile.length > 0 ? '当前游戏暂无存档' : '暂无存档'
   }
 
   private buildSaveSlot(item: SaveStateManifestItem, index: number): SaveSlotItem {
@@ -188,9 +188,9 @@ struct SaveStatePage {
     return {
       id: item.id,
       fileName: item.fileName,
-      slotLabel: `SLOT_${slotNumber}`,
+      slotLabel: `存档位_${slotNumber}`,
       detail: `${this.normalizeTitle(item.fileName)} | ${this.formatBytes(item.byteLength)}`,
-      durationLabel: item.createdAt > 0 ? this.formatDateTime(item.createdAt) : 'LOCAL',
+      durationLabel: item.createdAt > 0 ? this.formatDateTime(item.createdAt) : '本地',
       isActive: index === 0,
       coverColor: this.coverColors[colorIndex]
     }
@@ -200,7 +200,7 @@ struct SaveStatePage {
     const dotIndex = fileName.lastIndexOf('.')
     const baseName = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName
     const cleaned = baseName.replace(/[_-]+/g, ' ')
-    return cleaned.length > 0 ? cleaned : 'Unknown Save'
+    return cleaned.length > 0 ? cleaned : '未知存档'
   }
 
   private formatBytes(byteLength: number): string {
@@ -256,7 +256,7 @@ struct SaveStatePage {
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      this.showToastMessage('Archive Deleted Successfully')
+      this.showToastMessage('存档删除成功')
       await this.refreshSaveItems()
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
@@ -274,7 +274,7 @@ struct SaveStatePage {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
-      this.showToastMessage('CONTEXT_MISSING')
+      this.showToastMessage(ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_SAVE_FAILED.numericCode))
       return
     }
     try {
@@ -284,14 +284,14 @@ struct SaveStatePage {
         return
       }
       if (!stateData || stateData.byteLength <= 0) {
-        this.showToastMessage('SAVE_STATE_UNAVAILABLE')
+        this.showToastMessage(ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_SAVE_FAILED.numericCode))
         return
       }
       await saveStateData(context, stateData, this.currentRomFile)
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      this.showToastMessage('SAVE_STATE_WRITTEN')
+      this.showToastMessage('即时存档已保存')
       await this.refreshSaveItems()
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
@@ -308,14 +308,18 @@ struct SaveStatePage {
   private async loadSave(fileName: string): Promise<void> {
     const context = this.getContext()
     if (!context) {
-      this.showToastMessage('CONTEXT_MISSING')
+      this.showToastMessage(ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_LOAD_FAILED.numericCode))
       return
     }
     try {
       const stateData = readSaveStateData(context, fileName)
       // 与 quickSave() 保持一致，避免同步 NAPI 调用阻塞 UI 线程。
       const loaded = await nativeApi.refactoredLoadStateAsync(stateData)
-      this.showToastMessage(loaded ? 'SAVE_STATE_LOADED' : 'LOAD_STATE_REJECTED')
+      this.showToastMessage(
+        loaded
+          ? '即时存档已读取'
+          : ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_LOAD_FAILED.numericCode)
+      )
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('SaveStatePage', 'Save', `读取即时存档失败: ${message}`)
@@ -421,9 +425,9 @@ struct SaveStatePage {
   @Builder
   private TelemetryStrip() {
     Row() {
-      this.StatusColumn('Storage', this.currentRomFile.length > 0 ? 'Current ROM' : 'Local Files')
-      this.StatusColumn('Slots', `${this.saveItems.length}/99`)
-      this.StatusColumn('Archive', this.loading ? 'Reading local...' : this.syncStatusText)
+      this.StatusColumn('存储', this.currentRomFile.length > 0 ? '当前游戏' : '本地文件')
+      this.StatusColumn('存档位', `${this.saveItems.length}/99`)
+      this.StatusColumn('归档', this.loading ? '正在读取本地...' : this.syncStatusText)
     }
     .width('100%')
     .height(100)
@@ -452,7 +456,7 @@ struct SaveStatePage {
 
         Text(value)
           .fontSize(EmuTypography.md)
-                    .fontColor(label === 'Archive' ? EmuColors.primary : EmuColors.onSurfaceVariant)
+                    .fontColor(label === '归档' ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .letterSpacing(1.6)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
@@ -595,7 +599,7 @@ struct SaveStatePage {
           .fontColor(EmuColors.onSurfaceVariant)
           .opacity(0.48)
 
-        Text('END OF ARCHIVE STREAM')
+        Text('已到存档列表末尾')
           .fontSize(EmuTypography.sm)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(4)
@@ -720,7 +724,7 @@ struct SaveStatePage {
         .fontColor(EmuColors.onSurfaceVariant)
         .opacity(0.48)
 
-      Text('SELECT A SAVE SLOT')
+      Text('请选择存档位')
         .fontSize(EmuTypography.sm)
         .fontColor(EmuColors.onSurfaceVariant)
         .letterSpacing(4)
@@ -744,12 +748,12 @@ struct SaveStatePage {
           .opacity(0.72)
 
         Column({ space: 8 }) {
-          Text('PREVIEW')
+          Text('预览')
             .fontSize(EmuTypography.xs)
             .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(2)
 
-          Text('No Screenshot')
+          Text('无截图')
             .fontSize(EmuTypography.sm)
             .fontColor(EmuColors.onSurfaceVariant)
             .opacity(0.6)
@@ -763,11 +767,11 @@ struct SaveStatePage {
 
       // 存档详情
       Column({ space: 16 }) {
-        this.DetailRow('File Name', this.normalizeTitle(item.fileName))
-        this.DetailRow('Slot', item.slotLabel)
-        this.DetailRow('Size', this.getSaveItemSizeText(item))
-        this.DetailRow('Created', item.durationLabel)
-        this.DetailRow('ROM', this.currentRomFile.length > 0 ? this.currentRomFile : 'Unknown')
+        this.DetailRow('文件名', this.normalizeTitle(item.fileName))
+        this.DetailRow('存档位', item.slotLabel)
+        this.DetailRow('大小', this.getSaveItemSizeText(item))
+        this.DetailRow('创建时间', item.durationLabel)
+        this.DetailRow('游戏', this.currentRomFile.length > 0 ? this.currentRomFile : '未知')
       }
       .width('100%')
       .padding(16)
@@ -777,7 +781,7 @@ struct SaveStatePage {
 
       // 操作按钮
       Column({ space: 12 }) {
-        Button('Load Save')
+        Button('读取存档')
           .width('100%')
           .height(48)
           .fontSize(EmuTypography.md)
@@ -788,7 +792,7 @@ struct SaveStatePage {
             void this.loadSave(item.fileName)
           })
 
-        Button('Delete Save')
+        Button('删除存档')
           .width('100%')
           .height(48)
           .fontSize(EmuTypography.md)
@@ -847,12 +851,12 @@ struct SaveStatePage {
     Column({ space: 24 }) {
       // 快速操作
       Column({ space: 12 }) {
-        Text('QUICK ACTIONS')
+        Text('快捷操作')
           .fontSize(EmuTypography.xs)
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(2)
 
-        Button('Create New Save')
+        Button('新建存档')
           .width('100%')
           .height(48)
           .fontSize(EmuTypography.md)
@@ -863,7 +867,7 @@ struct SaveStatePage {
             void this.quickSave()
           })
 
-        Button('Refresh List')
+        Button('刷新列表')
           .width('100%')
           .height(48)
           .fontSize(EmuTypography.sm)
@@ -899,7 +903,7 @@ struct SaveStatePage {
         .opacity(0.72)
 
       Column({ space: 8 }) {
-        Text('PREVIEW')
+        Text('预览')
           .fontSize(EmuTypography.xs)
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(2)

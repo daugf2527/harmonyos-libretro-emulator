@@ -387,6 +387,24 @@ inline napi_value MakeResolvedStringArrayPromise(
   return promise;
 }
 
+namespace EngineErrorCodes {
+constexpr int CORE_LOAD_FAILED = 3001;
+constexpr int ROM_LOAD_FAILED = 3010;
+constexpr int ENGINE_START_FAILED = 3020;
+constexpr int STATE_TRANSITION_FAILED = 3022;
+constexpr int SAVE_STATE_SAVE_FAILED = 3031;
+// 预留：与 ErrorCodes.ets 的 SRAM_LOAD_FAILED(3032) 对称定义。
+// 当前 GetSRAM/SetSRAM 失败返回 null/false 不走结构化错误码，故此常量暂未被
+// MakeErrorResult 引用；待未来 SRAM 失败需要回传 errorCode 时启用。详见
+// docs/audit-report-2026-06-04.md P3-1 与 docs/napi-error-code-mapping.md。
+constexpr int SRAM_LOAD_FAILED = 3032;
+} // namespace EngineErrorCodes
+
+namespace NapiErrorCodes {
+constexpr int INVALID_ARGUMENT_COUNT = 8001;
+constexpr int INVALID_ARGUMENT_TYPE = 8002;
+} // namespace NapiErrorCodes
+
 /**
  * 创建结构化错误响应对象
  *
@@ -398,11 +416,14 @@ inline napi_value MakeResolvedStringArrayPromise(
  * }
  *
  * 错误码映射到 entry/src/main/ets/common/ErrorCodes.ets：
- * - 3001: CORE_LOAD_FAILED (核心加载失败)
- * - 3010: ROM_LOAD_FAILED (ROM 加载失败)
- * - 3020: ENGINE_START_FAILED (引擎启动失败)
- * - 3031: SAVE_STATE_SAVE_FAILED (存档保存失败)
- * - 3032: SRAM_LOAD_FAILED (SRAM 加载失败)
+ * - EngineErrorCodes::CORE_LOAD_FAILED: 核心加载失败
+ * - EngineErrorCodes::ROM_LOAD_FAILED: ROM 加载失败
+ * - EngineErrorCodes::ENGINE_START_FAILED: 引擎启动失败
+ * - EngineErrorCodes::STATE_TRANSITION_FAILED: 状态转换失败
+ * - EngineErrorCodes::SAVE_STATE_SAVE_FAILED: 存档保存失败
+ * - EngineErrorCodes::SRAM_LOAD_FAILED: SRAM 加载失败
+ * - NapiErrorCodes::INVALID_ARGUMENT_COUNT: 参数数量错误
+ * - NapiErrorCodes::INVALID_ARGUMENT_TYPE: 参数类型错误
  *
  * @param env NAPI 环境
  * @param success 操作是否成功
@@ -412,6 +433,9 @@ inline napi_value MakeResolvedStringArrayPromise(
  */
 inline napi_value MakeErrorResult(napi_env env, bool success, int errorCode = 0,
                                    const char *message = nullptr) {
+  if (!env) {
+    return nullptr;
+  }
   bool pending = false;
   if (napi_is_exception_pending(env, &pending) == napi_ok && pending) {
     return nullptr;

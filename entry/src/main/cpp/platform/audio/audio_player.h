@@ -146,6 +146,24 @@ private:
         OH_AudioInterrupt_ForceType type,
         OH_AudioInterrupt_Hint hint
     );
+
+    /**
+     * @brief OHAudio 输出设备变化回调 (API20+ 独立回调)
+     */
+    static void OnOutputDeviceChange(
+        OH_AudioRenderer* renderer,
+        void* userData,
+        OH_AudioStream_DeviceChangeReason reason
+    );
+
+    /**
+     * @brief OHAudio 渲染器错误回调 (API20+ 独立回调)
+     */
+    static void OnRendererError(
+        OH_AudioRenderer* renderer,
+        void* userData,
+        OH_AudioStream_Result error
+    );
     bool PauseFromInterrupt();
 
     /**

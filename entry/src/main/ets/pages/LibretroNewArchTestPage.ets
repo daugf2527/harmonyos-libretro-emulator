@@ -32,6 +32,7 @@ import {
 } from '../common/LibretroEventHub';
 import LogHelper from '../common/LogHelper';
 import { EmuStateColors, EmuTypography } from '../common/EmuUiTokens';
+import { NapiErrorResult } from '../common/ErrorCodes';
 import { EmuButton, EmuButtonKind, EmuButtonSize } from '../components/EmuButton';
 import { DevDiagnosticsBlock } from '../components/DevDiagnosticsBlock';
 import { runtimeCoreDiagnosticController } from '../common/RuntimeCoreDiagnosticController';
@@ -42,14 +43,14 @@ import {
 
 // NAPI 接口定义 (遵循 AGENTS.md 规范)
 interface LibretroNapi {
-  refactoredStartEngine(): boolean;
+  refactoredStartEngine(): NapiErrorResult;
   refactoredStopEngine(): boolean;
   refactoredStopEngineAsync(): Promise<boolean>;
-  refactoredLoadCore(path: string): boolean;
+  refactoredLoadCore(path: string): NapiErrorResult;
   refactoredLoadRom(
     path: string,
     resMgr?: resourceManager.ResourceManager
-  ): boolean;
+  ): NapiErrorResult;
   refactoredSetFilesDir(path: string): boolean;
   refactoredSendInput(port: number, keyId: number, pressed: boolean): boolean;
   refactoredSendAnalog(
@@ -239,9 +240,9 @@ struct LibretroNewArchTestPage {
   private onStartEngine = async (): Promise<void> => {
     this.log('调用 refactoredStartEngine');
     nativeApi.refactoredClearLastErrorInfo();
-    const ok = nativeApi.refactoredStartEngine();
-    this.log(`refactoredStartEngine 返回: ${ok}`);
-    if (!ok) { this.status = '启动失败'; return; }
+    const startResult = nativeApi.refactoredStartEngine();
+    this.log(`refactoredStartEngine 返回: ${startResult.success}`);
+    if (!startResult.success) { this.status = '启动失败'; return; }
     const started = await nativeApi.refactoredWaitForStateAsync(EngineState.STARTING, 5000);
     this.status = started ? '引擎已启动' : '启动超时';
   };
@@ -259,9 +260,9 @@ struct LibretroNewArchTestPage {
     const abiPath = this.resolveAbiPath();
     const corePath = `${context.bundleCodeDir}/libs/${abiPath}/libgambatte_libretro.so`;
     this.log(`调用 refactoredLoadCore: ${corePath}`);
-    const ok: boolean = nativeApi.refactoredLoadCore(corePath);
-    this.log(`refactoredLoadCore 返回: ${ok}`);
-    if (!ok) { this.status = '核心加载失败'; return; }
+    const coreResult = nativeApi.refactoredLoadCore(corePath);
+    this.log(`refactoredLoadCore 返回: ${coreResult.success}`);
+    if (!coreResult.success) { this.status = '核心加载失败'; return; }
     const loaded = await nativeApi.refactoredWaitForStateAsync(EngineState.CORE_LOADED, 5000);
     if (!loaded) {
       const err = nativeApi.refactoredGetLastErrorInfo();
@@ -276,9 +277,9 @@ struct LibretroNewArchTestPage {
     if (!context) { this.log('获取上下文失败'); return; }
     const resMgr = context.resourceManager;
     this.log('调用 refactoredLoadRom: roms/snake_v0.1.gb');
-    const ok: boolean = nativeApi.refactoredLoadRom('roms/snake_v0.1.gb', resMgr);
-    this.log(`refactoredLoadRom 返回: ${ok}`);
-    if (!ok) { this.status = 'ROM加载失败'; return; }
+    const romResult = nativeApi.refactoredLoadRom('roms/snake_v0.1.gb', resMgr);
+    this.log(`refactoredLoadRom 返回: ${romResult.success}`);
+    if (!romResult.success) { this.status = 'ROM加载失败'; return; }
     const running = await nativeApi.refactoredWaitForStateAsync(EngineState.RUNNING, 5000);
     if (!running) {
       const err = nativeApi.refactoredGetLastErrorInfo();
@@ -286,7 +287,7 @@ struct LibretroNewArchTestPage {
       this.log(`LoadRom 超时: ${detail}`);
     }
     this.status = running ? 'ROM已加载，运行中' : 'ROM加载超时';
-    if (ok) { this.refreshCoreOptions(); }
+    if (romResult.success) { this.refreshCoreOptions(); }
   };
   private onPauseEngine = (): void => {
     this.log('调用 refactoredPauseEngine');

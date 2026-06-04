@@ -10,7 +10,9 @@
 #include <hilog/log.h>
 #include <napi/native_api.h>
 #include <cstring>
+#include <cstdint>
 #include <vector>
+#include <rawfile/raw_file.h>
 #include <rawfile/raw_file_manager.h>
 #include "core/libretro/libretro.h"
 
@@ -233,7 +235,7 @@ static napi_value TestGambatteROM(napi_env env, napi_callback_info info) {
     }
     
     // 打开 rawfile
-    RawFile* rawFile = OH_ResourceManager_OpenRawFile(nativeResourceManager, rom_filename);
+    RawFile64* rawFile = OH_ResourceManager_OpenRawFile64(nativeResourceManager, rom_filename);
     if (!rawFile) {
         LOGF(LOG_ERROR, " 无法打开 ROM 文件: %{public}s", rom_filename);
         OH_ResourceManager_ReleaseNativeResourceManager(nativeResourceManager);
@@ -247,19 +249,45 @@ static napi_value TestGambatteROM(napi_env env, napi_callback_info info) {
     }
     
     // 获取文件大小
-    long rom_size = OH_ResourceManager_GetRawFileSize(rawFile);
-    LOGF(LOG_INFO, "ROM 文件大小: %{public}ld bytes", rom_size);
+    int64_t rom_size = OH_ResourceManager_GetRawFileSize64(rawFile);
+    LOGF(LOG_INFO, "ROM 文件大小: %{public}lld bytes", static_cast<long long>(rom_size));
+    if (rom_size <= 0) {
+        LOGF(LOG_ERROR, " 无效 ROM 文件大小: %{public}lld bytes", static_cast<long long>(rom_size));
+        OH_ResourceManager_CloseRawFile64(rawFile);
+        OH_ResourceManager_ReleaseNativeResourceManager(nativeResourceManager);
+        retro_deinit();
+        dlclose(handle);
+        delete[] core_path;
+        delete[] rom_filename;
+        napi_value result;
+        napi_get_boolean(env, false, &result);
+        return result;
+    }
+    constexpr int64_t kMaxRomSize = 512LL * 1024LL * 1024LL;
+    if (rom_size > kMaxRomSize) {
+        LOGF(LOG_ERROR, " ROM 文件过大: %{public}lld bytes", static_cast<long long>(rom_size));
+        OH_ResourceManager_CloseRawFile64(rawFile);
+        OH_ResourceManager_ReleaseNativeResourceManager(nativeResourceManager);
+        retro_deinit();
+        dlclose(handle);
+        delete[] core_path;
+        delete[] rom_filename;
+        napi_value result;
+        napi_get_boolean(env, false, &result);
+        return result;
+    }
     
     // 读取文件内容
-    std::vector<uint8_t> rom_data(rom_size);
-    int bytes_read = OH_ResourceManager_ReadRawFile(rawFile, rom_data.data(), rom_size);
+    std::vector<uint8_t> rom_data(static_cast<size_t>(rom_size));
+    int64_t bytes_read = OH_ResourceManager_ReadRawFile64(rawFile, rom_data.data(), rom_size);
     
     // 关闭文件
-    OH_ResourceManager_CloseRawFile(rawFile);
+    OH_ResourceManager_CloseRawFile64(rawFile);
     OH_ResourceManager_ReleaseNativeResourceManager(nativeResourceManager);
     
     if (bytes_read != rom_size) {
-        LOGF(LOG_ERROR, " 读取 ROM 文件失败: 期望 %{public}ld bytes, 实际 %{public}d bytes", rom_size, bytes_read);
+        LOGF(LOG_ERROR, " 读取 ROM 文件失败: 期望 %{public}lld bytes, 实际 %{public}lld bytes",
+             static_cast<long long>(rom_size), static_cast<long long>(bytes_read));
         retro_deinit();
         dlclose(handle);
         delete[] core_path;

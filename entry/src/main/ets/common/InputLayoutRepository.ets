@@ -207,7 +207,7 @@ function localizeButtonLabel(buttonId: string, rawLabel: string): string {
 }
 
 function normalizeRetroButtonId(value: number | undefined, fallback: number): number {
-  if (!Number.isFinite(value)) {
+  if (value === undefined || !Number.isFinite(value)) {
     return fallback
   }
   const intValue = Math.floor(value)
@@ -225,7 +225,7 @@ function normalizeText(value: string | undefined, fallback: string): string {
 }
 
 function normalizeNumber(value: number | undefined): number {
-  if (!Number.isFinite(value)) {
+  if (value === undefined || !Number.isFinite(value)) {
     return 0
   }
   return Math.floor(value)

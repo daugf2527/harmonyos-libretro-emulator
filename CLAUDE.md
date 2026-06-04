@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+@C:/Users/newwo/.cc-switch/agent-policy/COMMON.md
+
 ## Layered context
 
 - **This file (root)**: cross-layer architecture, build/release commands, environment notes.
