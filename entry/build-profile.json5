@@ -23,6 +23,14 @@
             ]
           }
         }
+      },
+      "externalNativeOptions": {
+        "abiFilters": ["arm64-v8a"]
+      },
+      "nativeLib": {
+        "debugSymbol": {
+          "strip": true
+        }
       }
     },
   ],
