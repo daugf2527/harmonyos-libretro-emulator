@@ -134,7 +134,12 @@ if(BUILD_LIBRETRO_TESTS)
         tests/integration/test_gambatte_load.cpp
         tests/integration/test_gambatte_rom.cpp
     )
-    target_link_libraries(libretro_tests PRIVATE ${hilog-lib} dl)
+    target_link_libraries(libretro_tests PRIVATE
+        ${hilog-lib}
+        libace_napi.z.so
+        librawfile.z.so
+        dl
+    )
 endif()
 
 target_link_libraries(entry PUBLIC ${hilog-lib})

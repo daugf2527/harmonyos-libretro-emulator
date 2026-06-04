@@ -28,21 +28,12 @@
 #define LOG_FLOW "Video"
 #include "common/log_prefix.h"
 
-// Define SET_BUFFER_GEOMETRY if not available in SDK headers
-#ifndef SET_BUFFER_GEOMETRY
-#define SET_BUFFER_GEOMETRY 0
-#endif
-
 #ifndef NATIVE_ERROR_OK
 #define NATIVE_ERROR_OK 0
 #endif
 
 #ifndef NATIVE_ERROR_NO_BUFFER
 #define NATIVE_ERROR_NO_BUFFER 40601000
-#endif
-
-#ifndef SET_SWAP_INTERVAL
-#define SET_SWAP_INTERVAL 8
 #endif
 
 namespace libretro {
