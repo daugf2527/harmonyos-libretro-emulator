@@ -345,9 +345,9 @@ static napi_value StartEngine(napi_env env, napi_callback_info info) {
         ? "Engine start failed"
         : errorInfo.message.c_str();
 
-    // 错误码 3020: ENGINE_START_FAILED
     LOGF(LOG_ERROR, "[NEW] StartEngine failed: %{public}s", message);
-    return MakeErrorResult(env, false, 3020, message);
+    return MakeErrorResult(env, false,
+                           EngineErrorCodes::ENGINE_START_FAILED, message);
   }
 
   return MakeErrorResult(env, true);
@@ -359,12 +359,16 @@ static napi_value LoadCore(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[1];
   if (!GetArgs(env, info, 1, 1, args, &argc, "LoadCore")) {
-    return MakeErrorResult(env, false, 8001, "Invalid argument count");
+    return MakeErrorResult(env, false,
+                           NapiErrorCodes::INVALID_ARGUMENT_COUNT,
+                           "Invalid argument count");
   }
 
   char path[1024];
   if (!GetStringArg(env, args[0], path, sizeof(path), "LoadCore", "path")) {
-    return MakeErrorResult(env, false, 8002, "Invalid path argument type");
+    return MakeErrorResult(env, false,
+                           NapiErrorCodes::INVALID_ARGUMENT_TYPE,
+                           "Invalid path argument type");
   }
 
   LOGF(LOG_INFO, " [NEW] LoadCore: %{public}s", path);
@@ -377,9 +381,9 @@ static napi_value LoadCore(napi_env env, napi_callback_info info) {
         ? "Core load failed"
         : errorInfo.message.c_str();
 
-    // 错误码 3001: CORE_LOAD_FAILED
     LOGF(LOG_ERROR, "[NEW] LoadCore failed: %{public}s", message);
-    return MakeErrorResult(env, false, 3001, message);
+    return MakeErrorResult(env, false,
+                           EngineErrorCodes::CORE_LOAD_FAILED, message);
   }
 
   return MakeErrorResult(env, true);
@@ -391,13 +395,17 @@ static napi_value LoadRom(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[2];
   if (!GetArgs(env, info, 1, 2, args, &argc, "LoadRom")) {
-    return MakeErrorResult(env, false, 8001, "Invalid argument count");
+    return MakeErrorResult(env, false,
+                           NapiErrorCodes::INVALID_ARGUMENT_COUNT,
+                           "Invalid argument count");
   }
 
   char path[1024];
   if (!GetStringArgAllowEmpty(env, args[0], path, sizeof(path), "LoadRom",
                               "path")) {
-    return MakeErrorResult(env, false, 8002, "Invalid path argument type");
+    return MakeErrorResult(env, false,
+                           NapiErrorCodes::INVALID_ARGUMENT_TYPE,
+                           "Invalid path argument type");
   }
   std::string romPath(path);
 
@@ -412,9 +420,9 @@ static napi_value LoadRom(napi_env env, napi_callback_info info) {
         ? "ROM rawfile processing failed"
         : errorInfo.message.c_str();
 
-    // 错误码 3010: ROM_LOAD_FAILED
     LOGF(LOG_ERROR, "[NEW] LoadRom rawfile failed: %{public}s", message);
-    return MakeErrorResult(env, false, 3010, message);
+    return MakeErrorResult(env, false,
+                           EngineErrorCodes::ROM_LOAD_FAILED, message);
   }
 
   const bool ok = GetEngine()->LoadGame(romPath, romData);
@@ -425,9 +433,9 @@ static napi_value LoadRom(napi_env env, napi_callback_info info) {
         ? "ROM load failed"
         : errorInfo.message.c_str();
 
-    // 错误码 3010: ROM_LOAD_FAILED
     LOGF(LOG_ERROR, "[NEW] LoadRom failed: %{public}s", message);
-    return MakeErrorResult(env, false, 3010, message);
+    return MakeErrorResult(env, false,
+                           EngineErrorCodes::ROM_LOAD_FAILED, message);
   }
 
   return MakeErrorResult(env, true);
@@ -835,17 +843,16 @@ static void CompleteSwitchGame(napi_env env, napi_status status, void *data) {
   if (!ctx->result) {
     auto errorInfo = GetEngine()->GetLastErrorInfo();
 
-    // 根据 reason 映射错误码
     if (errorInfo.reason.find("load_core") != std::string::npos) {
-      ctx->errorCode = 3001;  // CORE_LOAD_FAILED
+      ctx->errorCode = EngineErrorCodes::CORE_LOAD_FAILED;
     } else if (errorInfo.reason.find("load_game") != std::string::npos) {
-      ctx->errorCode = 3010;  // ROM_LOAD_FAILED
+      ctx->errorCode = EngineErrorCodes::ROM_LOAD_FAILED;
     } else if (errorInfo.reason.find("start") != std::string::npos) {
-      ctx->errorCode = 3020;  // ENGINE_START_FAILED
+      ctx->errorCode = EngineErrorCodes::ENGINE_START_FAILED;
     } else if (errorInfo.reason.find("cancelled") != std::string::npos) {
-      ctx->errorCode = 3022;  // STATE_TRANSITION_FAILED
+      ctx->errorCode = EngineErrorCodes::STATE_TRANSITION_FAILED;
     } else {
-      ctx->errorCode = 3022;  // STATE_TRANSITION_FAILED (通用)
+      ctx->errorCode = EngineErrorCodes::STATE_TRANSITION_FAILED;
     }
 
     ctx->errorMessage = errorInfo.message.empty()
