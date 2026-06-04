@@ -221,11 +221,14 @@ target_link_libraries(entry PUBLIC libqos.so)
 
 if (${OHOS_ARCH} STREQUAL "arm64-v8a")
     # 添加优化选项
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -fvisibility=hidden -ffunction-sections -fdata-sections")
     message(STATUS "NEON optimization enabled for arm64-v8a")
     message(STATUS "   Compiler flags: ${CMAKE_CXX_FLAGS}")
 elseif (${OHOS_ARCH} STREQUAL "armeabi-v7a")
     # armeabi-v7a 需要显式启用 NEON
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon -mfloat-abi=softfp -O3")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon -mfloat-abi=softfp -O3 -fvisibility=hidden -ffunction-sections -fdata-sections")
     message(STATUS "NEON optimization enabled for armeabi-v7a")
 endif()
+
+# 链接时剔除未使用代码段（需配合 -ffunction-sections -fdata-sections）
+set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--gc-sections")
