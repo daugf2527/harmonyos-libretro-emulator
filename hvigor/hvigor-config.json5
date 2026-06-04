@@ -1,5 +1,12 @@
 {
   "modelVersion": "5.0.0",
   "dependencies": {
+  },
+  "nodeOptions": {
+    "maxOldSpaceSize": 8192,
+    "maxSemiSpaceSize": 64
+  },
+  "execution": {
+    "daemon": true
   }
 }
