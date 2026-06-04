@@ -1,5 +1,22 @@
 # Repository Guidelines
 
+## 公共行为准则
+
+<!-- SSOT 提示：本段是 C:/Users/newwo/.cc-switch/agent-policy/COMMON.md 的镜像副本。
+     Codex Bot 不支持 @import，故此处内嵌；根 CLAUDE.md 则通过 @import 引用 COMMON.md。
+     修改任一条准则时，必须同步 COMMON.md（唯一真值源），避免双轨漂移。 -->
+
+- 默认中文沟通，必要时保留英文术语。
+- 先读实物再判断；已知关键词优先用 `rg` / `rg --files`，探索调用链优先 `fast-context`。
+- 改动保持最小、可验证；关键改动前说明影响范围。
+- 不回滚用户已有改动；遇到不属于当前任务的改动，忽略或绕开。
+- 宣称完成、修复、通过前，先运行新鲜的验证命令并阅读输出。
+- 禁止破坏性 git 操作，除非用户明确授权；包括 `git reset --hard`、`git checkout --`、强制清理。
+- 删除、递归移动、替换全局配置前，先确认路径、备份，并取得明确许可。
+- 不打印 secret、token、provider key、raw memory、raw log body；报告只列位置和键名。
+- 全局归全局，项目归项目；项目 MCP、项目 skill、业务规则不要塞进全局。
+- Windows 远端流程：PowerShell 只做启动器，传 `.sh` 到远端后执行 bash；不要在 PowerShell 内联复杂远端命令。
+
 > **WARNING: TOP PRIORITY**  
 > Default to Chinese responses unless the user explicitly asks for another language.
 
