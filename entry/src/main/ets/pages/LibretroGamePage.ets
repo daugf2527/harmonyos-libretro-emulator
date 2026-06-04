@@ -71,6 +71,19 @@ import { runtimeRenderSettingsController } from '../common/RuntimeRenderSettings
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
 import { scanRuntimeRomSources } from '../common/RuntimeRomSourceScanner'
 
+/**
+ * 携带 C++ 回传 errorCode 的切换游戏异常。
+ * 让 catch 块直接消费结构化错误码，不再依赖 message 字符串嗅探。
+ */
+class SwitchGameError extends Error {
+  errorCode?: number
+
+  constructor(errorCode: number | undefined, message: string) {
+    super(message)
+    this.errorCode = errorCode
+  }
+}
+
 interface LibraryLaunchRouteParams {
   coreId?: string
   romFile?: string
@@ -412,11 +425,9 @@ struct LibretroGamePage {
 
   handleFpsUpdate(payload: FpsUpdatePayload) {
     const fps = Number(payload.fps);
-    if (!Number.isNaN(fps)) {
-      const displayFps = this.normalizeFpsForDisplay(fps);
-      this.perfDisplay.coreFps = displayFps;
-      this.refreshHudMetricsCache();
-    }
+    const displayFps = (!Number.isNaN(fps))
+      ? this.normalizeFpsForDisplay(fps)
+      : this.perfDisplay.coreFps;
 
     const drops = Number(payload.drops ?? 0);
     const dupes = Number(payload.dupes ?? 0);
@@ -426,7 +437,17 @@ struct LibretroGamePage {
     const buf = Number(payload.audioBufferUsage ?? 0);
     this.librarySessionTracker.updateFrameStats(fps, drops, dupes, nulls, underruns, overruns, buf);
 
-    this.perfDisplay.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
+    // 整体替换触发 @State 刷新（V1 不支持字段级 mutate 观测；ArkTS 禁对象 spread，显式列字段）
+    this.perfDisplay = {
+      realtimeFps: this.perfDisplay.realtimeFps,
+      coreFps: displayFps,
+      audioStatusText: this.perfDisplay.audioStatusText,
+      perfStatsText: `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`,
+      geometryText: this.perfDisplay.geometryText
+    };
+    if (!Number.isNaN(fps)) {
+      this.refreshHudMetricsCache();
+    }
   }
 
   // 限制 FPS 显示范围：> 240 视为没有 v-sync 限速的瞬时跑分值，
@@ -449,7 +470,14 @@ struct LibretroGamePage {
       return;
     }
     this.librarySessionTracker.updateAudioStatus(occupancy, underruns, Number(payload.overruns));
-    this.perfDisplay.audioStatusText = `Buf:${occupancy.toFixed(0)}% U:${underruns}`;
+    // 整体替换触发 @State 刷新（ArkTS 禁对象 spread，显式列字段）
+    this.perfDisplay = {
+      realtimeFps: this.perfDisplay.realtimeFps,
+      coreFps: this.perfDisplay.coreFps,
+      audioStatusText: `Buf:${occupancy.toFixed(0)}% U:${underruns}`,
+      perfStatsText: this.perfDisplay.perfStatsText,
+      geometryText: this.perfDisplay.geometryText
+    };
   }
 
   handleGeometryUpdate(payload: GeometryUpdatePayload) {
@@ -458,7 +486,14 @@ struct LibretroGamePage {
     const a = Number(payload.aspect_ratio ?? 0);
     if (w > 0 && h > 0) {
       const aspectText = (a > 0) ? a.toFixed(3) : (w / h).toFixed(3);
-      this.perfDisplay.geometryText = `Base:${w}x${h} AR:${aspectText}`;
+      // 整体替换触发 @State 刷新（ArkTS 禁对象 spread，显式列字段）
+      this.perfDisplay = {
+        realtimeFps: this.perfDisplay.realtimeFps,
+        coreFps: this.perfDisplay.coreFps,
+        audioStatusText: this.perfDisplay.audioStatusText,
+        perfStatsText: this.perfDisplay.perfStatsText,
+        geometryText: `Base:${w}x${h} AR:${aspectText}`
+      };
       // 让 ArkUI 容器按真实游戏画面比例渲染 XComponent，避免拉伸。
       // 例如 2048 是 376×464（竖屏 ≈ 0.81），GBA 是 240×160（横屏 1.5）。
       const ratio = (a > 0) ? a : (w / h);
@@ -995,7 +1030,7 @@ struct LibretroGamePage {
         'Engine',
         `Resolved ROM path: ${resolved.romPath}, useResMgr=${resolved.useResMgr}`
       );
-      const ok = await runtimeSessionController.switchGame({
+      const result = await runtimeSessionController.switchGame({
         corePath,
         romPath: resolved.romPath,
         filesDir,
@@ -1010,8 +1045,14 @@ struct LibretroGamePage {
       if (!this.isCurrentSwitchTask(token)) {
         return;
       }
-      if (!ok) {
-        throw new Error(runtimeSessionController.formatLastError('SwitchGame'));
+      if (!result.success) {
+        // 直接消费 C++ 回传的结构化 errorCode（接通跨层错误码通道，
+        // 不再靠 message 字符串嗅探）。errorCode 缺省时回退到引擎错误信息。
+        const failure = new SwitchGameError(
+          result.errorCode,
+          result.message || runtimeSessionController.formatLastError('SwitchGame')
+        );
+        throw failure;
       }
 
       this.currentCore = core.name;
@@ -1035,12 +1076,18 @@ struct LibretroGamePage {
       if (!this.isCurrentSwitchTask(token)) {
         return;
       }
-      // 使用错误码系统提供具体错误信息
       const rawMessage = (e as Error).message || String(e);
       let errorCode = EngineErrorCodes.ENGINE_START_FAILED;
 
-      // 根据错误消息推断具体错误类型
-      if (rawMessage.includes('Core') || rawMessage.includes('核心')) {
+      if (e instanceof SwitchGameError && e.errorCode !== undefined) {
+        // 首选：C++ 回传的结构化 errorCode（精确，含 STATE_TRANSITION_FAILED 等
+        // 字符串嗅探拿不到的码）。
+        const definition = ErrorCodeUtils.findByNumericCode(e.errorCode);
+        if (definition) {
+          errorCode = definition;
+        }
+      } else if (rawMessage.includes('Core') || rawMessage.includes('核心')) {
+        // 兜底：非结构化异常（如中间层 reject）退回消息推断。
         errorCode = EngineErrorCodes.CORE_LOAD_FAILED;
       } else if (rawMessage.includes('ROM') || rawMessage.includes('游戏')) {
         errorCode = EngineErrorCodes.ROM_LOAD_FAILED;

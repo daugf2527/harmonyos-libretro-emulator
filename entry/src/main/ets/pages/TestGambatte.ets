@@ -17,17 +17,18 @@ import { deviceInfo } from '@kit.BasicServicesKit';
 import { common } from '@kit.AbilityKit';
 import { resourceManager } from '@kit.LocalizationKit';
 import { EmuStateColors, EmuTypography } from '../common/EmuUiTokens';
+import { NapiErrorResult } from '../common/ErrorCodes';
 
 // NAPI 接口定义 (遵循 AGENTS.md 规范)
 interface LibretroNapi {
-  refactoredStartEngine(): boolean;
+  refactoredStartEngine(): NapiErrorResult;
   refactoredStopEngine(): boolean;
   refactoredStopEngineAsync(): Promise<boolean>;
-  refactoredLoadCore(path: string): boolean;
+  refactoredLoadCore(path: string): NapiErrorResult;
   refactoredLoadRom(
     path: string,
     resMgr?: resourceManager.ResourceManager
-  ): boolean;
+  ): NapiErrorResult;
   refactoredSetFilesDir(path: string): boolean;
   refactoredGetRawFileList(
     resMgr: resourceManager.ResourceManager,
@@ -752,8 +753,8 @@ struct TestGambatte {
         }
       }
 
-      const startOk = nativeApi.refactoredStartEngine();
-      if (!startOk) {
+      const startResult = nativeApi.refactoredStartEngine();
+      if (!startResult.success) {
         throw new Error('引擎启动失败');
       }
       const setDirOk = nativeApi.refactoredSetFilesDir(filesDir);
@@ -762,8 +763,8 @@ struct TestGambatte {
       }
 
       LogHelper.info('TestGambatte', 'Core', '步骤1: 加载核心...');
-      const coreLoaded = nativeApi.refactoredLoadCore(corePath);
-      if (!coreLoaded) {
+      const coreLoadResult = nativeApi.refactoredLoadCore(corePath);
+      if (!coreLoadResult.success) {
         throw new Error('加载核心失败');
       }
       const coreReady = await nativeApi.refactoredWaitForStateAsync(
@@ -776,8 +777,8 @@ struct TestGambatte {
       LogHelper.info('TestGambatte', 'Core', '核心加载成功');
 
       LogHelper.info('TestGambatte', 'ROM', '步骤2: 加载 ROM...');
-      const romLoaded = nativeApi.refactoredLoadRom(rom.file, resMgr);
-      if (!romLoaded) {
+      const romLoadResult = nativeApi.refactoredLoadRom(rom.file, resMgr);
+      if (!romLoadResult.success) {
         throw new Error('加载 ROM 失败');
       }
       const running = await nativeApi.refactoredWaitForStateAsync(
@@ -913,8 +914,8 @@ struct TestGambatte {
 
     try {
       // Start Engine
-      const startOk = nativeApi.refactoredStartEngine();
-      if (!startOk) {
+      const startResult = nativeApi.refactoredStartEngine();
+      if (!startResult.success) {
         return this.classifyFromLastError(
           core,
           romName,
@@ -935,8 +936,8 @@ struct TestGambatte {
       }
       
       // Load Core
-      const loadCoreOk = nativeApi.refactoredLoadCore(corePath);
-      if (!loadCoreOk) {
+      const loadCoreResult = nativeApi.refactoredLoadCore(corePath);
+      if (!loadCoreResult.success) {
         return this.classifyFromLastError(
           core,
           romName,
@@ -961,8 +962,8 @@ struct TestGambatte {
 
       // Load ROM (如果有)
       if (rom) {
-        const loadRomOk = nativeApi.refactoredLoadRom(rom.file, resMgr);
-        if (!loadRomOk) {
+        const loadRomResult = nativeApi.refactoredLoadRom(rom.file, resMgr);
+        if (!loadRomResult.success) {
           return this.classifyFromLastError(
             core,
             romName,
