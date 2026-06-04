@@ -3,6 +3,26 @@
 > **For Claude:** 本文档是 2026-06-04 质检后，用户要求"用最佳 API"的前瞻优化方案。
 > 联网核对 + 2 个 opus agent 实地测绘产出。**实施前必读对应章节 + 重新 Read 实物**。
 
+---
+
+> ## ⛔ 2026-06-04 暂缓决策 + 实物核查修正（用户拍板：两案均暂缓）
+>
+> 本文档下方原始方案保留作 audit trail，但**已知失真/证伪，动手前以本块为准**：
+>
+> **方案 B（状态 V2）— ❌ 废弃，不要实施。**
+> 文档建议把 HUD DTO 标 `@ObservedV2 + @Trace`，但实践已证伪：V1 项目里 `@ObservedV2` 类定义本身就触发编译器递归代理 → **heap OOM**（上会话连续 3 次崩溃）。
+> 详见 memory `feedback_arkts_v1v2_no_mixing.md`。perfDisplay 现状（`LibretroGamePage.ets:441/474/490` 纯 V1 整体替换）**已是当前最优**，保持不动。
+>
+> **方案 A（路由 Navigation）— ⏸️ 暂缓。**
+> router 在 API22 **未 deprecated**（上会话核查 0 deprecated API），迁移属纯合规/前瞻投入、**无功能收益**。用户 2026-06-04 决定本会话暂缓。
+> 若未来重启，先按下方"实物核查修正"更新数据，**别用下方过时的旧数字**。
+>
+> **实物核查修正（2026-06-04 Explore agent 复测，覆盖下方旧数据）：**
+> - router 调用方式：全仓 **0 处静态 import**，统一走 `this.getUIContext().getRouter().pushUrl/replaceUrl/back`（UIContext 是 API12+ 统一入口，封装点天然集中——迁移利好）
+> - 跳转边实测 **~42 条**（pushUrl 17 + replaceUrl 19 + back 3 + getParams 4），比下方"28 条"多 ~50%
+> - Navigation/NavPathStack/NavDestination 当前 **0 使用**（`commitLaunchNavigation` 是业务方法名，非 ArkUI Navigation）
+> - 底部 tab 切换：10 页 `onBottomNavClick` 统一 `replaceUrl({url: route})`，EmuBottomNav 纯回调不导航（与下方描述一致）
+
 **背景**：项目 native 核心（GLES/Vulkan/CPU 三后端 + 音频 AudioWorkgroup）联网核对后**已是 API22 最佳实践**；音频 LatencyMode 用 NORMAL 是踩坑后的有意决策（FAST 致音频断续，**不改**）。剩余两个官方推荐的前瞻迁移如下。
 
 ---
