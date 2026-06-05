@@ -119,7 +119,7 @@
 | 影响 | P2 — 错误码以裸字面量散落各 .cpp，改一个码需全仓 grep；`docs/napi-error-code-mapping.md`（145 行）定义了码段但 C++ 侧无对应 enum，文档与代码靠人肉同步易 drift；若与 ArkTS `ErrorCodes.ets` 的 numericCode 不一致，用户会看到错误码错乱 |
 | 拟修 | 已在 `engine_napi_common.h` 加 `namespace EngineErrorCodes`/`NapiErrorCodes` 的 `constexpr int` 定义，替换 `engine_lifecycle_napi.cpp` / `engine_state_napi.cpp` 调用点裸数字；ArkTS `ErrorCodes.ets` 仍是用户可见错误定义 SOT，C++ 常量作为 native 侧映射锚点。 |
 | 状态 | closed |
-| 备注 | 2026-06-02 收口：静态 grep 确认相关 `.cpp` 调用点不再直接传递 `3001/3010/3020/3022/3031/8001/8002` 给 `MakeErrorResult` 或 `ctx->errorCode`；未编译/未真机。 |
+| 备注 | 2026-06-02 收口：静态 grep 确认相关 `.cpp` 调用点不再直接传递 `3001/3010/3020/3022/3031/8001/8002` 给 `MakeErrorResult` 或 `ctx->errorCode`；未编译/未真机。**2026-06-06 三处一致性核对通过**（followup loop）：C++ `EngineErrorCodes`/`NapiErrorCodes` 8 码（3001/3010/3020/3022/3031/3032/8001/8002）↔ ArkTS `ErrorCodes.ets` numericCode ↔ `docs/napi-error-code-mapping.md` 三处**数值+code 字符串名全部语义一致**（如两侧 `CORE_LOAD_FAILED`=3001、`INVALID_ARGUMENT_COUNT`=8001），每码 ArkTS 唯一命中、文档全覆盖。D008 影响项担忧的"errorCode 错乱"风险确认不存在，D010 接通的 errorCode 跨层通道健康。 |
 
 ### D009 — M3「质量门禁」里程碑标 ✅ 但门禁脚本未落地
 
