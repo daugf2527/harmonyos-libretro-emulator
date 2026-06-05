@@ -37,23 +37,23 @@
 
 | Key | 值 |
 |---|---|
-| 引入 | 2026-05-27 / `docs/audit/audit-20260527-124137/fix-verify-T8C.md` T8C-F3+F7 PARTIAL |
-| 位置 | `entry/src/main/ets/common/LibrarySaveFilePurger.ets:71-74` |
+| 引入 | 2026-05-27 / `docs/audit/audit-20260527-124137/fix-verify-T8C.md` T8C-F3+F7 |
+| 位置 | `entry/src/main/ets/common/LibrarySaveFilePurger.ets:71-93`（matchesBaseName / extractRomStem / normalizeContentKey） |
 | 影响 | P1 — 用户在游戏库页面点"清除存档"，`purgeSaveFilesForBaseName` 始终返回 `deletedCount: 0`，存档文件不被删除 |
-| 拟修 | 将 `matchesBaseName` 内的 `indexOf(normalizedBaseName) === 0` 改为 `includes(normalizedBaseName)`；或在函数内先提取 `romFile` 的文件名部分再比较 |
-| 状态 | open |
-| 备注 | audit-20260527-124137 T8C-F7；fix-verify 评为 PARTIAL，F3 manifest 同步已修，F7 匹配算法未修；`feedback_string_match_trace_inputs.md` 记录了同类教训 |
+| 拟修 | 将 `matchesBaseName` 内的 `indexOf(normalizedBaseName) === 0` 改为精确比较——先 `extractRomStem`(取 basename+去扩展名)→`normalizeContentKey`(小写+去特殊字符)→`===` 比较。同时处理路径前缀("roms/")、扩展名差异(".nes" vs 无扩展名)、宽松匹配误删边界 |
+| 状态 | fixed |
+| 备注 | **2026-06-05 实物核查发现早已修复**（tracker drift）：`588a824`(05-27 T8-C-F7) 已将 `matchesBaseName` 全重写为现在三函数结构——`extractRomStem` 取 basename+去扩展名 → `normalizeContentKey` 小写去特殊字符 → `===` 精确比较。旧 `indexOf === 0` 逻辑完全不在了。同 commit 还加了 purge 后 `pruneManifestForFileNames` 同步 manifest（T8-C-F3），解决"已删存档 SaveStatePage 仍显示"的第二个问题。`normalizeContentKey` 内部先调 `extractRomStem` 再去扩展名 → normalize，`matchesBaseName` 再调一次 `extractRomStem` 是冗余但**无害**（二次调在已剥过的 stem 上 no-op），改掉可视为微优化但非 bug。 |
 
 ### D002 — SaveStateRepository 写 .state 文件与更新 manifest 之间存在 orphan 窗口
 
 | Key | 值 |
 |---|---|
 | 引入 | 2026-05-27 / `docs/audit/audit-20260527-124137/agent-T8C-arkts.md` T8C-F6 |
-| 位置 | `entry/src/main/ets/common/SaveStateRepository.ets:37-43` |
+| 位置 | `entry/src/main/ets/common/SaveStateRepository.ets:189-227`（reconcileManifestItems） |
 | 影响 | P2 — 进程在写完 `.state` 文件但 manifest 尚未更新时崩溃，留下孤立存档文件；代码注释 L41-42 已记录此风险 |
-| 拟修 | 将写文件与 manifest 更新合并为原子操作：先写临时文件，manifest 更新成功后再 rename 到目标路径；或在启动时扫描孤立文件并清理 |
-| 状态 | open |
-| 备注 | audit-20260527-124137 T8C-F6；fix-verify 标记为 SKIP (DESIGN)，主 Claude 判定跳过；代码内已有 `// T6-F4` 注释标记 |
+| 拟修 | 在 `loadManifest` 成功路径加 `reconcileManifestItems` 对账：(a) manifest 有条目但文件不存在→裁剪；(b) 磁盘有 .state 但 manifest 无→补充（romFile=''）。**刻意不改写入顺序**——当前 .state 先写保证崩溃时数据在磁盘可恢复，反转则 save 可能丢失。 |
+| 状态 | fixed |
+| 备注 | **2026-06-05 修复**（commit b719eb5）：复用 `buildManifestFromDirectory` 既有扫描模式；`.tmp` 半写文件后缀不匹配不被拾取；三处调用方（list/save/delete）经 loadManifest 统一覆盖。未编译/未真机（ArkTS quick_signals 不覆盖，需 DevEco 复编）。原 fix-verify 标 SKIP (DESIGN)，本次实做。 |
 
 ### D003 — engine_lifecycle_napi / core_loader_napi 三处 Complete 函数未处理 napi_cancelled，env teardown 时 UB
 
@@ -88,16 +88,16 @@
 | 状态 | fixed |
 | 备注 | **2026-06-05 实物核查发现早已修复**（tracker drift）：`writeArrayBufferToFile`（`SaveStateRepository.ets:235`）已是 `async function ... Promise<void>`，内部全 `await fs.open/write/close/rename`，并实现 tmp+rename 原子写（T6-F3）。修复在 `588a824`(05-27 17:28) — 与 debt 录入同一 commit，即录入时其实已修，状态误标 open。`saveStateData` L44 正确 `await`。未编译/未真机。 |
 
-### D006 — 55 个 refactored* NAPI export 未在 CLAUDE.md / AGENTS.md 任何位置提及（文档化缺口）
+### D006 — 63 个 refactored* NAPI export 未在 CLAUDE.md / AGENTS.md 任何位置提及（文档化缺口）
 
 | Key | 值 |
 |---|---|
 | 引入 | 2026-05-28 / `docs/gc-code-drift-20260528-155349.md` Pattern 5 |
 | 位置 | `entry/src/main/cpp/app/napi/**`（`engine_lifecycle_napi.cpp` / `engine_state_napi.cpp` / `engine_input_napi.cpp` / `engine_audio_napi.cpp` / `core_loader_napi.cpp` 等;55 个 export 完整清单见 `docs/gc-code-drift-20260528-155349.md` "Pattern 5" 节) |
 | 影响 | P1 — ArkTS 端调用 `globalThis.refactoredXxx` 时 agent 找不到该 API 在哪个 .cpp 文件实现 / 参数契约怎么定;ArkTS 侧改动易踩 NAPI 边界坑(memory `feedback_napi_reviewer_no_skip`) |
-| 拟修 | 在 `AGENTS.md` 加一节 "NAPI Export Inventory",分组列出(Lifecycle / State / Input / Audio / Cheat / DiskControl / Stats)55 个 export 名 + 实现文件路径 + 参数类型一句话;每加新 export 必须同时更新此节(用 `scan_code_drift.sh` Pattern 5 守) |
-| 状态 | open |
-| 备注 | `/gc` 2026-05-28 首次扫描发现;`napi-boundary-reviewer` agent 已经覆盖修改路径,但缺文档化的入口让 agent 自助查找;批量补一次性投资,后续靠 Pattern 5 增量守 |
+| 拟修 | 在 `AGENTS.md` 加一节 "NAPI Export Inventory",分组列出(生命周期/状态/输入/视频音频/磁盘/查询/其他)63 个 export 名 + 实现文件路径 + 签名一句话;每加新 export 必须同时更新此节(用 `scan_code_drift.sh` Pattern 5 守) |
+| 状态 | fixed |
+| 备注 | **2026-06-05 修复**（commit 0bb1aee）：实物 grep 实证为 **63 个**（非标题的 55；旧 gc 计数漏 input_mapping/core_loader 两独立模块 + 后续新增）。AGENTS.md 运行链路图节后加 NAPI Export Inventory，7 域表格，签名全部取自真值源 `index.d.ts`，修正 5 处此前二手描述偏差（testCoreLoader 同步 string / sendSensor 3 参 / getRegion·getStats·getAVInfo 返回 number·结构化对象）。`/gc` 2026-05-28 首次发现；后续靠 Pattern 5 增量守。 |
 
 ### D007 — 30 处 @State 装饰复杂类型（V1 模式整体替换，V2 迁移时需改为 @ObservedV2+@Trace）
 
@@ -128,9 +128,9 @@
 | 引入 | 2026-06-01 / 本会话质检 |
 | 位置 | `scripts/test/`（缺 matrix/compat 脚本）；设计文档 `docs/design/m3-automated-test-design.md` + `m3-core-compatibility-matrix.md` 已完整 |
 | 影响 | P1 — Roadmap 标 M3「✅ 已完成」，但 `scripts/test/` 无任何兼容矩阵/自动化测试脚本，发版前「必跑清单」无可执行产物，门禁名存实亡（"完成"的只有设计图纸） |
-| 拟修 | 二选一：(1) 按 `m3-automated-test-design.md` 3 层架构落地 Bash 层兼容矩阵跑测脚本；(2) 据实将 Roadmap M3 状态降级为「⚠️ 设计完成 / 门禁脚本落地 pending」 |
-| 状态 | open |
-| 备注 | 2026-06-01 质检实地核实（find scripts 无 matrix/compat）；与 Roadmap 账本对齐任务（`docs/plans/2026-06-01-verification-backlog-index.md`）联动 |
+| 拟修 | 按 `m3-automated-test-design.md` Layer 1（Bash 脚本扫描 .so+ROM→test-manifest.json）+ quick_signals 集成 + CI artifact 上传。Layer 2 (ArkTS 真机测试) 和 Layer 3 (手工验证矩阵) 后续单独排期（需真机）。 |
+| 状态 | fixed |
+| 备注 | **2026-06-05 Layer1 落地**（commit b1c0838）：新建 `scripts/test/check_core_compatibility.sh`（30 cores + 35 roms = 65 entries；逐行 printf 构 JSON 无 jq 依赖；目录缺失不 FAIL）；`quick_signals.sh` 加 core-compat check(skip_check 模式仿 cxx-build)；`harmonyos-pr-ci.yml` Build HAP 后加 M3 manifest + artifact 上传；`.gitignore` 补根级 `build/`。**未做**：Layer 2 ArkTS (CoreCompatibilityTest.ets/TestPage.ets)、Layer 3 手工模板、Roadmap 状态改标。D009 按 Layer1 范围 fixed，Layer 2/3 记录为 follow-up。 |
 
 ### D010 — refactoredSwitchGameAsync 类型谎言掩盖 switch 失败误判 bug（已修）
 
