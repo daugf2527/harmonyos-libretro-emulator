@@ -505,22 +505,26 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   if (!player->workgroup_disabled_.load(std::memory_order_relaxed)) {
     std::lock_guard<std::mutex> lock(player->state_mutex_);
     if (player->workgroup_ && player->workgroup_token_ > 0) {
+      // OH_AudioWorkgroup_Start 的 startTime/deadlineTime header 口径为「毫秒」
+      // （native_audio_resource_manager.h: "The unit of time is milliseconds"），
+      // 此前误传纳秒导致 deadline 巨值、调度提示失效——改为毫秒口径。
       timespec ts{};
       clock_gettime(CLOCK_MONOTONIC, &ts);
-      uint64_t start_ns = static_cast<uint64_t>(ts.tv_sec) * 1000000000ULL +
-                          static_cast<uint64_t>(ts.tv_nsec);
+      uint64_t start_ms = static_cast<uint64_t>(ts.tv_sec) * 1000ULL +
+                          static_cast<uint64_t>(ts.tv_nsec) / 1000000ULL;
 
-      uint64_t work_ns =
-          (static_cast<uint64_t>(frames_needed) * 1000000000ULL +
+      // 本帧音频处理预算（毫秒，向上取整，至少 1ms 给 deadline 窗口）
+      uint64_t work_ms =
+          (static_cast<uint64_t>(frames_needed) * 1000ULL +
            static_cast<uint64_t>(player->sample_rate_) - 1ULL) /
           static_cast<uint64_t>(player->sample_rate_);
-      if (work_ns < 1) {
-        work_ns = 1;
+      if (work_ms < 1) {
+        work_ms = 1;
       }
 
       OH_AudioCommon_Result start_result =
-          OH_AudioWorkgroup_Start(player->workgroup_, start_ns,
-                                  start_ns + work_ns);
+          OH_AudioWorkgroup_Start(player->workgroup_, start_ms,
+                                  start_ms + work_ms);
       workgroup_started = (start_result == AUDIOCOMMON_RESULT_SUCCESS);
       if (!workgroup_started) {
         bool expected = false;

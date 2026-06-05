@@ -77,6 +77,7 @@ older clients pull them in on demand when Claude works under those paths.
 |---|---|---|
 | **cclsp** | **C/C++ 只**（本地 `.claude/cclsp.json` 配的 clangd） | find_definition / find_references / get_incoming_calls / get_outgoing_calls / find_workspace_symbols / get_hover / get_diagnostics_for_file / prepare_call_hierarchy |
 | **serena** | 全仓库（C++/ets/md）+ project memory | get_symbols_overview / find_symbol / find_referencing_symbols / list_memories / write_memory / 跨语言文件级符号操作 |
+| **codegraph** | **C/C++ 为主**（`.codegraph/` 索引 + daemon watcher 自动同步） | codegraph_explore / codegraph_search / codegraph_callers / codegraph_impact — 跨文件调用图 / 影响面。**不索引 `.ets`**（0.9.9 `EXTENSION_MAP` 无此扩展）→ ArkTS 符号 / UI 组件查询一律走 serena；**codegraph 空结果 ≠ 无此符号** |
 | **ast-grep** | 任意语言（AST pattern） | find_code / find_code_by_rule — **配对检查**（acquire/release、map/unmap）、threading violation 跨文件扫 |
 | **web-search** | Web | `mcp__web-search__web_fetch`（单 URL）/ `mcp__web-search__web_search`（关键词）— HarmonyOS 官方文档抓取；本机 SDK header 优先（`feedback_websearch_fail_fallback_to_sdk_header`）。**firecrawl 已弃用**（见 memory `feedback_firecrawl_deprecated`） |
 | **sequential-thinking** | — | 罕见 finding 拿不准时多角度推理（不滥用） |

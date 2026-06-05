@@ -33,17 +33,17 @@ export interface NapiErrorResult {
   errorCode?: number;
   message?: string;
 }
-export const refactoredStartEngine: () => boolean;
+export const refactoredStartEngine: () => NapiErrorResult;
 export const refactoredStopEngine: () => boolean;
 export function refactoredStopEngineAsync(): Promise<boolean>;
 export const refactoredResetEngine: () => boolean;
 export const refactoredPauseEngine: () => boolean;
 export const refactoredResumeEngine: () => boolean;
-export const refactoredLoadCore: (corePath: string) => boolean;
+export const refactoredLoadCore: (corePath: string) => NapiErrorResult;
 export const refactoredLoadRom: (
   romPath: string,
   resMgr?: resourceManager.ResourceManager
-) => boolean;
+) => NapiErrorResult;
 export function refactoredSwitchGameAsync(
   corePath: string,
   romPath: string,

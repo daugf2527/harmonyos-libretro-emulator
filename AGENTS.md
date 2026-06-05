@@ -112,14 +112,14 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
-| `refactoredStartEngine` | `() => boolean` | sync | 启动引擎线程 + 消息循环 |
+| `refactoredStartEngine` | `() => NapiErrorResult` | sync | 启动引擎线程 + 消息循环（**返回结构对象非 boolean**，判定用 `.success`） |
 | `refactoredStopEngine` | `() => boolean` | sync | 同步停止引擎 |
 | `refactoredStopEngineAsync` | `() => Promise<boolean>` | async | 异步停止引擎（推荐） |
 | `refactoredResetEngine` | `() => boolean` | sync | 重置引擎 |
 | `refactoredPauseEngine` | `() => boolean` | sync | 暂停游戏循环 |
 | `refactoredResumeEngine` | `() => boolean` | sync | 恢复游戏循环 |
-| `refactoredLoadCore` | `(corePath: string) => boolean` | sync | 加载 libretro 核心 (.so) |
-| `refactoredLoadRom` | `(romPath: string, resMgr?: ResourceManager) => boolean` | sync | 加载 ROM（支持 rawfile） |
+| `refactoredLoadCore` | `(corePath: string) => NapiErrorResult` | sync | 加载 libretro 核心 (.so)（**返回结构对象非 boolean**，判定用 `.success`） |
+| `refactoredLoadRom` | `(romPath: string, resMgr?: ResourceManager) => NapiErrorResult` | sync | 加载 ROM（支持 rawfile）（**返回结构对象非 boolean**，判定用 `.success`） |
 | `refactoredSwitchGameAsync` | `(corePath, romPath, filesDir, [resMgr], [timeoutMs], [token]) => Promise<NapiErrorResult>` | async | 切换游戏（两个重载，含/不含 resMgr）；返回结构化错误对象 |
 | `refactoredCancelSwitch` | `() => boolean` | sync | 取消进行中的切换（token 失效） |
 | `refactoredGetRawFileList` | `(resMgr: ResourceManager, dir?: string) => string[]` | sync | 列出 rawfile 目录文件 |
