@@ -898,25 +898,25 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   size_t argc = 0;
   napi_value args[7];  // 增加一个参数位用于进度回调
   if (!GetArgs(env, info, 3, 7, args, &argc, "SwitchGameAsync")) {
-    return MakeResolvedPromise(env, false);
+    return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_COUNT);
   }
 
   char corePath[1024];
   if (!GetStringArg(env, args[0], corePath, sizeof(corePath),
                     "SwitchGameAsync", "corePath")) {
-    return MakeResolvedPromise(env, false);
+    return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
   }
 
   char romPath[1024];
   if (!GetStringArgAllowEmpty(env, args[1], romPath, sizeof(romPath),
                               "SwitchGameAsync", "romPath")) {
-    return MakeResolvedPromise(env, false);
+    return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
   }
 
   char filesDir[1024];
   if (!GetStringArg(env, args[2], filesDir, sizeof(filesDir),
                     "SwitchGameAsync", "filesDir")) {
-    return MakeResolvedPromise(env, false);
+    return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
   }
 
   napi_value resMgrValue = nullptr;
@@ -931,7 +931,11 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   if (argc >= 4) {
     napi_valuetype arg3Type = napi_undefined;
     if (napi_typeof(env, args[3], &arg3Type) != napi_ok) {
-      return MakeResolvedPromise(env, false);
+      // napi_typeof 是原生调用(非项目 helper),失败不产生 pending exception,
+      // 故 resolve 结构化 {success:false,errorCode} 接通错误码(D013b review:
+      // 此前裸 boolean false 是隐藏 type-lie——声明 NapiErrorResult 却 resolve
+      // boolean。区别于上方 GetArgs/GetStringArg 等 helper 已 throw→reject 路径)。
+      return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
     }
     if (arg3Type == napi_object) {
       resMgrValue = args[3];
@@ -949,7 +953,7 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     int32_t t = 0;
     if (!GetInt32Arg(env, args[timeoutIndex], t, "SwitchGameAsync",
                      "timeoutMs")) {
-      return MakeResolvedPromise(env, false);
+      return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
     }
     if (t >= 0) {
       timeoutMs = static_cast<uint32_t>(t);
@@ -960,7 +964,7 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     double tokenValue = 0.0;
     if (!GetDoubleArg(env, args[tokenIndex], tokenValue, "SwitchGameAsync",
                       "token")) {
-      return MakeResolvedPromise(env, false);
+      return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
     }
     if (tokenValue > 0) {
       callerToken = static_cast<uint64_t>(tokenValue);
@@ -971,7 +975,8 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   if (progressIndex >= 0 && argc > static_cast<size_t>(progressIndex)) {
     napi_valuetype callbackType = napi_undefined;
     if (napi_typeof(env, args[progressIndex], &callbackType) != napi_ok) {
-      return MakeResolvedPromise(env, false);
+      // 同 arg3:napi_typeof 原生失败不 throw,resolve 结构化错误接通 errorCode。
+      return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
     }
     if (callbackType == napi_function) {
       progressCallback = args[progressIndex];
