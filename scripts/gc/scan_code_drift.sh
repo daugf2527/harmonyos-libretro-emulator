@@ -28,8 +28,17 @@ p2_raw="$(rg "0xFF[0-9A-Fa-f]{6}|'#[0-9A-Fa-f]{3,8}'" "${ETS_DIR}" --glob '*.ets
 p2_hits="$(echo "${p2_raw}" | grep -c . || true)"
 [[ "${p2_raw}" == "" ]] && p2_hits=0
 
-# ── Pattern 3: ForEach without keyGenerator (list for human review) ──────────
-p3_raw="$(rg 'ForEach\(' "${ETS_DIR}" --glob '*.ets' -n --no-heading 2>/dev/null || true)"
+# ── Pattern 3: ForEach missing keyGenerator (精确核验,非"列出全部") ──────────
+# 旧实现仅 rg 'ForEach\(' 列出全部 ForEach → keyGenerator 是跨行第3参,单行
+# grep 看不到,导致每次扫描把全部 ForEach 当"待人工核实"(52 个纯噪音)。
+# 改用 check_foreach_keygen.pl:平衡括号解析 + 跳字符串字面量 + 顶层逗号计数,
+# 只报真正缺第3参的。\bForEach 自动排除 LazyForEach。
+p3_files="$(rg 'ForEach\(' "${ETS_DIR}" --glob '*.ets' -l --path-separator / 2>/dev/null || true)"
+if [[ -n "${p3_files}" ]]; then
+  p3_raw="$(perl scripts/gc/check_foreach_keygen.pl ${p3_files} 2>/dev/null | grep '^NO_KEY' || true)"
+else
+  p3_raw=""
+fi
 p3_hits="$(echo "${p3_raw}" | grep -c . || true)"
 [[ "${p3_raw}" == "" ]] && p3_hits=0
 
@@ -116,10 +125,10 @@ Hits: ${p2_hits}
 
 $(fmt_list "${p2_raw}")
 
-## Pattern 3: ForEach — keyGenerator presence (human review required)
+## Pattern 3: ForEach — missing keyGenerator (精确核验)
 
 Source: entry/src/main/ets/CLAUDE.md#foreach-always-provide-keygenerator
-All ForEach calls listed — verify 3rd argument exists: ${p3_hits}
+Missing 3rd-arg keyGenerator (balanced-paren parse, 跨行/字符串安全): ${p3_hits}
 
 $(fmt_list "${p3_raw}")
 
