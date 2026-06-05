@@ -176,6 +176,17 @@
 | 状态 | open（部分修复，见进展） |
 | 备注 | D012 修复 review 衍生；reviewer 判 D012 核心 PASS，3 concerns 均 follow-up 不 block。(a) 为模板 `MakeResolvedPromise` pre-existing 缺陷，新 helper 沿用同模式（一致但同缺陷）；(c) pre-existing drift，与 D006 NAPI Inventory 同步纪律相关。**进展 2026-06-06**：(c) ✅ 已修（index.d.ts 两 overload + AGENTS.md 补 `progressCallback?:(progress,message)=>void`）；(a) → **wontfix**（仅 JS 引擎 OOM 极端态触发，`MakeErrorResult` 入口已查 pending，现实只剩 `napi_create_object` 失败=OOM，实害≈0；且改它需变更 helper 失败语义、与模板不一致，收益不抵风险）；(b) 待下轮统一（behavior-neutral 消维护陷阱）。 |
 
+### D014 — refactoredSaveState(sync) 失败路径 return 结构对象而非声明的 ArrayBuffer|null（类型谎言）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-06 / 本会话 loop · NAPI 全 export 返回类型三处一致性核对 |
+| 位置 | `entry/src/main/cpp/app/napi/engine_state_napi.cpp` SaveState（修前 L116/125 两失败路径 `return MakeErrorResult(env,false,SAVE_STATE_SAVE_FAILED,...)`）；声明 `index.d.ts:114 refactoredSaveState: () => ArrayBuffer \| null` |
+| 影响 | P3 — 声明 `ArrayBuffer\|null`，失败却返回 `{success:false,errorCode,message}` 结构对象（truthy）→ ArkTS `if(!buf)`/`buf===null` 漏判失败（D010/D011/D012 同根类型谎言）。**当前无活跃 caller**：`RuntimeSessionController.saveState():56` 透传但全仓 0 上游调用，生产实走 `refactoredSaveStateAsync`（reject 失败，正确）。休眠路径，爆炸半径≈0，但属潜在地雷 |
+| 拟修 | 已修：两失败路径 `MakeErrorResult` → `MakeNull(env)`，对齐同文件 GetSRAM L161/166（同为 `ArrayBuffer\|null` sync，失败返回 MakeNull）正范式。errorCode 仍可经 `refactoredGetLastErrorInfo` 查。成功路径 return arrayBuffer 不变 |
+| 状态 | fixed |
+| 备注 | **2026-06-06 修复**（本会话 loop）：cxx-build PASS；napi-boundary-reviewer 复核 **PASS**（5/5 OK：MakeNull 对齐 GetSRAM、ArkTS 消费 0 依赖旧 struct、RAII 安全、文件级 MakeErrorResult 仅剩注释）。**全文件闭环结论**：reviewer 交叉核对 engine_state_napi.cpp 全部 13 sync export 返回类型现 100% 对齐 index.d.ts 声明。其余 6 async（GetSaveStateSize/SaveState/LoadState/WaitForState/StopEngine/GetRawFileList）resolve 类型本轮亦逐个核实与声明一致，失败均走 reject。memory `feedback_napi_return_type_lie_hides_bug` |
+
 ---
 
 ## 引用此文件的地方

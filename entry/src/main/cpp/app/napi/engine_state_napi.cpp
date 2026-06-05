@@ -113,8 +113,11 @@ static napi_value SaveState(napi_env env, napi_callback_info info) {
         : errorInfo.message.c_str();
 
     LOGF(LOG_ERROR, "[NEW] SaveState failed: %{public}s", message);
-    return MakeErrorResult(env, false,
-                           EngineErrorCodes::SAVE_STATE_SAVE_FAILED, message);
+    // D014: 声明 `() => ArrayBuffer | null`,失败须返回 null(对齐同文件 GetSRAM
+    // L161/166 范式),此前返回 MakeErrorResult 结构对象 → ArkTS `if(!buf)` 对
+    // truthy 结构对象漏判失败(D010/D011/D012 同类型谎言)。errorCode 经
+    // refactoredGetLastErrorInfo 仍可查;推荐用 refactoredSaveStateAsync(reject)。
+    return MakeNull(env);
   }
 
   // 成功时返回 ArrayBuffer（保持向后兼容）
@@ -122,9 +125,7 @@ static napi_value SaveState(napi_env env, napi_callback_info info) {
       MakeArrayBufferFromBytes(env, data.data(), data.size());
   if (!arrayBuffer) {
     LOGF(LOG_ERROR, "[NEW] SaveState failed to allocate ArrayBuffer");
-    return MakeErrorResult(env, false,
-                           EngineErrorCodes::SAVE_STATE_SAVE_FAILED,
-                           "Failed to allocate ArrayBuffer");
+    return MakeNull(env);
   }
   return arrayBuffer;
   NAPI_TRY_CATCH_END(env, nullptr)
