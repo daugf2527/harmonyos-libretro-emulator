@@ -57,6 +57,13 @@
 
 ## 🔴 ArkTS 用法层 2 个真问题（已主AI亲验代码实物，非 agent 转述）
 
+> ✅ **修复状态（2026-06-06 followup loop 更新）**：本节描述的是**审计时（2026-06-05）的问题状态**，下方 file:line 为审计快照行号。两个问题 + C++ 侧"行为待确认"项均已在分支 `fix/api22-audit-followup` 修复，**故下方引用的行号已因修复漂移，符号内容仍真实**：
+> - **问题 1（NAPI SSOT 谎报）** → commit `5f981ff`（index.d.ts/AGENTS.md 签名改 `NapiErrorResult`）+ `a710de4`（Coordinator 判定改 `.success`，全仓核实其为 0 引用 dead code，非"生产路径"——审计原描述高估了危害等级）。延伸系统核对扫清同类 D012/D013/D014（见 `docs/tech-debt-tracker.md`）。
+> - **问题 2（对象 spread）** → commit `a710de4`（`LibraryMetadataMigration.ets` 改逐字段赋值，已确认 orphan 模块 0 import）。
+> - **音频 Workgroup 纳秒→毫秒**（下方"行为待确认"项）→ commit `5f981ff`。
+>
+> 下方原始审计内容保留作 audit trail，不随修复回改行号。
+
 ### 问题 1 [HIGH] — NAPI 返回类型 SSOT 谎报 → 生产路径"失败假报成功"
 
 - **C++ 实物**（裁决真值）：`MakeErrorResult`（`engine_napi_common.h:434`）用 `MakeObject` + `SetNamedProperty("success",…)` 返回**结构对象** `{success, errorCode, message}`。`refactoredStartEngine`/`LoadCore`/`LoadRom` 全部 `return MakeErrorResult(...)`（`engine_lifecycle_napi.cpp` L365/369/...）。
@@ -100,6 +107,7 @@
 **音频 `OH_AudioWorkgroup_Start` 单位错位**：header 注释口径为**毫秒**，本地 `audio_player.cpp` L509-523 传入 `clock_gettime(CLOCK_MONOTONIC)` 算出的**纳秒**。
 → 后果：大核调度优化在真机上**很可能从未真正生效**（传纳秒巨值 → Start 大概率返回 `ERROR_INVALID_PARAM` → workgroup 静默自禁用）。**不破声、不属 API 兼容性缺陷**。
 → 建议：真机 profile 验证；若要让优化生效，把 L510-523 改为毫秒口径（`/1000000`）。
+> ✅ **已修（2026-06-06，commit `5f981ff`）**：`audio_player.cpp` 已改毫秒口径（`start_ms`/`work_ms`，header 真值 `native_audio_resource_manager.h:150-152` "milliseconds" 已核）。**真机 profile 验证仍 pending**（确认大核调度实际生效）。
 
 ### 审计输入勘误（之前会话发现，非代码问题，记录防误导）
 
