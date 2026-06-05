@@ -19,6 +19,7 @@
 #include <GLES3/gl3.h>
 #include <dlfcn.h>
 #include <hilog/log.h>
+#include "qos/qos.h"
 
 #undef LOG_DOMAIN
 #define LOG_DOMAIN 0xD010
@@ -1134,6 +1135,10 @@ bool LibretroEngine::InitializeEventBridge(napi_env env, napi_value callback) {
 }
 
 void LibretroEngine::GameLoop() {
+  // API12+ QoS：将引擎主循环线程标记为最高交互优先级，
+  // 强制大核调度、减少高负载抢占（音频线程已由 OH_AudioWorkgroup 覆盖，此处仅 Game 线程）。
+  int qosRet = OH_QoS_SetThreadQoS(QOS_USER_INTERACTIVE);
+  LOGF(LOG_INFO, "[QoS] GameLoop thread QoS set ret=%{public}d", qosRet);
   LOGF(LOG_INFO, " [NEW] GameLoop Thread Entry: ID = %{public}zu",
        std::hash<std::thread::id>{}(std::this_thread::get_id()));
   g_engineThreadInstance = this;

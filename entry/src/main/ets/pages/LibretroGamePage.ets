@@ -5,6 +5,7 @@
 
 import LogHelper from '../common/LogHelper';
 import { common } from '@kit.AbilityKit';
+import { window } from '@kit.ArkUI';
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens';
 import { RuntimeHudMetric } from '../components/RuntimeTopHudBar';
 import { RuntimePauseOverlay } from '../components/RuntimePauseOverlay';
@@ -179,6 +180,7 @@ struct LibretroGamePage {
 
   aboutToAppear() {
     this.pageActive = true;
+    this.setKeepScreenOn(true);
     this.eventScope = LibretroEventHub.getInstance().createScope();
     this.eventScope.onEngineState((payload) => {
       this.handleEngineState(payload);
@@ -220,6 +222,7 @@ struct LibretroGamePage {
     }
     this.stopGame();
     this.stopInputDebug();
+    this.setKeepScreenOn(false);
   }
 
   onBackPress(): boolean {
@@ -1150,11 +1153,25 @@ struct LibretroGamePage {
     }
   }
 
+  // 游戏活跃时保持屏幕常亮，暂停/离开时恢复系统息屏策略（省电）。
+  // 复用项目统一的 context 获取方式 this.getUIContext().getHostContext()。
+  private setKeepScreenOn(on: boolean): void {
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    window.getLastWindow(ctx).then((win: window.Window) => {
+      return win.setWindowKeepScreenOn(on);
+    }).then(() => {
+      LogHelper.info('LibretroGame', 'Window', `屏幕常亮=${on}`);
+    }).catch((err: Error) => {
+      LogHelper.warn('LibretroGame', 'Window', `setWindowKeepScreenOn 失败: ${err.message}`);
+    });
+  }
+
   // 暂停游戏
   pauseGame() {
     if (this.gameRunning && !this.gamePaused) {
       runtimeSessionController.pause();
       this.gamePaused = true;
+      this.setKeepScreenOn(false);
       LogHelper.info('LibretroGame', 'Engine', '游戏已暂停');
     }
   }
@@ -1164,6 +1181,7 @@ struct LibretroGamePage {
     if (this.gameRunning && this.gamePaused) {
       runtimeSessionController.resume();
       this.gamePaused = false;
+      this.setKeepScreenOn(true);
       LogHelper.info('LibretroGame', 'Engine', '游戏已继续');
     }
   }

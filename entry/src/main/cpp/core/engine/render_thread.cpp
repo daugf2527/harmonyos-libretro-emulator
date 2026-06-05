@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <chrono>
 #include <hilog/log.h>
+#include "qos/qos.h"
 
 #undef LOG_DOMAIN
 #define LOG_DOMAIN 0xD008
@@ -176,6 +177,9 @@ WindowSessionSnapshot RenderThread::GetWindowSessionSnapshot() const {
 }
 
 void RenderThread::ThreadMain() {
+  // API12+ QoS：渲染线程同样标记为最高交互优先级，与 Game 线程一致争取大核。
+  int qosRet = OH_QoS_SetThreadQoS(QOS_USER_INTERACTIVE);
+  LOGF(LOG_INFO, "[QoS] RenderThread QoS set ret=%{public}d", qosRet);
   StartVSyncIfNeeded();
   if (nativeVsyncActive_.load(std::memory_order_acquire)) {
     RequestNextVSync();
