@@ -154,6 +154,17 @@
 | 状态 | fixed |
 | 备注 | D010 同根（类型谎言）；边界经实物核对 `MakeErrorResult`(结构对象,3个) vs `MakeBool`(真boolean,其余)；同需 DevEco 真机验证；memory `feedback_napi_return_type_lie_hides_bug` |
 
+### D012 — refactoredSwitchGameAsync 同步早期失败/dedup 路径 resolve boolean 而非 NapiErrorResult（D010 残留）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-06 / 本会话 api22-diff followup loop · NAPI async 契约一致性核对 |
+| 位置 | `entry/src/main/cpp/app/napi/engine_lifecycle_napi.cpp` SwitchGameAsync 同步早期失败路径（L901/907/913/919/934/952/963/974/986 `MakeResolvedPromise(env,false)`）+ dedup 成功路径（L993 `MakeResolvedPromise(env,true)`）；helper `engine_napi_common.h:199 MakeResolvedPromise(env,bool)` resolve 纯 boolean |
+| 影响 | P2 — 声明 `Promise<NapiErrorResult>`，但 dedup 路径 resolve boolean `true` → ArkTS `LibretroGamePage:1048 if(!result.success)` 读 `true.success===undefined` → `!undefined===true` → 误 throw `SwitchGameError`：用户短时间重复切换游戏，第二次请求被去重却报错（首次仍正常切换）。早期失败路径 resolve `false`：throw 结果正确但 `errorCode` 丢失，降级 `formatLastError` 字符串。边缘场景，危害有限但属类型谎言残留 |
+| 拟修 | SwitchGameAsync 同步早期失败/dedup 路径 `MakeResolvedPromise(env,bool)` → resolve NapiErrorResult 结构对象（dedup→`{success:true}`；失败→`{success:false,errorCode,message}`）。可加 helper `MakeResolvedErrorPromise(env,success,errorCode,msg)` 或复用 `MakeErrorResult`+`ResolveDeferredChecked` 即时 resolve。**改 app/napi 须 dispatch napi-boundary-reviewer**。未真机 |
+| 状态 | open |
+| 备注 | D010 同根；D010 仅修 `CompleteSwitchGame` 正常完成路径（L880 `MakeErrorResult`），残留同步早期失败/dedup 未改。链路实物核实：`MakeResolvedPromise`(h:199 resolve bool) → `RuntimeSessionController.switchGame`(:85 直 return 无 boolean 兜底) → `LibretroGamePage:1048 if(!result.success)`。memory `feedback_napi_return_type_lie_hides_bug` |
+
 ---
 
 ## 引用此文件的地方
