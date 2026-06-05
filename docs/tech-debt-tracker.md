@@ -60,11 +60,11 @@
 | Key | 值 |
 |---|---|
 | 引入 | 2026-05-27 / `docs/audit/audit-20260527-124137/napi-review-batch2.md` Concern-6 |
-| 位置 | `entry/src/main/cpp/app/napi/engine_lifecycle_napi.cpp:210`（CompleteGetRawFileListAsync）、`engine_lifecycle_napi.cpp:817`（CompleteStopEngineAsync）、`entry/src/main/cpp/app/napi/core_loader_napi.cpp:530`（CompleteTestCoreLoader） |
-| 影响 | P1 — 引擎关闭 / JS 环境退出时 napi_cancelled 触发，三处函数仍调用 `napi_create_string_utf8` + `napi_reject_deferred`，对已销毁 env 操作属于 UB |
-| 拟修 | 在三处 Complete 函数顶部加 `if (status == napi_cancelled) { napi_delete_async_work(env, ctx->work); delete ctx; return; }` 守卫，与 T8B-F4 已修的三处对齐 |
-| 状态 | open |
-| 备注 | audit-20260527-124137 napi-review-batch2 Concern-6（范围外旁观）；T8B-F4 已修的三处 Complete 函数是正确范式参考 |
+| 位置 | `entry/src/main/cpp/app/napi/engine_lifecycle_napi.cpp:206`（CompleteGetRawFileListAsync）、`engine_lifecycle_napi.cpp:1173`（CompleteStopEngineAsync）、`entry/src/main/cpp/app/napi/core_loader_napi.cpp:587`（CompleteTestCoreLoader） |
+| 影响 | P1 — 引擎关闭 / JS 环境退出时 napi_cancelled 触发，函数仍调用 `MakeString` + `napi_reject_deferred`，对已销毁 env 操作属于 UB |
+| 拟修 | 在三处 Complete 函数顶部加 `if (status == napi_cancelled) { 释放 work + 原生资源; delete ctx; return; }` 守卫，与 T8B-F4 已修的三处对齐 |
+| 状态 | fixed |
+| 备注 | **2026-06-05 收口**（实物核查发现 tracker drift）：三处中 `CompleteTestCoreLoader` 早在 `0bb99ce`(05-25 T1-F6) 已有 guard；本次修 lifecycle 两处（`CompleteGetRawFileListAsync`+`CompleteStopEngineAsync`），cancelled 分支只释放 work/mgr + delete ctx，不碰任何 napi_*，对齐 `engine_state_napi.cpp:33/286/403` 正范式。napi-boundary-reviewer 复核 PASS（资源释放完整 / `napi_delete_async_work` 在 teardown 安全 / `stop_in_progress` 卡锁仅 env teardown 无实害 / 范式一致）。当前 HEAD 1e55809 之后的 working tree 改动；未编译/未真机。 |
 
 ### D004 — engine_state_napi create_promise 失败路径不一致：GetSaveStateSizeAsync / SaveStateAsync 返回 nullptr 而非可 await 的 Promise
 
@@ -72,21 +72,21 @@
 |---|---|
 | 引入 | 2026-05-27 / `docs/audit/audit-20260527-124137/napi-review-batch2.md` Concern-2 |
 | 位置 | `entry/src/main/cpp/app/napi/engine_state_napi.cpp:64-67`（GetSaveStateSizeAsync）、`engine_state_napi.cpp:330-333`（SaveStateAsync） |
-| 影响 | P1 — `napi_create_promise` 失败时返回 `nullptr` 给 ArkTS，调用方 `await` 一个非 Promise 值会抛 TypeError；LoadStateAsync（L441）已正确返回 `MakeResolvedPromise`，三处不一致 |
-| 拟修 | 将 GetSaveStateSizeAsync 和 SaveStateAsync 的 create_promise 失败路径改为返回 `MakeResolvedInt64Promise(env, 0)` / `MakeResolvedPromise(env, false)`，与 LoadStateAsync 对齐 |
-| 状态 | open |
-| 备注 | audit-20260527-124137 napi-review-batch2 Concern-2；当前无 ArkTS 调用方，改动安全，优先级低 |
+| 影响 | P1 — `napi_create_promise` 失败时返回 `nullptr` 给 ArkTS，调用方 `await` 一个非 Promise 值会抛 TypeError |
+| 拟修 | ~~将 GetSaveStateSizeAsync 和 SaveStateAsync 的 create_promise 失败路径改为返回 MakeResolvedPromise，与 LoadStateAsync 对齐~~（依据已证伪，见备注） |
+| 状态 | wontfix |
+| 备注 | **2026-06-05 实物核查证伪**：tracker 原描述称 LoadStateAsync「已正确返回 MakeResolvedPromise」是错的——实物三处（`GetSaveStateSizeAsync:64-67`、`SaveStateAsync:334-337`、`LoadStateAsync:456-459`）的 `napi_create_promise` 失败路径**全部是 `return nullptr`，本就一致**，不存在「两处错一处对」。且 `napi_create_promise` 失败 = JS 引擎已 OOM/销毁的极端态，此时无有效 deferred 可 resolve，`MakeResolvedPromise` 内部同样会 `napi_create_promise` 再失败一次。三处 callsite 均在 env teardown 路径，返回 nullptr 可接受。判定非真 bug，不修。 |
 
 ### D005 — SaveStateRepository.writeArrayBufferToFile 同步阻塞主线程（T8C-F1 SKIP）
 
 | Key | 值 |
 |---|---|
 | 引入 | 2026-05-27 / `docs/audit/audit-20260527-124137/agent-T8C-arkts.md` T8C-F1 |
-| 位置 | `entry/src/main/ets/common/SaveStateRepository.ets:43`（`writeArrayBufferToFile` 调用点）、`SaveStateRepository.ets:199-218`（函数实现，内含 `fs.openSync` / `fs.writeSync` / `fs.renameSync`） |
+| 位置 | `entry/src/main/ets/common/SaveStateRepository.ets:44`（`writeArrayBufferToFile` 调用点）、`SaveStateRepository.ets:235-256`（函数实现） |
 | 影响 | P1 — GBA/GBC 存档数据 128 KB～512 KB，主线程同步写入阻塞帧渲染，可触发 ArkUI 主线程超时警告 |
 | 拟修 | 将 `writeArrayBufferToFile` 改为 `async` 函数，内部使用 `fs.write`（Promise 版）替换 `fs.writeSync`；`saveStateData()` 已是 async，直接 `await` 即可 |
-| 状态 | open |
-| 备注 | audit-20260527-124137 T8C-F1；fix-verify 未列入修复批次（主 Claude 判定 SKIP），需单独排期 |
+| 状态 | fixed |
+| 备注 | **2026-06-05 实物核查发现早已修复**（tracker drift）：`writeArrayBufferToFile`（`SaveStateRepository.ets:235`）已是 `async function ... Promise<void>`，内部全 `await fs.open/write/close/rename`，并实现 tmp+rename 原子写（T6-F3）。修复在 `588a824`(05-27 17:28) — 与 debt 录入同一 commit，即录入时其实已修，状态误标 open。`saveStateData` L44 正确 `await`。未编译/未真机。 |
 
 ### D006 — 55 个 refactored* NAPI export 未在 CLAUDE.md / AGENTS.md 任何位置提及（文档化缺口）
 

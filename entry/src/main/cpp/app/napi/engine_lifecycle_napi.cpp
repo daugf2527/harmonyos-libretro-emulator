@@ -210,6 +210,22 @@ static void CompleteGetRawFileListAsync(napi_env env, napi_status status,
     return;
   }
 
+  // T8-B-F4: env teardown 时 status == napi_cancelled,对已销毁 env 调任何 napi_* 都是 UB,
+  // 必须先单独处理——只释放原生资源 + delete ctx,不碰 deferred/MakeString。
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] GetRawFileListAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    if (ctx->mgr) {
+      OH_ResourceManager_ReleaseNativeResourceManager(ctx->mgr);
+      ctx->mgr = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
   if (status != napi_ok) {
     LOGF(LOG_ERROR,
          "[NEW] GetRawFileListAsync work failed: status=%{public}d",
@@ -1158,6 +1174,18 @@ static void CompleteStopEngineAsync(napi_env env, napi_status status,
                                     void *data) {
   auto *ctx = static_cast<StopEngineAsyncContext *>(data);
   if (!ctx) {
+    return;
+  }
+
+  // T8-B-F4: env teardown 时 status == napi_cancelled,对已销毁 env 调任何 napi_* 都是 UB,
+  // 必须先单独处理——只 delete ctx + work,不碰 deferred/MakeString/MakeBool。
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] StopEngineAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
     return;
   }
 
