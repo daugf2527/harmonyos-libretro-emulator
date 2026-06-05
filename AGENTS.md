@@ -120,7 +120,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredResumeEngine` | `() => boolean` | sync | 恢复游戏循环 |
 | `refactoredLoadCore` | `(corePath: string) => NapiErrorResult` | sync | 加载 libretro 核心 (.so)（**返回结构对象非 boolean**，判定用 `.success`） |
 | `refactoredLoadRom` | `(romPath: string, resMgr?: ResourceManager) => NapiErrorResult` | sync | 加载 ROM（支持 rawfile）（**返回结构对象非 boolean**，判定用 `.success`） |
-| `refactoredSwitchGameAsync` | `(corePath, romPath, filesDir, [resMgr], [timeoutMs], [token]) => Promise<NapiErrorResult>` | async | 切换游戏（两个重载，含/不含 resMgr）；返回结构化错误对象 |
+| `refactoredSwitchGameAsync` | `(corePath, romPath, filesDir, [resMgr], [timeoutMs], [token], [progressCallback]) => Promise<NapiErrorResult>` | async | 切换游戏（两个重载，含/不含 resMgr）；返回结构化错误对象 |
 | `refactoredCancelSwitch` | `() => boolean` | sync | 取消进行中的切换（token 失效） |
 | `refactoredGetRawFileList` | `(resMgr: ResourceManager, dir?: string) => string[]` | sync | 列出 rawfile 目录文件 |
 | `refactoredGetRawFileListAsync` | `(resMgr: ResourceManager, dir?: string) => Promise<string[]>` | async | 异步列出 rawfile 目录 |

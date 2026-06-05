@@ -50,14 +50,16 @@ export function refactoredSwitchGameAsync(
   filesDir: string,
   resMgr?: resourceManager.ResourceManager,
   timeoutMs?: number,
-  token?: number
+  token?: number,
+  progressCallback?: (progress: number, message: string) => void
 ): Promise<NapiErrorResult>;
 export function refactoredSwitchGameAsync(
   corePath: string,
   romPath: string,
   filesDir: string,
   timeoutMs?: number,
-  token?: number
+  token?: number,
+  progressCallback?: (progress: number, message: string) => void
 ): Promise<NapiErrorResult>;
 export const refactoredGetRawFileList: (
   resMgr: resourceManager.ResourceManager,
