@@ -169,13 +169,68 @@ async function loadManifest(context: common.UIAbilityContext): Promise<SaveState
         items.push(normalizeManifestItem(item))
       })
     }
+    // D002: manifest 与磁盘 reconciliation。覆盖 saveStateData 写 .state 与写 manifest
+    // 两步之间崩溃留下的孤儿文件，以及 manifest 残留指向已删文件的条目。
+    const reconciled = await reconcileManifestItems(context, items)
     return {
       version: SAVE_STATE_VERSION,
-      items: items
+      items: reconciled
     }
   } catch (err) {
     return await buildManifestFromDirectory(context)
   }
+}
+
+// D002: 对账 manifest 条目与 saves/ 目录实际文件，消除两类孤儿：
+//   (a) manifest 有条目但 .state 文件不存在 → 裁剪（如 deleteSaveStateItem unlink 后崩溃）
+//   (b) .state 文件存在但 manifest 无条目 → 补充（romFile='' 待后续编辑补全；
+//       如 saveStateData 写完 .state 但写 manifest 前崩溃，避免用户存档丢失）
+// 写操作本身是 tmp+rename 原子写，半写文件以 .tmp 结尾不被本对账拾取。
+async function reconcileManifestItems(
+  context: common.UIAbilityContext,
+  manifestItems: SaveStateManifestItem[]
+): Promise<SaveStateManifestItem[]> {
+  const validItems: SaveStateManifestItem[] = []
+  const knownFileNames = new Set<string>()
+  // (a) 逐条 stat：文件不存在则裁剪
+  for (let index = 0; index < manifestItems.length; index += 1) {
+    const item = manifestItems[index]
+    knownFileNames.add(item.fileName)
+    const path = buildSaveFilePath(context.filesDir, item.fileName)
+    try {
+      await fs.stat(path)
+      validItems.push(item)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('SaveStateRepository', 'Reconcile', `裁剪不存在的存档条目 ${item.fileName}: ${message}`)
+    }
+  }
+  // (b) 扫描目录：磁盘上有但 manifest 无的 .state 文件补充为孤儿条目
+  try {
+    const saveDir = buildSaveDirPath(context.filesDir)
+    const entries = await fs.listFile(saveDir)
+    for (let index = 0; index < entries.length; index += 1) {
+      const fileName = entries[index]
+      if (!fileName.endsWith('.state') || knownFileNames.has(fileName)) {
+        continue
+      }
+      const path = buildSaveFilePath(context.filesDir, fileName)
+      const stat = await fs.stat(path)
+      validItems.push({
+        id: fileName,
+        fileName: fileName,
+        romFile: '',
+        createdAt: readTimestampFromFileName(fileName),
+        byteLength: Number(stat.size)
+      })
+      LogHelper.warn('SaveStateRepository', 'Reconcile', `补充孤儿存档文件到清单: ${fileName}`)
+    }
+  } catch (err) {
+    // 目录扫描失败不阻塞主流程，仅丢失孤儿补充能力
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('SaveStateRepository', 'Reconcile', `扫描孤儿存档失败: ${message}`)
+  }
+  return validItems
 }
 
 async function buildManifestFromDirectory(context: common.UIAbilityContext): Promise<SaveStateManifestDocument> {
