@@ -162,8 +162,19 @@
 | 位置 | `entry/src/main/cpp/app/napi/engine_lifecycle_napi.cpp` SwitchGameAsync 同步早期失败路径（L901/907/913/919/934/952/963/974/986 `MakeResolvedPromise(env,false)`）+ dedup 成功路径（L993 `MakeResolvedPromise(env,true)`）；helper `engine_napi_common.h:199 MakeResolvedPromise(env,bool)` resolve 纯 boolean |
 | 影响 | P2 — 声明 `Promise<NapiErrorResult>`，但 dedup 路径 resolve boolean `true` → ArkTS `LibretroGamePage:1048 if(!result.success)` 读 `true.success===undefined` → `!undefined===true` → 误 throw `SwitchGameError`：用户短时间重复切换游戏，第二次请求被去重却报错（首次仍正常切换）。早期失败路径 resolve `false`：throw 结果正确但 `errorCode` 丢失，降级 `formatLastError` 字符串。边缘场景，危害有限但属类型谎言残留 |
 | 拟修 | SwitchGameAsync 同步早期失败/dedup 路径 `MakeResolvedPromise(env,bool)` → resolve NapiErrorResult 结构对象（dedup→`{success:true}`；失败→`{success:false,errorCode,message}`）。可加 helper `MakeResolvedErrorPromise(env,success,errorCode,msg)` 或复用 `MakeErrorResult`+`ResolveDeferredChecked` 即时 resolve。**改 app/napi 须 dispatch napi-boundary-reviewer**。未真机 |
+| 状态 | fixed |
+| 备注 | **2026-06-06 修复**（本会话 loop，分支 fix/api22-audit-followup）：dedup 路径 `MakeResolvedPromise(env,true)` → `MakeResolvedErrorPromise(env,true)`（resolve `{success:true}`）；ROM 加载失败路径 → `MakeResolvedErrorPromise(env,false,ROM_LOAD_FAILED,...)`；新增 helper `engine_napi_common.h MakeResolvedErrorPromise`。8 参数校验路径保持 `MakeResolvedPromise(env,false)`（上游 GetArgs/GetStringArg 等已 napi_throw → pending 守卫使其走 reject，契约违规即抛行为正确）。cxx-build PASS；napi-boundary-reviewer 复核**核心 PASS**（类型映射 `LibretroGamePage:1051 if(!result.success)` 对 `{success:true}` 正确）。未真机。3 个衍生 follow-up 见 D013。memory `feedback_napi_return_type_lie_hides_bug` |
+
+### D013 — D012 review 衍生：NAPI helper deferred-leak + SwitchGameAsync 参数路径混用 + index.d.ts progressCallback drift
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-06 / D012 修复 napi-boundary-reviewer 复核（3 findings，均非 block） |
+| 位置 | (a) `engine_napi_common.h` `MakeResolvedPromise`(~L211)+`MakeResolvedErrorPromise`(~L494)：`MakeBool`/`MakeErrorResult` 返回 nullptr 时 deferred 未 settle；(b) `engine_lifecycle_napi.cpp` SwitchGameAsync 8 参数校验路径仍 `MakeResolvedPromise(env,false)`；(c) `entry/src/main/cpp/types/libentry/index.d.ts:47-61` 两 overload 漏第7参 progressCallback |
+| 影响 | P3 — (a) deferred leak 仅 JS 引擎 OOM/销毁极端态触发（`MakeErrorResult` 入口已查 pending exception，现实只剩 `napi_create_object` 失败=OOM），实害≈0；(b) 混用为维护陷阱（未来移除某 helper 的 throw / 复制旧 boolean 模式会重新引入 type-lie），今日 behavior-neutral；(c) progressCallback：caller（`RuntimeSessionController:94/103`）传第7参但声明缺，strict mode 不报错但失类型校验 |
+| 拟修 | (a) helper 在 `MakeBool`/`MakeErrorResult` 失败时 clear pending + `napi_reject_deferred` + return promise（非 nullptr），模板 `MakeResolvedPromise` 同步；(b) 8 路径统一 `MakeResolvedErrorPromise(env,false,STATE_TRANSITION_FAILED)`（behavior-neutral，闭维护缺口）；(c) `index.d.ts` 两 overload + `AGENTS.md` NAPI Inventory 补 `progressCallback?: (progress:number,message:string)=>void`。改 app/napi 须 dispatch napi-boundary-reviewer |
 | 状态 | open |
-| 备注 | D010 同根；D010 仅修 `CompleteSwitchGame` 正常完成路径（L880 `MakeErrorResult`），残留同步早期失败/dedup 未改。链路实物核实：`MakeResolvedPromise`(h:199 resolve bool) → `RuntimeSessionController.switchGame`(:85 直 return 无 boolean 兜底) → `LibretroGamePage:1048 if(!result.success)`。memory `feedback_napi_return_type_lie_hides_bug` |
+| 备注 | D012 修复 review 衍生；reviewer 判 D012 核心 PASS，3 concerns 均 follow-up 不 block。(a) 为模板 `MakeResolvedPromise` pre-existing 缺陷，新 helper 沿用同模式（一致但同缺陷）；(c) pre-existing drift，与 D006 NAPI Inventory 同步纪律相关 |
 
 ---
 

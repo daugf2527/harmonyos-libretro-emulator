@@ -983,14 +983,21 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
   if (!LoadRomDataFromRawfileIfNeeded(env, resolvedRomPath, resMgrValue,
                                       std::string(filesDir),
                                       resolvedRomPath, romData)) {
-    return MakeResolvedPromise(env, false);
+    // D012: rawfile ROM 加载失败是可恢复运行期错误(非契约违规,上游不 throw),
+    // resolve 结构化 {success:false,errorCode} 而非裸 boolean,使 ArkTS 拿到
+    // errorCode 而非靠字符串嗅探降级。
+    return MakeResolvedErrorPromise(env, false, EngineErrorCodes::ROM_LOAD_FAILED,
+                                    "SwitchGameAsync: failed to load ROM data");
   }
 
   if (ShouldDedupSwitchRequest(std::string(corePath), resolvedRomPath)) {
     LOGF(LOG_WARN,
          "[NEW] SwitchGameAsync deduped duplicate request within %{public}llu ms",
          static_cast<unsigned long long>(kSwitchDedupeWindowMs));
-    return MakeResolvedPromise(env, true);
+    // D012: 去重=该切换已在处理中,语义视为成功。此前 resolve boolean true →
+    // ArkTS `!true.success`=`!undefined`=true → 误 throw SwitchGameError。
+    // 改 resolve {success:true} 与正常完成路径一致,消除重复切换误报。
+    return MakeResolvedErrorPromise(env, true);
   }
 
   // 使用 native 全局递增 token 作为并发仲裁依据，避免前端局部 token

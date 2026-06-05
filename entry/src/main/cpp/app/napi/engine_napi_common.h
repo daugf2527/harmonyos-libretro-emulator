@@ -472,6 +472,35 @@ inline napi_value MakeErrorResult(napi_env env, bool success, int errorCode = 0,
   return result;
 }
 
+// D012: async 接口同步早期返回用——创建并立即 resolve 一个携带 NapiErrorResult
+// 结构对象的 Promise,与 CompleteSwitchGame 正常完成路径(MakeErrorResult)同构。
+// 解决早期返回 resolve 纯 boolean 导致 ArkTS `!result.success`(对 boolean 取
+// .success 得 undefined)误判的问题——dedup 路径 resolve true 尤其会被误当失败。
+// 若已有 pending exception(上游 GetArgs/GetStringArg 等契约校验已 throw),
+// 守卫返回 nullptr → Promise reject,保留"契约违规即抛"的既有行为不变。
+inline napi_value MakeResolvedErrorPromise(napi_env env, bool success,
+                                           int errorCode = 0,
+                                           const char *message = nullptr) {
+  bool pending = false;
+  if (napi_is_exception_pending(env, &pending) == napi_ok && pending) {
+    return nullptr;
+  }
+  napi_deferred deferred = nullptr;
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &deferred, &promise) != napi_ok || !deferred) {
+    napi_throw_error(env, nullptr, "Failed to create promise");
+    return nullptr;
+  }
+  napi_value result = MakeErrorResult(env, success, errorCode, message);
+  if (!result) {
+    return nullptr;
+  }
+  if (!ResolveDeferredChecked(env, deferred, result)) {
+    return nullptr;
+  }
+  return promise;
+}
+
 void RegisterLifecycleNapi(napi_env env, napi_value exports);
 void RegisterInputNapi(napi_env env, napi_value exports);
 void RegisterVideoAudioNapi(napi_env env, napi_value exports);
