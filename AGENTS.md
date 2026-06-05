@@ -99,6 +99,113 @@ ArkTS 虚拟手柄 / 键盘 / 触控
   -> Libretro input_poll/input_state 回调读取 InputSnapshot
 ```
 
+## NAPI Export Inventory
+
+`libentry.so` 通过 `napi_define_properties` 暴露给 ArkTS 的全部 63 个 export。
+ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名以此为准，本表与之同步）。
+注册入口：`libretro_engine_napi.cpp` 转发 6 个子注册函数 + `module_init.cpp` 注册 core_loader / input_mapping 两个独立模块。
+
+命名约定：61 个以 `refactored` 前缀标识新架构；2 个例外（`setInputKeyMapping`、`testCoreLoader`）为遗留/专用接口。
+改 `app/napi/**` 任何 export（增删/改签名）须同步本表 + `index.d.ts`（`scan_code_drift.sh` Pattern 5 守）。
+
+### 生命周期 (13) — engine_lifecycle_napi.cpp
+
+| Export | 签名 | 类型 | 功能 |
+|--------|------|------|------|
+| `refactoredStartEngine` | `() => boolean` | sync | 启动引擎线程 + 消息循环 |
+| `refactoredStopEngine` | `() => boolean` | sync | 同步停止引擎 |
+| `refactoredStopEngineAsync` | `() => Promise<boolean>` | async | 异步停止引擎（推荐） |
+| `refactoredResetEngine` | `() => boolean` | sync | 重置引擎 |
+| `refactoredPauseEngine` | `() => boolean` | sync | 暂停游戏循环 |
+| `refactoredResumeEngine` | `() => boolean` | sync | 恢复游戏循环 |
+| `refactoredLoadCore` | `(corePath: string) => boolean` | sync | 加载 libretro 核心 (.so) |
+| `refactoredLoadRom` | `(romPath: string, resMgr?: ResourceManager) => boolean` | sync | 加载 ROM（支持 rawfile） |
+| `refactoredSwitchGameAsync` | `(corePath, romPath, filesDir, [resMgr], [timeoutMs], [token]) => Promise<NapiErrorResult>` | async | 切换游戏（两个重载，含/不含 resMgr）；返回结构化错误对象 |
+| `refactoredCancelSwitch` | `() => boolean` | sync | 取消进行中的切换（token 失效） |
+| `refactoredGetRawFileList` | `(resMgr: ResourceManager, dir?: string) => string[]` | sync | 列出 rawfile 目录文件 |
+| `refactoredGetRawFileListAsync` | `(resMgr: ResourceManager, dir?: string) => Promise<string[]>` | async | 异步列出 rawfile 目录 |
+| `refactoredInitEventBridge` | `(callback: (data: RefactoredEvent) => void) => boolean` | sync | 初始化 EventBridge 事件通道 |
+
+### 状态/存档/SRAM/作弊/选项 (13) — engine_state_napi.cpp
+
+| Export | 签名 | 类型 | 功能 |
+|--------|------|------|------|
+| `refactoredGetSaveStateSize` | `() => number` | sync | 存档大小（**@deprecated** 阻塞≤5s，用 Async 版） |
+| `refactoredGetSaveStateSizeAsync` | `() => Promise<number>` | async | 异步获取存档大小（推荐） |
+| `refactoredSaveState` | `() => ArrayBuffer \| null` | sync | 同步保存状态（阻塞） |
+| `refactoredLoadState` | `(data: ArrayBuffer) => boolean` | sync | 同步加载状态（阻塞） |
+| `refactoredSaveStateAsync` | `() => Promise<ArrayBuffer \| null>` | async | 异步保存状态（推荐） |
+| `refactoredLoadStateAsync` | `(data: ArrayBuffer) => Promise<boolean>` | async | 异步加载状态（推荐） |
+| `refactoredGetSRAM` | `() => ArrayBuffer \| null` | sync | 获取电池备份 SRAM |
+| `refactoredSetSRAM` | `(data: ArrayBuffer) => boolean` | sync | 设置电池备份 SRAM |
+| `refactoredResetCore` | `() => boolean` | sync | retro_reset 重置核心 |
+| `refactoredCheatReset` | `() => boolean` | sync | 重置所有金手指 |
+| `refactoredCheatSet` | `(index: number, enabled: boolean, code: string) => boolean` | sync | 设置单条金手指 |
+| `refactoredGetCoreOptions` | `() => string` | sync | 核心选项（JSON 字符串，需 parse） |
+| `refactoredSetCoreOption` | `(key: string, value: string) => boolean` | sync | 设置单条核心选项 |
+
+### 输入 (9) — engine_input_napi.cpp (8) + input_mapping_napi.cpp (1)
+
+| Export | 签名 | 类型 | 功能 |
+|--------|------|------|------|
+| `refactoredSendInput` | `(port: number, id: number, pressed: boolean) => boolean` | sync | 发送数字按键 |
+| `refactoredSendAnalog` | `(port: number, index: number, id: number, value: number) => boolean` | sync | 发送模拟摇杆 |
+| `refactoredAssignPortSource` | `(port: number, sourceType: number, deviceId?: string) => boolean` | sync | 分配输入源到端口 |
+| `refactoredUnassignPort` | `(port: number) => boolean` | sync | 解除端口绑定 |
+| `refactoredListInputDevices` | `() => InputDeviceInfo[]` | sync | 列出已注册输入设备 |
+| `refactoredSendSensor` | `(port: number, id: number, value: number) => boolean` | sync | 发送传感器事件（**注意 3 参非 5 参**） |
+| `refactoredSetControllerPortDevice` | `(port: number, device: number) => boolean` | sync | 设置端口手柄类型 |
+| `refactoredGetInputDescriptorMask` | `() => number` | sync | 16-bit 输入描述符掩码，0=核心未声明 |
+| `setInputKeyMapping` *(无 refactored 前缀)* | `(mappingMap: Record<string, number>) => boolean` | sync | 设置键盘→libretro 映射表 |
+
+### 视频 (5) + 音频 (2) — engine_video_napi.cpp
+
+| Export | 签名 | 类型 | 功能 |
+|--------|------|------|------|
+| `refactoredSetScalingMode` | `(mode: number) => boolean` | sync | 缩放模式 0=Hardware/1=Software/2=GLES |
+| `refactoredSetSwapInterval` | `(interval: number) => boolean` | sync | swap interval 0=禁用 VSync/1=启用 |
+| `refactoredSetSoftwareMaxResolution` | `(maxWidth: number, maxHeight: number) => boolean` | sync | 限制软渲染最大分辨率 |
+| `refactoredSetAIUpscale` | `(enabled: boolean) => boolean` | sync | AI 超分开关 |
+| `refactoredSetHwRenderAllowed` | `(enabled: boolean) => boolean` | sync | 允许/禁止硬件渲染 |
+| `refactoredSetMinimumAudioLatency` | `(latencyMs: number) => boolean` | sync | 设置音频最小延迟 (ms) |
+| `refactoredSetAudioSyncMode` | `(mode: number) => boolean` | sync | 音频同步模式 0=NonBlocking/1=Blocking |
+
+### 磁盘控制 (7) — engine_disk_napi.cpp
+
+| Export | 签名 | 类型 | 功能 |
+|--------|------|------|------|
+| `refactoredDiskControlSetEjectState` | `(ejected: boolean) => boolean` | sync | 设置光驱弹出状态 |
+| `refactoredDiskControlGetEjectState` | `() => boolean` | sync | 获取光驱弹出状态 |
+| `refactoredDiskControlGetImageIndex` | `() => number` | sync | 当前磁盘映像索引 |
+| `refactoredDiskControlSetImageIndex` | `(index: number) => boolean` | sync | 设置磁盘映像索引 |
+| `refactoredDiskControlGetNumImages` | `() => number` | sync | 磁盘映像总数 |
+| `refactoredDiskControlReplaceImageIndex` | `(index: number, path: string) => boolean` | sync | 替换指定索引映像 |
+| `refactoredDiskControlAddImageIndex` | `() => boolean` | sync | 新增磁盘映像槽位 |
+
+### 查询/统计/诊断 (13) — engine_query_napi.cpp
+
+| Export | 签名 | 类型 | 功能 |
+|--------|------|------|------|
+| `refactoredGetState` | `() => number` | sync | 引擎状态枚举值 |
+| `refactoredWaitForState` | `(state: number, timeoutMs?: number) => boolean` | sync | 同步等待状态（阻塞） |
+| `refactoredWaitForStateAsync` | `(state: number, timeoutMs?: number) => Promise<boolean>` | async | 异步等待状态（推荐） |
+| `refactoredGetLastErrorInfo` | `() => EngineErrorInfo` | sync | 上次错误详情 {reason,step,message} |
+| `refactoredClearLastErrorInfo` | `() => boolean` | sync | 清除错误信息 |
+| `refactoredSetFilesDir` | `(filesDir: string) => boolean` | sync | 设置引擎文件目录 |
+| `refactoredGetStats` | `() => EngineStats` | sync | 运行时统计（**结构化对象非 JSON 串**） |
+| `refactoredResetStats` | `() => boolean` | sync | 重置运行时统计 |
+| `refactoredGetInputDebugStats` | `() => InputDebugStats` | sync | 输入调试统计（结构化对象） |
+| `refactoredGetRegion` | `() => number` | sync | 区域枚举（**number 非 string**，NTSC/PAL） |
+| `refactoredGetAVInfo` | `() => AVInfo` | sync | 音视频信息 {videoWidth,videoHeight,fps,audioSampleRate} |
+| `refactoredHasCoreLoaded` | `() => boolean` | sync | 是否已加载核心 |
+| `refactoredHasGameLoaded` | `() => boolean` | sync | 是否已加载游戏 |
+
+### 其他 (1) — core_loader_napi.cpp
+
+| Export | 签名 | 类型 | 功能 |
+|--------|------|------|------|
+| `testCoreLoader` *(无 refactored 前缀)* | `(corePath: string) => string` | **sync** | 测试核心 dlopen/dlsym，返回结果字符串（**同步返回 string 非 Promise**） |
+
 ## Project Structure & Module Organization
 - `entry/src/main/ets/`: ArkTS UI and routing (pages, abilities, interfaces).
 - `entry/src/main/cpp/`: Native C++ implementation (framework, platform, input, NAPI bindings).
