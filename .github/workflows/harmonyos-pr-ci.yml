@@ -89,6 +89,18 @@ jobs:
           HARMONY_MODULE_TARGET: entry@default
         run: bash scripts/ci/build_harmony_hap.sh
 
+      - name: M3 Core Compatibility Manifest
+        shell: bash
+        run: bash scripts/test/check_core_compatibility.sh
+
+      - name: Upload M3 Test Manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmonyos-pr-m3-manifest
+          path: build/test-manifest.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Build Libretro Tests (BUILD_LIBRETRO_TESTS=ON)
         continue-on-error: true
         shell: bash
