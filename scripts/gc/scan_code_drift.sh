@@ -97,6 +97,19 @@ done < <(rg '\.wait(_for|_until)?\(' "${CPP_DIR}" --glob '*.cpp' --glob '*.h' -n
 p6_hits="$(echo "${p6_raw}" | grep -c . || true)"
 [[ "${p6_raw}" == "" ]] && p6_hits=0
 
+# ── Pattern 7: ArkTS async 方法 await 后写 @State 漏生命周期守卫 (D016/D017/D018) ──
+# 启发式 + human-review:await 后写 @State 字段且赋值前无 pageActive/isCurrent*/token
+# 守卫 → 页面销毁后 setState 竞态候选。check_async_state_guard.pl 平衡括号取方法体 +
+# 逐行状态机,识别 pageActive/isCurrent*()/token=== 三类守卫。误报需人工复核。
+p7_files="$(rg 'async ' "${ETS_DIR}" --glob '*.ets' -l 2>/dev/null || true)"
+if [[ -n "${p7_files}" ]]; then
+  p7_raw="$(perl scripts/gc/check_async_state_guard.pl ${p7_files} 2>/dev/null | grep '^NO_GUARD' || true)"
+else
+  p7_raw=""
+fi
+p7_hits="$(echo "${p7_raw}" | grep -c . || true)"
+[[ "${p7_raw}" == "" ]] && p7_hits=0
+
 # ── Format hits as markdown list ─────────────────────────────────────────────
 fmt_list() {
   local raw="$1"
@@ -153,6 +166,13 @@ Hits: ${p6_hits}
 
 $(fmt_list "${p6_raw}")
 
+## Pattern 7: ArkTS async await 后写 @State 漏生命周期守卫 (human review required)
+
+Source: tech-debt-tracker.md D016/D017/D018 (async-@State 守卫范式)
+await 后写 @State 无 pageActive/isCurrent*/token 守卫 (启发式候选, 含误报): ${p7_hits}
+
+$(fmt_list "${p7_raw}")
+
 ## Summary
 
 | Pattern | Hits | Severity |
@@ -163,14 +183,15 @@ $(fmt_list "${p6_raw}")
 | 4. build() >200 lines | ${p4_hits} | P1 |
 | 5. NAPI exports undocumented | ${p5_hits} | P1 |
 | 6. wait without lock | ${p6_hits} | P0 |
+| 7. async-@State no guard | ${p7_hits} | P2 (human-review) |
 
 Recommend: feed Pattern 5/6 P0/P1 hits into tech-debt-tracker.md.
 EOF
 
 echo "[scan_code_drift] Report: ${REPORT}"
-echo "  P1:${p1_hits} P2:${p2_hits} P3:${p3_hits} P4:${p4_hits} P5:${p5_hits} P6:${p6_hits}"
+echo "  P1:${p1_hits} P2:${p2_hits} P3:${p3_hits} P4:${p4_hits} P5:${p5_hits} P6:${p6_hits} P7:${p7_hits}"
 
-total=$((p1_hits + p2_hits + p3_hits + p4_hits + p5_hits + p6_hits))
+total=$((p1_hits + p2_hits + p3_hits + p4_hits + p5_hits + p6_hits + p7_hits))
 # Exit code 仅表示 clean/dirty（0/1），total 数字通过上方 echo + REPORT 提供。
 # 历史曾用 exit ${total},但 bash exit code 只有 0-255,total > 255 会被 mod 256 截断
 # (例 total=640 → exit 128 看起来像 SIGTERM,且 total=256 → exit 0 误判为 clean)。
