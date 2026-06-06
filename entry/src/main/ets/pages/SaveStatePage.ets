@@ -315,6 +315,11 @@ struct SaveStatePage {
       const stateData = readSaveStateData(context, fileName)
       // 与 quickSave() 保持一致，避免同步 NAPI 调用阻塞 UI 线程。
       const loaded = await nativeApi.refactoredLoadStateAsync(stateData)
+      // D018: await 后页面可能已销毁,写 @State(toast)前检查 pageActive,与同页
+      // confirmDelete/quickSave 的 isCurrentPageTask 守卫一致(此处用 pageActive)。
+      if (!this.pageActive) {
+        return
+      }
       this.showToastMessage(
         loaded
           ? '即时存档已读取'

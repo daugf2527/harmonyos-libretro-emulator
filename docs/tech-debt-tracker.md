@@ -220,6 +220,17 @@
 | 状态 | fixed |
 | 备注 | **2026-06-06 修复**（本会话 loop）：D016 逐方法细查范式扩展到 SettingsPage 挖到。SettingsPage 7 个 async 核对：refreshPageData(token守卫)/persistRenderProfile(token守卫)/cycle×2+toggleHwRender(经persist)安全，仅 2 个 inputPreferences toggle 漏守卫。regression guard PASS；**未编译/未真机**。关联 `[[D016]]`（同类竞态范式） |
 
+### D018 — SaveStatePage.loadSave await 后写 @State 漏守卫 + ArkTS async-@State 守卫【系统性范式不完整】（loadSave 已修，系统性 open）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-06 / 本会话 loop · ArkTS 异步逐方法细查（D016/D017 系列第 3 例） |
+| 位置 | 已修单点：`entry/src/main/ets/pages/SaveStatePage.ets` `loadSave`（L308，修前 L318 await `refactoredLoadStateAsync` 后直接 `showToastMessage` 写 @State toastMessage/showToast 无守卫）。**系统性面**：全 `entry/src/main/ets/pages/**` 的 async 方法中"await 后写 @State 漏 pageActive/token 守卫"的零散遗漏 |
+| 影响 | P3（单点）/ **P2（系统性）** — 单点 loadSave 危害最轻（仅 toast，且 toast 有 setTimeout 自动隐藏+守卫）。**系统性问题**：逐方法细查 3 个页面（LibretroGamePage→D016、SettingsPage→D017、SaveStatePage→D018）**每页都有 1 处同类遗漏**——项目有 pageActive/token 守卫范式但落实不完整，是"整页有守卫、个别方法 inline await 漏守卫"的隐蔽模式。剩余未细查页面（RomManagerPage async=15、LibraryDetailPage、MetadataEditPage、CoreManagerPage 等）大概率仍有零散遗漏 |
+| 拟修 | 单点已修：loadSave await 后加 `if(!this.pageActive){return}`（主路径；catch 内 showToast 双重低概率未加）。**系统性需决策**：(a) 人工统一审计剩余页面所有 async 方法补守卫（工作量中等，逐页逐方法）；(b) 建立 async helper 范式（如 `await this.guardedAwait(promise, token)` 封装"await+守卫"）从源头防遗漏；(c) gc 加启发式扫描 pattern（async 方法体内 await 后 `this.<@State字段>=` 且无 pageActive/isCurrent 守卫，human-review，类似 ForEach Pattern 3 的启发式+人工复核）。逐个手修是打地鼠，应统一处理 |
+| 状态 | open（loadSave 单点 fixed；系统性范式落实待统一方案） |
+| 备注 | **2026-06-06**：本会话逐方法细查挖到 D016/D017/D018 三连同根，证明是系统性而非孤立。已修 3 处代表性单点（覆盖 use-after-free 高风险的 LibretroGamePage 渲染设置 + SettingsPage 偏好 + SaveStatePage toast）。**收口此角度的逐个手修**——边际递减（打地鼠），转为记录系统性 debt 供统一方案决策。regression guard PASS；未编译/未真机。关联 `[[D016]]` `[[D017]]` |
+
 ---
 
 ## 引用此文件的地方
