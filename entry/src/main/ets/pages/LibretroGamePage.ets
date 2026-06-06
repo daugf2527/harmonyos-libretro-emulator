@@ -69,6 +69,12 @@ import {
   saveRuntimeRenderSettingsProfile
 } from '../common/RuntimeRenderSettingsRepository'
 import { runtimeRenderSettingsController } from '../common/RuntimeRenderSettingsController'
+import {
+  createDefaultRuntimeAudioSettingsProfile,
+  loadRuntimeAudioSettingsProfile,
+  RuntimeAudioSettingsProfile
+} from '../common/RuntimeAudioSettingsRepository'
+import { runtimeAudioSettingsController } from '../common/RuntimeAudioSettingsController'
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
 import { scanRuntimeRomSources } from '../common/RuntimeRomSourceScanner'
 
@@ -161,6 +167,7 @@ struct LibretroGamePage {
   private readonly inputDebugTracker: RuntimeInputDebugTracker = new RuntimeInputDebugTracker();
   private readonly runtimeSaveStateController: RuntimeSaveStateController = new RuntimeSaveStateController();
   private renderSettingsProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile();
+  private audioSettingsProfile: RuntimeAudioSettingsProfile = createDefaultRuntimeAudioSettingsProfile();
   private readonly startOrSwitchDebounceMs: number = 600;
   private readonly runtimeInputLayoutWidth: number = 440;
   private readonly runtimeInputLayoutHeight: number = 340;
@@ -203,6 +210,7 @@ struct LibretroGamePage {
     this.syncPortAssignments();
     void this.loadRuntimeInputLayout();
     void this.loadRuntimeRenderSettings();
+    void this.loadRuntimeAudioSettings();
     this.refreshHudMetricsCache();
   }
 
@@ -278,6 +286,24 @@ struct LibretroGamePage {
     this.scalingMode = profile.scalingMode;
     this.softwareMaxPresetIndex = profile.softwareMaxPresetIndex;
     this.hwRenderAllowed = profile.hwRenderAllowed;
+  }
+
+  private async loadRuntimeAudioSettings(): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      return;
+    }
+    const profile = await loadRuntimeAudioSettingsProfile(context);
+    // await 后页面可能已销毁(D016 范式);audioSettingsProfile 虽为 private(无
+    // re-render),仍守卫保持一致 + 避免向已销毁页面写。
+    if (!this.pageActive) {
+      return;
+    }
+    this.audioSettingsProfile = profile;
+    // 若游戏已在运行(用户改设置后返回游戏页等场景),立即应用新延迟。
+    if (this.gameRunning) {
+      runtimeAudioSettingsController.setMinimumAudioLatency(profile.latencyMs);
+    }
   }
 
   private async persistRuntimeRenderSettingsProfile(): Promise<void> {
@@ -1071,6 +1097,10 @@ struct LibretroGamePage {
       this.gameRunning = true;
       this.gamePaused = false;
       this.pendingStart = false;
+      // D019: 游戏启动成功(引擎 RUNNING、AudioBridge 已 Reset(sample_rate))后应用
+      // 音频缓冲延迟,加深 RingBuffer 水位抗 callback 抖动(模拟器/低端机 underrun)。
+      // 生产路径此前从不调用,沿用默认 latency=0(浅缓冲),故模拟器抖动即 underrun。
+      runtimeAudioSettingsController.setMinimumAudioLatency(this.audioSettingsProfile.latencyMs);
       // core 在 retro_load_game / retro_run 早期 frame 通过 SET_INPUT_DESCRIPTORS
       // 声明使用的按键,这里在 switchGame 成功后立刻拉一次。
       this.runtimeInputDescriptorMask = getRuntimeInputDescriptorMask();

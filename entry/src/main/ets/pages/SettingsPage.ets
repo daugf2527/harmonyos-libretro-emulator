@@ -17,6 +17,17 @@ import {
   saveRuntimeRenderSettingsProfile
 } from '../common/RuntimeRenderSettingsRepository'
 import {
+  AUDIO_LATENCY_PRESETS,
+  createDefaultRuntimeAudioSettingsProfile,
+  describeAudioLatency,
+  getAudioLatencyForPreset,
+  getAudioLatencyPresetIndex,
+  loadRuntimeAudioSettingsProfile,
+  RuntimeAudioSettingsProfile,
+  saveRuntimeAudioSettingsProfile
+} from '../common/RuntimeAudioSettingsRepository'
+import { runtimeAudioSettingsController } from '../common/RuntimeAudioSettingsController'
+import {
   createDefaultRuntimeInputPreferencesProfile,
   loadRuntimeInputPreferencesProfile,
   RuntimeInputPreferencesProfile,
@@ -136,6 +147,7 @@ struct SettingsPage {
   @State private telemetryFooterRight: string = '进入游戏后会更新摘要'
   @State private telemetryBars: BarChartItem[] = this.createEmptyTelemetryBars()
   @State private renderProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile()
+  @State private audioProfile: RuntimeAudioSettingsProfile = createDefaultRuntimeAudioSettingsProfile()
   @State private inputPreferences: RuntimeInputPreferencesProfile = createDefaultRuntimeInputPreferencesProfile()
   @State private advancedStatusText: string = '运行时设置尚未读取'
   @State private runtimeApplyStatusText: string = '尚未执行运行时写入'
@@ -304,6 +316,11 @@ struct SettingsPage {
       return
     }
     this.renderProfile = renderProfile
+    const audioProfile = await loadRuntimeAudioSettingsProfile(context)
+    if (!this.isCurrentRefresh(token)) {
+      return
+    }
+    this.audioProfile = audioProfile
     const inputPreferences = await loadRuntimeInputPreferencesProfile(context)
     if (!this.isCurrentRefresh(token)) {
       return
@@ -467,7 +484,35 @@ struct SettingsPage {
     await this.persistRenderProfile(nextProfile)
   }
 
-  private async cycleSoftwareResolutionPreset(): Promise<void> {
+  private async cycleAudioLatencyPreset(): Promise<void> {
+    const currentIndex = getAudioLatencyPresetIndex(this.audioProfile.latencyMs)
+    const nextIndex = (currentIndex + 1) % AUDIO_LATENCY_PRESETS.length
+    const nextLatency = getAudioLatencyForPreset(nextIndex)
+    const ok = runtimeAudioSettingsController.setMinimumAudioLatency(nextLatency)
+    this.setRuntimeApplyStatus('音频缓冲延迟', ok)
+    if (!ok) {
+      return
+    }
+    await this.persistAudioProfile(nextLatency)
+  }
+
+  private async persistAudioProfile(latencyMs: number): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      return
+    }
+    const token = this.beginRefresh()
+    const nextProfile: RuntimeAudioSettingsProfile = {
+      version: this.audioProfile.version,
+      latencyMs: latencyMs,
+      updatedAt: this.audioProfile.updatedAt
+    }
+    const saved = await saveRuntimeAudioSettingsProfile(context, nextProfile)
+    if (!this.isCurrentRefresh(token)) {
+      return
+    }
+    this.audioProfile = saved
+  } {
     const nextPreset = (this.renderProfile.softwareMaxPresetIndex + 1) % 3
     const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
     nextProfile.scalingMode = 1
@@ -1111,6 +1156,14 @@ struct SettingsPage {
         }
       )
       this.AdvancedSettingRow('Audio Buffer', `最近一次运行摘要 · ${this.audioBufferSummaryText}`)
+      this.AdvancedSettingRow(
+        'Audio Latency',
+        `${describeAudioLatency(this.audioProfile.latencyMs)} · 缓冲越大越抗模拟器/低端机音频卡顿(underrun),代价是按键到出声延迟`,
+        '切换',
+        () => {
+          void this.cycleAudioLatencyPreset()
+        }
+      )
       this.AdvancedSettingRow(
         'Shader Mode',
         this.shaderModeSummaryText,
