@@ -55,11 +55,15 @@ export class RuntimeInputDebugTracker {
   start(onChange: (state: RuntimeInputDebugTextState) => void): void {
     if (this.timer !== -1) {
       clearInterval(this.timer)
+      this.timer = -1
     }
+    // 仅读一次初值。原 500ms 轮询定时器已移除:它产出的 inputDebugText / inputFocusText /
+    // uiInputDebugText 三个 @State 在 LibretroGamePage.build() 中从未被读取(死输出),却每
+    // 500ms 做 NAPI 同步往返 refactoredGetInputDebugStats() + 写 3 个 @State → 触发 1239 行
+    // 整页 build() 空重渲染,在无 RT 调度的模拟器上无谓占用 UI 线程、连累按键跟手。
+    // 需要输入调试时恢复轮询即可:
+    //   this.timer = setInterval(() => { onChange(this.readState()) }, 500)
     onChange(this.readState())
-    this.timer = setInterval(() => {
-      onChange(this.readState())
-    }, 500)
   }
 
   stop(): void {
