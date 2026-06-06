@@ -176,6 +176,12 @@ public:
     framePacer_.SetTargetFps(fps);
   }
 
+  // 平台门控转发:模拟器(无 RT)禁 FramePacer 忙等自旋,改纯 sleep,避免 RenderThread
+  // 烧满虚拟核抢 GameLoop 的核。由 RenderThread 据 OH_QoS_SetThreadQoS 成败注入。
+  void SetFramePacerBusyWaitAllowed(bool allowed) {
+    framePacer_.SetBusyWaitAllowed(allowed);
+  }
+
   /**
    * @brief 启用/禁用 XEngine AI 超分
    */

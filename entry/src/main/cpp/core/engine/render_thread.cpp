@@ -180,6 +180,12 @@ void RenderThread::ThreadMain() {
   // API12+ QoS：渲染线程同样标记为最高交互优先级，与 Game 线程一致争取大核。
   int qosRet = OH_QoS_SetThreadQoS(QOS_USER_INTERACTIVE);
   LOGF(LOG_INFO, "[QoS] RenderThread QoS set ret=%{public}d", qosRet);
+  // 平台门控:QoS 成功(真机,有 RT 调度、多大核)→ 允许 FramePacer 末尾 hybrid 极短
+  // 自旋收窄帧抖动;失败(模拟器,无 RT、少 vCPU、软件 GPU 已占满核)→ 禁忙等自旋改纯
+  // sleep,不让 RenderThread 用 PAUSE 烧满一个虚拟核去抢 GameLoop / 软件 GL 的核。
+  // 依据:外网实证 PAUSE 忙等填毫秒级帧节拍在 VM/模拟器是反模式;FramePacer(093d3a8
+  // 2026-05-24 引入)正落在 5.0.5→6.0.2 回归窗口。详见 docs/audit/2026-06-06-video-swap-stall.md。
+  videoPipeline_.SetFramePacerBusyWaitAllowed(qosRet == 0);
   StartVSyncIfNeeded();
   if (nativeVsyncActive_.load(std::memory_order_acquire)) {
     RequestNextVSync();
