@@ -39,7 +39,6 @@ static const char* GetEventName(EventBridge::EventType event) {
         case EventBridge::EventType::OPTIONS_UPDATE: return "options_update";
         case EventBridge::EventType::PIXEL_FORMAT_UPDATE: return "pixel_format_update";
         case EventBridge::EventType::CORE_MESSAGE: return "core_message";
-        case EventBridge::EventType::CORE_ERROR: return "core_error";
         case EventBridge::EventType::CORE_CRASH: return "core_crash";
         case EventBridge::EventType::ENGINE_STATE: return "engine_state";
         case EventBridge::EventType::DISK_CONTROL: return "disk_control";
@@ -57,7 +56,6 @@ static EventBridge::EventType GetEventType(const std::string& event) {
     if (event == "options_update") return EventBridge::EventType::OPTIONS_UPDATE;
     if (event == "pixel_format_update") return EventBridge::EventType::PIXEL_FORMAT_UPDATE;
     if (event == "core_message") return EventBridge::EventType::CORE_MESSAGE;
-    if (event == "core_error") return EventBridge::EventType::CORE_ERROR;
     if (event == "core_crash") return EventBridge::EventType::CORE_CRASH;
     if (event == "engine_state") return EventBridge::EventType::ENGINE_STATE;
     if (event == "disk_control") return EventBridge::EventType::DISK_CONTROL;
