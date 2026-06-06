@@ -266,6 +266,14 @@ struct LibretroGamePage {
       return;
     }
     const profile = await loadRuntimeRenderSettingsProfile(context);
+    // T8-C-F5 同范式:本方法由 aboutToAppear fire-and-forget 触发,await 配置读取
+    // 期间用户可能退出页面(aboutToDisappear 置 pageActive=false 并销毁),写
+    // @State(scalingMode/softwareMaxPresetIndex/hwRenderAllowed)前必须检查
+    // pageActive,否则向已销毁页面 setState。对照 quickSave/quickLoad 已有此守卫,
+    // 本方法此前遗漏(D016)。
+    if (!this.pageActive) {
+      return;
+    }
     this.renderSettingsProfile = profile;
     this.scalingMode = profile.scalingMode;
     this.softwareMaxPresetIndex = profile.softwareMaxPresetIndex;

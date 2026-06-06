@@ -198,6 +198,17 @@
 | 状态 | open |
 | 备注 | **EventBridge 核心功能健康**：本核对证实 12/13 事件接线完整——core_message(emit `libretro_engine:2475` ↔ ArkTS subscribe@218)、core_crash(emit 多处 ↔ ArkTS case@413)、engine_state/fps_update/audio_status/options_update/pixel_format_update/geometry_update/disk_control/rumble/sensor_state 全对齐。**仅 core_error 单事件 + 枚举版 Emit 是死代码**，事件名一致性除此之外全对齐。EventBridge 跨语言边界确认通过 |
 
+### D016 — LibretroGamePage.loadRuntimeRenderSettings async 竞态：await 后写 @State 漏 pageActive 守卫（已修）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-06 / 本会话 loop · ArkTS 异步生命周期审计 |
+| 位置 | `entry/src/main/ets/pages/LibretroGamePage.ets` `loadRuntimeRenderSettings`（L263，由 `aboutToAppear` L205 fire-and-forget 触发）；修前 await `loadRuntimeRenderSettingsProfile` 后直接写 `scalingMode`/`softwareMaxPresetIndex`/`hwRenderAllowed`（均 @State，L132-134） |
+| 影响 | P3 — use-after-free 类竞态：aboutToAppear 触发 → await 读配置文件（几 ms 窗口）→ 用户快速退出游戏页（aboutToDisappear 置 `pageActive=false` 并销毁）→ await 回来向已销毁页面写 @State 触发 re-render。ArkUI setState-on-destroyed 通常 warning/静默，极端可 crash。竞态窗口小（需配置读取期间退出），但**违反项目自建范式**——quickSave/quickLoad（L307/321）有 `if(!pageActive)return` 守卫（T8-C-F5），本方法遗漏 |
+| 拟修 | 已修：await 后、写 @State 前加 `if(!this.pageActive){return;}`，与 quickSave/quickLoad T8-C-F5 范式一致。**未碰** `loadRuntimeInputLayout`（写 `runtimeInputLayoutButtons` 为 private 非 @State，销毁后赋值无 re-render，无害）、`persistRuntimeRenderSettingsProfile`（写 renderSettingsProfile private，同理）、`startOrSwitchGame`（已有 isCurrentSwitchTask 6 处守卫）、`refreshRomList`（已有 romListRefreshToken 守卫） |
+| 状态 | fixed |
+| 备注 | **2026-06-06 修复**（本会话 loop）：ArkTS 异步审计换角度挖到（C++/NAPI 边界全健康后转 ArkTS 竞态）。regression guard PASS；**未编译/未真机**（quick_signals 不覆盖 .ets hvigor 编译，需 DevEco 复编验证守卫不破坏布局加载）。同页其余 7 个 async 守卫覆盖经核对完整（startOrSwitch/quickSave/quickLoad/refreshRom 有守卫，loadInputLayout/persist/finalize 写 private 或无 setState 无需守卫）。memory `feedback_arkts_v1v2_no_mixing`(@State 范式) |
+
 ---
 
 ## 引用此文件的地方
