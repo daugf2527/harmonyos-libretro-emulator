@@ -411,10 +411,17 @@ struct SettingsPage {
     }
     try {
       const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
+      // D017: await 后页面可能已销毁(用户点 toggle 后立即退出),写 @State
+      // inputPreferences 前检查 pageActive,与同页 refreshPageData/persistRenderProfile
+      // 的 token 守卫范式一致(此处用 pageActive)。
+      if (!this.pageActive) {
+        return
+      }
       this.inputPreferences = saved
       this.setRuntimeApplyStatus('虚拟手柄显示', true)
     } catch (_err) {
-      this.setRuntimeApplyStatus('虚拟手柄显示', false)    }
+      this.setRuntimeApplyStatus('虚拟手柄显示', false)
+    }
   }
 
   private async toggleHideUndeclaredKeys(): Promise<void> {
@@ -431,6 +438,10 @@ struct SettingsPage {
     }
     try {
       const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
+      // D017: 同 toggleHideVirtualController,await 后写 @State 前检查 pageActive。
+      if (!this.pageActive) {
+        return
+      }
       this.inputPreferences = saved
       this.setRuntimeApplyStatus('按 core 隐藏未声明键', true)
     } catch (_err) {

@@ -209,6 +209,17 @@
 | 状态 | fixed |
 | 备注 | **2026-06-06 修复**（本会话 loop）：ArkTS 异步审计换角度挖到（C++/NAPI 边界全健康后转 ArkTS 竞态）。regression guard PASS；**未编译/未真机**（quick_signals 不覆盖 .ets hvigor 编译，需 DevEco 复编验证守卫不破坏布局加载）。同页其余 7 个 async 守卫覆盖经核对完整（startOrSwitch/quickSave/quickLoad/refreshRom 有守卫，loadInputLayout/persist/finalize 写 private 或无 setState 无需守卫）。memory `feedback_arkts_v1v2_no_mixing`(@State 范式) |
 
+### D017 — SettingsPage toggle 方法 await 后写 @State 漏 pageActive 守卫（D016 同类，已修）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-06 / 本会话 loop · ArkTS 异步生命周期逐方法细查（续 D016 角度） |
+| 位置 | `entry/src/main/ets/pages/SettingsPage.ets` `toggleHideVirtualController`（L400，修前 L414）+ `toggleHideUndeclaredKeys`（L420，修前 L434）；二者 inline `await saveRuntimeInputPreferencesProfile` 后直接写 `this.inputPreferences`（@State L139），无守卫；由用户点击触发（L1067/L1075） |
+| 影响 | P3 — D016 同类 use-after-free 竞态：用户点 toggle（虚拟手柄显示/隐藏未声明键）→ await 保存配置（IO 窗口）→ 立即退出 Settings 页（aboutToDisappear 置 pageActive=false）→ await 回来写 @State inputPreferences 触发 re-render on destroyed。竞态窗口比 D016 更窄（需用户主动点击+退出双重操作），但同属真竞态。**违反同页范式**：renderProfile 的写都走 persistRenderProfile（有 isCurrentRefresh token 守卫 L375），inputPreferences 的写在 toggle 内 inline 漏守卫 |
+| 拟修 | 已修：两 toggle 的 try 内 await 后、写 inputPreferences 前加 `if(!this.pageActive){return}`，与同页 refreshPageData/persistRenderProfile token 守卫范式一致（此处用 pageActive，因 toggle 无 beginRefresh token）。顺手规整 catch 块预存格式瑕疵（`false)    }` → 换行）。**未碰** cycleRenderMode/cycleSoftwareResolutionPreset/toggleHwRenderAllowed（均经 persistRenderProfile 守卫，安全）、refreshPageData（4 处 token 守卫完整） |
+| 状态 | fixed |
+| 备注 | **2026-06-06 修复**（本会话 loop）：D016 逐方法细查范式扩展到 SettingsPage 挖到。SettingsPage 7 个 async 核对：refreshPageData(token守卫)/persistRenderProfile(token守卫)/cycle×2+toggleHwRender(经persist)安全，仅 2 个 inputPreferences toggle 漏守卫。regression guard PASS；**未编译/未真机**。关联 `[[D016]]`（同类竞态范式） |
+
 ---
 
 ## 引用此文件的地方
