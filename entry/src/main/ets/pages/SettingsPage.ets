@@ -512,7 +512,9 @@ struct SettingsPage {
       return
     }
     this.audioProfile = saved
-  } {
+  }
+
+  private async cycleSoftwareResolutionPreset(): Promise<void> {
     const nextPreset = (this.renderProfile.softwareMaxPresetIndex + 1) % 3
     const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
     nextProfile.scalingMode = 1
