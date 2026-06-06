@@ -13,7 +13,7 @@ public:
     const auto now = std::chrono::steady_clock::now();
     frame_start_ = now;
     frame_started_ = true;
-    const int64_t period_us = target_frame_time_us_.load();
+    const int64_t period_us = EffectivePeriodUs();
     if (!deadline_initialized_) {
       next_deadline_ = now;
       deadline_initialized_ = true;
@@ -44,7 +44,7 @@ public:
     if (!frame_started_) {
       return;
     }
-    const int64_t period_us = target_frame_time_us_.load();
+    const int64_t period_us = EffectivePeriodUs();
     auto target_end = next_deadline_;
     auto now = std::chrono::steady_clock::now();
 
@@ -92,6 +92,23 @@ public:
   }
 
 private:
+  // 模拟器渲染降频:RenderThread 无 RT 调度时把渲染目标帧时封顶到 30fps,每帧多 sleep
+  // 让出虚拟核给 GameLoop(跑模拟 + 每帧喂音频)。引擎 GameLoop 自身节拍
+  // (libretro_engine.cpp:1274,独立于本 FramePacer)不受影响 → 游戏/音频仍全速,仅
+  // 显示降到 30fps。emulator-gated:busy_wait_allowed_==false(源自 OH_QoS 失败)才生效。
+  static constexpr int64_t kEmulatorRenderMinFrameUs = 33333; // 30fps 上限(模拟器)
+
+  int64_t EffectivePeriodUs() const {
+    const int64_t period = target_frame_time_us_.load();
+    // 用比较 + 返回值,而非 std::max(const T&, const T&)——后者对 static constexpr
+    // 成员取址 → odr-use,头文件内无独立定义会链接报 undefined symbol。
+    if (!busy_wait_allowed_.load(std::memory_order_relaxed) &&
+        period < kEmulatorRenderMinFrameUs) {
+      return kEmulatorRenderMinFrameUs;
+    }
+    return period;
+  }
+
   std::chrono::steady_clock::time_point frame_start_;
   std::chrono::steady_clock::time_point next_deadline_;
   bool deadline_initialized_ = false;
