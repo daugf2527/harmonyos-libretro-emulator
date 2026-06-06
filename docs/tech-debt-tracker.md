@@ -187,6 +187,17 @@
 | 状态 | fixed |
 | 备注 | **2026-06-06 修复**（本会话 loop）：cxx-build PASS；napi-boundary-reviewer 复核 **PASS**（5/5 OK：MakeNull 对齐 GetSRAM、ArkTS 消费 0 依赖旧 struct、RAII 安全、文件级 MakeErrorResult 仅剩注释）。**全文件闭环结论**：reviewer 交叉核对 engine_state_napi.cpp 全部 13 sync export 返回类型现 100% 对齐 index.d.ts 声明。其余 6 async（GetSaveStateSize/SaveState/LoadState/WaitForState/StopEngine/GetRawFileList）resolve 类型本轮亦逐个核实与声明一致，失败均走 reject。memory `feedback_napi_return_type_lie_hides_bug` |
 
+### D015 — EventBridge core_error 死事件类型 + 枚举版 Emit/GetEventName 死代码（需决策）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-06 / 本会话 loop · EventBridge 事件名 C++↔ArkTS 一致性核对 |
+| 位置 | (a) `core/engine/event_bridge.h:39` `CORE_ERROR` enum + `.cpp:42/60` 双向字符串映射；ArkTS `LibretroEventHub.ets` `EventName` union(L11-22)+ `normalizeEventName` switch(L411-426) **均漏 `core_error`**。(b) `event_bridge.h:48` 枚举版 `Emit(EventType,...)` + `GetEventName` 映射表 |
+| 影响 | P3（非当前 bug，均"定义未接线"）— (a) **core_error 死事件**：C++ 有 EventType+双向映射但**无 emit callsite**（全仓 `Emit("core_error"` 0 命中）、ArkTS 无监听 → 当前零危害（从不发出）；潜在地雷：未来 `Emit("core_error",...)` 会被 ArkTS `normalizeEventName` 返 null **静默丢弃**（类似类型谎言静默风险）。(b) **枚举版 Emit 死代码**：21 个 emit callsite **全走 deprecated 字符串版 `Emit(string,...)`**（`.h:51`），枚举版 `Emit(EventType,...)`+`GetEventName` **0 使用** → 死代码 + 主路径反用 deprecated 接口 |
+| 拟修 | **需决策（非自主）**：(a) core_error 若确定要用（核心错误细分于 core_crash/core_message）→ 两侧接线（C++ 加 `Emit("core_error",...)` callsite + ArkTS 补 union/case/subscribe + UI 行为）；若不用 → 删 C++ 死枚举+映射。(b) 枚举版 Emit 扶正（callsite 改枚举版、删 deprecated 字符串版）or 认字符串版为正、删枚举版+GetEventName。两者均涉架构/产品决策，故记录不自主改 |
+| 状态 | open |
+| 备注 | **EventBridge 核心功能健康**：本核对证实 12/13 事件接线完整——core_message(emit `libretro_engine:2475` ↔ ArkTS subscribe@218)、core_crash(emit 多处 ↔ ArkTS case@413)、engine_state/fps_update/audio_status/options_update/pixel_format_update/geometry_update/disk_control/rumble/sensor_state 全对齐。**仅 core_error 单事件 + 枚举版 Emit 是死代码**，事件名一致性除此之外全对齐。EventBridge 跨语言边界确认通过 |
+
 ---
 
 ## 引用此文件的地方
