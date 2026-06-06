@@ -192,3 +192,20 @@ cclsp `get_incoming_calls` 三跳全部唯一(`VideoPipeline::Render` ← `Handl
 ### 复核底线(对原结论的修正)
 
 原"底线结论"主轴(165ms 主因 = 模拟器固有抢占,非 App 某个同步阻塞调用)**仍成立、不推翻**。但需补一条修正:**"App 无可修点"过强**——FramePacer 忙等自旋(`frame_pacer.h:54`,RenderThread)是一个 App 可门控削减的核争用次级加剧因素;模拟器上无 vsync 还精确烧核纯属浪费,平台门控(复用现成 `qosRet==0` 信号,改判别就地在 `render_thread.cpp:181`)可削减其对稀缺虚拟核的挤占。预期收益为边际改善(尤其对 `producer max_gap_ms` / 音频 underrun 的连带缓解),非根治。诚实标注:自旋对 165ms 的具体贡献量静态不可测,需真机/模拟器 `perfetto`/`ftrace` 抓 GameLoop runnable→running 等待间隙 + 对比"禁自旋前后"才能定量坐实。
+
+## 治标减负预案(待 FramePacer 修复(05dc30b)实测后按需启用,勿盲目提前应用)
+
+**前提判断**:FramePacer 忙等自旋已改纯 sleep(05dc30b)——RenderThread 在"等待"期已让核(原来 `pause` 烧核)。**若实测模拟器已回 60fps 流畅,则下列降级不必做**(会无谓把画面降到 30fps)。仅当实测 FramePacer 仍不够、RenderThread 软件 GL 渲染本身(非等待)仍抢满核时,再启用:
+
+### 预案 A:模拟器渲染目标降至 30fps(收益高/可逆)
+- 机制:模拟器(qosRet==-1)下 `FramePacer::SetTargetFps(30)`(RenderThread 渲一帧后 sleep 到 33ms deadline,空出半个核给 GameLoop 跑模拟+喂音频);引擎/音频仍 60fps 全速,仅显示 30fps。
+- 落点:`render_thread.cpp:181` 拿 qosRet 后,若 -1 则 `videoPipeline_.SetTargetFps(30.0)`(需确认不与核心 AV fps 设置冲突——core fps 走 `:2147 SetTargetFps(pendingAv.timing.fps)`,二者需协调:渲染 pacer 与引擎 pacer 解耦或取 min)。
+- tradeoff:画面 30fps(开发态可接受),换音频/按键流畅 + 核让给 GameLoop。**用户决策项**。
+
+### 预案 B:F1 音频回调去锁(真机 robustness,与当前模拟器症状无关)
+- `OnWriteDataCallback` 内 workgroup 路径的 `state_mutex_` 改为无锁(workgroup handle/token 在 init/cleanup 稳定 + 现有 CallbackGuard/active_callbacks_ 已序列化 cleanup)→ 消除 RT 音频回调持锁反模式。仅真机生效(模拟器 workgroup 已禁)。需谨慎改实时回调。
+
+### 预案 C:kSyncTaskTimeoutMs 5000→降值(ANR 防护,latent)
+- 撞 APP_INPUT_BLOCK 阈值;但降太低会让重载下同步存档/换盘提前失败。**用户决策值**。
+
+**优先级**:全部待"3 刀实测结果"再定。若实测三症状已显著缓解 → A/B/C 可不做或仅做 B/C robustness。
