@@ -89,14 +89,34 @@ public:
   void SetSyncMode(SyncMode mode) { sync_mode_.store(mode); }
   SyncMode GetSyncMode() const { return sync_mode_.load(); }
 
+  // 平台实时调度能力(由引擎 GameLoop 入口 OH_QoS_SetThreadQoS 成败注入):
+  // true=真机(有 RT,回调规整)→ 浅缓冲低延迟;false=模拟器(无 RT,回调抖)→ 深缓冲抗抖动。
+  // 须在 AudioBridge::Initialize 之前调用方生效(引擎设 QoS 后即调,早于游戏加载)。
+  void SetRtSchedulingAvailable(bool available) {
+    rt_scheduling_available_.store(available, std::memory_order_relaxed);
+  }
+
 private:
-  // --- DRC Constants ---
-  static constexpr float kDrcLowThreshold = 0.40f;
-  static constexpr float kDrcHighThreshold = 0.60f;
+  // --- 平台双 profile:缓冲深度 + DRC 带 ---
+  // 按 RT 调度能力(SetRtSchedulingAvailable,源自引擎 OH_QoS_SetThreadQoS 成败)二选一,
+  // 在 Initialize 落地。详见 memory project-audio-underrun-api22-emulator-not-code。
+  //  - 真机(有 RT):回调规整 ~20ms,浅缓冲 + DRC 维持 ~116ms,低延迟。
+  //  - 模拟器(无 RT,workgroup/QoS 被系统拒):回调抖 ~150ms,需深缓冲扛,DRC 带抬高
+  //    (留足深缓冲不被 DRC 抽干);延迟高些但不卡,开发环境可接受。
+  // DRC 带语义: 水位 < low 加速生产补水、> high 减速,把水位维持在带内。
+  static constexpr int kMinBufferMsDevice = 100;
+  static constexpr int kMinBufferMsEmulator = 250;
+  static constexpr float kDrcLowThresholdDevice = 0.06f;    // ~82ms
+  static constexpr float kDrcHighThresholdDevice = 0.11f;   // ~150ms
+  static constexpr float kDrcLowThresholdEmulator = 0.12f;  // ~164ms
+  static constexpr float kDrcHighThresholdEmulator = 0.28f; // ~382ms
   static constexpr double kDrcStep = 0.001;
   static constexpr double kDrcMaxSkew = 1.015;
   static constexpr double kDrcMinSkew = 0.995;
   static constexpr int kDrcUpdateIntervalMs = 50;
+  // 运行时生效的 DRC 带(Initialize 按 profile 赋值;默认真机档)。同线程(引擎)读写,无需原子。
+  float drc_low_threshold_ = kDrcLowThresholdDevice;
+  float drc_high_threshold_ = kDrcHighThresholdDevice;
 
   AudioBridge();
   ~AudioBridge() override;
@@ -118,6 +138,8 @@ private:
   bool buffering_ = false;
 
   std::atomic<SyncMode> sync_mode_{SyncMode::AUDIO_BLOCKING};
+  // 平台 RT 调度能力。默认 false=保守走模拟器深缓冲档;引擎 GameLoop 入口早期注入纠正。
+  std::atomic<bool> rt_scheduling_available_{false};
   bool is_started_ = false; // Intended state
   std::atomic<size_t> min_buffer_frames_{0};
   std::atomic<size_t> default_min_buffer_frames_{0};

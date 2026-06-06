@@ -470,7 +470,13 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
     buffer_ref->GetStats(underruns, overruns);
     const size_t last_rebuffer_underruns =
         last_rebuffer_underruns_.load(std::memory_order_relaxed);
-    if (underruns > last_rebuffer_underruns && available_frames < min_frames) {
+    // 运行时重缓冲会在引擎线程上调 AudioPlayer Pause()/Start()。真机这俩廉价;但模拟器
+    // 无 RT 调度时它们耗时 95-231ms,直接卡死 retro_run → 更多 underrun → 更多重缓冲的
+    // 死循环(实测)。故仅真机重缓冲;模拟器 ride-through(消费回调补静音)+ 深缓冲 + DRC
+    // 维持,绝不在引擎线程上做昂贵的 HAL 状态切换。详见 memory
+    // project-audio-underrun-api22-emulator-not-code。
+    if (rt_scheduling_available_.load(std::memory_order_relaxed) &&
+        underruns > last_rebuffer_underruns && available_frames < min_frames) {
       std::lock_guard<std::mutex> guard(mutex_);
       if (audio_player_ && !buffering_ && audio_player_->IsPlaying()) {
         const bool paused = audio_player_->Pause();
@@ -533,7 +539,9 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
          started_snapshot ? 1 : 0);
   }
 
-  // DRC 动态比率微调（目标水位 50% ±10%，节流 ≥50ms）
+  // DRC 动态比率微调: 连续把缓冲水位维持在 kDrcLow~kDrcHigh (~82-150ms, 节流 ≥50ms)。
+  // 这是抗模拟器 callback 抖动的主力(替代"堆大缓冲"): 水位低于带就加速生产补水、
+  // 高于带就减速,使水位稳定在 ~116ms 而非下沉到读穿。
   {
     auto now = std::chrono::steady_clock::now();
     // 简单的原子检查，无需加锁
@@ -544,9 +552,9 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
                 .count() >= kDrcUpdateIntervalMs) {
       float usage = buffer_ref ? buffer_ref->GetUsage() : 0.0f;
       double skew = drc_skew_.load();
-      if (usage < kDrcLowThreshold) {
+      if (usage < drc_low_threshold_) {
         skew = std::min(skew + kDrcStep, static_cast<double>(kDrcMaxSkew));
-      } else if (usage > kDrcHighThreshold) {
+      } else if (usage > drc_high_threshold_) {
         skew = std::max(skew - kDrcStep, static_cast<double>(kDrcMinSkew));
       }
 
@@ -638,9 +646,23 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   // 使用新的 RingBuffer (传入 Samples)
   ring_buffer_ = std::make_unique<RingBuffer>(buffer_capacity_samples);
 
-  // 设定最小缓冲帧数 (200ms)。OHAudio NORMAL 模式下单次回调约 20ms，
-  // 100ms 水位在系统调度抖动时容易读穿，导致持续 underrun。
-  default_min_buffer_frames_.store(output_sample_rate_ / 5);
+  // 平台双 profile:按 RT 调度能力(SetRtSchedulingAvailable,源自引擎 QoS 成败)选缓冲深度
+  // + DRC 带。真机有 RT(回调规整 ~20ms)→ 浅缓冲低延迟;模拟器无 RT(回调抖 ~150ms,
+  // workgroup/QoS 被系统拒)→ 深缓冲扛抖动 + DRC 带抬高不抽干。详见 memory
+  // project-audio-underrun-api22-emulator-not-code。
+  const bool rt_sched = rt_scheduling_available_.load(std::memory_order_relaxed);
+  const int min_buffer_ms = rt_sched ? kMinBufferMsDevice : kMinBufferMsEmulator;
+  drc_low_threshold_ = rt_sched ? kDrcLowThresholdDevice : kDrcLowThresholdEmulator;
+  drc_high_threshold_ = rt_sched ? kDrcHighThresholdDevice : kDrcHighThresholdEmulator;
+  default_min_buffer_frames_.store(
+      static_cast<size_t>(output_sample_rate_) * min_buffer_ms / 1000);
+  LOGF(LOG_INFO,
+       "%{public}s Audio profile: %{public}s (rt_sched=%{public}d, min_buffer=%{public}d ms, "
+       "drc_band=%{public}d%%-%{public}d%%)",
+       kAudioChainPrefix, rt_sched ? "device/low-latency" : "emulator/deep-buffer",
+       rt_sched ? 1 : 0, min_buffer_ms,
+       static_cast<int>(drc_low_threshold_ * 100.0f + 0.5f),
+       static_cast<int>(drc_high_threshold_ * 100.0f + 0.5f));
   min_buffer_frames_.store(default_min_buffer_frames_.load());
   minimum_latency_ms_.store(0);
 

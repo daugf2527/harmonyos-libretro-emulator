@@ -1139,6 +1139,10 @@ void LibretroEngine::GameLoop() {
   // 强制大核调度、减少高负载抢占（音频线程已由 OH_AudioWorkgroup 覆盖，此处仅 Game 线程）。
   int qosRet = OH_QoS_SetThreadQoS(QOS_USER_INTERACTIVE);
   LOGF(LOG_INFO, "[QoS] GameLoop thread QoS set ret=%{public}d", qosRet);
+  // 平台能力探测:QoS 成功(ret==0)=平台支持实时调度(真机)→ 音频走低延迟浅缓冲;
+  // 失败(ret==-1,模拟器无 RT 调度)→ 音频走深缓冲扛抖动。须早于游戏加载(AudioBridge
+  // ::Initialize 读此标志选 profile)注入,故置于 GameLoop 入口。
+  AudioBridge::GetInstance()->SetRtSchedulingAvailable(qosRet == 0);
   LOGF(LOG_INFO, " [NEW] GameLoop Thread Entry: ID = %{public}zu",
        std::hash<std::thread::id>{}(std::this_thread::get_id()));
   g_engineThreadInstance = this;
