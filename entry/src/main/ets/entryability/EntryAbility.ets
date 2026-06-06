@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { AbilityConstant, UIAbility, Want, MemoryLevel } from '@kit.AbilityKit';
+import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import LogHelper from '../common/LogHelper';
 import { LibretroEventHub } from '../common/LibretroEventHub';
@@ -89,7 +89,7 @@ export default class EntryAbility extends UIAbility {
     // when the user navigates to the game page — see imports note above.
   }
 
-  onMemoryLevel(level: MemoryLevel): void {
+  onMemoryLevel(level: AbilityConstant.MemoryLevel): void {
     // 内存压力回调（诊断用）：系统内存不足时触发。
     // 模拟器内存大头（ROM / core .so）无法在运行时释放，此回调目前仅做日志。
     // 未来可在此处释放 shader 缓存、降低音频缓冲等不关键资源。
