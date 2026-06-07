@@ -23,14 +23,14 @@ interface CoreLoaderNapi {
 const nativeApi = testNapi as CoreLoaderNapi;
 
 @Entry
-@Component
+@ComponentV2
 struct CoreLoaderTest {
-  @State testResult: string = '等待测试...';
-  @State corePath: string = '';
-  @State isLoading: boolean = false;
-  @State coreOptions: SelectOption[] = [];
-  @State selectedCoreIndex: number = 0;
-  @State coreDescription: string = '';
+  @Local testResult: string = '等待测试...';
+  @Local corePath: string = '';
+  @Local isLoading: boolean = false;
+  @Local coreOptions: SelectOption[] = [];
+  @Local selectedCoreIndex: number = 0;
+  @Local coreDescription: string = '';
   private bundleCodeDir: string = '';
   private abiPath: string = 'arm64';
   private cores: CoreConfig[] = [

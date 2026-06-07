@@ -17,10 +17,10 @@ interface ImportParticle {
   opacity: number
 }
 
-@Component
+@ComponentV2
 struct ParticleLayer {
-  @Prop boosted: boolean = false
-  @State particlePhase: number = 0
+  @Param boosted: boolean = false
+  @Local particlePhase: number = 0
   private timer: number = -1
   private readonly particles: ImportParticle[] = [
     { x: 24, y: 88, size: 2, opacity: 0.12 },
@@ -82,15 +82,15 @@ struct ParticleLayer {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct ImportEntryPage {
-  @State private hasGames: boolean = false
-  @State private isScanning: boolean = false
-  @State private scanProgress: number = 0
-  @State private scanStatusText: string = '正在扫描本地文件...'
-  @State private importButtonPressed: boolean = false
-  @State private particleBoosted: boolean = false
-  @State private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+  @Local private hasGames: boolean = false
+  @Local private isScanning: boolean = false
+  @Local private scanProgress: number = 0
+  @Local private scanStatusText: string = '正在扫描本地文件...'
+  @Local private importButtonPressed: boolean = false
+  @Local private particleBoosted: boolean = false
+  @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private scanTimer: number = -1
   private pageActive: boolean = false
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('library')

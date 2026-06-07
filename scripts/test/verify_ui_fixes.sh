@@ -85,26 +85,26 @@ assert_grep "RETRO_BUTTON_OPTIONS Select for key mapping" \
   "RETRO_BUTTON_OPTIONS\[index\]" "$F"
 
 echo ""
-echo "=== Fix 4: Slider <-> percentage two-way binding via @Component ==="
+echo "=== Fix 4: Slider <-> percentage two-way binding via @ComponentV2 ==="
 F=entry/src/main/ets/pages/SettingsPage.ets
-if grep -qzE "@Component\s+struct LinearSettingRow" "$F" 2>/dev/null; then
-  check "LinearSettingRow is a @Component" "ok"
+if grep -qzE "@ComponentV2\s+struct LinearSettingRow" "$F" 2>/dev/null; then
+  check "LinearSettingRow is a @ComponentV2" "ok"
 else
-  check "LinearSettingRow is a @Component" "fail"
+  check "LinearSettingRow is a @ComponentV2" "fail"
 fi
-assert_grep "LinearSettingRow has @Prop value" \
-  "@Prop value: number" "$F"
+assert_grep "LinearSettingRow has @Param value" \
+  "@Param value: number" "$F"
 assert_grep "LinearSettingBlock builder wraps LinearSettingRow" \
   "LinearSettingRow\(\{" "$F"
-assert_no_grep "No direct @Prop assignment (this.value = clamped)" \
+assert_no_grep "No direct @Param assignment (this.value = clamped)" \
   "this\.value\s*=\s*clamped" "$F"
 
 F=entry/src/main/ets/pages/ShaderPreviewPage.ets
-assert_grep "ShaderSliderRow is a @Component" \
+assert_grep "ShaderSliderRow is a @ComponentV2" \
   "struct ShaderSliderRow" "$F"
-assert_grep "ShaderSliderRow has @Prop value" \
-  "@Prop value: number" "$F"
-assert_no_grep "ShaderSliderRow no @Prop write" \
+assert_grep "ShaderSliderRow has @Param value" \
+  "@Param value: number" "$F"
+assert_no_grep "ShaderSliderRow no @Param write" \
   "this\.value\s*=\s*clamped" "$F"
 
 echo ""
@@ -189,12 +189,12 @@ assert_grep "localizeButtonLabel migrates old English saves" \
 echo ""
 echo "=== Fix 12: Layout split + per-button press feedback + no full-screen shroud ==="
 F=entry/src/main/ets/components/RuntimeVirtualControllerLayer.ets
-assert_grep "RuntimeKeyButton extracted as @Component" \
-  "^@Component$" "$F"
+assert_grep "RuntimeKeyButton extracted as @ComponentV2" \
+  "^@ComponentV2$" "$F"
 assert_grep "RuntimeKeyButton struct declared" \
   "struct RuntimeKeyButton" "$F"
-assert_grep "Per-button @State pressed" \
-  "@State private pressed: boolean = false" "$F"
+assert_grep "Per-button @Local pressed" \
+  "@Local private pressed: boolean = false" "$F"
 assert_grep "Pressed visual: primary fill" \
   "this\.pressed" "$F"
 assert_grep "Pressed visual: scale-down" \
@@ -238,10 +238,10 @@ assert_grep "Spinner uses EmuMotion.loadingSpinMs" \
   "EmuMotion\.loadingSpinMs" "$F"
 
 F=entry/src/main/ets/components/RuntimeVirtualControllerLayer.ets
-assert_grep "RuntimeKeyButton uses EaseInOut transition" \
-  "Curve\.EaseInOut" "$F"
-assert_grep "RuntimeKeyButton supports disabled prop" \
-  "@Prop disabled: boolean" "$F"
+assert_grep "RuntimeKeyButton uses instant press feedback (EaseOut)" \
+  "Curve\.EaseOut" "$F"
+assert_grep "RuntimeKeyButton supports disabled param" \
+  "@Param disabled: boolean" "$F"
 assert_grep "RuntimeKeyButton uses disabledBackground token" \
   "EmuStateColors\.disabledBackground" "$F"
 assert_grep "RuntimeKeyButton disabled overrides pressed (priority)" \
@@ -256,8 +256,8 @@ assert_grep "DevDiagnosticsBlock CoreCheck/Soak buttons have EaseInOut animation
 echo ""
 echo "=== Fix 13: Game viewport aspect-ratio adaptive ==="
 F=entry/src/main/ets/pages/LibretroGamePage.ets
-assert_grep "gameAspectRatio @State tracked" \
-  "@State private gameAspectRatio: number" "$F"
+assert_grep "gameAspectRatio @Local tracked" \
+  "@Local private gameAspectRatio: number" "$F"
 assert_grep "handleGeometryUpdate writes gameAspectRatio" \
   "this\.gameAspectRatio = ratio" "$F"
 assert_grep "XComponent uses aspectRatio not 100% stretch" \

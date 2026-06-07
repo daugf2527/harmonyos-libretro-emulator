@@ -44,13 +44,18 @@ interface PlatformStorageItem {
   count: number
 }
 
-@Component
+@ComponentV2
 struct SpinnerLine {
-  @Prop @Watch('onActiveChange') active: boolean = false
-  @State angle: number = 0
+  @Param active: boolean = false
+  @Local angle: number = 0
   private timer: number = -1
 
-  onActiveChange(): void {
+  @Monitor('active')
+  onActiveChange(monitor: IMonitor): void {
+    this.syncSpinner()
+  }
+
+  private syncSpinner(): void {
     if (this.active && this.timer === -1) {
       this.timer = setInterval(() => {
         this.angle = (this.angle + 14) % 360
@@ -62,7 +67,7 @@ struct SpinnerLine {
   }
 
   aboutToAppear(): void {
-    this.onActiveChange()
+    this.syncSpinner()
   }
 
   aboutToDisappear(): void {
@@ -95,24 +100,24 @@ struct SpinnerLine {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct RomManagerPage {
-  @State private allRoms: RomListItem[] = []
-  @State private selectedPlatform: string = 'ALL'
-  @State private loading: boolean = false
-  @State private showToast: boolean = false
-  @State private toastMessage: string = ''
-  @State private showImportProgress: boolean = false
-  @State private importProgress: number = 0
-  @State private importProgressText: string = ''
-  @State private importStage: string = ''
-  @State private storageStats: StorageStats = {
+  @Local private allRoms: RomListItem[] = []
+  @Local private selectedPlatform: string = 'ALL'
+  @Local private loading: boolean = false
+  @Local private showToast: boolean = false
+  @Local private toastMessage: string = ''
+  @Local private showImportProgress: boolean = false
+  @Local private importProgress: number = 0
+  @Local private importProgressText: string = ''
+  @Local private importStage: string = ''
+  @Local private storageStats: StorageStats = {
     totalUsed: 0,
     totalAvailable: 0,
     platformBreakdown: []
   }
-  @State private showDeleteConfirm: boolean = false
-  @State private deleteTargetItem: RomListItem | undefined = undefined
+  @Local private showDeleteConfirm: boolean = false
+  @Local private deleteTargetItem: RomListItem | undefined = undefined
   private toastTimer: number = -1
   private pageActive: boolean = false
   private pageActionToken: number = 0

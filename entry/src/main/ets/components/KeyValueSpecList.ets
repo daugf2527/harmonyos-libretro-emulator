@@ -5,10 +5,10 @@ export interface KeyValueSpecItem {
   value: string
 }
 
-@Component
+@ComponentV2
 export struct KeyValueSpecList {
-  @Prop title: string = ''
-  @Prop items: KeyValueSpecItem[] = []
+  @Param title: string = ''
+  @Param items: KeyValueSpecItem[] = []
 
   @Builder
   private SpecRow(item: KeyValueSpecItem) {

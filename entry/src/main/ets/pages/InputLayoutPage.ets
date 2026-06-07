@@ -44,15 +44,15 @@ interface NetplayRoomItem {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct InputLayoutPage {
-  @State private activeMode: string = 'center'
-  @State private savedToastVisible: boolean = false
-  @State private layoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons
-  @State private selectedButtonId: string = 'a'
-  @State private layoutStatusText: string = 'LOCAL_LAYOUT_READY'
-  @State private layoutUpdatedAtText: string = 'NOT_SAVED'
-  @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
+  @Local private activeMode: string = 'center'
+  @Local private savedToastVisible: boolean = false
+  @Local private layoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons
+  @Local private selectedButtonId: string = 'a'
+  @Local private layoutStatusText: string = 'LOCAL_LAYOUT_READY'
+  @Local private layoutUpdatedAtText: string = 'NOT_SAVED'
+  @Local private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
   private savedToastTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0

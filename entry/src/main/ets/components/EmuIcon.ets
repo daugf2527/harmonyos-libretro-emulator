@@ -1,9 +1,9 @@
-@Component
+@ComponentV2
 export struct EmuIcon {
-  @Prop name: string = ''
-  @Prop tone: string = 'primary'
-  @Prop iconSize: number = 24
-  @Prop opacityValue: number = 1
+  @Param name: string = ''
+  @Param tone: string = 'primary'
+  @Param iconSize: number = 24
+  @Param opacityValue: number = 1
 
   private isTone(value: string): boolean {
     return this.tone === value

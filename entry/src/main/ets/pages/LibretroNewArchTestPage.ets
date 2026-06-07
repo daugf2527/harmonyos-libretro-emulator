@@ -137,25 +137,25 @@ interface CoreCheckState {
 // RetroPad Constants removed (imported inputs used dynamically)
 
 @Entry
-@Component
+@ComponentV2
 struct LibretroNewArchTestPage {
-  @State status: string = '未启动';
-  @State logs: string[] = [];
-  @State coreOptions: CoreOptionItem[] = [];
-  @State audioStatus: AudioStatusPayload = {
+  @Local status: string = '未启动';
+  @Local logs: string[] = [];
+  @Local coreOptions: CoreOptionItem[] = [];
+  @Local audioStatus: AudioStatusPayload = {
     active: false,
     occupancy: 0,
     underrun: false,
     underruns: 0,
     overruns: 0
   };
-  @State fps: number = 0;
-  @State perfStatsText: string = '';
-  @State geometryText: string = '';
-  @State inputDebugText: string = '';
-  @State inputFocusText: string = '';
-  @State uiInputDebugText: string = '';
-  @State stats: RuntimeStatsDTO = {
+  @Local fps: number = 0;
+  @Local perfStatsText: string = '';
+  @Local geometryText: string = '';
+  @Local inputDebugText: string = '';
+  @Local inputFocusText: string = '';
+  @Local uiInputDebugText: string = '';
+  @Local stats: RuntimeStatsDTO = {
     videoRefreshCalls: 0,
     videoNullFrames: 0,
     videoDupeFrames: 0,
@@ -166,25 +166,25 @@ struct LibretroNewArchTestPage {
     audioUnderruns: 0,
     audioOverruns: 0
   };
-  @State scalingMode: number = 2;
-  @State softwareMaxPresetIndex: number = 1;
-  @State autoAdjust: boolean = true;
-  @State latencyMs: number = 0;
-  @State lastAdjustTs: number = 0;
-  @State lastUnderruns: number = 0;
-  @State selectedPortIndex: number = 0;
-  @State portAssignments: PortAssignState[] = createDefaultPortAssignments();
-  @State inputDevices: InputDeviceInfo[] = [];
-  @State alertMsg: string = '';
-  @State alertVisible: boolean = false;
-  @State drawerVisible: boolean = false;
-  @State logsOverlayVisible: boolean = false;
-  @State useDrawer: boolean = false;
-  @State aiUpscaleEnabled: boolean = false;
-  @State xengineAvailable: boolean = false;
-  @State hideVirtualController: boolean = false;
-  @State coreCheck: CoreCheckState = { running: false, text: '' };
-  @State soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
+  @Local scalingMode: number = 2;
+  @Local softwareMaxPresetIndex: number = 1;
+  @Local autoAdjust: boolean = true;
+  @Local latencyMs: number = 0;
+  @Local lastAdjustTs: number = 0;
+  @Local lastUnderruns: number = 0;
+  @Local selectedPortIndex: number = 0;
+  @Local portAssignments: PortAssignState[] = createDefaultPortAssignments();
+  @Local inputDevices: InputDeviceInfo[] = [];
+  @Local alertMsg: string = '';
+  @Local alertVisible: boolean = false;
+  @Local drawerVisible: boolean = false;
+  @Local logsOverlayVisible: boolean = false;
+  @Local useDrawer: boolean = false;
+  @Local aiUpscaleEnabled: boolean = false;
+  @Local xengineAvailable: boolean = false;
+  @Local hideVirtualController: boolean = false;
+  @Local coreCheck: CoreCheckState = { running: false, text: '' };
+  @Local soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
   private readonly soakController: RuntimeSoakTestController = new RuntimeSoakTestController();
 
   private xComponentId: string = 'new_arch_xcomponent';

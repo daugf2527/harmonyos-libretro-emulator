@@ -5,10 +5,10 @@ export interface RuntimeHudMetric {
   value: string
 }
 
-@Component
+@ComponentV2
 export struct RuntimeTopHudBar {
-  @Prop titleText: string = 'TELEMETRY_V1.0.4'
-  @Prop metrics: RuntimeHudMetric[] = []
+  @Param titleText: string = 'TELEMETRY_V1.0.4'
+  @Param metrics: RuntimeHudMetric[] = []
 
   @Builder
   private MetricCell(item: RuntimeHudMetric) {

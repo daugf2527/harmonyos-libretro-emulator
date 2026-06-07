@@ -1,13 +1,13 @@
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuIcon } from './EmuIcon'
 
-@Component
+@ComponentV2
 export struct LibraryContextMenuOverlay {
-  onClose?: () => void
-  onLaunch?: () => void
-  onDetails?: () => void
-  onCoverChange?: () => void
-  onDeleteSaves?: () => void
+  @Event onClose?: () => void
+  @Event onLaunch?: () => void
+  @Event onDetails?: () => void
+  @Event onCoverChange?: () => void
+  @Event onDeleteSaves?: () => void
 
   build() {
     Stack() {

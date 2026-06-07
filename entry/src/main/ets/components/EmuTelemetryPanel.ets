@@ -7,9 +7,9 @@ export interface EmuTelemetryCellItem {
   progressColor: string
 }
 
-@Component
+@ComponentV2
 export struct EmuTelemetryPanel {
-  @Prop cells: EmuTelemetryCellItem[] = []
+  @Param cells: EmuTelemetryCellItem[] = []
 
   private clampProgress(value: number): number {
     if (!Number.isFinite(value) || value < 0) {

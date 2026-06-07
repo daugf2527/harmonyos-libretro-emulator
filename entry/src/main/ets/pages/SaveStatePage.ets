@@ -38,18 +38,18 @@ interface SaveStateRouteParams {
 const nativeApi = testNapi as SaveStateNapi
 
 @Entry
-@Component
+@ComponentV2
 struct SaveStatePage {
-  @State private saveItems: SaveSlotItem[] = []
-  @State private selectedSaveFile: string = ''
-  @State private showDeleteConfirm: boolean = false
-  @State private toastMessage: string = ''
-  @State private showToast: boolean = false
-  @State private syncStatusText: string = '本地存档'
-  @State private loading: boolean = false
-  @State private currentRomFile: string = ''
-  @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
-  @State private selectedSaveItem: SaveSlotItem | null = null
+  @Local private saveItems: SaveSlotItem[] = []
+  @Local private selectedSaveFile: string = ''
+  @Local private showDeleteConfirm: boolean = false
+  @Local private toastMessage: string = ''
+  @Local private showToast: boolean = false
+  @Local private syncStatusText: string = '本地存档'
+  @Local private loading: boolean = false
+  @Local private currentRomFile: string = ''
+  @Local private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
+  @Local private selectedSaveItem: SaveSlotItem | null = null
   private toastTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0

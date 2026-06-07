@@ -55,29 +55,29 @@ interface LibraryLaunchRouteParams {
   autoStart?: boolean
 }
 
-@Component
+@ComponentV2
 struct AnimatedDetailBody {
-  @Prop coverKey: string = ''
-  @Prop displayTitle: string = ''
-  @Prop localizedTitle: string = ''
-  @Prop coreLabel: string = ''
-  @Prop showExtendedDetails: boolean = false
-  @Prop primaryCells: LibraryDetailSummaryCellData[] = []
-  @Prop extendedCells: LibraryDetailSummaryCellData[] = []
-  @Prop hasRuntimeSnapshot: boolean = false
-  @Prop telemetryFpsText: string = ''
-  @Prop telemetryAudioText: string = ''
-  @Prop telemetryDropText: string = ''
-  @Prop telemetryProfile: number[] = []
-  @Prop overviewText: string = ''
-  @Prop runtimeSummaryText: string = ''
-  @Prop coreSpecItems: KeyValueSpecItem[] = []
-  onLaunch?: () => void
-  onQuickAction?: (message: string) => void
-  onToggleDetails?: () => void
-  @State private heroScale: number = 1.04
-  @State private telemetryScanOffset: number = -180
-  @State private telemetryGlowOpacity: number = 0.2
+  @Param coverKey: string = ''
+  @Param displayTitle: string = ''
+  @Param localizedTitle: string = ''
+  @Param coreLabel: string = ''
+  @Param showExtendedDetails: boolean = false
+  @Param primaryCells: LibraryDetailSummaryCellData[] = []
+  @Param extendedCells: LibraryDetailSummaryCellData[] = []
+  @Param hasRuntimeSnapshot: boolean = false
+  @Param telemetryFpsText: string = ''
+  @Param telemetryAudioText: string = ''
+  @Param telemetryDropText: string = ''
+  @Param telemetryProfile: number[] = []
+  @Param overviewText: string = ''
+  @Param runtimeSummaryText: string = ''
+  @Param coreSpecItems: KeyValueSpecItem[] = []
+  @Event onLaunch?: () => void
+  @Event onQuickAction?: (message: string) => void
+  @Event onToggleDetails?: () => void
+  @Local private heroScale: number = 1.04
+  @Local private telemetryScanOffset: number = -180
+  @Local private telemetryGlowOpacity: number = 0.2
   private visualTimer: number = -1
 
   aboutToAppear(): void {
@@ -154,16 +154,16 @@ struct AnimatedDetailBody {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct LibraryDetailPage {
-  @State private libraryRecord: LibraryRecord | undefined = undefined
-  @State private showExtendedDetails: boolean = false
-  @State private showActionMenu: boolean = false
-  @State private showToast: boolean = false
-  @State private toastMessage: string = ''
-  @State private isLaunching: boolean = false
-  @State private launchProgress: number = 0
-  @State private launchStatusText: string = 'READY_TO_HANDOFF'
+  @Local private libraryRecord: LibraryRecord | undefined = undefined
+  @Local private showExtendedDetails: boolean = false
+  @Local private showActionMenu: boolean = false
+  @Local private showToast: boolean = false
+  @Local private toastMessage: string = ''
+  @Local private isLaunching: boolean = false
+  @Local private launchProgress: number = 0
+  @Local private launchStatusText: string = 'READY_TO_HANDOFF'
   private readonly coverCycleKeys: string[] = ['', 'metroid_fusion', 'zelda_triforce']
   private readonly coverPalette: string[] = ['#274530', '#27405E', '#4E2A41', '#5A4331']
   private readonly navItems = createEmuBottomNavItems('library')

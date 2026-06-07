@@ -54,14 +54,14 @@ interface SoftwareResolutionPreset {
   height: number
 }
 
-@Component
+@ComponentV2
 struct LinearSettingRow {
-  @Prop label: string = ''
-  @Prop code: string = ''
-  @Prop value: number = 0
-  @Prop min: number = 0
-  @Prop max: number = 100
-  onChange?: (value: number) => void
+  @Param label: string = ''
+  @Param code: string = ''
+  @Param value: number = 0
+  @Param min: number = 0
+  @Param max: number = 100
+  @Event onChange?: (value: number) => void
 
   build() {
     Column({ space: 14 }) {
@@ -130,29 +130,29 @@ interface SettingGroup {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct SettingsPage {
-  @State private activeTab: string = 'basic'
-  @State private aspectMode: string = '4:3'
-  @State private scanlineIntensity: number = 64
-  @State private masterVolume: number = 80
-  @State private inputDeviceStatus: string = '正在读取'
-  @State private inputLayoutSummaryText: string = '正在读取布局信息'
-  @State private inputLayoutDetailText: string = '正在读取本地触控布局'
-  @State private telemetryPrimaryLabel: string = '最近一次运行'
-  @State private telemetryPrimaryValue: string = '--'
-  @State private telemetrySecondaryLabel: string = '音频缓冲'
-  @State private telemetrySecondaryValue: string = '--'
-  @State private telemetryFooterLeft: string = '尚无运行记录'
-  @State private telemetryFooterRight: string = '进入游戏后会更新摘要'
-  @State private telemetryBars: BarChartItem[] = this.createEmptyTelemetryBars()
-  @State private renderProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile()
-  @State private audioProfile: RuntimeAudioSettingsProfile = createDefaultRuntimeAudioSettingsProfile()
-  @State private inputPreferences: RuntimeInputPreferencesProfile = createDefaultRuntimeInputPreferencesProfile()
-  @State private advancedStatusText: string = '运行时设置尚未读取'
-  @State private runtimeApplyStatusText: string = '尚未执行运行时写入'
-  @State private foldableMode: FoldableMode = FoldableMode.SINGLE
-  @State private activeGroup: string = 'video'  // 当前选中的设置分组
+  @Local private activeTab: string = 'basic'
+  @Local private aspectMode: string = '4:3'
+  @Local private scanlineIntensity: number = 64
+  @Local private masterVolume: number = 80
+  @Local private inputDeviceStatus: string = '正在读取'
+  @Local private inputLayoutSummaryText: string = '正在读取布局信息'
+  @Local private inputLayoutDetailText: string = '正在读取本地触控布局'
+  @Local private telemetryPrimaryLabel: string = '最近一次运行'
+  @Local private telemetryPrimaryValue: string = '--'
+  @Local private telemetrySecondaryLabel: string = '音频缓冲'
+  @Local private telemetrySecondaryValue: string = '--'
+  @Local private telemetryFooterLeft: string = '尚无运行记录'
+  @Local private telemetryFooterRight: string = '进入游戏后会更新摘要'
+  @Local private telemetryBars: BarChartItem[] = this.createEmptyTelemetryBars()
+  @Local private renderProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile()
+  @Local private audioProfile: RuntimeAudioSettingsProfile = createDefaultRuntimeAudioSettingsProfile()
+  @Local private inputPreferences: RuntimeInputPreferencesProfile = createDefaultRuntimeInputPreferencesProfile()
+  @Local private advancedStatusText: string = '运行时设置尚未读取'
+  @Local private runtimeApplyStatusText: string = '尚未执行运行时写入'
+  @Local private foldableMode: FoldableMode = FoldableMode.SINGLE
+  @Local private activeGroup: string = 'video'  // 当前选中的设置分组
   private pageActive: boolean = false
   private refreshToken: number = 0
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
@@ -455,7 +455,7 @@ struct SettingsPage {
     }
     try {
       const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
-      // D017: 同 toggleHideVirtualController,await 后写 @State 前检查 pageActive。
+      // D017: 同 toggleHideVirtualController,await 后写 @Local 前检查 pageActive。
       if (!this.pageActive) {
         return
       }

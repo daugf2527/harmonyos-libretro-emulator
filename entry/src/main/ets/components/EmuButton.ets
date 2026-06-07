@@ -33,24 +33,24 @@ export enum EmuButtonShape {
   PILL = 'pill'
 }
 
-@Component
+@ComponentV2
 export struct EmuButton {
-  @Prop label: string = ''
-  // 用 string 而非联合 literal，避免 ArkTS @Prop 对窄类型的限制。
-  @Prop kind: string = EmuButtonKind.PRIMARY
-  @Prop buttonSize: string = EmuButtonSize.MD
-  @Prop disabled: boolean = false
-  @Prop loading: boolean = false
-  @Prop icon: string = ''
+  @Param label: string = ''
+  // 用 string 而非联合 literal，避免 ArkTS @Param 对窄类型的限制。
+  @Param kind: string = EmuButtonKind.PRIMARY
+  @Param buttonSize: string = EmuButtonSize.MD
+  @Param disabled: boolean = false
+  @Param loading: boolean = false
+  @Param icon: string = ''
   // tinted=true：背景用 alpha 半透明、字色用 accent 强色、自带 0.5px border。用于"次级强调"按钮。
-  @Prop tinted: boolean = false
+  @Param tinted: boolean = false
   // shape=PILL：胶囊圆角（borderRadius=pill）；ROUNDED：标准矩形圆角（EmuRadius.md）。
-  @Prop shape: string = EmuButtonShape.ROUNDED
+  @Param shape: string = EmuButtonShape.ROUNDED
   // accent='primary'：覆盖 kind 默认 fontColor 强制用 primary 强调色（项目 CRT 绿）。
   // 适合 SettingsPage 这类需要"项目特色绿字"的次级按钮，避免为单一视觉建新 kind。
-  @Prop accent: string = 'default'
-  @State private pressed: boolean = false
-  onTap?: () => void
+  @Param accent: string = 'default'
+  @Local private pressed: boolean = false
+  @Event onTap?: () => void
 
   // 取当前 kind 的"强色"基色：tinted 模式下的 bg/border/text 都派生自它。
   private resolveAccent(): string {

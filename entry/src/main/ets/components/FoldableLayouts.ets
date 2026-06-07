@@ -9,17 +9,17 @@ import { DPadControl, ABXYControl, StartSelectControl, SystemControl } from './V
 import { EmuTypography } from '../common/EmuUiTokens'
 
 // 单折态 UI (F态) - Phantom Overlay (幽灵悬浮)
-@Component
+@ComponentV2
 export struct SingleModeLayout {
   // XComponent ID
-  @Prop xComponentId: string = 'new_arch_game_surface';
+  @Param xComponentId: string = 'new_arch_game_surface';
   // 屏幕比例 (宽:高) - 根据模拟器类型动态设置
   // 示例: 1.0 (2048/GB), 1.5 (GBA), 1.33 (NES/SNES)
-  @Prop screenAspectRatio: number = 1.0;
+  @Param screenAspectRatio: number = 1.0;
   // 回调函数
-  onKeyPress?: (keyId: number, pressed: boolean) => void;
-  onReset?: () => void;
-  onStop?: () => void;
+  @Event onKeyPress?: (keyId: number, pressed: boolean) => void;
+  @Event onReset?: () => void;
+  @Event onStop?: () => void;
 
   build() {
     Column() {
@@ -103,16 +103,16 @@ export struct SingleModeLayout {
 }
 
 // 双折态 UI (M态) - Digital GameBoy (虚拟掌机)
-@Component
+@ComponentV2
 export struct DualModeLayout {
   // XComponent ID
-  @Prop xComponentId: string = 'new_arch_game_surface';
+  @Param xComponentId: string = 'new_arch_game_surface';
   // 屏幕比例 (宽:高) - 根据模拟器类型动态设置
-  @Prop screenAspectRatio: number = 1.0;
+  @Param screenAspectRatio: number = 1.0;
   // 回调函数
-  onKeyPress?: (keyId: number, pressed: boolean) => void;
-  onReset?: () => void;
-  onStop?: () => void;
+  @Event onKeyPress?: (keyId: number, pressed: boolean) => void;
+  @Event onReset?: () => void;
+  @Event onStop?: () => void;
 
   build() {
     Column() {
@@ -224,19 +224,19 @@ export struct DualModeLayout {
 }
 
 // 三折态 UI (G态) - Switch Layout (分体手柄)
-@Component
+@ComponentV2
 export struct TripleModeLayout {
   // XComponent ID
-  @Prop xComponentId: string = 'new_arch_game_surface';
+  @Param xComponentId: string = 'new_arch_game_surface';
   // 屏幕比例 (宽:高) - 根据模拟器类型动态设置
-  @Prop screenAspectRatio: number = 1.0;
+  @Param screenAspectRatio: number = 1.0;
   // 回调函数
-  onKeyPress?: (keyId: number, pressed: boolean) => void;
-  onReset?: () => void;
-  onStop?: () => void;
+  @Event onKeyPress?: (keyId: number, pressed: boolean) => void;
+  @Event onReset?: () => void;
+  @Event onStop?: () => void;
   // 性能信息
-  @Prop fps: number = 0;
-  @Prop cpuUsage: number = 0;
+  @Param fps: number = 0;
+  @Param cpuUsage: number = 0;
 
   build() {
     Stack() {

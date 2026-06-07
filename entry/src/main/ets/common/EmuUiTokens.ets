@@ -106,6 +106,9 @@ export interface EmuMotionTokens {
   containerExpandMs: number
   // 1200ms - 一圈，loading spinner 旋转周期
   loadingSpinMs: number
+  // 60ms - 即时反馈（游戏手柄虚拟按键按压高亮）。游戏键需"按下即亮",
+  // 200ms EaseInOut 会让连按时变色拖泥带水显得卡/像节流;60ms 近即时且不突兀。
+  instantMs: number
   // ArkUI Curve.EaseInOut 引用（避免每个调用方都 import Curve）
   // 类型用 number 避免 strict ArkTS 跨模块枚举校验问题；实际由组件按需用
   // Curve.EaseInOut 实例化。
@@ -114,7 +117,8 @@ export interface EmuMotionTokens {
 export const EmuMotion: EmuMotionTokens = {
   stateChangeMs: 200,
   containerExpandMs: 300,
-  loadingSpinMs: 1200
+  loadingSpinMs: 1200,
+  instantMs: 60
 }
 
 // === 字号 token（与 EmuSpacing 命名风格对齐）===

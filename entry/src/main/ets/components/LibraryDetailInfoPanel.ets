@@ -10,21 +10,21 @@ export interface LibraryDetailSummaryCellData {
   value: string
 }
 
-@Component
+@ComponentV2
 export struct LibraryDetailInfoPanel {
-  @Prop showExtendedDetails: boolean = false
-  @Prop hasRuntimeSnapshot: boolean = false
-  @Prop telemetryFpsText: string = '--.-'
-  @Prop telemetryAudioText: string = '--'
-  @Prop telemetryDropText: string = '--'
-  @Prop telemetryScanOffset: number = -180
-  @Prop telemetryGlowOpacity: number = 0.2
-  @Prop overviewText: string = 'Unknown'
-  @Prop runtimeSummaryText: string = ''
-  @Prop primaryCells: LibraryDetailSummaryCellData[] = []
-  @Prop extendedCells: LibraryDetailSummaryCellData[] = []
-  @Prop telemetryProfile: number[] = []
-  onToggleDetails?: () => void
+  @Param showExtendedDetails: boolean = false
+  @Param hasRuntimeSnapshot: boolean = false
+  @Param telemetryFpsText: string = '--.-'
+  @Param telemetryAudioText: string = '--'
+  @Param telemetryDropText: string = '--'
+  @Param telemetryScanOffset: number = -180
+  @Param telemetryGlowOpacity: number = 0.2
+  @Param overviewText: string = 'Unknown'
+  @Param runtimeSummaryText: string = ''
+  @Param primaryCells: LibraryDetailSummaryCellData[] = []
+  @Param extendedCells: LibraryDetailSummaryCellData[] = []
+  @Param telemetryProfile: number[] = []
+  @Event onToggleDetails?: () => void
   private readonly telemetryVerticalLines: number[] = createIndexRange(13)
   private readonly telemetryHorizontalLines: number[] = createIndexRange(4)
 

@@ -1,8 +1,8 @@
-@Component
+@ComponentV2
 export struct EmuCoverArt {
-  @Prop coverKey: string = ''
-  @Prop variant: string = 'recent'
-  @Prop coverUrl: string = ''
+  @Param coverKey: string = ''
+  @Param variant: string = 'recent'
+  @Param coverUrl: string = ''
 
   private isCyberCover(): boolean {
     return this.coverKey === 'metroid_fusion' || this.coverKey === 'aria_of_sorrow'

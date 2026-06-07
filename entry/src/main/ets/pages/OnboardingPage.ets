@@ -19,9 +19,9 @@ interface PermissionItem {
 
 const Colors = EmuColors
 
-@Component
+@ComponentV2
 struct ScanningLine {
-  @State scanOffset: number = 0
+  @Local scanOffset: number = 0
   private timer: number = -1
 
   aboutToAppear(): void {
@@ -57,20 +57,20 @@ struct ScanningLine {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct OnboardingPage {
-  @State private currentStep: number = 1
-  @State private stepOpacity: number = 1
-  @State private stepOffsetY: number = 0
-  @State private startButtonPressed: boolean = false
-  @State private authorizeButtonPressed: boolean = false
-  @State private permissions: PermissionItem[] = [
+  @Local private currentStep: number = 1
+  @Local private stepOpacity: number = 1
+  @Local private stepOffsetY: number = 0
+  @Local private startButtonPressed: boolean = false
+  @Local private authorizeButtonPressed: boolean = false
+  @Local private permissions: PermissionItem[] = [
     { key: 'DOCUMENT_PICKER', label: 'DOCUMENT_PICKER', status: 'PENDING', detail: '等待检查系统文件选择器' },
     { key: 'SANDBOX_IMPORT', label: 'SANDBOX_IMPORT', status: 'PENDING', detail: '等待检查应用沙箱写入能力' },
   ]
-  @State private protocolStatus: ProtocolStatus = 'PENDING'
-  @State private protocolDetailText: string = '正在检查导入前置条件'
-  @State private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+  @Local private protocolStatus: ProtocolStatus = 'PENDING'
+  @Local private protocolDetailText: string = '正在检查导入前置条件'
+  @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
     this.updateFoldDisplayMode()
@@ -774,7 +774,7 @@ struct OnboardingPage {
 }
 
 @Preview
-@Component
+@ComponentV2
 struct OnboardingPagePreview {
   build() {
     OnboardingPage()

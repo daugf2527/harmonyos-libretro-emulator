@@ -4,14 +4,14 @@ import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
 
-@Component
+@ComponentV2
 struct ShaderSliderRow {
-  @Prop label: string = ''
-  @Prop value: number = 0
-  @Prop suffix: string = ''
-  @Prop min: number = 0
-  @Prop max: number = 100
-  onChange?: (value: number) => void
+  @Param label: string = ''
+  @Param value: number = 0
+  @Param suffix: string = ''
+  @Param min: number = 0
+  @Param max: number = 100
+  @Event onChange?: (value: number) => void
 
   build() {
     Column({ space: 8 }) {
@@ -49,13 +49,13 @@ struct ShaderSliderRow {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct ShaderPreviewPage {
-  @State private scanlineIntensity: number = 65
-  @State private curvature: number = 12
-  @State private saturation: number = 115
-  @State private selectedMode: string = 'STATIC_PREVIEW'
-  @State private statusText: string = '滤镜运行时未接入'
+  @Local private scanlineIntensity: number = 65
+  @Local private curvature: number = 12
+  @Local private saturation: number = 115
+  @Local private selectedMode: string = 'STATIC_PREVIEW'
+  @Local private statusText: string = '滤镜运行时未接入'
   private readonly scanlineRows: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
   private readonly previewStatBars: number[] = [12, 22, 34, 18, 42, 28]
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')

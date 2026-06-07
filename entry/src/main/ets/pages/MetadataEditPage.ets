@@ -14,16 +14,16 @@ interface MetadataEditRouteParams {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct MetadataEditPage {
-  @State private romFile: string = ''
-  @State private titleText: string = ''
-  @State private publisherText: string = ''
-  @State private overviewText: string = ''
-  @State private releaseYearText: string = ''
-  @State private platformText: string = ''
-  @State private coverKeyText: string = ''
-  @State private statusText: string = 'LOCAL_METADATA_EDITOR'
+  @Local private romFile: string = ''
+  @Local private titleText: string = ''
+  @Local private publisherText: string = ''
+  @Local private overviewText: string = ''
+  @Local private releaseYearText: string = ''
+  @Local private platformText: string = ''
+  @Local private coverKeyText: string = ''
+  @Local private statusText: string = 'LOCAL_METADATA_EDITOR'
   private pageActive: boolean = false
   private pageTaskToken: number = 0
 

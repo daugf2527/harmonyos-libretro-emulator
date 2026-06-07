@@ -45,18 +45,18 @@ export interface LibraryGameSectionsState {
   spinnerAngle: number
 }
 
-@Component
+@ComponentV2
 export struct LibraryGameSections {
-  @Prop recentGames: LibraryRecord[] = []
-  @Prop @Watch('onGamesChanged') games: LibraryRecord[] = []
-  @Prop highlightedRecentGameId: string = ''
-  @Prop bottomLoaderActive: boolean = false
-  @Prop spinnerAngle: number = 0
-  onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
-  onHideSearchResults?: () => void
-  onListScrolled?: (yOffset: number) => void
-  onListReachEnd?: () => void
-  onListTouched?: (event: TouchEvent, yOffset: number) => void
+  @Param recentGames: LibraryRecord[] = []
+  @Param games: LibraryRecord[] = []
+  @Param highlightedRecentGameId: string = ''
+  @Param bottomLoaderActive: boolean = false
+  @Param spinnerAngle: number = 0
+  @Event onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
+  @Event onHideSearchResults?: () => void
+  @Event onListScrolled?: (yOffset: number) => void
+  @Event onListReachEnd?: () => void
+  @Event onListTouched?: (event: TouchEvent, yOffset: number) => void
   private allGamesDataSource: LibraryDataSource = new LibraryDataSource();
   private listScroller: ListScroller = new ListScroller();
 
@@ -242,7 +242,8 @@ export struct LibraryGameSections {
     return this.recentGames.length > 0 ? this.recentGames[0].id : ''
   }
 
-  private onGamesChanged(): void {
+  @Monitor('games')
+  private onGamesChanged(monitor: IMonitor): void {
     this.allGamesDataSource.updateGames(this.games);
   }
 }

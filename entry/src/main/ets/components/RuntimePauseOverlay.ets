@@ -7,15 +7,15 @@ interface RuntimePauseAction {
   actionCode: string
 }
 
-@Component
+@ComponentV2
 export struct RuntimePauseOverlay {
-  @Prop processText: string = ''
-  @Prop saveStatusText: string = '存档就绪'
-  @Prop fpsText: string = '--.-'
-  @Prop cpuLoadText: string = '12.4%'
-  onResume?: () => void
-  onTerminate?: () => void
-  onAction?: (actionCode: string) => void
+  @Param processText: string = ''
+  @Param saveStatusText: string = '存档就绪'
+  @Param fpsText: string = '--.-'
+  @Param cpuLoadText: string = '12.4%'
+  @Event onResume?: () => void
+  @Event onTerminate?: () => void
+  @Event onAction?: (actionCode: string) => void
 
   private readonly actions: RuntimePauseAction[] = [
     { title: '快速存档', code: '当前进度落盘', iconText: '▣', actionCode: 'quick_save' },

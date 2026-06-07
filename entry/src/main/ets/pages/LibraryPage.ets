@@ -47,13 +47,18 @@ interface TouchPoint {
   y: number
 }
 
-@Component
+@ComponentV2
 struct SpinnerLine {
-  @Prop @Watch('onActiveChange') active: boolean = false
-  @State angle: number = 0
+  @Param active: boolean = false
+  @Local angle: number = 0
   private timer: number = -1
 
-  onActiveChange(): void {
+  @Monitor('active')
+  onActiveChange(monitor: IMonitor): void {
+    this.syncSpinner()
+  }
+
+  private syncSpinner(): void {
     if (this.active && this.timer === -1) {
       this.timer = setInterval(() => {
         this.angle = (this.angle + 14) % 360
@@ -65,7 +70,7 @@ struct SpinnerLine {
   }
 
   aboutToAppear(): void {
-    this.onActiveChange()
+    this.syncSpinner()
   }
 
   aboutToDisappear(): void {
@@ -98,22 +103,22 @@ struct SpinnerLine {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct LibraryPage {
-  @State private selectedPlatform: string = 'ALL'
-  @State private searchKeyword: string = ''
-  @State private allGames: LibraryRecord[] = []
-  @State private searchBusy: boolean = false
-  @State private showSearchResults: boolean = false
-  @State private showContextMenu: boolean = false
-  @State private contextMenuGame: LibraryRecord | undefined = undefined
-  @State private highlightedRecentGameId: string = ''
-  @State private showToast: boolean = false
-  @State private toastMessage: string = '已刷新库 SYNCED'
-  @State private pullRefreshHeight: number = 0
-  @State private pullRefreshOpacity: number = 0
-  @State private refreshing: boolean = false
-  @State private bottomLoaderActive: boolean = false
+  @Local private selectedPlatform: string = 'ALL'
+  @Local private searchKeyword: string = ''
+  @Local private allGames: LibraryRecord[] = []
+  @Local private searchBusy: boolean = false
+  @Local private showSearchResults: boolean = false
+  @Local private showContextMenu: boolean = false
+  @Local private contextMenuGame: LibraryRecord | undefined = undefined
+  @Local private highlightedRecentGameId: string = ''
+  @Local private showToast: boolean = false
+  @Local private toastMessage: string = '已刷新库 SYNCED'
+  @Local private pullRefreshHeight: number = 0
+  @Local private pullRefreshOpacity: number = 0
+  @Local private refreshing: boolean = false
+  @Local private bottomLoaderActive: boolean = false
   private searchTimer: number = -1
   private toastTimer: number = -1
   private refreshTimer: number = -1
@@ -132,18 +137,18 @@ struct LibraryPage {
   private cardTouchStartY: number = 0
   private cardTouchMoved: boolean = false
   private cardLongPressed: boolean = false
-  @State private cachedFilteredGames: LibraryRecord[] = []
-  @State private cachedFilteredRecentGames: LibraryRecord[] = []
-  @State private cachedSearchResults: LibraryRecord[] = []
-  @State private cachedDisplayPlatformFilters: string[] = []
-  @State private hasLastPlayed: boolean = false
-  @State private lastPlayedTitle: string = ''
-  @State private lastPlayedPlatform: string = ''
-  @State private lastPlayedRelative: string = ''
+  @Local private cachedFilteredGames: LibraryRecord[] = []
+  @Local private cachedFilteredRecentGames: LibraryRecord[] = []
+  @Local private cachedSearchResults: LibraryRecord[] = []
+  @Local private cachedDisplayPlatformFilters: string[] = []
+  @Local private hasLastPlayed: boolean = false
+  @Local private lastPlayedTitle: string = ''
+  @Local private lastPlayedPlatform: string = ''
+  @Local private lastPlayedRelative: string = ''
   private lastPlayedRecord: LibraryRecord | undefined = undefined
   // 折叠屏适配状态
-  @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
-  @State private selectedGameForDetail: LibraryRecord | undefined = undefined
+  @Local private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
+  @Local private selectedGameForDetail: LibraryRecord | undefined = undefined
   aboutToAppear(): void {
     this.pageActive = true
     void this.refreshLibraryGames()

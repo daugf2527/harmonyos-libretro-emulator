@@ -30,16 +30,16 @@ interface ManagedCoreItem {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct CoreManagerPage {
-  @State private coreItems: ManagedCoreItem[] = []
-  @State private statusText: string = '正在扫描本地核心'
-  @State private selectedCoreId: string = ''
-  @State private firmwareSummaryText: string = '正在读取本地 system 目录'
-  @State private firmwareFilesText: string = 'system/ 尚未扫描'
-  @State private firmwareDirectoryText: string = 'filesDir/system'
-  @State private remoteUpdateText: string = '当前构建未配置远端 core / firmware 仓库'
-  @State private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+  @Local private coreItems: ManagedCoreItem[] = []
+  @Local private statusText: string = '正在扫描本地核心'
+  @Local private selectedCoreId: string = ''
+  @Local private firmwareSummaryText: string = '正在读取本地 system 目录'
+  @Local private firmwareFilesText: string = 'system/ 尚未扫描'
+  @Local private firmwareDirectoryText: string = 'filesDir/system'
+  @Local private remoteUpdateText: string = '当前构建未配置远端 core / firmware 仓库'
+  @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private pageActive: boolean = false
   private coreRefreshToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')

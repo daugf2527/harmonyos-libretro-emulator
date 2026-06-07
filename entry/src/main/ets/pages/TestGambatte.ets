@@ -115,25 +115,25 @@ interface AutoTestResult {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct TestGambatte {
-  @State testStatus: string = '等待测试';
-  @State testResult: string = '选择核心和 ROM 开始测试';
-  @State selectedCoreIndex: number = 0;
-  @State selectedRomIndex: number = 0;
-  @State testRunning: boolean = false;
-  @State coreCheckRunning: boolean = false;
-  @State lastTestResult: TestResult | null = null;
-  @State coreOptions: SelectOption[] = [];
-  @State romOptions: SelectOption[] = [];
-  @State currentCoreDescription: string = '';
-  @State currentRomDescription: string = '';
+  @Local testStatus: string = '等待测试';
+  @Local testResult: string = '选择核心和 ROM 开始测试';
+  @Local selectedCoreIndex: number = 0;
+  @Local selectedRomIndex: number = 0;
+  @Local testRunning: boolean = false;
+  @Local coreCheckRunning: boolean = false;
+  @Local lastTestResult: TestResult | null = null;
+  @Local coreOptions: SelectOption[] = [];
+  @Local romOptions: SelectOption[] = [];
+  @Local currentCoreDescription: string = '';
+  @Local currentRomDescription: string = '';
   
   // 自动化测试状态
-  @State autoTesting: boolean = false;
-  @State autoTestCurrentInfo: string = '';
-  @State autoTestResults: AutoTestResult[] = [];
-  @State currentFps: number = 0;
+  @Local autoTesting: boolean = false;
+  @Local autoTestCurrentInfo: string = '';
+  @Local autoTestResults: AutoTestResult[] = [];
+  @Local currentFps: number = 0;
 
   private eventScope: EventHubScope | undefined = undefined;
 

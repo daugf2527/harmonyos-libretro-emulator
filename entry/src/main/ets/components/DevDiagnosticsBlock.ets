@@ -3,16 +3,16 @@ import { EmuLoadingSpinner } from './EmuLoadingSpinner'
 
 // Dev-only diagnostics: 验证核心符号 + 10 分钟压力测试。
 // 挂在 LibretroNewArchTestPage。生产 LibretroGamePage 不承载这两个调试入口。
-@Component
+@ComponentV2
 export struct DevDiagnosticsBlock {
-  @Prop coreCheckRunning: boolean = false
-  @Prop coreCheckText: string = ''
-  @Prop soakRunning: boolean = false
-  @Prop soakSecondsLeft: number = 0
-  @Prop soakSummaryText: string = ''
-  @Prop switching: boolean = false
-  onCoreCheck?: () => void
-  onSoakToggle?: () => void
+  @Param coreCheckRunning: boolean = false
+  @Param coreCheckText: string = ''
+  @Param soakRunning: boolean = false
+  @Param soakSecondsLeft: number = 0
+  @Param soakSummaryText: string = ''
+  @Param switching: boolean = false
+  @Event onCoreCheck?: () => void
+  @Event onSoakToggle?: () => void
 
   build() {
     Column({ space: 12 }) {

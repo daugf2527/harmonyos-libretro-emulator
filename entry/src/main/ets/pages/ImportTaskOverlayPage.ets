@@ -21,9 +21,9 @@ type FeedbackState = 'CONFLICT' | 'IMPORTING' | 'SUCCESS' | 'ERROR'
 
 const Colors = EmuColors
 
-@Component
+@ComponentV2
 struct ImportPulseDot {
-  @State private visible: boolean = true
+  @Local private visible: boolean = true
   private pulseTimer: number = -1
 
   aboutToAppear(): void {
@@ -49,10 +49,10 @@ struct ImportPulseDot {
   }
 }
 
-@Component
+@ComponentV2
 struct ImportPulseStatusText {
-  @Prop text: string = ''
-  @State private visible: boolean = true
+  @Param text: string = ''
+  @Local private visible: boolean = true
   private pulseTimer: number = -1
 
   aboutToAppear(): void {
@@ -77,29 +77,29 @@ struct ImportPulseStatusText {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct ImportTaskOverlayPage {
-  @State private feedbackState: FeedbackState = 'IMPORTING'
-  @State private overlayOpacity: number = 1
-  @State private overlayScale: number = 1
-  @State private cancelPressed: boolean = false
-  @State private etaText: string = '剩余约 02:45'
-  @State private sourceText: string = '来源：本地文件选择器'
-  @State private transferRateText: string = '--'
-  @State private progressPercent: number = 0
-  @State private processStatusText: string = '等待导入任务...'
-  @State private processIdText: string = '本地导入'
-  @State private conflictTitleText: string = '检测到同名文件'
-  @State private conflictMessageText: string = '请选择本次导入任务的冲突处理策略'
-  @State private conflictDetailText: string = ''
-  @State private conflictNamesPreviewText: string = ''
-  @State private conflictNames: string[] = []
-  @State private resultTitleText: string = '导入成功'
-  @State private resultMessageText: string = '3个项目已成功添加至游戏库'
-  @State private resultDetailText: string = ''
-  @State private currentProgressText: string = '正在导入 1/3'
-  @State private importedNamesPreviewText: string = ''
-  @State private resultItems: RomImportItemResult[] = []
+  @Local private feedbackState: FeedbackState = 'IMPORTING'
+  @Local private overlayOpacity: number = 1
+  @Local private overlayScale: number = 1
+  @Local private cancelPressed: boolean = false
+  @Local private etaText: string = '剩余约 02:45'
+  @Local private sourceText: string = '来源：本地文件选择器'
+  @Local private transferRateText: string = '--'
+  @Local private progressPercent: number = 0
+  @Local private processStatusText: string = '等待导入任务...'
+  @Local private processIdText: string = '本地导入'
+  @Local private conflictTitleText: string = '检测到同名文件'
+  @Local private conflictMessageText: string = '请选择本次导入任务的冲突处理策略'
+  @Local private conflictDetailText: string = ''
+  @Local private conflictNamesPreviewText: string = ''
+  @Local private conflictNames: string[] = []
+  @Local private resultTitleText: string = '导入成功'
+  @Local private resultMessageText: string = '3个项目已成功添加至游戏库'
+  @Local private resultDetailText: string = ''
+  @Local private currentProgressText: string = '正在导入 1/3'
+  @Local private importedNamesPreviewText: string = ''
+  @Local private resultItems: RomImportItemResult[] = []
   private hasActualImportResult: boolean = false
   private currentImportUris: string[] = []
   private latestImportResult: RomImportResult | undefined = undefined
@@ -1140,7 +1140,7 @@ struct ImportTaskOverlayPage {
 }
 
 @Preview
-@Component
+@ComponentV2
 struct ImportTaskOverlayPagePreview {
   build() {
     ImportTaskOverlayPage()

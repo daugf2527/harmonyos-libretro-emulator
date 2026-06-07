@@ -3,14 +3,14 @@ import { EmuCoverArt } from './EmuCoverArt'
 import { EmuIcon } from './EmuIcon'
 import { ScanlineBackground } from './EmuAppShell'
 
-@Component
+@ComponentV2
 export struct LibraryLaunchOverlay {
-  @Prop coverKey: string = ''
-  @Prop progress: number = 0
-  @Prop statusText: string = 'READY_TO_HANDOFF'
-  @Prop cpuText: string = 'FPS: --'
-  @Prop runtimeStatusText: string = 'NO DATA'
-  @Prop fileLabel: string = ''
+  @Param coverKey: string = ''
+  @Param progress: number = 0
+  @Param statusText: string = 'READY_TO_HANDOFF'
+  @Param cpuText: string = 'FPS: --'
+  @Param runtimeStatusText: string = 'NO DATA'
+  @Param fileLabel: string = ''
 
   private get normalizedProgress(): number {
     return Math.max(0, Math.min(100, Math.round(this.progress)))

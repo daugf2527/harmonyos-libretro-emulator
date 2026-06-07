@@ -108,50 +108,54 @@ interface PendingSwitch {
   retryCount: number;
 }
 
-interface PerfDisplayState {
-  realtimeFps: number;
-  coreFps: number;
-  audioStatusText: string;
-  perfStatsText: string;
-  geometryText: string;
+// 性能 HUD 状态:V2 @ObservedV2 + @Trace 属性级追踪。改某字段只触发"读该字段"的 UI 节点,
+// 不读的字段(如 audioStatusText,当前 UI 无节点渲染)改动 → 零重渲染 → 修复输入延迟根因
+// (旧 V1 对象 @State 整体替换会触发整页 build())。handler 必须改字段而非整体替换。
+@ObservedV2
+class PerfDisplayState {
+  @Trace realtimeFps: number = 0;
+  @Trace coreFps: number = 0;
+  @Trace audioStatusText: string = '';
+  @Trace perfStatsText: string = '';
+  @Trace geometryText: string = '';
 }
 
 @Entry
-@Component
+@ComponentV2
 struct LibretroGamePage {
-  @State currentCore: string = '';
-  @State currentRom: string = '';
-  @State gameRunning: boolean = false;
-  @State gamePaused: boolean = false;
-  @State switching: boolean = false;
-  @State switchError: string = '';
-  @State switchProgress: number = 0;
-  @State switchProgressText: string = '';
-  @State selectedCoreIndex: number = 0;
-  @State selectedRomIndex: number = 0;
-  @State selectedPortIndex: number = 0;
+  @Local currentCore: string = '';
+  @Local currentRom: string = '';
+  @Local gameRunning: boolean = false;
+  @Local gamePaused: boolean = false;
+  @Local switching: boolean = false;
+  @Local switchError: string = '';
+  @Local switchProgress: number = 0;
+  @Local switchProgressText: string = '';
+  @Local selectedCoreIndex: number = 0;
+  @Local selectedRomIndex: number = 0;
+  @Local selectedPortIndex: number = 0;
   private portAssignments: PortAssignState[] = createDefaultPortAssignments();
-  @State perfDisplay: PerfDisplayState = { realtimeFps: 0, coreFps: 0, audioStatusText: '', perfStatsText: '', geometryText: '' };
-  @State inputDebugText: string = '';
-  @State inputFocusText: string = '';
-  @State uiInputDebugText: string = '';
-  @State scalingMode: number = 2; // 默认 GLES (2)
-  @State softwareMaxPresetIndex: number = 1;
-  @State hwRenderAllowed: boolean = true;
-  @State hideVirtualController: boolean = false;
-  @State private idleHintReady: boolean = false;
+  @Local perfDisplay: PerfDisplayState = new PerfDisplayState();
+  @Local inputDebugText: string = '';
+  @Local inputFocusText: string = '';
+  @Local uiInputDebugText: string = '';
+  @Local scalingMode: number = 2; // 默认 GLES (2)
+  @Local softwareMaxPresetIndex: number = 1;
+  @Local hwRenderAllowed: boolean = true;
+  @Local hideVirtualController: boolean = false;
+  @Local private idleHintReady: boolean = false;
   // 游戏画面 aspect ratio：0 表示尚未收到 geometry_update（用 fallback 4/3）。
   // handleGeometryUpdate 会写入真实值（如 2048 ≈ 0.81 竖屏、GBA 1.5 横屏）。
-  @State private gameAspectRatio: number = 0;
-  @State runtimeSaveStatusText: string = '存档就绪';
+  @Local private gameAspectRatio: number = 0;
+  @Local runtimeSaveStatusText: string = '存档就绪';
   // 折叠屏适配状态
-  @State currentFoldMode: 'single' | 'dual' | 'triple' = 'single';
-  @State screenWidth: number = 0;
-  @State screenHeight: number = 0;
+  @Local currentFoldMode: 'single' | 'dual' | 'triple' = 'single';
+  @Local screenWidth: number = 0;
+  @Local screenHeight: number = 0;
   private runtimeInputLayoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons;
   // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS mask:bit N = RETRO_DEVICE_ID_JOYPAD_N 被
   // 当前 core 声明使用,0 = core 未上报(用 fallback 全键集)。@State 触发子组件 re-render。
-  @State private runtimeInputDescriptorMask: number = 0;
+  @Local private runtimeInputDescriptorMask: number = 0;
 
   // 使用包含 "new_arch" 的 ID 以触发 C++ 侧的新引擎逻辑
   private xComponentId: string = 'new_arch_game_xcomponent';
@@ -474,14 +478,10 @@ struct LibretroGamePage {
     const buf = Number(payload.audioBufferUsage ?? 0);
     this.librarySessionTracker.updateFrameStats(fps, drops, dupes, nulls, underruns, overruns, buf);
 
-    // 整体替换触发 @State 刷新（V1 不支持字段级 mutate 观测；ArkTS 禁对象 spread，显式列字段）
-    this.perfDisplay = {
-      realtimeFps: this.perfDisplay.realtimeFps,
-      coreFps: displayFps,
-      audioStatusText: this.perfDisplay.audioStatusText,
-      perfStatsText: `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`,
-      geometryText: this.perfDisplay.geometryText
-    };
+    // V2 属性级:只改变化字段(@Trace 精准追踪),不再整体替换。coreFps 有 UI 节点读;
+    // perfStatsText 当前无节点渲染 → 改它零重渲染。
+    this.perfDisplay.coreFps = displayFps;
+    this.perfDisplay.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
     if (!Number.isNaN(fps)) {
       this.refreshHudMetricsCache();
     }
@@ -507,14 +507,9 @@ struct LibretroGamePage {
       return;
     }
     this.librarySessionTracker.updateAudioStatus(occupancy, underruns, Number(payload.overruns));
-    // 整体替换触发 @State 刷新（ArkTS 禁对象 spread，显式列字段）
-    this.perfDisplay = {
-      realtimeFps: this.perfDisplay.realtimeFps,
-      coreFps: this.perfDisplay.coreFps,
-      audioStatusText: `Buf:${occupancy.toFixed(0)}% U:${underruns}`,
-      perfStatsText: this.perfDisplay.perfStatsText,
-      geometryText: this.perfDisplay.geometryText
-    };
+    // V2 属性级:audioStatusText 当前 UI 无任何节点渲染 → 60Hz 改它零重渲染。
+    // 这正是输入延迟根因的根治:旧 V1 整体替换顶层对象 @State 会 60Hz 触发整页 build()。
+    this.perfDisplay.audioStatusText = `Buf:${occupancy.toFixed(0)}% U:${underruns}`;
   }
 
   handleGeometryUpdate(payload: GeometryUpdatePayload) {
@@ -523,14 +518,8 @@ struct LibretroGamePage {
     const a = Number(payload.aspect_ratio ?? 0);
     if (w > 0 && h > 0) {
       const aspectText = (a > 0) ? a.toFixed(3) : (w / h).toFixed(3);
-      // 整体替换触发 @State 刷新（ArkTS 禁对象 spread，显式列字段）
-      this.perfDisplay = {
-        realtimeFps: this.perfDisplay.realtimeFps,
-        coreFps: this.perfDisplay.coreFps,
-        audioStatusText: this.perfDisplay.audioStatusText,
-        perfStatsText: this.perfDisplay.perfStatsText,
-        geometryText: `Base:${w}x${h} AR:${aspectText}`
-      };
+      // V2 属性级:只改 geometryText(当前无节点渲染 → 零重渲染)。
+      this.perfDisplay.geometryText = `Base:${w}x${h} AR:${aspectText}`;
       // 让 ArkUI 容器按真实游戏画面比例渲染 XComponent，避免拉伸。
       // 例如 2048 是 376×464（竖屏 ≈ 0.81），GBA 是 240×160（横屏 1.5）。
       const ratio = (a > 0) ? a : (w / h);
