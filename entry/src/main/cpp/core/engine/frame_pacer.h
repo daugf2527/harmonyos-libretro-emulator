@@ -92,21 +92,15 @@ public:
   }
 
 private:
-  // 模拟器渲染降频:RenderThread 无 RT 调度时把渲染目标帧时封顶到 30fps,每帧多 sleep
-  // 让出虚拟核给 GameLoop(跑模拟 + 每帧喂音频)。引擎 GameLoop 自身节拍
-  // (libretro_engine.cpp:1274,独立于本 FramePacer)不受影响 → 游戏/音频仍全速,仅
-  // 显示降到 30fps。emulator-gated:busy_wait_allowed_==false(源自 OH_QoS 失败)才生效。
-  static constexpr int64_t kEmulatorRenderMinFrameUs = 33333; // 30fps 上限(模拟器)
-
+  // [2026-06-07] 撤销模拟器渲染降频 30fps(原 commit 14b4759)。
+  // 经用户实测权衡后决定恢复 60fps 显示:降频虽缓解模拟器音频 underrun,但牺牲了
+  // 输入→画面跟手度;且音频 underrun 本质是 API22 模拟器缺实时调度(workgroup/QoS)
+  // 的平台问题,真机/5.0.5 不存在(真机本就 60fps)。故渲染节拍统一按 target fps,
+  // 不再因模拟器(busy_wait_allowed_==false)封顶 30fps。如需回退降频见 git 14b4759。
+  // 注:busy_wait_allowed_ 仍保留——它独立门控 EndFrame 的"纯 sleep vs 末尾自旋",
+  // 模拟器不忙等烧核的策略不变,仅恢复 60fps 节拍。
   int64_t EffectivePeriodUs() const {
-    const int64_t period = target_frame_time_us_.load();
-    // 用比较 + 返回值,而非 std::max(const T&, const T&)——后者对 static constexpr
-    // 成员取址 → odr-use,头文件内无独立定义会链接报 undefined symbol。
-    if (!busy_wait_allowed_.load(std::memory_order_relaxed) &&
-        period < kEmulatorRenderMinFrameUs) {
-      return kEmulatorRenderMinFrameUs;
-    }
-    return period;
+    return target_frame_time_us_.load();
   }
 
   std::chrono::steady_clock::time_point frame_start_;
