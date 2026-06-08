@@ -42,10 +42,6 @@ import {
   loadInputLayoutProfile
 } from '../common/InputLayoutRepository'
 import {
-  RuntimeInputDebugTextState,
-  RuntimeInputDebugTracker
-} from '../common/RuntimeInputDebugTracker'
-import {
   getRuntimeInputDescriptorMask,
   sendRuntimeAnalog,
   sendRuntimeButton
@@ -136,9 +132,6 @@ struct LibretroGamePage {
   @Local selectedPortIndex: number = 0;
   private portAssignments: PortAssignState[] = createDefaultPortAssignments();
   @Local perfDisplay: PerfDisplayState = new PerfDisplayState();
-  @Local inputDebugText: string = '';
-  @Local inputFocusText: string = '';
-  @Local uiInputDebugText: string = '';
   @Local scalingMode: number = 2; // 默认 GLES (2)
   @Local softwareMaxPresetIndex: number = 1;
   @Local hwRenderAllowed: boolean = true;
@@ -168,7 +161,6 @@ struct LibretroGamePage {
   private romListRefreshToken: number = 0;
   private lastStartOrSwitchAtMs: number = 0;
   private readonly librarySessionTracker: RuntimeLibrarySessionTracker = new RuntimeLibrarySessionTracker();
-  private readonly inputDebugTracker: RuntimeInputDebugTracker = new RuntimeInputDebugTracker();
   private readonly runtimeSaveStateController: RuntimeSaveStateController = new RuntimeSaveStateController();
   private renderSettingsProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile();
   private audioSettingsProfile: RuntimeAudioSettingsProfile = createDefaultRuntimeAudioSettingsProfile();
@@ -210,7 +202,6 @@ struct LibretroGamePage {
     });
 
     void this.refreshRomList();
-    this.startInputDebug();
     this.syncPortAssignments();
     void this.loadRuntimeInputLayout();
     void this.loadRuntimeRenderSettings();
@@ -233,7 +224,6 @@ struct LibretroGamePage {
       this.eventScope = undefined;
     }
     this.stopGame();
-    this.stopInputDebug();
     this.setKeepScreenOn(false);
   }
 
@@ -533,22 +523,6 @@ struct LibretroGamePage {
     if (mask !== this.runtimeInputDescriptorMask) {
       this.runtimeInputDescriptorMask = mask;
     }
-  }
-
-  private startInputDebug() {
-    this.inputDebugTracker.start((state: RuntimeInputDebugTextState) => {
-      this.applyInputDebugTextState(state);
-    });
-  }
-
-  private stopInputDebug() {
-    this.inputDebugTracker.stop();
-  }
-
-  private applyInputDebugTextState(state: RuntimeInputDebugTextState): void {
-    this.inputDebugText = state.inputDebugText;
-    this.inputFocusText = state.inputFocusText;
-    this.uiInputDebugText = state.uiInputDebugText;
   }
 
   updateRomOptions() {
@@ -902,18 +876,6 @@ struct LibretroGamePage {
           .constraintSize({ maxWidth: '100%', maxHeight: '100%' })
           .focusable(true)
           .focusOnTouch(true)
-          .onTouch((event) => {
-            this.inputDebugTracker.recordTouch(Number(event.type));
-          })
-          .onMouse((event) => {
-            this.inputDebugTracker.recordMouse(Number(event.action));
-          })
-          .onKeyEvent((event) => {
-            if (!event) {
-              return;
-            }
-            this.inputDebugTracker.recordKey(Number(event.type));
-          })
           .onLoad(() => {
             LogHelper.info(
               'LibretroGame',
