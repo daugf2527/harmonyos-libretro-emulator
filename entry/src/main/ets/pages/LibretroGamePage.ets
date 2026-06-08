@@ -7,7 +7,6 @@ import LogHelper from '../common/LogHelper';
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens';
-import { RuntimeHudMetric } from '../components/RuntimeTopHudBar';
 import { RuntimePauseOverlay } from '../components/RuntimePauseOverlay';
 import { RuntimeVirtualControllerLayer } from '../components/RuntimeVirtualControllerLayer';
 import { SingleModeLayout, DualModeLayout, TripleModeLayout } from '../components/FoldableLayouts';
@@ -174,12 +173,6 @@ struct LibretroGamePage {
   private availableRomsCache: RuntimeRomConfig[] = [];
   private availableRomsCacheRef: RuntimeRomConfig[] | null = null;
   private availableRomsCacheCoreIndex: number = -1;
-  // HIGH fix: reuse HUD metrics array instead of allocating in build() every render
-  private hudMetricsCache: RuntimeHudMetric[] = [
-    { label: 'FPS', value: '--.-' },
-    { label: 'LAT', value: '--' },
-    { label: 'CORE', value: '--' }
-  ];
 
   aboutToAppear() {
     this.pageActive = true;
@@ -206,7 +199,6 @@ struct LibretroGamePage {
     void this.loadRuntimeInputLayout();
     void this.loadRuntimeRenderSettings();
     void this.loadRuntimeAudioSettings();
-    this.refreshHudMetricsCache();
   }
 
   aboutToDisappear() {
@@ -396,7 +388,6 @@ struct LibretroGamePage {
     const paused = stateValue === EngineState.PAUSED;
     this.gameRunning = running;
     this.gamePaused = paused;
-    this.refreshHudMetricsCache();
     if (stateValue === EngineState.RUNNING && this.pendingStart) {
       this.pendingStart = false;
       LogHelper.info('LibretroGame', 'Engine', '游戏启动成功');
@@ -472,9 +463,6 @@ struct LibretroGamePage {
     // perfStatsText 当前无节点渲染 → 改它零重渲染。
     this.perfDisplay.coreFps = displayFps;
     this.perfDisplay.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
-    if (!Number.isNaN(fps)) {
-      this.refreshHudMetricsCache();
-    }
   }
 
   // 限制 FPS 显示范围：> 240 视为没有 v-sync 限速的瞬时跑分值，
@@ -621,35 +609,11 @@ struct LibretroGamePage {
     return fps > 0 ? fps.toFixed(1) : '--.-';
   }
 
-  private getRuntimeLatencyText(): string {
-    if (this.librarySessionTracker.audioBufferUsage > 0) {
-      return `${Math.max(1, Math.round(this.librarySessionTracker.audioBufferUsage * 8))}ms`;
-    }
-    return '--';
-  }
-
-  private getRuntimeCoreText(): string {
-    if (this.currentCore.length > 0) {
-      return this.currentCore.replace('.so', '').toUpperCase();
-    }
-    return '--';
-  }
-
   private getRuntimeProcessText(): string {
     if (this.currentRom.length > 0) {
       return getFileNameFromPath(this.currentRom).replace(/\.[^.]+$/, '').toUpperCase();
     }
     return 'IDLE';
-  }
-
-  private refreshHudMetricsCache(): void {
-    this.hudMetricsCache[0].value = this.getRuntimeFpsText();
-    this.hudMetricsCache[1].value = this.getRuntimeLatencyText();
-    this.hudMetricsCache[2].value = this.getRuntimeCoreText();
-  }
-
-  private getRuntimeHudMetrics(): RuntimeHudMetric[] {
-    return this.hudMetricsCache;
   }
 
   // 折叠态检测：根据屏幕宽高比判断折叠态
@@ -1055,7 +1019,6 @@ struct LibretroGamePage {
       // core 在 retro_load_game / retro_run 早期 frame 通过 SET_INPUT_DESCRIPTORS
       // 声明使用的按键,这里在 switchGame 成功后立刻拉一次。
       this.runtimeInputDescriptorMask = getRuntimeInputDescriptorMask();
-      this.refreshHudMetricsCache();
       await markLibraryRecordPlayed(context, rom.file);
       if (!this.isCurrentSwitchTask(token)) {
         return;
