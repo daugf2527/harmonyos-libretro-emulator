@@ -107,8 +107,8 @@
 | 位置 | `entry/src/main/ets/pages/**` 和 `entry/src/main/ets/components/**`（30 处完整清单见 `docs/gc-code-drift-20260529-113336.md` L8-37;典型：`CoreLoaderTest.ets:30` / `LibraryPage.ets:101` / `LibretroNewArchTestPage.ets:131-132` / `ImportTaskOverlayPage.ets:95+101`） |
 | 影响 | P3 — 风格债;当前使用整体替换模式（`this.arr = newArr`）能正常触发 rerender,不是 bug;但不是 V2 最佳实践（`@ObservedV2`+`@Trace` 可做增量 rerender,性能更优） |
 | 拟修 | V1→V2 迁移时批量处理：(1) 将涉及的 model 类改为 `@ObservedV2` 装饰 + 属性加 `@Trace`；(2) 组件内 `@State` 改为 `@Local`（或保持 `@State` 兼容模式）；(3) 实例化用 `new` 构造；参考 2026 官方文档 developer.huawei.com/consumer/en/doc/harmonyos-guides/arkts-new-observedv2-and-trace |
-| 状态 | open |
-| 备注 | `/gc` 2026-05-29 扫描 + web verify 核实上游规则;抽查 6 个全部用整体替换,无 mutation;项目当前仍在 V1 模式（无 `@ObservedV2`/`@ComponentV2` 关键字）;优先级 P3 = 不影响功能,V2 迁移时统一处理 |
+| 状态 | fixed |
+| 备注 | `/gc` 2026-05-29 扫描 + web verify 核实上游规则;抽查 6 个全部用整体替换,无 mutation;录入时项目仍 V1 模式,优先级 P3。**2026-06-07 全量迁移完成并实物核实**（commit `ddb9ad7`）：grep 实测 `@ComponentV2=44 / @Local=251 / @Trace=7`，`@Component/@Prop` 残留 0，`@State` 仅剩 10 处（均在测试/诊断页）。D007 的"V2 迁移时统一处理"已兑现——并非孤立改 30 处，而是 91 文件/64 组件全量迁 V2，同时根治了虚拟键输入延迟根因（顶层对象 `@State perfDisplay` 被 60Hz 整体替换→整页 build() 重渲染，改 `@ObservedV2`+`@Trace` 属性级追踪）。详见 memory `project_arkts_v2_migration_done`。**仍待用户真机冒烟回归**（quick_signals 不覆盖 .ets hvigor 编译）。 |
 
 ### D008 — NAPI error code 在 C++ 侧全是硬编码 magic number，无 enum/constexpr 定义
 
