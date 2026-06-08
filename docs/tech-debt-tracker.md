@@ -231,6 +231,50 @@
 | 状态 | open（loadSave 单点 fixed；系统性范式落实待统一方案） |
 | 备注 | **2026-06-06**：本会话逐方法细查挖到 D016/D017/D018 三连同根，证明是系统性而非孤立。已修 3 处代表性单点（覆盖 use-after-free 高风险的 LibretroGamePage 渲染设置 + SettingsPage 偏好 + SaveStatePage toast）。**收口此角度的逐个手修**——边际递减（打地鼠），转为记录系统性 debt 供统一方案决策。regression guard PASS；未编译/未真机。关联 `[[D016]]` `[[D017]]`。**2026-06-06 拟修(c) gc 检测工具已落地**：`scripts/gc/check_async_state_guard.pl`（平衡括号取方法体 + 逐行状态机，识别 pageActive/isCurrent*()/token=== 三类守卫）+ 集成 `scan_code_drift.sh` Pattern 7。已修的 D016/D017/D018 不再报（防回归验证通过）。全项目扫出 7 启发式候选，human-review 结论：**均非需立即修**——5 个测试/诊断页（CoreLoaderTest/TestGambatte，非生产路径）+ startOrSwitchGame(switchProgress 进度更新设计性) + MultiplayerInputPage.refreshDevices(`await Promise.resolve()` microtask yield，竞态窗口≈0)。即 D016/D017/D018 已覆盖生产页真竞态，剩余候选为低危/误报。防回归机制就位，(a)人工全审计/(b)helper 范式仍可选 |
 
+### D021 — inputDebugTracker 死代码链路（已清理）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / B档调研（`docs/audit/2026-06-07-arkts-ui-jank.md` #1 附带项） |
+| 位置 | `LibretroGamePage.ets`（3 死 @Local + start/stop/apply 方法 + XComponent 三回调）+ `common/RuntimeInputDebugTracker.ets`（整文件） |
+| 影响 | P3 — 死代码：500ms 轮询早已注释（`3e833c0`），`inputDebugText/inputFocusText/uiInputDebugText` 三 @Local build() 0 读取（死输出），record 虽在 onTouch 热路径但数据无消费者 |
+| 拟修 | 删整条链路 + 孤儿文件 |
+| 状态 | fixed |
+| 备注 | **2026-06-08 清理**（commit `0701965`，-147 行）：grep 验证三 @Local build() 0 读取属实。`LibretroNewArchTestPage` 同名 inputDebugText 是其自有活实现（build 读取显示），不动。未编译/未真机：需 DevEco 复编 + 真机确认游戏输入/焦点正常。 |
+
+### D022 — hudMetricsCache 死代码 + RuntimeTopHudBar 孤儿组件（已删）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / B档调研（`docs/audit/2026-06-07-arkts-ui-jank.md` #2 深挖） |
+| 位置 | `LibretroGamePage.ets`（hudMetricsCache + refreshHudMetricsCache 4 调用点+定义 + getRuntimeHudMetrics/Latency/Core）+ `components/RuntimeTopHudBar.ets`（整文件） |
+| 影响 | P3 — `RuntimeTopHudBar`（运行时顶部 FPS/LAT/CORE 遥测 HUD）全项目 0 实例化；`getRuntimeHudMetrics()` 0 调用；4 处 `refreshHudMetricsCache()` 每帧 fps/state 白算 3 串 |
+| 拟修 | 删死代码 + 孤儿组件；保留 `getRuntimeFpsText`（暂停界面 RuntimePauseOverlay 活用） |
+| 状态 | fixed |
+| 备注 | **2026-06-08 删除**（commit `2a5458a`，-114 行）：`ets/CLAUDE.md` 历史 log 证实 HUD 曾接入 build()（getRuntimeHudMetrics 缓存优化）后被移除 = 有意弃用。**运行时 HUD overlay 如需要应作为独立 feature 正式设计（响应式数据流 @Local/@Trace + 布局 + 折叠态 + 真机视觉），不在死代码清理阶段草率接入**。未编译/未真机。 |
+
+### D023 — 7 个同步 NAPI 无 Async 版（latent，决定 defer）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / B档调研（`docs/audit/2026-06-07-load-switch-stability.md` R3） |
+| 位置 | DiskControl(7) + SRAM(GetSRAM/SetSRAM) + Cheat + ResetCore + GetRegion 等同步 NAPI；`core/engine/libretro_engine.cpp` `ExecuteSyncTask`(kSyncTaskTimeoutMs=5000) |
+| 影响 | P3（latent）— 同步 NAPI × 5s 阻塞 × UI 线程，恰撞 HarmonyOS `APP_INPUT_BLOCK` 阈值；但这 14 个当前 **0 个 ArkTS 调用**，active 风险≈0，不炸 |
+| 拟修 | **defer（YAGNI）**：给 0 调用接口补用不上的 Async 版 = 为假设未来设计（违反 CLAUDE.md）。接 UI 前再补 Async 或 ArkTS 侧 taskpool 包装即可 |
+| 状态 | open（deferred） |
+| 备注 | **2026-06-08 用户决策 defer**。详见 load-switch-stability audit R1/R3（R1 是唯一 active 高风险但存档/读档已走 Async 绕开）。改 app/napi 须 dispatch napi-boundary-reviewer。 |
+
+### D024 — 音频写回调内持 state_mutex_（RT 反模式，决定 defer）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / B档调研（`docs/audit/2026-06-07-audio-adversarial.md` F1） |
+| 位置 | `entry/src/main/cpp/platform/audio/audio_player.cpp` 写回调 L463/L505/L636（3 处 `state_mutex_` 围绕 workgroup AddCurrentThread/Start/Stop） |
+| 影响 | P3 — 实时音频反模式（回调内持可被非 RT 线程争用的锁 → 优先级反转风险）；但模拟器 `workgroup_disabled_` 短路这些锁路径不触发，**真机 workgroup 正常时才有意义** |
+| 拟修 | **defer（高风险盲改）**：audit 修法 = workgroup handle/token 改原子读 + 去 state_mutex_；但改实时回调无真机验证 = 高风险，audit 自身亦判"优先级排最后/非当前症状" |
+| 状态 | open（deferred） |
+| 备注 | **2026-06-08 用户决策 defer**。等有真机调试条件再做。详见 audio-adversarial audit F1（外网坐实的 RT 铁律反模式）。robustness note：Reset 同采样率复用路径不重选 profile，同属该 audit 的次要发现。 |
+
 ---
 
 ## 引用此文件的地方
