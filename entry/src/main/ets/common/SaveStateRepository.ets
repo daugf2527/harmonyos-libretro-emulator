@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit'
-import { fileIo as fs, ReadOptions, WriteOptions } from '@kit.CoreFileKit'
+import { fileIo as fs, fileUri, ReadOptions, WriteOptions } from '@kit.CoreFileKit'
+import { image } from '@kit.ImageKit'
 import LogHelper from './LogHelper'
 
 export interface SaveStateManifestItem {
@@ -8,6 +9,15 @@ export interface SaveStateManifestItem {
   romFile: string
   createdAt: number
   byteLength: number
+  thumbnailFileName?: string
+  thumbnailWidth?: number
+  thumbnailHeight?: number
+}
+
+export interface SaveStateManifestItemThumbnail {
+  rgba: ArrayBuffer
+  width: number
+  height: number
 }
 
 interface SaveStateManifestDocument {
@@ -15,9 +25,22 @@ interface SaveStateManifestDocument {
   items: SaveStateManifestItem[]
 }
 
-const SAVE_STATE_VERSION = 1
+export interface SaveStateWriteOptions {
+  thumbnail?: SaveStateManifestItemThumbnail
+}
+
+interface PersistedSaveStateThumbnail {
+  fileName: string
+  width: number
+  height: number
+}
+
+const SAVE_STATE_VERSION = 2
 const SAVE_STATE_DIR_NAME = 'saves'
 const SAVE_STATE_MANIFEST_FILE = 'manifest.json'
+const SAVE_STATE_THUMBNAIL_SUFFIX = '.thumb.jpg'
+const SAVE_STATE_THUMBNAIL_FORMAT = 'image/jpeg'
+const SAVE_STATE_THUMBNAIL_QUALITY = 90
 
 export async function listSaveStateItems(context: common.UIAbilityContext): Promise<SaveStateManifestItem[]> {
   const document = await loadManifest(context)
@@ -32,7 +55,8 @@ export async function listSaveStateItems(context: common.UIAbilityContext): Prom
 export async function saveStateData(
   context: common.UIAbilityContext,
   data: ArrayBuffer,
-  romFile: string
+  romFile: string,
+  options?: SaveStateWriteOptions
 ): Promise<SaveStateManifestItem> {
   await ensureDirExists(buildSaveDirPath(context.filesDir))
   const createdAt = Date.now()
@@ -42,12 +66,18 @@ export async function saveStateData(
   // Mitigated by T6-F3 (both writes are atomic), but a process kill between the two steps is still possible.
   // T8-C-F1: writeArrayBufferToFile 改 async, 避免 PS1/GBA 等大存档 (128KB-1MB) 阻塞主线程。
   await writeArrayBufferToFile(targetPath, data)
+  const thumbnail = await tryPersistSaveStateThumbnail(context.filesDir, fileName, options?.thumbnail)
   const item: SaveStateManifestItem = {
     id: fileName,
     fileName: fileName,
     romFile: romFile,
     createdAt: createdAt,
     byteLength: data.byteLength
+  }
+  if (thumbnail) {
+    item.thumbnailFileName = thumbnail.fileName
+    item.thumbnailWidth = thumbnail.width
+    item.thumbnailHeight = thumbnail.height
   }
   const document = await loadManifest(context)
   const nextItems: SaveStateManifestItem[] = [item]
@@ -105,6 +135,8 @@ export async function deleteSaveStateItem(
   fileName: string
 ): Promise<void> {
   const safeName = sanitizeFileName(fileName)
+  const document = await loadManifest(context)
+  const targetItem = document.items.find((item: SaveStateManifestItem) => item.fileName === safeName)
   try {
     await fs.unlink(buildSaveFilePath(context.filesDir, safeName))
   } catch (err) {
@@ -120,7 +152,7 @@ export async function deleteSaveStateItem(
     // 文件本就不存在,或 errno 不明: 走容忍路径,清理 manifest
     LogHelper.warn('SaveStateRepository', 'Delete', `删除存档文件: ${message} (按文件不存在处理)`)
   }
-  const document = await loadManifest(context)
+  await deleteThumbnailFileBestEffort(context.filesDir, targetItem?.thumbnailFileName)
   const nextItems = document.items.filter((item: SaveStateManifestItem) => item.fileName !== safeName)
   await saveManifest(context, {
     version: SAVE_STATE_VERSION,
@@ -147,6 +179,12 @@ export async function pruneManifestForFileNames(
   const removedSet = new Set<string>()
   removedFileNames.forEach((name: string) => { removedSet.add(sanitizeFileName(name)) })
   const document = await loadManifest(context)
+  for (let index = 0; index < document.items.length; index += 1) {
+    const item = document.items[index]
+    if (removedSet.has(item.fileName)) {
+      await deleteThumbnailFileBestEffort(context.filesDir, item.thumbnailFileName)
+    }
+  }
   const nextItems = document.items.filter((item: SaveStateManifestItem) => !removedSet.has(item.fileName))
   await saveManifest(context, {
     version: SAVE_STATE_VERSION,
@@ -194,11 +232,12 @@ async function reconcileManifestItems(
   const knownFileNames = new Set<string>()
   // (a) 逐条 stat：文件不存在则裁剪
   for (let index = 0; index < manifestItems.length; index += 1) {
-    const item = manifestItems[index]
+    let item = manifestItems[index]
     knownFileNames.add(item.fileName)
     const path = buildSaveFilePath(context.filesDir, item.fileName)
     try {
       await fs.stat(path)
+      item = await reconcileThumbnailMetadata(context.filesDir, item)
       validItems.push(item)
     } catch (err) {
       const message = (err as Error).message || String(err)
@@ -310,14 +349,132 @@ async function writeArrayBufferToFile(path: string, data: ArrayBuffer): Promise<
   }
 }
 
-function normalizeManifestItem(item: SaveStateManifestItem): SaveStateManifestItem {
+export function buildSaveStateThumbnailUri(filesDir: string, thumbnailFileName?: string): string {
+  const safeName = sanitizeOptionalFileName(thumbnailFileName)
+  if (safeName.length === 0) {
+    return ''
+  }
+  return fileUri.getUriFromPath(buildSaveFilePath(filesDir, safeName))
+}
+
+async function tryPersistSaveStateThumbnail(
+  filesDir: string,
+  stateFileName: string,
+  thumbnail?: SaveStateManifestItemThumbnail
+): Promise<PersistedSaveStateThumbnail | undefined> {
+  if (!thumbnail || thumbnail.width <= 0 || thumbnail.height <= 0 || thumbnail.rgba.byteLength === 0) {
+    return undefined
+  }
+  try {
+    return await persistSaveStateThumbnail(filesDir, stateFileName, thumbnail)
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('SaveStateRepository', 'Thumbnail', `写入存档缩略图失败: ${message}`)
+    return undefined
+  }
+}
+
+async function persistSaveStateThumbnail(
+  filesDir: string,
+  stateFileName: string,
+  thumbnail: SaveStateManifestItemThumbnail
+): Promise<PersistedSaveStateThumbnail> {
+  const encoded = await encodeSaveStateThumbnail(thumbnail)
+  const thumbnailFileName = buildThumbnailFileName(stateFileName)
+  await writeArrayBufferToFile(buildSaveFilePath(filesDir, thumbnailFileName), encoded)
   return {
-    id: sanitizeFileName(item.id.length > 0 ? item.id : item.fileName),
+    fileName: thumbnailFileName,
+    width: thumbnail.width,
+    height: thumbnail.height
+  }
+}
+
+async function encodeSaveStateThumbnail(
+  thumbnail: SaveStateManifestItemThumbnail
+): Promise<ArrayBuffer> {
+  const expectedByteLength = thumbnail.width * thumbnail.height * 4
+  if (thumbnail.rgba.byteLength < expectedByteLength) {
+    throw new Error(`thumbnail_rgba_too_small:${thumbnail.rgba.byteLength}/${expectedByteLength}`)
+  }
+  const rgbaData = thumbnail.rgba.byteLength === expectedByteLength
+    ? thumbnail.rgba
+    : thumbnail.rgba.slice(0, expectedByteLength)
+  const options: image.InitializationOptions = {
+    size: {
+      width: thumbnail.width,
+      height: thumbnail.height
+    },
+    pixelFormat: image.PixelMapFormat.RGBA_8888,
+    alphaType: image.AlphaType.OPAQUE,
+    editable: false
+  }
+  const pixelMap = image.createPixelMapSync(rgbaData, options)
+  const imagePacker = image.createImagePacker()
+  const packingOption: image.PackingOption = {
+    format: SAVE_STATE_THUMBNAIL_FORMAT,
+    quality: SAVE_STATE_THUMBNAIL_QUALITY
+  }
+  try {
+    return await imagePacker.packToData(pixelMap, packingOption)
+  } finally {
+    await pixelMap.release()
+    await imagePacker.release()
+  }
+}
+
+async function reconcileThumbnailMetadata(
+  filesDir: string,
+  item: SaveStateManifestItem
+): Promise<SaveStateManifestItem> {
+  const thumbnailFileName = sanitizeOptionalFileName(item.thumbnailFileName)
+  if (thumbnailFileName.length === 0) {
+    return clearThumbnailMetadata(item)
+  }
+  try {
+    await fs.stat(buildSaveFilePath(filesDir, thumbnailFileName))
+    return item
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('SaveStateRepository', 'Reconcile', `裁剪不存在的缩略图 ${thumbnailFileName}: ${message}`)
+    return clearThumbnailMetadata(item)
+  }
+}
+
+async function deleteThumbnailFileBestEffort(filesDir: string, thumbnailFileName?: string): Promise<void> {
+  const safeName = sanitizeOptionalFileName(thumbnailFileName)
+  if (safeName.length === 0) {
+    return
+  }
+  try {
+    await fs.unlink(buildSaveFilePath(filesDir, safeName))
+  } catch (err) {
+    const errno = (err as ErrorWithCode).code
+    const message = (err as Error).message || String(err)
+    if (errno === ERR_CODE_ENOENT || errno === ERR_CODE_ENOENT_NUM) {
+      return
+    }
+    LogHelper.warn('SaveStateRepository', 'Thumbnail', `删除缩略图失败 (保留孤儿图): ${message}`)
+  }
+}
+
+function normalizeManifestItem(item: SaveStateManifestItem): SaveStateManifestItem {
+  const normalizedId = typeof item.id === 'string' && item.id.length > 0 ? item.id : item.fileName
+  const normalized: SaveStateManifestItem = {
+    id: sanitizeFileName(normalizedId),
     fileName: sanitizeFileName(item.fileName),
     romFile: item.romFile ?? '',
     createdAt: normalizeNumber(item.createdAt),
     byteLength: normalizeNumber(item.byteLength)
   }
+  const thumbnailFileName = sanitizeOptionalFileName(item.thumbnailFileName)
+  const thumbnailWidth = normalizeNumber(item.thumbnailWidth ?? 0)
+  const thumbnailHeight = normalizeNumber(item.thumbnailHeight ?? 0)
+  if (thumbnailFileName.length > 0 && thumbnailWidth > 0 && thumbnailHeight > 0) {
+    normalized.thumbnailFileName = thumbnailFileName
+    normalized.thumbnailWidth = thumbnailWidth
+    normalized.thumbnailHeight = thumbnailHeight
+  }
+  return normalized
 }
 
 function createEmptyManifest(): SaveStateManifestDocument {
@@ -344,6 +501,33 @@ function normalizeNumber(value: number): number {
 
 function sanitizeFileName(fileName: string): string {
   return fileName.replace(/[\\\/]/g, '').trim()
+}
+
+function sanitizeOptionalFileName(fileName?: string): string {
+  if (typeof fileName !== 'string') {
+    return ''
+  }
+  return sanitizeFileName(fileName)
+}
+
+function clearThumbnailMetadata(item: SaveStateManifestItem): SaveStateManifestItem {
+  const nextItem: SaveStateManifestItem = {
+    id: item.id,
+    fileName: item.fileName,
+    romFile: item.romFile,
+    createdAt: item.createdAt,
+    byteLength: item.byteLength
+  }
+  return nextItem
+}
+
+function buildThumbnailFileName(stateFileName: string): string {
+  const safeName = sanitizeFileName(stateFileName)
+  const suffixIndex = safeName.lastIndexOf('.state')
+  if (suffixIndex > 0) {
+    return `${safeName.substring(0, suffixIndex)}${SAVE_STATE_THUMBNAIL_SUFFIX}`
+  }
+  return `${safeName}${SAVE_STATE_THUMBNAIL_SUFFIX}`
 }
 
 function buildSaveDirPath(filesDir: string): string {

@@ -377,6 +377,150 @@ static napi_value SaveStateAsync(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+static napi_value BuildSaveStateBundleResult(napi_env env,
+                                             const SaveStateCaptureBundle &bundle) {
+  napi_value result = MakeObject(env);
+  if (!result) {
+    return nullptr;
+  }
+
+  napi_value stateData =
+      MakeArrayBufferFromBytes(env, bundle.stateData.data(),
+                               bundle.stateData.size());
+  if (!stateData ||
+      !SetNamedPropertyChecked(env, result, "stateData", stateData)) {
+    return nullptr;
+  }
+
+  napi_value thumbnailData = MakeNull(env);
+  if (!bundle.thumbnail.rgba.empty() && bundle.thumbnail.width > 0 &&
+      bundle.thumbnail.height > 0) {
+    thumbnailData = MakeArrayBufferFromBytes(env, bundle.thumbnail.rgba.data(),
+                                             bundle.thumbnail.rgba.size());
+  }
+  if (!thumbnailData ||
+      !SetNamedPropertyChecked(env, result, "thumbnailRgba", thumbnailData) ||
+      !SetNamedPropertyChecked(env, result, "thumbnailWidth",
+                               MakeUint32(env, bundle.thumbnail.width)) ||
+      !SetNamedPropertyChecked(env, result, "thumbnailHeight",
+                               MakeUint32(env, bundle.thumbnail.height))) {
+    return nullptr;
+  }
+  return result;
+}
+
+struct SaveStateBundleAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  SaveStateCaptureBundle bundle;
+  bool ok = false;
+};
+
+static void ExecuteSaveStateBundleAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<SaveStateBundleAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->ok = GetEngine()->CaptureSaveStateBundle(ctx->bundle);
+}
+
+static void CompleteSaveStateBundleAsync(napi_env env, napi_status status,
+                                         void *data) {
+  auto *ctx = static_cast<SaveStateBundleAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] SaveStateBundleAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else if (!ctx->ok || ctx->bundle.stateData.empty()) {
+    napi_value reason = MakeString(env, "SaveStateBundle failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    napi_value result = BuildSaveStateBundleResult(env, ctx->bundle);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      napi_value reason = MakeString(env, "SaveStateBundle result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value SaveStateBundleAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new SaveStateBundleAsyncContext();
+
+  napi_value promise;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "SaveStateBundleAsync");
+  if (!resourceName) {
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus =
+      napi_create_async_work(env, nullptr, resourceName,
+                             ExecuteSaveStateBundleAsync,
+                             CompleteSaveStateBundleAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    LOGF(LOG_ERROR, "[NEW] SaveStateBundleAsync create work failed");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] SaveStateBundleAsync queue work failed");
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 // --- LoadStateAsync (napi_async_work) ---
 struct LoadStateAsyncContext {
   // Audit T1-F3: removed unused napi_env env field
@@ -506,6 +650,7 @@ void RegisterStateNapi(napi_env env, napi_value exports) {
       {"refactoredSaveState", nullptr, SaveState, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredLoadState", nullptr, LoadState, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSaveStateAsync", nullptr, SaveStateAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredSaveStateBundleAsync", nullptr, SaveStateBundleAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredLoadStateAsync", nullptr, LoadStateAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetSRAM", nullptr, GetSRAM, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetSRAM", nullptr, SetSRAM, nullptr, nullptr, nullptr, napi_default, nullptr},

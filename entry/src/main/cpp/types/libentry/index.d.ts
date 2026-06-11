@@ -111,9 +111,16 @@ export const refactoredSetHwRenderAllowed: (enabled: boolean) => boolean;
 /** @deprecated T8-B-F3: 同步版阻塞 NAPI/UI 主线程最长 5s, 优先用 refactoredGetSaveStateSizeAsync. */
 export const refactoredGetSaveStateSize: () => number;
 export const refactoredGetSaveStateSizeAsync: () => Promise<number>;
+export interface SaveStateBundleResult {
+  stateData: ArrayBuffer;
+  thumbnailRgba: ArrayBuffer | null;
+  thumbnailWidth: number;
+  thumbnailHeight: number;
+}
 export const refactoredSaveState: () => ArrayBuffer | null;
 export const refactoredLoadState: (data: ArrayBuffer) => boolean;
 export const refactoredSaveStateAsync: () => Promise<ArrayBuffer | null>;
+export const refactoredSaveStateBundleAsync: () => Promise<SaveStateBundleResult>;
 export const refactoredLoadStateAsync: (data: ArrayBuffer) => Promise<boolean>;
 
 // SRAM

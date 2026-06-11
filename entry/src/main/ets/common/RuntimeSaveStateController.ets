@@ -4,9 +4,10 @@ import {
   listSaveStateItems,
   readSaveStateData,
   SaveStateManifestItem,
+  SaveStateManifestItemThumbnail,
   saveStateData
 } from './SaveStateRepository'
-import { runtimeSessionController } from './RuntimeSessionController'
+import { runtimeSessionController, RuntimeSaveStateBundle } from './RuntimeSessionController'
 
 export class RuntimeSaveStateController {
   async quickSave(
@@ -21,13 +22,18 @@ export class RuntimeSaveStateController {
       return '上下文缺失'
     }
     try {
-      // Use async version to avoid blocking main thread on save serialization
-      const stateData = await runtimeSessionController.saveStateAsync()
-      if (!stateData || stateData.byteLength <= 0) {
+      const bundle = await runtimeSessionController.saveStateBundleAsync()
+      if (!bundle.stateData || bundle.stateData.byteLength <= 0) {
         return '存档数据不可用'
       }
-      await saveStateData(context, stateData, romFile)
-      LogHelper.info('RuntimeSaveState', 'Save', `运行态即时存档已写入: rom=${romFile} bytes=${stateData.byteLength}`)
+      await saveStateData(context, bundle.stateData, romFile, {
+        thumbnail: buildThumbnailPayload(bundle)
+      })
+      LogHelper.info(
+        'RuntimeSaveState',
+        'Save',
+        `运行态即时存档已写入: rom=${romFile} bytes=${bundle.stateData.byteLength} thumb=${bundle.thumbnailWidth}x${bundle.thumbnailHeight}`
+      )
       return '存档已写入'
     } catch (err) {
       const message = (err as Error).message || String(err)
@@ -80,4 +86,17 @@ function findLatestSaveForRuntimeRom(
     }
   }
   return undefined
+}
+
+function buildThumbnailPayload(
+  bundle: RuntimeSaveStateBundle
+): SaveStateManifestItemThumbnail | undefined {
+  if (!bundle.thumbnailRgba || bundle.thumbnailWidth <= 0 || bundle.thumbnailHeight <= 0) {
+    return undefined
+  }
+  return {
+    rgba: bundle.thumbnailRgba,
+    width: bundle.thumbnailWidth,
+    height: bundle.thumbnailHeight
+  }
 }

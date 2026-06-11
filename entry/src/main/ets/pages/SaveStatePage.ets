@@ -6,17 +6,21 @@ import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { ErrorCodeUtils, EngineErrorCodes, FileErrorCodes } from '../common/ErrorCodes'
 import {
+  buildSaveStateThumbnailUri,
   deleteSaveStateItem,
   listSaveStateItems,
   readSaveStateData,
+  SaveStateManifestItemThumbnail,
   SaveStateManifestItem,
   saveStateData
 } from '../common/SaveStateRepository'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
+import { RuntimeSaveStateBundle } from '../common/RuntimeSessionController'
 
 interface SaveStateNapi {
   refactoredSaveStateAsync(): Promise<ArrayBuffer | null>
+  refactoredSaveStateBundleAsync(): Promise<RuntimeSaveStateBundle>
   refactoredLoadState(data: ArrayBuffer): boolean
   refactoredLoadStateAsync(data: ArrayBuffer): Promise<boolean>
 }
@@ -29,6 +33,8 @@ interface SaveSlotItem {
   durationLabel: string
   isActive: boolean
   coverColor: string
+  byteLength: number
+  thumbnailUrl: string
 }
 
 interface SaveStateRouteParams {
@@ -139,10 +145,14 @@ struct SaveStatePage {
       }
       const visibleEntries = this.filterSaveItemsForCurrentRom(entries)
       const nextItems: SaveSlotItem[] = []
+      const selectedSaveId = this.selectedSaveItem?.id ?? ''
       visibleEntries.forEach((item: SaveStateManifestItem, index: number) => {
-        nextItems.push(this.buildSaveSlot(item, index))
+        nextItems.push(this.buildSaveSlot(context, item, index))
       })
       this.saveItems = nextItems
+      this.selectedSaveItem = selectedSaveId.length > 0
+        ? nextItems.find((item: SaveSlotItem) => item.id === selectedSaveId) ?? null
+        : null
       this.syncStatusText = this.buildSaveStatusText(nextItems.length)
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
@@ -182,7 +192,11 @@ struct SaveStatePage {
     return this.currentRomFile.length > 0 ? '当前游戏暂无存档' : '暂无存档'
   }
 
-  private buildSaveSlot(item: SaveStateManifestItem, index: number): SaveSlotItem {
+  private buildSaveSlot(
+    context: common.UIAbilityContext,
+    item: SaveStateManifestItem,
+    index: number
+  ): SaveSlotItem {
     const slotNumber = (index + 1).toString().padStart(3, '0')
     const colorIndex = index % this.coverColors.length
     return {
@@ -192,7 +206,9 @@ struct SaveStatePage {
       detail: `${this.normalizeTitle(item.fileName)} | ${this.formatBytes(item.byteLength)}`,
       durationLabel: item.createdAt > 0 ? this.formatDateTime(item.createdAt) : '本地',
       isActive: index === 0,
-      coverColor: this.coverColors[colorIndex]
+      coverColor: this.coverColors[colorIndex],
+      byteLength: item.byteLength,
+      thumbnailUrl: buildSaveStateThumbnailUri(context.filesDir, item.thumbnailFileName)
     }
   }
 
@@ -278,16 +294,17 @@ struct SaveStatePage {
       return
     }
     try {
-      // T8-B-F5 / T8C-F8: 改用 async 版本, 避免同步 NAPI 阻塞 UI 主线程最长 5s。
-      const stateData = await nativeApi.refactoredSaveStateAsync()
+      const bundle = await nativeApi.refactoredSaveStateBundleAsync()
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      if (!stateData || stateData.byteLength <= 0) {
+      if (!bundle.stateData || bundle.stateData.byteLength <= 0) {
         this.showToastMessage(ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_SAVE_FAILED.numericCode))
         return
       }
-      await saveStateData(context, stateData, this.currentRomFile)
+      await saveStateData(context, bundle.stateData, this.currentRomFile, {
+        thumbnail: buildSaveSlotThumbnail(bundle)
+      })
       if (!this.isCurrentPageTask(token)) {
         return
       }
@@ -473,6 +490,39 @@ struct SaveStatePage {
   }
 
   @Builder
+  private SaveThumbnailContent(item: SaveSlotItem, showFallbackText: boolean = false) {
+    Stack() {
+      Row()
+        .width('100%')
+        .height('100%')
+        .backgroundColor(item.coverColor)
+        .opacity(item.thumbnailUrl.length > 0 ? 0.18 : 0.72)
+
+      if (item.thumbnailUrl.length > 0) {
+        Image(item.thumbnailUrl)
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+      } else if (showFallbackText) {
+        Column({ space: 8 }) {
+          Text('预览')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .letterSpacing(2)
+
+          Text('无截图')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .opacity(0.6)
+        }
+        .justifyContent(FlexAlign.Center)
+      }
+    }
+    .width('100%')
+    .height('100%')
+  }
+
+  @Builder
   private SaveSlotRow(item: SaveSlotItem) {
     Stack() {
       Row() {
@@ -488,11 +538,7 @@ struct SaveStatePage {
 
       Row({ space: 16 }) {
         Stack() {
-          Row()
-            .width('100%')
-            .height('100%')
-            .backgroundColor(item.coverColor)
-            .opacity(0.72)
+          this.SaveThumbnailContent(item)
 
           Row()
             .width('100%')
@@ -744,26 +790,8 @@ struct SaveStatePage {
   @Builder
   private SelectedSaveDetailPanel(item: SaveSlotItem) {
     Column({ space: 24 }) {
-      // 存档预览图（占位）
       Stack() {
-        Row()
-          .width('100%')
-          .height('100%')
-          .backgroundColor(item.coverColor)
-          .opacity(0.72)
-
-        Column({ space: 8 }) {
-          Text('预览')
-            .fontSize(EmuTypography.xs)
-            .fontColor(EmuColors.onSurfaceVariant)
-            .letterSpacing(2)
-
-          Text('无截图')
-            .fontSize(EmuTypography.sm)
-            .fontColor(EmuColors.onSurfaceVariant)
-            .opacity(0.6)
-        }
-        .justifyContent(FlexAlign.Center)
+        this.SaveThumbnailContent(item, true)
       }
       .width('100%')
       .aspectRatio(1.5)
@@ -825,11 +853,7 @@ struct SaveStatePage {
   }
 
   private getSaveItemSizeText(item: SaveSlotItem): string {
-    const parts = item.detail.split('|')
-    if (parts.length < 2) {
-      return this.formatBytes(0)
-    }
-    return this.formatBytes(Number(parts[1].trim() || '0'))
+    return this.formatBytes(item.byteLength)
   }
 
   @Builder
@@ -901,27 +925,7 @@ struct SaveStatePage {
   @Builder
   private SavePreviewPanel(item: SaveSlotItem) {
     Stack() {
-      Row()
-        .width('100%')
-        .height('100%')
-        .backgroundColor(item.coverColor)
-        .opacity(0.72)
-
-      Column({ space: 8 }) {
-        Text('预览')
-          .fontSize(EmuTypography.xs)
-          .fontColor(EmuColors.onSurfaceVariant)
-          .letterSpacing(2)
-
-        Text(this.normalizeTitle(item.fileName))
-          .fontSize(EmuTypography.sm)
-          .fontColor(EmuColors.onSurface)
-          .maxLines(2)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .textAlign(TextAlign.Center)
-      }
-      .width('80%')
-      .justifyContent(FlexAlign.Center)
+      this.SaveThumbnailContent(item, true)
     }
     .width('100%')
     .aspectRatio(1.2)
@@ -1067,5 +1071,18 @@ struct SaveStatePage {
     }
     .width('100%')
     .height('100%')
+  }
+}
+
+function buildSaveSlotThumbnail(
+  bundle: RuntimeSaveStateBundle
+): SaveStateManifestItemThumbnail | undefined {
+  if (!bundle.thumbnailRgba || bundle.thumbnailWidth <= 0 || bundle.thumbnailHeight <= 0) {
+    return undefined
+  }
+  return {
+    rgba: bundle.thumbnailRgba,
+    width: bundle.thumbnailWidth,
+    height: bundle.thumbnailHeight
   }
 }

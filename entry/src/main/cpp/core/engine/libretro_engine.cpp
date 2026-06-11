@@ -1187,7 +1187,7 @@ void LibretroEngine::GameLoop() {
         // 节拍器：若 retro_run 内部未走视频管线节拍（如 loading、菜单态、
         // hwrender 早退路径），这里兜底 sleep 到目标帧时间，避免 frameCount
         // 飙升到 1000+ FPS。VideoPipeline 内部仍有自己的节拍，本节拍仅作上限。
-        const double safeTargetFps = (targetFps_ > 0.0) ? targetFps_ : 60.0;
+        const double safeTargetFps = (targetFps_.load() > 0.0) ? targetFps_.load() : 60.0;
         const int64_t targetFrameUs =
             static_cast<int64_t>(1000000.0 / safeTargetFps);
         auto frameEnd = std::chrono::steady_clock::now();
@@ -1748,14 +1748,14 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
           LOGF(LOG_WARN,
                " [NEW] Abnormal audio sample rate detected: %{public}.2f "
                "Hz. Clamping to %{public}.2f Hz to match GB standard.",
-               audioSampleRate_, fallbackRate);
+               audioSampleRate_.load(), fallbackRate);
           audioSampleRate_ = fallbackRate;
           avInfo.timing.sample_rate = fallbackRate;
         }
         LOGF(LOG_INFO,
              "%{public}s AV applied: fps=%{public}.2f, audio_rate=%{public}.2f, "
              "video=%{public}ux%{public}u",
-             kAudioChainPrefix, targetFps_, audioSampleRate_, videoWidth_,
+             kAudioChainPrefix, targetFps_.load(), audioSampleRate_.load(), videoWidth_,
              videoHeight_);
         auto *bridge = AudioBridge::GetInstance();
         if (bridge) {
@@ -2827,6 +2827,36 @@ bool LibretroEngine::SaveState(std::vector<uint8_t> &outData) {
     return false;
   }
   outData = std::move(snapshot);
+  return true;
+}
+
+bool LibretroEngine::CaptureSaveStateBundle(SaveStateCaptureBundle &outBundle) {
+  if (!IsGameLoadedState(state_.load())) {
+    LOGF(LOG_WARN,
+         "[NEW] CaptureSaveStateBundle rejected: state=%{public}d (game not loaded)",
+         static_cast<int>(state_.load()));
+    return false;
+  }
+
+  SaveStateCaptureBundle bundle{};
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, &ok, &bundle]() {
+            if (stateManager_) {
+              ok = stateManager_->SaveState(bundle.stateData);
+            }
+          },
+          kSyncTaskTimeoutMs)) {
+    return false;
+  }
+  if (!ok || bundle.stateData.empty()) {
+    return false;
+  }
+
+  (void)videoPipeline_.CaptureLastFrameRgba(bundle.thumbnail.rgba,
+                                            bundle.thumbnail.width,
+                                            bundle.thumbnail.height);
+  outBundle = std::move(bundle);
   return true;
 }
 

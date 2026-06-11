@@ -100,6 +100,17 @@ struct RuntimeStats {
   }
 };
 
+struct SaveStateThumbnail {
+  std::vector<uint8_t> rgba;
+  unsigned width = 0;
+  unsigned height = 0;
+};
+
+struct SaveStateCaptureBundle {
+  std::vector<uint8_t> stateData;
+  SaveStateThumbnail thumbnail;
+};
+
 /**
  * @brief 引擎状态机定义
  */
@@ -178,6 +189,7 @@ public:
   // --- SaveState 接口 ---
   size_t GetSaveStateSize();
   bool SaveState(std::vector<uint8_t> &outData);
+  bool CaptureSaveStateBundle(SaveStateCaptureBundle &outBundle);
   bool LoadState(const std::vector<uint8_t> &data);
 
   // --- SRAM 接口 ---
@@ -378,8 +390,11 @@ private:
   unsigned videoHeight_{0};
   unsigned videoMaxWidth_{0};
   unsigned videoMaxHeight_{0};
-  double targetFps_{60.0};
-  double audioSampleRate_{44100.0};
+  // [2026-06-08 C-F4] atomic:Engine 线程写,NAPI 线程经 GetFps/GetAudioSampleRate
+  // (refactoredGetAVInfo)读 → 原 plain double 8 字节跨线程读 = 撕裂读(formally UB)。
+  // unsigned(videoWidth_ 等 4 字节对齐)平台本就原子,故仅 double 两个需原子化。
+  std::atomic<double> targetFps_{60.0};
+  std::atomic<double> audioSampleRate_{44100.0};
 
   // 运行时统计
   RuntimeStats stats_;

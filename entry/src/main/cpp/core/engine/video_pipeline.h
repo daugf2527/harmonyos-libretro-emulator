@@ -99,6 +99,8 @@ public:
   }
 
   retro_pixel_format GetPixelFormat() const { return pixel_format_; }
+  bool CaptureLastFrameRgba(std::vector<uint8_t> &rgba, unsigned &width,
+                            unsigned &height) const;
 
   enum class ScalingMode {
     /**
@@ -396,10 +398,12 @@ private:
   size_t hw_present_log_count_ = 0;
 
   // Dupe 帧缓存
+  mutable std::mutex frame_cache_mutex_;
   std::vector<uint8_t> lastFrame_;
   unsigned lastFrameWidth_ = 0;
   unsigned lastFrameHeight_ = 0;
   size_t lastFramePitch_ = 0;
+  retro_pixel_format lastFramePixelFormat_ = RETRO_PIXEL_FORMAT_UNKNOWN;
   bool canDupe_ = true;
 
   // GLES 渲染器
@@ -448,10 +452,12 @@ public:
   void ForceReconfiguration() { geometry_changed_.store(true); }
 
   void ClearFrameCache() {
+    std::lock_guard<std::mutex> lock(frame_cache_mutex_);
     lastFrame_.clear();
     lastFrameWidth_ = 0;
     lastFrameHeight_ = 0;
     lastFramePitch_ = 0;
+    lastFramePixelFormat_ = RETRO_PIXEL_FORMAT_UNKNOWN;
   }
 
   void Reset() {
