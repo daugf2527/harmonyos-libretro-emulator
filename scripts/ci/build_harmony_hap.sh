@@ -56,25 +56,13 @@ install_deps() {
 install_deps "${ROOT_DIR}"
 install_deps "${ROOT_DIR}/entry"
 
-# Strip signingConfigs so hvigorw always produces an unsigned HAP.
-# CI signs separately via GitHub Secrets + hap-sign-tool.jar.
-# Uses Node.js since JSON5 arrays span multiple lines (sed is fragile).
-echo "[INFO] Stripping signingConfigs from build-profile.json5 for unsigned HAP build..."
-node -e "
-const fs = require('fs');
-const path = '${ROOT_DIR}/build-profile.json5';
-let raw = fs.readFileSync(path, 'utf8');
-// Remove the signingConfigs array block (handles trailing comma)
-raw = raw.replace(/['\"]signingConfigs['\"]\s*:\s*\[[\s\S]*?\]\s*,?\s*/g, '');
-fs.writeFileSync(path, raw);
-"
-
-echo "[INFO] Running hvigor build..."
+echo "[INFO] Running hvigor unsigned build..."
 "${hvigorw_bin}" clean --no-daemon
 "${hvigorw_bin}" assembleHap --mode module \
   -p module="${module_target}" \
   -p product="${product_name}" \
   -p buildMode="${build_mode}" \
+  -p enableSignTask=false \
   --no-daemon
 
 mapfile -t hap_files < <(find "${ROOT_DIR}/entry/build" -type f -name "*.hap" | sort)
