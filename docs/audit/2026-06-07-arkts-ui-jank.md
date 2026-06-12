@@ -121,7 +121,7 @@ ArkTS 侧按键路径: `RuntimeKeyButton.onTouch(Down)`(`RuntimeVirtualControlle
 
 | # | 发现 | 严重度 | file:line | 修法 |
 |---|------|--------|-----------|------|
-| **1** | **debug `setInterval(500ms)` 常驻**: 每 500ms NAPI 往返 + 3×setState(死 @State,build 不读)+ 整页 build() 空转。游戏全程不停。 | **中(唯一常驻负载,模拟器累积可见)** | `LibretroGamePage.ets:209` + `RuntimeInputDebugTracker.ets:60-62` + `LibretroGamePage.ets:135-137,559-563` | 生产路径不启动该 tracker(debug 开关);或 3 个 @State 改 private | 
+| **1** | **debug `setInterval(500ms)` 常驻**: 每 500ms NAPI 往返 + 3×setState(死 @State,build 不读)+ 整页 build() 空转。游戏全程不停。 | **中(唯一常驻负载,模拟器累积可见)** | `LibretroGamePage.ets:209` + `RuntimeInputDebugTracker.ets:60-62` + `LibretroGamePage.ets:135-137,559-563` | 生产路径不启动该 tracker(debug 开关);或 3 个 @State 改 private |
 | 2 | `hudMetricsCache` 死代码: `refreshHudMetricsCache()` 每次 fps 事件(~2Hz)白算,getter 无人调用 | 低(轻微浪费) | `LibretroGamePage.ets:682-690` + 各调用点 | 删除 cache + 所有 `refreshHudMetricsCache()` 调用 |
 | 3 | 三折态 `perfDisplay.coreFps` 每 2Hz reconcile TripleModeLayout | 极低(仅三折态,2Hz 可接受) | `LibretroGamePage.ets:742` | 可选: fps 单独拆 number @State,或忽略 |
 | 4 | 按键过渡动画 200ms 偏软(手感,非逻辑) | 极低(体验) | `RuntimeVirtualControllerLayer.ets:89` / `EmuUiTokens` stateChangeMs | 可选: 调到 80-120ms 提升跟手感 |
