@@ -295,23 +295,63 @@ export struct StartSelectControl {
   @Param buttonWidth: number = 90;
   @Param buttonHeight: number = 50;
   @Param isVertical: boolean = false;  // 垂直布局 (三折态)
+  @Local private startPressed: boolean = false;
+  @Local private selectPressed: boolean = false;
 
   build() {
     if (this.isVertical) {
       Column({ space: 10 }) {
-        this.FunctionButton('START', RETRO_DEVICE_ID_JOYPAD_START, '#e74c3c')
-        this.FunctionButton('SELECT', RETRO_DEVICE_ID_JOYPAD_SELECT, '#95a5a6')
+        this.FunctionButton(
+          'START',
+          RETRO_DEVICE_ID_JOYPAD_START,
+          '#e74c3c',
+          this.startPressed,
+          (pressed: boolean) => {
+            this.startPressed = pressed;
+          }
+        )
+        this.FunctionButton(
+          'SELECT',
+          RETRO_DEVICE_ID_JOYPAD_SELECT,
+          '#95a5a6',
+          this.selectPressed,
+          (pressed: boolean) => {
+            this.selectPressed = pressed;
+          }
+        )
       }
     } else {
       Row({ space: 10 }) {
-        this.FunctionButton('START', RETRO_DEVICE_ID_JOYPAD_START, '#e74c3c')
-        this.FunctionButton('SELECT', RETRO_DEVICE_ID_JOYPAD_SELECT, '#95a5a6')
+        this.FunctionButton(
+          'START',
+          RETRO_DEVICE_ID_JOYPAD_START,
+          '#e74c3c',
+          this.startPressed,
+          (pressed: boolean) => {
+            this.startPressed = pressed;
+          }
+        )
+        this.FunctionButton(
+          'SELECT',
+          RETRO_DEVICE_ID_JOYPAD_SELECT,
+          '#95a5a6',
+          this.selectPressed,
+          (pressed: boolean) => {
+            this.selectPressed = pressed;
+          }
+        )
       }
     }
   }
 
   @Builder
-  FunctionButton(label: string, keyId: number, color: string) {
+  FunctionButton(
+    label: string,
+    keyId: number,
+    color: string,
+    pressed: boolean,
+    onPressedChange: (pressed: boolean) => void
+  ) {
     Button(label)
       .width(this.buttonWidth)
       .height(this.buttonHeight)
@@ -319,12 +359,24 @@ export struct StartSelectControl {
       .fontWeight(FontWeight.Bold)
       .backgroundColor(color)
       .borderRadius(this.buttonHeight / 2)
-      .onClick(() => {
-        triggerHaptic(15);
-        this.onKeyPress?.(keyId, true);
-        setTimeout(() => {
+      .scale(pressed ? { x: 0.95, y: 0.95 } : { x: 1, y: 1 })
+      .opacity(pressed ? 0.82 : 1)
+      .shadow({
+        radius: pressed ? 18 : 0,
+        color: pressed ? color : '#00000000',
+        offsetX: 0,
+        offsetY: 0
+      })
+      .animation({ duration: 70, curve: Curve.EaseOut })
+      .onTouch((event) => {
+        if (event.type === TouchType.Down) {
+          onPressedChange(true);
+          triggerHaptic(15);
+          this.onKeyPress?.(keyId, true);
+        } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+          onPressedChange(false);
           this.onKeyPress?.(keyId, false);
-        }, 100);
+        }
       })
   }
 }

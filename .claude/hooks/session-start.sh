@@ -36,15 +36,15 @@ echo "Project (.claude/cclsp.json): cclsp (12 — find_definition/find_reference
 echo "User: ast-grep (4 — find_code/find_code_by_rule/dump_syntax_tree/test_match_code_rule) | web-search (2 — web_fetch/web_search) | sequential-thinking (1)"
 
 echo ""
-echo "=== MCP TOOL POLICY — 本会话强制执行 ==="
-echo "【禁止】用 Grep 回答以下问题：'谁调用了 X / X 在哪定义 / 哪些地方引用了 X'"
-echo "【必须】符号/引用/调用链查询，MUST 优先选："
-echo "  cclsp  : find_references | find_definition | get_incoming_calls | get_outgoing_calls | find_workspace_symbols"
-echo "  serena : find_symbol | find_referencing_symbols | get_symbols_overview"
-echo "  ast-grep: find_code | find_code_by_rule   （AST 模式 / 配对检查）"
-echo "【允许 Grep 的场景】文件内容文本搜索 | CI regression guard 扫 banned-pattern | 非符号字符串匹配"
-echo "判断原则：MCP 能给更精确答案的地方用 Grep = 工具选型错误，不是 fallback。"
-echo "详见：CLAUDE.md 'MCP / Skill 工具决策树'"
+echo "=== MCP 工具策略（分语言实证版,2026-06-08 5天质检实测校准）==="
+echo "C++ 符号/引用/调用链 → cclsp/codegraph 优先;但【空结果≠不存在】必须 Grep 实物兜底"
+echo "                       (实测连活着的 GetEventName/Emit 都查不到)。C++ 诊断靠 cxx-build。"
+echo "ArkTS .ets          → serena 符号级(find_symbol/get_symbols_overview)可用;"
+echo "                       【serena LSP 诊断 + ast-grep 结构匹配对 .ets 失效(invalid AST)】"
+echo "                       → 诊断/结构/定性只能 Grep/Read + 真机编译。"
+echo "配对/banned-pattern/文本 → Grep 或 ast-grep(仅非 .ets);web 上游真值 → web-search。"
+echo "判断原则：按语言选工具,非一刀切优先 MCP。Grep 在 .ets 与文本场景往往是【正确】选择,非 fallback。"
+echo "详见：CLAUDE.md '工具决策树' + memory feedback_mcp_tools_fail_on_ets"
 
 # Write static MCP status for statusline (5 servers configured)
 echo "5/5" > .claude/.last-mcp-status.txt 2>/dev/null

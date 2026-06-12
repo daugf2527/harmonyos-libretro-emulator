@@ -155,6 +155,22 @@ bool AudioBridge::SetAudioSyncMode(int mode) {
   return false;
 }
 
+bool AudioBridge::SetVolumePercent(int percent) {
+  int safe_percent = percent;
+  if (safe_percent < 0) {
+    safe_percent = 0;
+  } else if (safe_percent > 100) {
+    safe_percent = 100;
+  }
+  volume_percent_.store(safe_percent, std::memory_order_release);
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (!audio_player_) {
+    return true;
+  }
+  return audio_player_->SetVolume(static_cast<float>(safe_percent) / 100.0f);
+}
+
 bool AudioBridge::Start() {
   std::lock_guard<std::mutex> lock(mutex_);
   if (!initialized_.load()) {
@@ -632,6 +648,7 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
          "%{public}s AudioBridge reuse: running reset, "
          "core_rate=%{public}d, out_rate=%{public}d",
          kAudioChainPrefix, core_sample_rate_, output_sample_rate_);
+    audio_player_->SetVolume(static_cast<float>(volume_percent_.load()) / 100.0f);
     return true;
   }
   // Libretro 核心采样率（输入）
@@ -676,6 +693,7 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
     ring_buffer_.reset();
     return false;
   }
+  audio_player_->SetVolume(static_cast<float>(volume_percent_.load()) / 100.0f);
 
   // 3. 初始化重采样器（Core -> 48k）
   resampler_.Init(core_sample_rate_, output_sample_rate_);

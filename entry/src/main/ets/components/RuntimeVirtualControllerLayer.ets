@@ -107,6 +107,50 @@ struct RuntimeKeyButton {
 }
 
 @ComponentV2
+struct RuntimeFloatingFunctionButton {
+  @Require @Param button: InputLayoutButton
+  @Local private pressed: boolean = false
+  @Event onPressChange?: (pressed: boolean) => void
+
+  build() {
+    Button({ type: ButtonType.Normal }) {
+      Text(this.button.label)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontFamily('monospace')
+        .fontColor(this.pressed ? EmuStateColors.onPrimary : EmuColors.primary)
+        .letterSpacing(0.4)
+    }
+    .height(26)
+    .padding({ left: 14, right: 14, top: 2, bottom: 2 })
+    .backgroundColor(this.pressed ? EmuColors.primary : '#1F00FF41')
+    .border({
+      width: this.pressed ? 1.8 : 1.2,
+      color: EmuColors.primary,
+      style: BorderStyle.Solid
+    })
+    .borderRadius(13)
+    .shadow({
+      radius: this.pressed ? 14 : 8,
+      color: this.pressed ? '#AA00FF41' : '#4400FF41',
+      offsetX: 0,
+      offsetY: this.pressed ? 1 : 2
+    })
+    .scale(this.pressed ? { x: 0.95, y: 0.95 } : { x: 1, y: 1 })
+    .animation({ duration: EmuMotion.instantMs, curve: Curve.EaseOut })
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.pressed = true
+        this.onPressChange?.(true)
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.pressed = false
+        this.onPressChange?.(false)
+      }
+    })
+  }
+}
+
+@ComponentV2
 export struct RuntimeVirtualControllerLayer {
   @Param buttons: InputLayoutButton[] = []
   @Param layoutWidth: number = 440
@@ -208,29 +252,14 @@ export struct RuntimeVirtualControllerLayer {
       Row({ space: 14 }) {
         ForEach(this.buttons, (button: InputLayoutButton) => {
           if (this.isFloatingFunctionButton(button.id) && this.isButtonDeclaredByCore(button)) {
-            Button({ type: ButtonType.Normal }) {
-              Text(button.label)
-                .fontSize(11)
-                .fontWeight(FontWeight.Bold)
-                .fontFamily('monospace')
-                .fontColor(EmuColors.primary)
-                .letterSpacing(0.4)
-            }
-            .height(26)
-            .padding({ left: 14, right: 14, top: 2, bottom: 2 })
-            .backgroundColor('#1F00FF41')
-            .border({ width: 1.2, color: EmuColors.primary, style: BorderStyle.Solid })
-            .borderRadius(13)
-            .shadow({ radius: 8, color: '#4400FF41', offsetX: 0, offsetY: 2 })
-            .onTouch((event: TouchEvent) => {
-              const keyId = this.getRetroButtonId(button)
-              if (keyId < 0 || !this.onButtonChange) {
-                return
-              }
-              if (event.type === TouchType.Down) {
-                this.onButtonChange(keyId, true)
-              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                this.onButtonChange(keyId, false)
+            RuntimeFloatingFunctionButton({
+              button: button,
+              onPressChange: (pressed: boolean) => {
+                const keyId = this.getRetroButtonId(button)
+                if (keyId < 0 || !this.onButtonChange) {
+                  return
+                }
+                this.onButtonChange(keyId, pressed)
               }
             })
           }

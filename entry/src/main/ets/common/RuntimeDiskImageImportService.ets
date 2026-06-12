@@ -1,0 +1,418 @@
+import { common } from '@kit.AbilityKit'
+import { BusinessError } from '@kit.BasicServicesKit'
+import { fileIo as fs, picker, ReadOptions } from '@kit.CoreFileKit'
+import LogHelper from './LogHelper'
+
+export interface RuntimeDiskImageImportResult {
+  canceled: boolean
+  importedEntryName: string
+  importedEntryPath: string
+  copiedCount: number
+  detail: string
+}
+
+interface RuntimeDiskImagePlan {
+  uri: string
+  fileName: string
+  dependencyNames: string[]
+  isDependencyFile: boolean
+  sourceIndex: number
+}
+
+interface RuntimeDiskPrimaryPlanResult {
+  plan: RuntimeDiskImagePlan | undefined
+  detail: string
+}
+
+interface PickerSelectOptionsCompat {
+  maxSelectNumber: number
+}
+
+const MULTIFILE_ENTRY_EXTENSIONS: string[] = ['cue', 'm3u']
+const RUNTIME_DISK_IMAGE_IMPORT_DIR = 'runtime/disks/imported'
+
+export async function importPickedRuntimeDiskImages(
+  context: common.UIAbilityContext
+): Promise<RuntimeDiskImageImportResult> {
+  const uris = await pickRuntimeDiskImageUris(context)
+  return importRuntimeDiskImageUris(context, uris)
+}
+
+async function pickRuntimeDiskImageUris(
+  context: common.UIAbilityContext
+): Promise<string[]> {
+  const documentSelectOptions = new picker.DocumentSelectOptions() as PickerSelectOptionsCompat
+  documentSelectOptions.maxSelectNumber = 12
+  const documentPicker = new picker.DocumentViewPicker(context)
+  try {
+    const uris = await documentPicker.select(documentSelectOptions)
+    return uris ?? []
+  } catch (err) {
+    const pickerError = err as BusinessError
+    LogHelper.warn(
+      'RuntimeDiskImport',
+      'Picker',
+      `选择磁盘镜像取消或失败: ${pickerError.code}, ${pickerError.message}`
+    )
+    return []
+  }
+}
+
+async function importRuntimeDiskImageUris(
+  context: common.UIAbilityContext,
+  uris: string[]
+): Promise<RuntimeDiskImageImportResult> {
+  const result = createEmptyRuntimeDiskImageImportResult()
+  if (!uris || uris.length === 0) {
+    result.canceled = true
+    result.detail = '已取消选择磁盘镜像'
+    return result
+  }
+
+  const diskDir = `${context.filesDir}/${RUNTIME_DISK_IMAGE_IMPORT_DIR}`
+  await ensureDirExists(diskDir)
+  const plans = await buildRuntimeDiskImagePlans(uris)
+  const primaryResult = resolvePrimaryRuntimeDiskPlan(plans)
+  if (!primaryResult.plan) {
+    result.detail = primaryResult.detail
+    return result
+  }
+
+  const missingDependencyNames = await findMissingDependencyNames(
+    diskDir,
+    plans,
+    primaryResult.plan.dependencyNames
+  )
+  if (missingDependencyNames.length > 0) {
+    result.detail = `缺少依赖文件: ${missingDependencyNames.join(', ')}`
+    return result
+  }
+
+  const orderedPlans = sortRuntimeDiskImagePlans(plans)
+  for (let index = 0; index < orderedPlans.length; index += 1) {
+    const plan = orderedPlans[index]
+    const destPath = `${diskDir}/${plan.fileName}`
+    await writeRuntimeDiskImageFile(plan.uri, destPath)
+  }
+
+  result.canceled = false
+  result.importedEntryName = primaryResult.plan.fileName
+  result.importedEntryPath = `${diskDir}/${primaryResult.plan.fileName}`
+  result.copiedCount = orderedPlans.length
+  result.detail = orderedPlans.length > 1
+    ? `已导入 ${orderedPlans.length} 个磁盘镜像文件`
+    : '已导入磁盘镜像'
+  return result
+}
+
+function createEmptyRuntimeDiskImageImportResult(): RuntimeDiskImageImportResult {
+  return {
+    canceled: false,
+    importedEntryName: '',
+    importedEntryPath: '',
+    copiedCount: 0,
+    detail: ''
+  }
+}
+
+async function buildRuntimeDiskImagePlans(
+  uris: string[]
+): Promise<RuntimeDiskImagePlan[]> {
+  const plans: RuntimeDiskImagePlan[] = []
+  for (let index = 0; index < uris.length; index += 1) {
+    const uri = uris[index]
+    const fileName = getFileNameFromUri(uri, index)
+    const dependencyNames = await resolveMultiFileDependencyNames(uri, fileName)
+    plans.push({
+      uri,
+      fileName,
+      dependencyNames,
+      isDependencyFile: false,
+      sourceIndex: index
+    })
+  }
+  markSelectedDependencyFiles(plans)
+  return plans
+}
+
+function markSelectedDependencyFiles(plans: RuntimeDiskImagePlan[]): void {
+  const dependencyNameSet: Set<string> = new Set()
+  plans.forEach((plan: RuntimeDiskImagePlan) => {
+    plan.dependencyNames.forEach((name: string) => {
+      dependencyNameSet.add(normalizeFileNameKey(name))
+    })
+  })
+  plans.forEach((plan: RuntimeDiskImagePlan) => {
+    plan.isDependencyFile = dependencyNameSet.has(normalizeFileNameKey(plan.fileName))
+  })
+}
+
+function resolvePrimaryRuntimeDiskPlan(
+  plans: RuntimeDiskImagePlan[]
+): RuntimeDiskPrimaryPlanResult {
+  const nonDependencyPlans: RuntimeDiskImagePlan[] = []
+  plans.forEach((plan: RuntimeDiskImagePlan) => {
+    if (!plan.isDependencyFile) {
+      nonDependencyPlans.push(plan)
+    }
+  })
+
+  if (nonDependencyPlans.length === 0) {
+    return {
+      plan: plans.length > 0 ? plans[0] : undefined,
+      detail: plans.length > 0 ? '' : '未选择磁盘镜像'
+    }
+  }
+
+  if (nonDependencyPlans.length > 1) {
+    return {
+      plan: undefined,
+      detail: '请一次只选择一个主磁盘入口文件，可附带其依赖文件'
+    }
+  }
+
+  return {
+    plan: nonDependencyPlans[0],
+    detail: ''
+  }
+}
+
+async function findMissingDependencyNames(
+  diskDir: string,
+  plans: RuntimeDiskImagePlan[],
+  dependencyNames: string[]
+): Promise<string[]> {
+  if (dependencyNames.length === 0) {
+    return []
+  }
+
+  const selectedNameSet: Set<string> = new Set()
+  plans.forEach((plan: RuntimeDiskImagePlan) => {
+    selectedNameSet.add(normalizeFileNameKey(plan.fileName))
+  })
+
+  const missingNames: string[] = []
+  for (let index = 0; index < dependencyNames.length; index += 1) {
+    const dependencyName = dependencyNames[index]
+    const normalizedName = normalizeFileNameKey(dependencyName)
+    if (selectedNameSet.has(normalizedName)) {
+      continue
+    }
+    if (await pathExists(`${diskDir}/${dependencyName}`)) {
+      continue
+    }
+    missingNames.push(dependencyName)
+  }
+  return missingNames
+}
+
+function sortRuntimeDiskImagePlans(
+  plans: RuntimeDiskImagePlan[]
+): RuntimeDiskImagePlan[] {
+  const sortedPlans: RuntimeDiskImagePlan[] = []
+  plans.forEach((plan: RuntimeDiskImagePlan) => {
+    sortedPlans.push(plan)
+  })
+  sortedPlans.sort((left: RuntimeDiskImagePlan, right: RuntimeDiskImagePlan) => {
+    if (left.isDependencyFile !== right.isDependencyFile) {
+      return left.isDependencyFile ? -1 : 1
+    }
+    return left.sourceIndex - right.sourceIndex
+  })
+  return sortedPlans
+}
+
+function getFileNameFromUri(uri: string, index: number): string {
+  const sanitizedUri = uri.split('?')[0]
+  const lastSlash = sanitizedUri.lastIndexOf('/')
+  const encodedName = lastSlash >= 0 ? sanitizedUri.substring(lastSlash + 1) : sanitizedUri
+  if (encodedName.length === 0) {
+    return `runtime_disk_${Date.now()}_${index}.img`
+  }
+  try {
+    return sanitizeImportFileName(
+      decodeURIComponent(encodedName),
+      `runtime_disk_${Date.now()}_${index}.img`
+    )
+  } catch (_err) {
+    return sanitizeImportFileName(
+      encodedName,
+      `runtime_disk_${Date.now()}_${index}.img`
+    )
+  }
+}
+
+async function resolveMultiFileDependencyNames(
+  uri: string,
+  fileName: string
+): Promise<string[]> {
+  const ext = getFileExtension(fileName)
+  if (!MULTIFILE_ENTRY_EXTENSIONS.includes(ext)) {
+    return []
+  }
+
+  let text = ''
+  try {
+    text = await fs.readText(uri)
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('RuntimeDiskImport', 'Dependency', `读取多文件入口失败 ${fileName}: ${message}`)
+    return []
+  }
+
+  if (ext === 'cue') {
+    return parseCueDependencyNames(text)
+  }
+  if (ext === 'm3u') {
+    return parseM3uDependencyNames(text)
+  }
+  return []
+}
+
+function getFileExtension(fileName: string): string {
+  const dotIndex = fileName.lastIndexOf('.')
+  if (dotIndex < 0 || dotIndex === fileName.length - 1) {
+    return ''
+  }
+  return fileName.substring(dotIndex + 1).toLowerCase()
+}
+
+function parseCueDependencyNames(text: string): string[] {
+  const names: string[] = []
+  const lines = text.split(/\r?\n/)
+  lines.forEach((line: string) => {
+    const match = /^\s*FILE\s+"?([^"]+?)"?\s+/i.exec(line)
+    if (!match || match.length < 2) {
+      return
+    }
+    appendDependencyName(names, extractBaseName(match[1]))
+  })
+  return names
+}
+
+function parseM3uDependencyNames(text: string): string[] {
+  const names: string[] = []
+  const lines = text.split(/\r?\n/)
+  lines.forEach((line: string) => {
+    const trimmed = line.trim()
+    if (trimmed.length === 0 || trimmed.startsWith('#')) {
+      return
+    }
+    appendDependencyName(names, extractBaseName(trimmed))
+  })
+  return names
+}
+
+function appendDependencyName(names: string[], name: string): void {
+  if (name.length === 0) {
+    return
+  }
+  const normalizedName = normalizeFileNameKey(name)
+  const exists = names.findIndex((item: string) => normalizeFileNameKey(item) === normalizedName) >= 0
+  if (!exists) {
+    names.push(name)
+  }
+}
+
+function extractBaseName(path: string): string {
+  const normalizedPath = path.replace(/\\/g, '/')
+  const slashIndex = normalizedPath.lastIndexOf('/')
+  return sanitizeImportFileName(
+    slashIndex >= 0 ? normalizedPath.substring(slashIndex + 1) : normalizedPath,
+    ''
+  )
+}
+
+function normalizeFileNameKey(fileName: string): string {
+  return fileName.toLowerCase()
+}
+
+async function writeRuntimeDiskImageFile(
+  sourceUri: string,
+  destPath: string
+): Promise<void> {
+  const tmpPath = `${destPath}.importing`
+  await deletePathIfExists(tmpPath)
+  try {
+    await copyFileFromUri(sourceUri, tmpPath)
+    await deletePathIfExists(destPath)
+    await fs.rename(tmpPath, destPath)
+  } catch (err) {
+    await deletePathIfExists(tmpPath)
+    throw err as Error
+  }
+}
+
+async function copyFileFromUri(
+  sourceUri: string,
+  destPath: string
+): Promise<void> {
+  let srcFile: fs.File | undefined = undefined
+  let destFile: fs.File | undefined = undefined
+  try {
+    srcFile = await fs.open(sourceUri, fs.OpenMode.READ_ONLY)
+    destFile = await fs.open(destPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
+    const bufSize = 64 * 1024
+    while (true) {
+      const chunk = new ArrayBuffer(bufSize)
+      const readOptions: ReadOptions = {
+        offset: 0,
+        length: bufSize
+      }
+      const readLen = await fs.read(srcFile.fd, chunk, readOptions)
+      if (readLen <= 0) {
+        break
+      }
+      const chunkToWrite = readLen >= chunk.byteLength ? chunk : chunk.slice(0, readLen)
+      await fs.write(destFile.fd, chunkToWrite)
+    }
+  } catch (err) {
+    throw err as Error
+  } finally {
+    if (srcFile) {
+      try {
+        await fs.close(srcFile.fd)
+      } catch (_closeErr) {
+      }
+    }
+    if (destFile) {
+      try {
+        await fs.close(destFile.fd)
+      } catch (_closeErr) {
+      }
+    }
+  }
+}
+
+function sanitizeImportFileName(fileName: string, fallback: string): string {
+  const decoded = fileName.trim()
+  const withoutPaths = decoded.replace(/[\\\/]/g, '')
+  const withoutTraversal = withoutPaths.replace(/\.\.+/g, '.')
+  const normalized = withoutTraversal.replace(/[:*?"<>|]/g, '_').trim()
+  return normalized.length > 0 ? normalized : fallback
+}
+
+async function deletePathIfExists(path: string): Promise<void> {
+  try {
+    await fs.unlink(path)
+  } catch (_err) {
+    return
+  }
+}
+
+async function ensureDirExists(path: string): Promise<void> {
+  try {
+    await fs.mkdir(path, true)
+  } catch (_err) {
+    return
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}

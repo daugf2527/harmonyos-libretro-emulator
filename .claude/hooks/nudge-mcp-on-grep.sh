@@ -37,14 +37,11 @@ fi
 
 if [[ $should_remind -eq 1 ]]; then
   cat >&2 <<EOF
-[MCP-POLICY] Grep call #$count this session.
-!! 本次 Grep 若是在查"谁调用了 X / X 在哪定义 / 哪些地方引用了 X"= POLICY VIOLATION !!
-   MUST 改用 MCP：
-     find_references | find_definition | get_incoming_calls | get_outgoing_calls   (cclsp)
-     find_symbol | find_referencing_symbols                                         (serena)
-     find_code | find_code_by_rule                                                  (ast-grep)
-   Grep 仅允许：文件内容文本搜索 / CI banned-pattern 扫描 / 非符号字符串匹配。
-   MCP 能更精确回答的问题上用 Grep = 工具选型错误。(CLAUDE.md 'MCP / Skill 工具决策树')
+[MCP-HINT] Grep call #$count this session（分语言提示,非违规判定）。
+   • 查 C++ "谁调用/在哪定义/谁引用 X" → 优先 cclsp/codegraph;但空结果必须 Grep 兜底(空≠不存在)。
+   • 查 .ets(ArkTS) → serena 符号级 OK;LSP 诊断/ast-grep 结构匹配对 .ets 失效,定性就用 Grep/Read。
+   • 文本 / banned-pattern / 配对扫 → Grep 本就是正确工具。
+   按语言选,非一刀切。详见 CLAUDE.md '工具决策树' / memory feedback_mcp_tools_fail_on_ets。
 EOF
 fi
 

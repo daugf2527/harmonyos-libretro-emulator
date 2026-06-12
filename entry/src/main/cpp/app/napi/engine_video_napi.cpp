@@ -165,6 +165,32 @@ static napi_value SetAudioSyncMode(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+static napi_value SetAudioVolume(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[1];
+  if (!GetArgs(env, info, 1, 1, args, &argc, "SetAudioVolume")) {
+    return MakeBool(env, false);
+  }
+
+  int32_t percent = 100;
+  if (!GetInt32Arg(env, args[0], percent, "SetAudioVolume", "percent")) {
+    return MakeBool(env, false);
+  }
+  if (percent < 0) {
+    percent = 0;
+  } else if (percent > 100) {
+    percent = 100;
+  }
+
+  auto *audioBridge = libretro::AudioBridge::GetInstance();
+  if (!audioBridge) {
+    return MakeBool(env, false);
+  }
+  return MakeBool(env, audioBridge->SetVolumePercent(percent));
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 void RegisterVideoAudioNapi(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"refactoredSetScalingMode", nullptr, SetScalingMode, nullptr, nullptr, nullptr, napi_default, nullptr},
@@ -174,6 +200,7 @@ void RegisterVideoAudioNapi(napi_env env, napi_value exports) {
       {"refactoredSetHwRenderAllowed", nullptr, SetHwRenderAllowed, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetMinimumAudioLatency", nullptr, SetMinimumAudioLatency, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetAudioSyncMode", nullptr, SetAudioSyncMode, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredSetAudioVolume", nullptr, SetAudioVolume, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   if (regStatus != napi_ok) {

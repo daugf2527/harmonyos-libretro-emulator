@@ -176,6 +176,302 @@ assert_no_grep "No CHRONO_TRIGGER hardcoded fallback" \
   "CHRONO_TRIGGER_USA_SNES" "$F"
 
 echo ""
+echo "=== Fix 15: PauseOverlay inline save manager ==="
+F=entry/src/main/ets/components/RuntimePauseOverlay.ets
+assert_grep "Pause overlay exposes save_manager action" \
+  "actionCode: 'save_manager'" "$F"
+assert_grep "Pause overlay accepts runtime save items param" \
+  "@Param saveManagerItems: RuntimeSaveStateListItem\\[\\]" "$F"
+assert_grep "Pause overlay declares SaveManagerPanel builder" \
+  "private SaveManagerPanel\\(" "$F"
+assert_grep "Pause overlay wires save-manager load callback" \
+  "onSaveManagerLoad\\?: \\(fileName: string\\) => void" "$F"
+
+F=entry/src/main/ets/common/RuntimeSaveStateController.ets
+assert_grep "RuntimeSaveStateController exposes listSaveItemsForRom" \
+  "async listSaveItemsForRom\\(" "$F"
+assert_grep "RuntimeSaveStateController exposes loadSaveByFileName" \
+  "async loadSaveByFileName\\(" "$F"
+assert_grep "RuntimeSaveStateController exposes deleteSaveByFileName" \
+  "async deleteSaveByFileName\\(" "$F"
+
+F=entry/src/main/ets/pages/LibretroGamePage.ets
+assert_grep "LibretroGamePage handles save_manager pause action" \
+  "actionCode === 'save_manager'" "$F"
+assert_grep "LibretroGamePage tracks runtime save-manager visibility" \
+  "runtimeSaveManagerVisible: boolean = false" "$F"
+assert_grep "LibretroGamePage passes saveManagerItems into overlay" \
+  "saveManagerItems: this\\.runtimeSaveManagerItems" "$F"
+assert_grep "LibretroGamePage passes save-manager load handler into overlay" \
+  "onSaveManagerLoad: \\(fileName: string\\) =>" "$F"
+
+echo ""
+echo "=== Fix 16: PauseOverlay inline cheat manager ==="
+F=entry/src/main/ets/components/RuntimePauseOverlay.ets
+assert_grep "Pause overlay exposes cheat_manager action" \
+  "actionCode: 'cheat_manager'" "$F"
+assert_grep "Pause overlay accepts runtime cheat items param" \
+  "@Param cheatManagerItems: RuntimeCheatItem\\[\\]" "$F"
+assert_grep "Pause overlay declares CheatManagerPanel builder" \
+  "private CheatManagerPanel\\(" "$F"
+assert_grep "Pause overlay wires cheat add callback" \
+  "onCheatManagerAdd\\?: \\(\\) => void" "$F"
+
+F=entry/src/main/ets/common/RuntimeCoreDiagnosticController.ets
+assert_grep "RuntimeCoreCapabilities tracks cheat reset support" \
+  "supportsCheatReset: boolean" "$F"
+assert_grep "RuntimeCoreCapabilities tracks cheat set support" \
+  "supportsCheatSet: boolean" "$F"
+assert_grep "Capability parser checks retro_cheat_reset warning" \
+  "retro_cheat_reset not provided" "$F"
+assert_grep "Capability parser checks retro_cheat_set warning" \
+  "retro_cheat_set not provided" "$F"
+
+F=entry/src/main/ets/common/RuntimeCheatController.ets
+assert_grep "RuntimeCheatController exposes applyCheatEntries" \
+  "applyCheatEntries\\(" "$F"
+
+F=entry/src/main/ets/common/RuntimeCheatRepository.ets
+assert_grep "RuntimeCheatRepository loads ROM cheat items" \
+  "loadRuntimeCheatItemsForRom\\(" "$F"
+assert_grep "RuntimeCheatRepository saves ROM cheat items" \
+  "saveRuntimeCheatItemsForRom\\(" "$F"
+
+F=entry/src/main/ets/pages/LibretroGamePage.ets
+assert_grep "LibretroGamePage handles cheat_manager pause action" \
+  "actionCode === 'cheat_manager'" "$F"
+assert_grep "LibretroGamePage tracks runtime cheat-manager visibility" \
+  "runtimeCheatManagerVisible: boolean = false" "$F"
+assert_grep "LibretroGamePage passes cheatManagerItems into overlay" \
+  "cheatManagerItems: this\\.runtimeCheatManagerItems" "$F"
+assert_grep "LibretroGamePage applies runtime cheat entries through controller" \
+  "runtimeCheatController\\.applyCheatEntries" "$F"
+
+echo ""
+echo "=== Fix 17: PauseOverlay runtime disk image import ==="
+F=entry/src/main/ets/components/RuntimePauseOverlay.ets
+assert_grep "Pause overlay wires disk replace callback" \
+  "onDiskReplaceCurrent\\?: \\(\\) => void" "$F"
+assert_grep "Pause overlay wires disk append callback" \
+  "onDiskAppendImage\\?: \\(\\) => void" "$F"
+assert_grep "Pause overlay shows replace-current disk button" \
+  "Button\\('替换当前盘'\\)" "$F"
+assert_grep "Pause overlay shows append disk button" \
+  "Button\\('新增一张'\\)" "$F"
+
+F=entry/src/main/ets/common/RuntimeDiskControlController.ets
+assert_grep "RuntimeDiskControlController exposes replaceImageIndex" \
+  "replaceImageIndex\\(" "$F"
+assert_grep "RuntimeDiskControlController exposes addImageIndex" \
+  "addImageIndex\\(" "$F"
+
+F=entry/src/main/ets/common/RuntimeDiskImageImportService.ets
+assert_grep "RuntimeDiskImageImportService imports picked disk images" \
+  "importPickedRuntimeDiskImages\\(" "$F"
+assert_grep "RuntimeDiskImageImportService uses DocumentViewPicker" \
+  "DocumentViewPicker" "$F"
+assert_grep "RuntimeDiskImageImportService copies selected file into runtime disk sandbox" \
+  "runtime/disks/imported" "$F"
+
+F=entry/src/main/ets/pages/LibretroGamePage.ets
+assert_grep "LibretroGamePage tracks disk-control busy state" \
+  "diskControlBusy: boolean = false" "$F"
+assert_grep "LibretroGamePage handles replace-current disk image" \
+  "handleRuntimeDiskReplaceCurrentImage\\(" "$F"
+assert_grep "LibretroGamePage handles append disk image" \
+  "handleRuntimeDiskAppendImage\\(" "$F"
+assert_grep "LibretroGamePage passes disk replace callback into overlay" \
+  "onDiskReplaceCurrent: \\(\\) =>" "$F"
+assert_grep "LibretroGamePage passes disk append callback into overlay" \
+  "onDiskAppendImage: \\(\\) =>" "$F"
+
+echo ""
+echo "=== Fix 18: PauseOverlay runtime core options ==="
+F=entry/src/main/ets/components/RuntimePauseOverlay.ets
+assert_grep "Pause overlay exposes core_options action" \
+  "actionCode: 'core_options'" "$F"
+assert_grep "Pause overlay accepts runtime core options items param" \
+  "@Param coreOptionsItems: RuntimeCoreOptionItem\\[\\]" "$F"
+assert_grep "Pause overlay declares CoreOptionsPanel builder" \
+  "private CoreOptionsPanel\\(" "$F"
+assert_grep "Pause overlay wires core option advance callback" \
+  "onCoreOptionAdvance\\?: \\(key: string, value: string\\) => void" "$F"
+
+F=entry/src/main/ets/common/RuntimeCoreOptionsController.ets
+assert_grep "RuntimeCoreOptionsController exposes getOptions" \
+  "getOptions\\(" "$F"
+assert_grep "RuntimeCoreOptionsController exposes setOption" \
+  "setOption\\(" "$F"
+assert_grep "RuntimeCoreOptionsController parses core options json" \
+  "JSON\\.parse" "$F"
+
+F=entry/src/main/ets/pages/LibretroGamePage.ets
+assert_grep "LibretroGamePage handles core_options pause action" \
+  "actionCode === 'core_options'" "$F"
+assert_grep "LibretroGamePage tracks runtime core-options visibility" \
+  "runtimeCoreOptionsVisible: boolean = false" "$F"
+assert_grep "LibretroGamePage passes coreOptionsItems into overlay" \
+  "coreOptionsItems: this\\.runtimeCoreOptionsItems" "$F"
+assert_grep "LibretroGamePage refreshes runtime core options panel" \
+  "refreshRuntimeCoreOptionsPanel\\(" "$F"
+assert_grep "LibretroGamePage applies runtime core option change" \
+  "advanceRuntimeCoreOption\\(" "$F"
+
+echo ""
+echo "=== Fix 19: Production render settings wire VSync and AI upscale ==="
+F=entry/src/main/ets/common/RuntimeRenderSettingsController.ets
+assert_grep "RuntimeRenderSettingsController exposes setSwapInterval" \
+  "setSwapInterval\\(" "$F"
+assert_grep "RuntimeRenderSettingsController exposes setAIUpscale" \
+  "setAIUpscale\\(" "$F"
+
+F=entry/src/main/ets/common/RuntimeRenderSettingsRepository.ets
+assert_grep "RuntimeRenderSettingsProfile stores swapInterval" \
+  "swapInterval: number" "$F"
+assert_grep "RuntimeRenderSettingsProfile stores aiUpscaleEnabled" \
+  "aiUpscaleEnabled: boolean" "$F"
+assert_grep "Default render profile seeds swapInterval" \
+  "swapInterval:" "$F"
+assert_grep "Default render profile seeds aiUpscaleEnabled" \
+  "aiUpscaleEnabled:" "$F"
+
+F=entry/src/main/ets/pages/SettingsPage.ets
+assert_grep "SettingsPage exposes VSync advanced row" \
+  "'VSync'" "$F"
+assert_grep "SettingsPage exposes AI Upscale advanced row" \
+  "'AI Upscale'" "$F"
+assert_grep "SettingsPage toggles swap interval" \
+  "toggleSwapInterval\\(" "$F"
+assert_grep "SettingsPage toggles AI upscale" \
+  "toggleAIUpscale\\(" "$F"
+
+F=entry/src/main/ets/pages/LibretroGamePage.ets
+assert_grep "LibretroGamePage applies swap interval to native runtime settings" \
+  "setSwapInterval\\(this\\.renderSettingsProfile\\.swapInterval\\)" "$F"
+assert_grep "LibretroGamePage applies AI upscale to native runtime settings" \
+  "setAIUpscale\\(this\\.renderSettingsProfile\\.aiUpscaleEnabled\\)" "$F"
+
+echo ""
+echo "=== Fix 20: PauseOverlay runtime SRAM manager ==="
+F=entry/src/main/ets/components/RuntimePauseOverlay.ets
+assert_grep "Pause overlay exposes sram_manager action" \
+  "actionCode: 'sram_manager'" "$F"
+assert_grep "Pause overlay accepts runtime SRAM items param" \
+  "@Param sramManagerItems: RuntimeSramBackupListItem\\[\\]" "$F"
+assert_grep "Pause overlay declares SramManagerPanel builder" \
+  "private SramManagerPanel\\(" "$F"
+assert_grep "Pause overlay wires SRAM export callback" \
+  "onSramManagerCreate\\?: \\(\\) => void" "$F"
+assert_grep "Pause overlay wires SRAM load callback" \
+  "onSramManagerLoad\\?: \\(fileName: string\\) => void" "$F"
+
+F=entry/src/main/ets/common/RuntimeSramController.ets
+assert_grep "RuntimeSramController exports current SRAM backup" \
+  "exportCurrentSramBackup\\(" "$F"
+assert_grep "RuntimeSramController loads SRAM backup by file name" \
+  "loadBackupByFileName\\(" "$F"
+assert_grep "RuntimeSramController lists backup items for ROM" \
+  "listBackupItemsForRom\\(" "$F"
+
+F=entry/src/main/ets/common/RuntimeSramRepository.ets
+assert_grep "RuntimeSramRepository saves SRAM backup files" \
+  "saveRuntimeSramBackup\\(" "$F"
+assert_grep "RuntimeSramRepository reads SRAM backup files" \
+  "readRuntimeSramBackup\\(" "$F"
+assert_grep "RuntimeSramRepository lists SRAM backups for ROM" \
+  "listRuntimeSramBackupsForRom\\(" "$F"
+
+F=entry/src/main/ets/pages/LibretroGamePage.ets
+assert_grep "LibretroGamePage handles sram_manager pause action" \
+  "actionCode === 'sram_manager'" "$F"
+assert_grep "LibretroGamePage tracks runtime SRAM-manager visibility" \
+  "runtimeSramManagerVisible: boolean = false" "$F"
+assert_grep "LibretroGamePage refreshes runtime SRAM panel" \
+  "refreshRuntimeSramManagerPanel\\(" "$F"
+assert_grep "LibretroGamePage exports current SRAM backup" \
+  "exportCurrentRuntimeSramBackup\\(" "$F"
+assert_grep "LibretroGamePage passes SRAM items into overlay" \
+  "sramManagerItems: this\\.runtimeSramManagerItems" "$F"
+
+echo ""
+echo "=== Fix 21: PauseOverlay runtime status snapshot ==="
+F=entry/src/main/ets/components/RuntimePauseOverlay.ets
+assert_grep "Pause overlay accepts runtime state text param" \
+  "@Param runtimeStateText: string = ''" "$F"
+assert_grep "Pause overlay accepts runtime load-state text param" \
+  "@Param runtimeLoadStateText: string = ''" "$F"
+assert_grep "Pause overlay accepts runtime save-state-size text param" \
+  "@Param runtimeSaveStateSizeText: string = ''" "$F"
+assert_grep "Pause overlay accepts runtime input-debug text param" \
+  "@Param runtimeInputDebugText: string = ''" "$F"
+assert_grep "Pause telemetry renders runtime state text" \
+  "this\\.runtimeStateText\\.length > 0" "$F"
+assert_grep "Pause telemetry renders runtime input-debug text" \
+  "Text\\(this\\.runtimeInputDebugText\\)" "$F"
+
+F=entry/src/main/ets/common/RuntimeCoreDiagnosticController.ets
+assert_grep "RuntimeCoreDiagnosticController exposes runtime status snapshot" \
+  "async readRuntimeStatusSnapshot\\(" "$F"
+assert_grep "RuntimeCoreDiagnosticController queries native engine state" \
+  "refactoredGetState\\(" "$F"
+assert_grep "RuntimeCoreDiagnosticController queries save-state size async" \
+  "refactoredGetSaveStateSizeAsync\\(" "$F"
+assert_grep "RuntimeCoreDiagnosticController queries input debug stats" \
+  "refactoredGetInputDebugStats\\(" "$F"
+
+F=entry/src/main/ets/pages/LibretroGamePage.ets
+assert_grep "LibretroGamePage tracks runtime state text" \
+  "runtimeStateText: string = ''" "$F"
+assert_grep "LibretroGamePage tracks runtime input-debug text" \
+  "runtimeInputDebugText: string = ''" "$F"
+assert_grep "LibretroGamePage refreshes runtime status snapshot" \
+  "refreshRuntimeStatusSnapshot\\(" "$F"
+assert_grep "LibretroGamePage passes runtime state text into overlay" \
+  "runtimeStateText: this\\.runtimeStateText" "$F"
+assert_grep "LibretroGamePage passes runtime input-debug text into overlay" \
+  "runtimeInputDebugText: this\\.runtimeInputDebugText" "$F"
+
+echo ""
+echo "=== Fix 22: PauseOverlay runtime port control ==="
+F=entry/src/main/ets/components/RuntimePauseOverlay.ets
+assert_grep "Pause overlay exposes port_control action" \
+  "actionCode: 'port_control'" "$F"
+assert_grep "Pause overlay accepts runtime port-control visible param" \
+  "@Param portControlVisible: boolean = false" "$F"
+assert_grep "Pause overlay accepts runtime port assignments param" \
+  "@Param portAssignments: PortAssignState\\[\\] = \\[\\]" "$F"
+assert_grep "Pause overlay declares PortControlPanel builder" \
+  "private PortControlPanel\\(" "$F"
+assert_grep "Pause overlay wires virtual-port select callback" \
+  "onVirtualPortSelect\\?: \\(portId: number\\) => void" "$F"
+assert_grep "Pause overlay wires controller-device select callback" \
+  "onControllerDeviceSelect\\?: \\(device: number\\) => void" "$F"
+
+F=entry/src/main/ets/common/RuntimeInputPortController.ets
+assert_grep "RuntimeInputPortController exports controller device options" \
+  "RUNTIME_CONTROLLER_PORT_DEVICE_OPTIONS" "$F"
+assert_grep "RuntimeInputPortController exposes setControllerPortDevice" \
+  "setControllerPortDevice\\(" "$F"
+
+F=entry/src/main/ets/common/InputPortRouting.ts
+assert_grep "InputPortRouting clears stale virtual port on reassignment" \
+  "sourceType === InputSourceType\\.Virtual && item\\.sourceType === InputSourceType\\.Virtual" "$F"
+
+F=entry/src/main/ets/pages/LibretroGamePage.ets
+assert_grep "LibretroGamePage handles port_control pause action" \
+  "actionCode === 'port_control'" "$F"
+assert_grep "LibretroGamePage tracks runtime port-control visibility" \
+  "runtimePortControlVisible: boolean = false" "$F"
+assert_grep "LibretroGamePage selects runtime virtual port" \
+  "selectRuntimeVirtualPort\\(" "$F"
+assert_grep "LibretroGamePage applies runtime controller port device" \
+  "applyRuntimeControllerPortDevice\\(" "$F"
+assert_grep "LibretroGamePage passes port-control visibility into overlay" \
+  "portControlVisible: this\\.runtimePortControlVisible" "$F"
+assert_grep "LibretroGamePage passes virtual-port select callback into overlay" \
+  "onVirtualPortSelect: \\(portId: number\\) =>" "$F"
+
+echo ""
 echo "=== Fix 11: D-pad labels Chinese single-char (was clipped 'RI...' / 'DO...') ==="
 F=entry/src/main/ets/common/InputLayoutRepository.ets
 assert_grep "up label is 上" "id: 'up', label: '上'" "$F"
@@ -260,8 +556,12 @@ assert_grep "gameAspectRatio @Local tracked" \
   "@Local private gameAspectRatio: number" "$F"
 assert_grep "handleGeometryUpdate writes gameAspectRatio" \
   "this\.gameAspectRatio = ratio" "$F"
-assert_grep "XComponent uses aspectRatio not 100% stretch" \
-  "\.aspectRatio\(this\.gameAspectRatio" "$F"
+assert_grep "runtime aspect helper keeps gameAspectRatio as native baseline" \
+  "const nativeAspectRatio = this\.gameAspectRatio > 0 \? this\.gameAspectRatio : 4 / 3;" "$F"
+assert_grep "runtime aspect helper resolves visual aspect override" \
+  "resolveRuntimeVisualAspectRatio\(this\.visualSettingsProfile\.aspectMode, nativeAspectRatio\)" "$F"
+assert_grep "XComponent uses runtime aspect helper not 100% stretch" \
+  "\.aspectRatio\(this\.getRuntimeScreenAspectRatio\(\)\)" "$F"
 assert_grep "XComponent constrained inside Stack with black letterbox" \
   "constraintSize\(\{ maxWidth: '100%', maxHeight: '100%' \}\)" "$F"
 

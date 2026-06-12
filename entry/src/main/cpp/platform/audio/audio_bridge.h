@@ -53,6 +53,8 @@ public:
   bool IsRunning() const override;
   bool SetMinimumAudioLatency(int latency_ms) override;
   bool SetAudioSyncMode(int mode) override;
+  bool SetVolumePercent(int percent);
+  int GetVolumePercent() const { return volume_percent_.load(); }
 
   // 保留旧的 Initialize (为了兼容现有代码)
   bool Initialize(int32_t sample_rate = 48000);
@@ -144,6 +146,7 @@ private:
   std::atomic<size_t> min_buffer_frames_{0};
   std::atomic<size_t> default_min_buffer_frames_{0};
   std::atomic<unsigned> minimum_latency_ms_{0};
+  std::atomic<int> volume_percent_{100};
 
   // DRC 更新节流（从 static 移为成员变量，避免多线程数据竞争）
   std::chrono::steady_clock::time_point drc_last_update_{};

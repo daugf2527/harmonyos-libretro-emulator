@@ -101,11 +101,11 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 
 ## NAPI Export Inventory
 
-`libentry.so` 通过 `napi_define_properties` 暴露给 ArkTS 的全部 63 个 export。
+`libentry.so` 通过 `napi_define_properties` 暴露给 ArkTS 的全部 65 个 export。
 ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名以此为准，本表与之同步）。
 注册入口：`libretro_engine_napi.cpp` 转发 6 个子注册函数 + `module_init.cpp` 注册 core_loader / input_mapping 两个独立模块。
 
-命名约定：61 个以 `refactored` 前缀标识新架构；2 个例外（`setInputKeyMapping`、`testCoreLoader`）为遗留/专用接口。
+命名约定：63 个以 `refactored` 前缀标识新架构；2 个例外（`setInputKeyMapping`、`testCoreLoader`）为遗留/专用接口。
 改 `app/napi/**` 任何 export（增删/改签名）须同步本表 + `index.d.ts`（`scan_code_drift.sh` Pattern 5 守）。
 
 ### 生命周期 (13) — engine_lifecycle_napi.cpp
@@ -126,7 +126,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredGetRawFileListAsync` | `(resMgr: ResourceManager, dir?: string) => Promise<string[]>` | async | 异步列出 rawfile 目录 |
 | `refactoredInitEventBridge` | `(callback: (data: RefactoredEvent) => void) => boolean` | sync | 初始化 EventBridge 事件通道 |
 
-### 状态/存档/SRAM/作弊/选项 (13) — engine_state_napi.cpp
+### 状态/存档/SRAM/作弊/选项 (14) — engine_state_napi.cpp
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
@@ -135,6 +135,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredSaveState` | `() => ArrayBuffer \| null` | sync | 同步保存状态（阻塞） |
 | `refactoredLoadState` | `(data: ArrayBuffer) => boolean` | sync | 同步加载状态（阻塞） |
 | `refactoredSaveStateAsync` | `() => Promise<ArrayBuffer \| null>` | async | 异步保存状态（推荐） |
+| `refactoredSaveStateBundleAsync` | `() => Promise<{stateData:ArrayBuffer,thumbnailRgba:ArrayBuffer \| null,thumbnailWidth:number,thumbnailHeight:number}>` | async | 异步保存状态并返回当前帧缩略图原始 RGBA（CPU/GLES 最小闭环） |
 | `refactoredLoadStateAsync` | `(data: ArrayBuffer) => Promise<boolean>` | async | 异步加载状态（推荐） |
 | `refactoredGetSRAM` | `() => ArrayBuffer \| null` | sync | 获取电池备份 SRAM |
 | `refactoredSetSRAM` | `(data: ArrayBuffer) => boolean` | sync | 设置电池备份 SRAM |
@@ -158,7 +159,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredGetInputDescriptorMask` | `() => number` | sync | 16-bit 输入描述符掩码，0=核心未声明 |
 | `setInputKeyMapping` *(无 refactored 前缀)* | `(mappingMap: Record<string, number>) => boolean` | sync | 设置键盘→libretro 映射表 |
 
-### 视频 (5) + 音频 (2) — engine_video_napi.cpp
+### 视频 (5) + 音频 (3) — engine_video_napi.cpp
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
@@ -169,6 +170,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredSetHwRenderAllowed` | `(enabled: boolean) => boolean` | sync | 允许/禁止硬件渲染 |
 | `refactoredSetMinimumAudioLatency` | `(latencyMs: number) => boolean` | sync | 设置音频最小延迟 (ms) |
 | `refactoredSetAudioSyncMode` | `(mode: number) => boolean` | sync | 音频同步模式 0=NonBlocking/1=Blocking |
+| `refactoredSetAudioVolume` | `(percent: number) => boolean` | sync | 设置主音量百分比 0-100 |
 
 ### 磁盘控制 (7) — engine_disk_napi.cpp
 
@@ -204,7 +206,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
-| `testCoreLoader` *(无 refactored 前缀)* | `(corePath: string) => string` | **sync** | 测试核心 dlopen/dlsym，返回结果字符串（**同步返回 string 非 Promise**） |
+| `testCoreLoader` *(无 refactored 前缀)* | `(corePath: string) => Promise<string>` | **async** | 测试核心 dlopen/dlsym，异步返回结果字符串 |
 
 ## Project Structure & Module Organization
 - `entry/src/main/ets/`: ArkTS UI and routing (pages, abilities, interfaces).
@@ -241,4 +243,3 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 做 UI 页面/组件/蓝湖/HTML→ArkUI 落地时，加载 `/skill arkui-design`（progressive disclosure，只在改 `entry/src/main/ets/**/*.ets` 时触发）。
 
 该 skill 包含完整的 ArkUI 设计规范：布局单位/安全区/响应式/容器选型、5 步页面落地流程、HTML→ArkUI 转换规则、组件规范、工程级约束（类型/状态管理/生命周期/路由/SDK 适配）、反模式与禁止事项。
-

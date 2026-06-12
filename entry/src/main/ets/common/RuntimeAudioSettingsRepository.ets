@@ -4,24 +4,32 @@ import { fileIo as fs } from '@kit.CoreFileKit'
 export interface RuntimeAudioSettingsProfile {
   version: number
   latencyMs: number
+  volumePercent: number
   updatedAt: number
 }
 
-const RUNTIME_AUDIO_SETTINGS_VERSION = 1
+const RUNTIME_AUDIO_SETTINGS_VERSION = 2
 const RUNTIME_AUDIO_SETTINGS_DIR_NAME = 'runtime'
 const RUNTIME_AUDIO_SETTINGS_FILE_NAME = 'audio_settings.json'
 
-// 音频缓冲延迟预设档位（ms）：0=低延迟（高端真机），1=标准（默认，兼顾），2=高缓冲（模拟器/低端机抗抖动）。
-// 越大缓冲越深、抗 callback 抖动越强，但按键到出声的延迟越明显。默认 48ms 在真机手感损失小、
-// 又能吸收模拟器 ~100ms 音频 callback 抖动（见 tech-debt D019 / 模拟器 audio_server overTime）。
-export const AUDIO_LATENCY_PRESETS: number[] = [16, 48, 96]
+// 音频缓冲延迟预设档位（ms）：0=低延迟，1=标准，2=高缓冲（模拟器抗 underrun）。
+// [2026-06-08 D025/C-F1] 原 [16,48,96] 全 < C++ 端 profile 缓冲地板（device 100ms /
+// emulator 250ms，见 audio_bridge.cpp kMinBufferMsDevice/Emulator）；SetMinimumLatencyMs
+// 做 max(目标,地板) 只升不降 → 三档在两个平台全被地板钳死、对模拟器(underrun 发生地)
+// 零影响 = placebo（连"高缓冲 模拟器抗抖动"档 96ms 都低于 250ms 地板）。
+// 现把高缓冲抬到 300ms（> emulator 250 地板）使其真正生效；默认仍 48（靠地板兜底，真机低延迟
+// 手感不变）；标准 128 在真机(100地板)之上加缓冲。MAX→400 给高缓冲留头寸
+// （400ms=19200帧 << RingBuffer 48000帧容量，安全）。改动需 DevEco + 模拟器实测抗 underrun。
+export const AUDIO_LATENCY_PRESETS: number[] = [48, 128, 300]
 const DEFAULT_AUDIO_LATENCY_MS = 48
-const MAX_AUDIO_LATENCY_MS = 200
+const MAX_AUDIO_LATENCY_MS = 400
+const DEFAULT_AUDIO_VOLUME_PERCENT = 100
 
 export function createDefaultRuntimeAudioSettingsProfile(): RuntimeAudioSettingsProfile {
   return {
     version: RUNTIME_AUDIO_SETTINGS_VERSION,
     latencyMs: DEFAULT_AUDIO_LATENCY_MS,
+    volumePercent: DEFAULT_AUDIO_VOLUME_PERCENT,
     updatedAt: 0
   }
 }
@@ -51,6 +59,7 @@ export async function saveRuntimeAudioSettingsProfile(
   const nextProfile: RuntimeAudioSettingsProfile = {
     version: RUNTIME_AUDIO_SETTINGS_VERSION,
     latencyMs: normalized.latencyMs,
+    volumePercent: normalized.volumePercent,
     updatedAt: Date.now()
   }
   let file: fs.File | undefined = undefined
@@ -79,6 +88,7 @@ export function normalizeRuntimeAudioSettingsProfile(
   return {
     version: RUNTIME_AUDIO_SETTINGS_VERSION,
     latencyMs: clampLatency(profile?.latencyMs),
+    volumePercent: clampVolumePercent(profile?.volumePercent),
     updatedAt: Number(profile?.updatedAt) || 0
   }
 }
@@ -122,6 +132,20 @@ function clampLatency(latencyMs: number | undefined): number {
   }
   if (safe > MAX_AUDIO_LATENCY_MS) {
     return MAX_AUDIO_LATENCY_MS
+  }
+  return safe
+}
+
+function clampVolumePercent(volumePercent: number | undefined): number {
+  const safe = Math.floor(Number(volumePercent))
+  if (!Number.isFinite(safe)) {
+    return DEFAULT_AUDIO_VOLUME_PERCENT
+  }
+  if (safe < 0) {
+    return 0
+  }
+  if (safe > 100) {
+    return 100
   }
   return safe
 }

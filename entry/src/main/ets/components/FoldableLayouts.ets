@@ -6,7 +6,33 @@
 
 import LogHelper from '../common/LogHelper';
 import { DPadControl, ABXYControl, StartSelectControl, SystemControl } from './VirtualController';
+import { ScanlineBackground } from './EmuAppShell'
 import { EmuTypography } from '../common/EmuUiTokens'
+
+function getScreenCornerRadius(curvature: number, baseRadius: number): number {
+  return baseRadius + Math.round(curvature * 0.24)
+}
+
+function getScreenSaturationFactor(saturation: number): number {
+  return Math.max(0, saturation / 100)
+}
+
+function getScanlineOpacity(intensity: number): number {
+  if (intensity <= 0) {
+    return 0
+  }
+  return Math.min(0.42, 0.08 + intensity * 0.0034)
+}
+
+function getScanlineSpacing(intensity: number): number {
+  if (intensity >= 70) {
+    return 1
+  }
+  if (intensity >= 35) {
+    return 2
+  }
+  return 3
+}
 
 // 单折态 UI (F态) - Phantom Overlay (幽灵悬浮)
 @ComponentV2
@@ -109,6 +135,9 @@ export struct DualModeLayout {
   @Param xComponentId: string = 'new_arch_game_surface';
   // 屏幕比例 (宽:高) - 根据模拟器类型动态设置
   @Param screenAspectRatio: number = 1.0;
+  @Param scanlineIntensity: number = 0;
+  @Param screenCurvature: number = 0;
+  @Param screenSaturation: number = 100;
   // 回调函数
   @Event onKeyPress?: (keyId: number, pressed: boolean) => void;
   @Event onReset?: () => void;
@@ -123,29 +152,46 @@ export struct DualModeLayout {
           .width('100%')
           .height('100%')
           .backgroundColor('#000000')
-        
+
         // 游戏画面 (动态比例 + CRT 边框)
-        XComponent({
-          id: this.xComponentId,
-          type: XComponentType.SURFACE,
-          libraryname: 'entry'
-        })
-          .width('90%')       // 横向留边距
-          .aspectRatio(this.screenAspectRatio)  // 动态比例
+        Stack({ alignContent: Alignment.Center }) {
+          XComponent({
+            id: this.xComponentId,
+            type: XComponentType.SURFACE,
+            libraryname: 'entry'
+          })
+            .width('90%')
+            .aspectRatio(this.screenAspectRatio)
+            .onLoad(() => {
+              LogHelper.info('DualMode', 'UI', `XComponent 加载: ${this.xComponentId}`, 0xD005);
+            })
+
+          if (this.scanlineIntensity > 0) {
+            ScanlineBackground({
+              lineColor: '#2400FF41',
+              lineSpacing: getScanlineSpacing(this.scanlineIntensity),
+              alternateColor: '#0F000000'
+            })
+              .width('90%')
+              .aspectRatio(this.screenAspectRatio)
+              .opacity(getScanlineOpacity(this.scanlineIntensity))
+              .hitTestBehavior(HitTestMode.None)
+          }
+        }
+          .saturate(getScreenSaturationFactor(this.screenSaturation))
           .border({
             width: 8,
             color: '#2C2C2C',
-            radius: 12
+            radius: getScreenCornerRadius(this.screenCurvature, 12)
           })
+          .borderRadius(getScreenCornerRadius(this.screenCurvature, 12))
           .shadow({
             radius: 20,
             color: '#000000',
             offsetX: 0,
             offsetY: 4
           })
-          .onLoad(() => {
-            LogHelper.info('DualMode', 'UI', `XComponent 加载: ${this.xComponentId}`, 0xD005);
-          })
+          .clip(true)
       }
       .layoutWeight(0.65)
       .alignContent(Alignment.Center)
@@ -230,6 +276,9 @@ export struct TripleModeLayout {
   @Param xComponentId: string = 'new_arch_game_surface';
   // 屏幕比例 (宽:高) - 根据模拟器类型动态设置
   @Param screenAspectRatio: number = 1.0;
+  @Param scanlineIntensity: number = 0;
+  @Param screenCurvature: number = 0;
+  @Param screenSaturation: number = 100;
   // 回调函数
   @Event onKeyPress?: (keyId: number, pressed: boolean) => void;
   @Event onReset?: () => void;
@@ -278,7 +327,7 @@ export struct TripleModeLayout {
         .justifyContent(FlexAlign.Center)
         .backdropBlur(30)  // 背景模糊
         .backgroundColor('#80000000')  // 半透明黑色
-        
+
         // 游戏视窗 (60% - 保持比例，不裁切)
         Stack() {
           // 黑色背景
@@ -286,19 +335,36 @@ export struct TripleModeLayout {
             .width('100%')
             .height('100%')
             .backgroundColor('#000000')
-          
+
           // 游戏画面 (动态比例)
-          XComponent({
-            id: this.xComponentId,
-            type: XComponentType.SURFACE,
-            libraryname: 'entry'
-          })
-            .height('100%')        // 高度撑满
-            .aspectRatio(this.screenAspectRatio)  // 动态比例
-            .backgroundColor('#000000')
-            .onLoad(() => {
-              LogHelper.info('TripleMode', 'UI', `XComponent 加载: ${this.xComponentId}`, 0xD005);
+          Stack({ alignContent: Alignment.Center }) {
+            XComponent({
+              id: this.xComponentId,
+              type: XComponentType.SURFACE,
+              libraryname: 'entry'
             })
+              .height('100%')
+              .aspectRatio(this.screenAspectRatio)
+              .backgroundColor('#000000')
+              .onLoad(() => {
+                LogHelper.info('TripleMode', 'UI', `XComponent 加载: ${this.xComponentId}`, 0xD005);
+              })
+
+            if (this.scanlineIntensity > 0) {
+              ScanlineBackground({
+                lineColor: '#2400FF41',
+                lineSpacing: getScanlineSpacing(this.scanlineIntensity),
+                alternateColor: '#0F000000'
+              })
+                .height('100%')
+                .aspectRatio(this.screenAspectRatio)
+                .opacity(getScanlineOpacity(this.scanlineIntensity))
+                .hitTestBehavior(HitTestMode.None)
+            }
+          }
+            .saturate(getScreenSaturationFactor(this.screenSaturation))
+            .borderRadius(getScreenCornerRadius(this.screenCurvature, 10))
+            .clip(true)
         }
         .width('60%')
         .height('100%')
@@ -354,12 +420,12 @@ export struct TripleModeLayout {
   @Builder
   InfoPanel() {
     Column() {
-      Text(`FPS: ${this.fps}`)
+      Text(`FPS: ${this.fps > 0 ? this.fps.toFixed(1) : '--.-'}`)
         .fontSize(EmuTypography.md)
         .fontColor(Color.White)
         .margin({ bottom: 5 })
-      
-      Text(`CPU: ${this.cpuUsage}%`)
+
+      Text(this.cpuUsage > 0 ? `LOAD: ${this.cpuUsage}%` : 'LOAD: --')
         .fontSize(EmuTypography.md)
         .fontColor(Color.White)
     }

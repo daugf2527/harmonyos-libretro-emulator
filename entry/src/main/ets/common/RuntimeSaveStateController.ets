@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit'
 import LogHelper from './LogHelper'
 import {
+  deleteSaveStateItem,
   listSaveStateItems,
   readSaveStateData,
   SaveStateManifestItem,
@@ -8,6 +9,15 @@ import {
   saveStateData
 } from './SaveStateRepository'
 import { runtimeSessionController, RuntimeSaveStateBundle } from './RuntimeSessionController'
+
+export interface RuntimeSaveStateListItem {
+  id: string
+  fileName: string
+  slotLabel: string
+  detail: string
+  createdLabel: string
+  isLatest: boolean
+}
 
 export class RuntimeSaveStateController {
   async quickSave(
@@ -70,6 +80,69 @@ export class RuntimeSaveStateController {
       return '读档失败'
     }
   }
+
+  async listSaveItemsForRom(
+    context: common.UIAbilityContext | undefined,
+    romFile: string
+  ): Promise<RuntimeSaveStateListItem[]> {
+    if (!context) {
+      return []
+    }
+    const entries = await listSaveStateItems(context)
+    const filtered = filterSaveItemsForRuntimeRom(entries, romFile)
+    const items: RuntimeSaveStateListItem[] = []
+    filtered.forEach((item: SaveStateManifestItem, index: number) => {
+      items.push(buildRuntimeSaveStateListItem(item, index))
+    })
+    return items
+  }
+
+  async loadSaveByFileName(
+    context: common.UIAbilityContext | undefined,
+    gameRunning: boolean,
+    fileName: string
+  ): Promise<string> {
+    if (!gameRunning) {
+      return '需在运行中读档'
+    }
+    if (!context) {
+      return '上下文缺失'
+    }
+    if (fileName.length === 0) {
+      return '存档文件无效'
+    }
+    try {
+      const stateData = readSaveStateData(context, fileName)
+      const loaded = await runtimeSessionController.loadStateAsync(stateData)
+      LogHelper.info('RuntimeSaveState', 'Save', `运行态指定读档: file=${fileName} ok=${loaded}`)
+      return loaded ? '读档已加载' : '读档被拒绝'
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.error('RuntimeSaveState', 'Save', `运行态指定读档失败: ${message}`)
+      return '读档失败'
+    }
+  }
+
+  async deleteSaveByFileName(
+    context: common.UIAbilityContext | undefined,
+    fileName: string
+  ): Promise<string> {
+    if (!context) {
+      return '上下文缺失'
+    }
+    if (fileName.length === 0) {
+      return '存档文件无效'
+    }
+    try {
+      await deleteSaveStateItem(context, fileName)
+      LogHelper.info('RuntimeSaveState', 'Save', `运行态删除存档: file=${fileName}`)
+      return '存档已删除'
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.error('RuntimeSaveState', 'Save', `运行态删除存档失败: ${message}`)
+      return '删除存档失败'
+    }
+  }
 }
 
 function findLatestSaveForRuntimeRom(
@@ -86,6 +159,63 @@ function findLatestSaveForRuntimeRom(
     }
   }
   return undefined
+}
+
+function filterSaveItemsForRuntimeRom(
+  items: SaveStateManifestItem[],
+  romFile: string
+): SaveStateManifestItem[] {
+  if (romFile.length === 0) {
+    return items
+  }
+  const filtered: SaveStateManifestItem[] = []
+  items.forEach((item: SaveStateManifestItem) => {
+    if (item.romFile === romFile) {
+      filtered.push(item)
+    }
+  })
+  return filtered
+}
+
+function buildRuntimeSaveStateListItem(
+  item: SaveStateManifestItem,
+  index: number
+): RuntimeSaveStateListItem {
+  const slotNumber = (index + 1).toString().padStart(3, '0')
+  return {
+    id: item.id,
+    fileName: item.fileName,
+    slotLabel: `存档位_${slotNumber}`,
+    detail: `${normalizeRuntimeSaveTitle(item.fileName)} | ${formatRuntimeSaveBytes(item.byteLength)}`,
+    createdLabel: item.createdAt > 0 ? formatRuntimeSaveDateTime(item.createdAt) : '本地',
+    isLatest: index === 0
+  }
+}
+
+function normalizeRuntimeSaveTitle(fileName: string): string {
+  const dotIndex = fileName.lastIndexOf('.')
+  const baseName = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName
+  const cleaned = baseName.replace(/[_-]+/g, ' ')
+  return cleaned.length > 0 ? cleaned : '未知存档'
+}
+
+function formatRuntimeSaveBytes(byteLength: number): string {
+  if (byteLength <= 0) {
+    return '0 B'
+  }
+  if (byteLength < 1024) {
+    return `${byteLength} B`
+  }
+  return `${Math.floor(byteLength / 1024)} KB`
+}
+
+function formatRuntimeSaveDateTime(timestamp: number): string {
+  const date = new Date(timestamp)
+  const month = `${date.getMonth() + 1}`.padStart(2, '0')
+  const day = `${date.getDate()}`.padStart(2, '0')
+  const hour = `${date.getHours()}`.padStart(2, '0')
+  const minute = `${date.getMinutes()}`.padStart(2, '0')
+  return `${date.getFullYear()}-${month}-${day} ${hour}:${minute}`
 }
 
 function buildThumbnailPayload(

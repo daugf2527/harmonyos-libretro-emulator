@@ -128,9 +128,14 @@ interface ResolutionPreset {
   h: number;
 }
 
-interface CoreCheckState {
-  running: boolean;
-  text: string;
+// [2026-06-08 D026] V2:改 @ObservedV2 class + @Trace 字段(原裸 interface)。
+// build() 读 this.coreCheck.running/.text 传给 DevDiagnosticsBlock 子组件,原 @Local 持
+// 裸 interface 时字段就地 mutate(this.coreCheck.running=)不触发 build() 重算→子组件停初值
+// (静默不刷新)。@ObservedV2+@Trace 使字段级 mutate 精准触发依赖该字段的节点重渲染。
+@ObservedV2
+class CoreCheckState {
+  @Trace running: boolean = false;
+  @Trace text: string = '';
 }
 
 
@@ -183,7 +188,7 @@ struct LibretroNewArchTestPage {
   @Local aiUpscaleEnabled: boolean = false;
   @Local xengineAvailable: boolean = false;
   @Local hideVirtualController: boolean = false;
-  @Local coreCheck: CoreCheckState = { running: false, text: '' };
+  @Local coreCheck: CoreCheckState = new CoreCheckState();
   @Local soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
   private readonly soakController: RuntimeSoakTestController = new RuntimeSoakTestController();
 
@@ -314,41 +319,85 @@ struct LibretroNewArchTestPage {
     const stateNames: string[] = ['INIT', 'CORE_LOADED', 'GAME_LOADED', 'RUNNING', 'PAUSED', 'STOPPING', 'STOPPED', 'STARTING', 'LOADING', 'ERROR'];
     this.log(`当前状态: ${stateNames[state] || state}`);
   };
-  private onQueryStats = (): void => {
+
+  private readRuntimeStats(): RuntimeStatsDTO {
+    const s = nativeApi.refactoredGetStats() as RuntimeStatsDTO;
+    return {
+      videoRefreshCalls: Number(s.videoRefreshCalls) || 0,
+      videoNullFrames: Number(s.videoNullFrames) || 0,
+      videoDupeFrames: Number(s.videoDupeFrames) || 0,
+      audioBatchCalls: Number(s.audioBatchCalls) || 0,
+      audioFramesIn: Number(s.audioFramesIn) || 0,
+      frameCount: Number(s.frameCount) || 0,
+      audioBufferUsage: Number(s.audioBufferUsage) || 0,
+      audioUnderruns: Number(s.audioUnderruns) || 0,
+      audioOverruns: Number(s.audioOverruns) || 0
+    };
+  }
+
+  private applyRuntimeStats(stats: RuntimeStatsDTO): void {
+    this.stats = stats;
+  }
+
+  private syncAudioStatusFromStats(stats: RuntimeStatsDTO): void {
+    const occupancyPercent = Math.max(0, Math.min(100, Math.round((Number(stats.audioBufferUsage) || 0) * 100)));
+    const underruns = Number(stats.audioUnderruns) || 0;
+    const overruns = Number(stats.audioOverruns) || 0;
+    const active = this.audioStatus.active || Number(stats.audioBatchCalls) > 0 || Number(stats.frameCount) > 0;
+
+    this.audioStatus = {
+      active: active,
+      occupancy: occupancyPercent,
+      underrun: underruns > this.lastUnderruns || (active && occupancyPercent <= 10),
+      underruns: underruns,
+      overruns: overruns
+    };
+  }
+
+  private syncAudioAlert(): void {
+    const occupancy = Number(this.audioStatus.occupancy) || 0;
+    const underruns = Number(this.audioStatus.underruns) || 0;
+    const overruns = Number(this.audioStatus.overruns) || 0;
+
+    if (this.audioStatus.underrun) {
+      this.alertVisible = true;
+      this.alertMsg = `音频欠载：Buf ${occupancy}% · U/O ${underruns}/${overruns}`;
+      return;
+    }
+
+    if (this.audioStatus.active && occupancy >= 85) {
+      this.alertVisible = true;
+      this.alertMsg = `缓冲高占用：Buf ${occupancy}% · U/O ${underruns}/${overruns}`;
+      return;
+    }
+
+    this.alertVisible = false;
+    this.alertMsg = '';
+  }
+
+  private refreshRuntimeStats(logMessage: string): void {
     try {
-      const s = nativeApi.refactoredGetStats() as RuntimeStatsDTO;
-      this.stats = {
-        videoRefreshCalls: Number(s.videoRefreshCalls) || 0,
-        videoNullFrames: Number(s.videoNullFrames) || 0,
-        videoDupeFrames: Number(s.videoDupeFrames) || 0,
-        audioBatchCalls: Number(s.audioBatchCalls) || 0,
-        audioFramesIn: Number(s.audioFramesIn) || 0,
-        frameCount: Number(s.frameCount) || 0,
-        audioBufferUsage: Number(s.audioBufferUsage) || 0,
-        audioUnderruns: Number(s.audioUnderruns) || 0,
-        audioOverruns: Number(s.audioOverruns) || 0,
-      };
-      this.log('已刷新统计');
-    } catch (e) { this.log('查询统计失败'); }
+      const stats = this.readRuntimeStats();
+      this.applyRuntimeStats(stats);
+      this.syncAudioStatusFromStats(stats);
+      this.handleAudioStatus();
+      this.log(logMessage);
+    } catch (_) {
+      this.log(`${logMessage}失败`);
+    }
+  }
+
+  private onQueryStats = (): void => {
+    this.refreshRuntimeStats('已刷新统计');
   };
   private onResetStats = (): void => {
     const ok = nativeApi.refactoredResetStats();
     this.log(`重置统计: ${ok}`);
     if (ok) {
-      try {
-        const s = nativeApi.refactoredGetStats() as RuntimeStatsDTO;
-        this.stats = {
-          videoRefreshCalls: Number(s.videoRefreshCalls) || 0,
-          videoNullFrames: Number(s.videoNullFrames) || 0,
-          videoDupeFrames: Number(s.videoDupeFrames) || 0,
-          audioBatchCalls: Number(s.audioBatchCalls) || 0,
-          audioFramesIn: Number(s.audioFramesIn) || 0,
-          frameCount: Number(s.frameCount) || 0,
-          audioBufferUsage: Number(s.audioBufferUsage) || 0,
-          audioUnderruns: Number(s.audioUnderruns) || 0,
-          audioOverruns: Number(s.audioOverruns) || 0,
-        };
-      } catch (_) {}
+      this.lastUnderruns = 0;
+      this.alertVisible = false;
+      this.alertMsg = '';
+      this.refreshRuntimeStats('统计已清零');
     }
   };
   private onAiUpscaleChange = (v: boolean): void => {
@@ -367,15 +416,11 @@ struct LibretroNewArchTestPage {
     const ok: boolean = nativeApi.refactoredSetMinimumAudioLatency(this.latencyMs);
     this.log(`设置最小延迟: ${this.latencyMs}ms => ${ok}`);
   };
-  private onSimulateUnderrun = (): void => {
-    this.audioStatus = { active: true, occupancy: 0, underrun: true, underruns: this.audioStatus.underruns + 1, overruns: this.audioStatus.overruns };
-    this.handleAudioStatus();
-    this.log('触发模拟欠载事件');
+  private onRefreshAudioStatus = (): void => {
+    this.refreshRuntimeStats('已刷新音频状态');
   };
-  private onSimulateHighOccupancy = (): void => {
-    this.audioStatus = { active: true, occupancy: 90, underrun: false, underruns: this.audioStatus.underruns, overruns: this.audioStatus.overruns };
-    this.handleAudioStatus();
-    this.log('触发模拟高占用事件');
+  private onRefreshPerformanceSnapshot = (): void => {
+    this.refreshRuntimeStats('已刷新性能快照');
   };
   private onClearAlert = (): void => { this.alertVisible = false; this.alertMsg = ''; };
   private onCloseDrawer = (): void => { this.drawerVisible = false; };
@@ -625,6 +670,12 @@ struct LibretroNewArchTestPage {
   }
 
   handleAudioStatus() {
+    const underruns = Number(this.audioStatus.underruns) || 0;
+    if (underruns > this.lastUnderruns) {
+      this.lastUnderruns = underruns;
+    }
+    this.syncAudioAlert();
+
     if (this.autoAdjust && this.audioStatus.underrun) {
       const now = new Date().getTime();
       if (now - this.lastAdjustTs > 2000) {
@@ -744,7 +795,7 @@ struct LibretroNewArchTestPage {
         this.coreCheck.text = '获取 Context 失败';
         return;
       }
-      const result = runtimeCoreDiagnosticController.testCoreLoader(corePath);
+      const result = await runtimeCoreDiagnosticController.testCoreLoader(corePath);
       this.coreCheck.text = result;
     } catch (e) {
       const msg = (e as Error)?.message || String(e);
@@ -769,9 +820,13 @@ struct LibretroNewArchTestPage {
   }
 
   private applySoakState(state: RuntimeSoakState): void {
-    this.soakState.running = state.running;
-    this.soakState.secondsLeft = state.secondsLeft;
-    this.soakState.summaryText = state.summaryText;
+    // [D026] 整体替换而非字段就地 mutate:RuntimeSoakState 是 controller 共享 DTO
+    // (不宜改 @ObservedV2 class),故 @Local 整体赋值触发引用变化→build() 重渲染。
+    this.soakState = {
+      running: state.running,
+      secondsLeft: state.secondsLeft,
+      summaryText: state.summaryText
+    };
   }
 
   private onCoreCheckClick = (): void => {
@@ -1024,13 +1079,13 @@ struct LibretroNewArchTestPage {
       .width('100%')
       .padding(4)
       Row() {
-        Button('模拟欠载')
+        Button('刷新音频状态')
           .fontSize(EmuTypography.sm)
-          .onClick(this.onSimulateUnderrun)
-        Button('模拟高占用')
+          .onClick(this.onRefreshAudioStatus)
+        Button('刷新性能快照')
           .fontSize(EmuTypography.sm)
           .margin({ left: 5 })
-          .onClick(this.onSimulateHighOccupancy)
+          .onClick(this.onRefreshPerformanceSnapshot)
       }
       .width('100%')
       .padding(4)

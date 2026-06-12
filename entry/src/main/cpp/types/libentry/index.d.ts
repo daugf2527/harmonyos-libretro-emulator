@@ -16,7 +16,7 @@
 import type { resourceManager } from '@kit.LocalizationKit';
 
 // Phase 3.1 - CoreLoader 测试接口
-export const testCoreLoader: (corePath: string) => string;
+export const testCoreLoader: (corePath: string) => Promise<string>;
 
 // Phase 1 重构版引擎接口 (独立 C++ 线程)
 export interface RefactoredEvent {
@@ -99,6 +99,7 @@ export const refactoredClearLastErrorInfo: () => boolean;
 export const refactoredSetFilesDir: (filesDir: string) => boolean;
 export const refactoredSetMinimumAudioLatency: (latencyMs: number) => boolean;
 export const refactoredSetAudioSyncMode: (mode: number) => boolean; // 0=NonBlocking, 1=Blocking
+export const refactoredSetAudioVolume: (percent: number) => boolean;
 
 // Video Config
 export const refactoredSetScalingMode: (mode: number) => boolean; // 0=Hardware, 1=Software, 2=GLES
@@ -166,6 +167,17 @@ export interface EngineStats {
   frameTimeMin: number;
   frameTimeMax: number;
   frameTimeSum: number;
+  queuePushed: number;
+  queuePopped: number;
+  queueDroppedOldest: number;
+  queueDroppedStaleOnPop: number;
+  queueDepthMax: number;
+  renderTickNoFrame: number;
+  renderThreadRenderedFrames: number;
+  renderThreadDroppedFrames: number;
+  vsyncCallbacks: number;
+  vsyncFallbackTicks: number;
+  vsyncRequestFailures: number;
   audioBufferUsage: number;
   audioUnderruns: number;
   audioOverruns: number;

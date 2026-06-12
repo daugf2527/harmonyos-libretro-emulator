@@ -105,8 +105,11 @@ private:
 
   std::chrono::steady_clock::time_point frame_start_;
   std::chrono::steady_clock::time_point next_deadline_;
-  bool deadline_initialized_ = false;
-  bool frame_started_ = false;
+  // [2026-06-08 D029] 改 atomic:SetTargetFps(Engine 线程)写这两 bool,
+  // BeginFrame/EndFrame(RenderThread)读写 → 原 plain bool 跨线程 = data race(UB)。
+  // 与 target_frame_time_us_ 已原子化对齐(此前漏了同函数顺带写的这两个)。
+  std::atomic<bool> deadline_initialized_{false};
+  std::atomic<bool> frame_started_{false};
   std::atomic<int64_t> target_frame_time_us_{16667};
   // 默认 true:保守保持真机 hybrid 自旋行为;模拟器(无 RT)由 RenderThread 显式置 false。
   std::atomic<bool> busy_wait_allowed_{true};

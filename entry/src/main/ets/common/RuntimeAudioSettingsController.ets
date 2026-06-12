@@ -3,6 +3,7 @@ import testNapi from 'libentry.so'
 interface RuntimeAudioSettingsNapi {
   refactoredSetMinimumAudioLatency(ms: number): boolean
   refactoredSetAudioSyncMode(mode: number): boolean
+  refactoredSetAudioVolume(percent: number): boolean
 }
 
 const nativeApi = testNapi as RuntimeAudioSettingsNapi
@@ -18,6 +19,11 @@ export class RuntimeAudioSettingsController {
   // 此入口预留给未来需要切非阻塞抗抖动时使用。
   setAudioSyncMode(mode: number): boolean {
     return nativeApi.refactoredSetAudioSyncMode(mode)
+  }
+
+  // 主音量百分比 0-100。通过 AudioRenderer_SetVolume 直接作用到当前输出流。
+  setVolumePercent(percent: number): boolean {
+    return nativeApi.refactoredSetAudioVolume(percent)
   }
 }
 

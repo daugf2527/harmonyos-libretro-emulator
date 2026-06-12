@@ -195,8 +195,8 @@
 | 位置 | (a) `core/engine/event_bridge.h:39` `CORE_ERROR` enum + `.cpp:42/60` 双向字符串映射；ArkTS `LibretroEventHub.ets` `EventName` union(L11-22)+ `normalizeEventName` switch(L411-426) **均漏 `core_error`**。(b) `event_bridge.h:48` 枚举版 `Emit(EventType,...)` + `GetEventName` 映射表 |
 | 影响 | P3（非当前 bug，均"定义未接线"）— (a) **core_error 死事件**：C++ 有 EventType+双向映射但**无 emit callsite**（全仓 `Emit("core_error"` 0 命中）、ArkTS 无监听 → 当前零危害（从不发出）；潜在地雷：未来 `Emit("core_error",...)` 会被 ArkTS `normalizeEventName` 返 null **静默丢弃**（类似类型谎言静默风险）。(b) **枚举版 Emit 死代码**：21 个 emit callsite **全走 deprecated 字符串版 `Emit(string,...)`**（`.h:51`），枚举版 `Emit(EventType,...)`+`GetEventName` **0 使用** → 死代码 + 主路径反用 deprecated 接口 |
 | 拟修 | **需决策（非自主）**：(a) core_error 若确定要用（核心错误细分于 core_crash/core_message）→ 两侧接线（C++ 加 `Emit("core_error",...)` callsite + ArkTS 补 union/case/subscribe + UI 行为）；若不用 → 删 C++ 死枚举+映射。(b) 枚举版 Emit 扶正（callsite 改枚举版、删 deprecated 字符串版）or 认字符串版为正、删枚举版+GetEventName。两者均涉架构/产品决策，故记录不自主改 |
-| 状态 | (a) core_error 死事件 fixed；(b) 枚举版 Emit 死代码 open（未决策） |
-| 备注 | **EventBridge 核心功能健康**：本核对证实 12/13 事件接线完整——core_message(emit `libretro_engine:2475` ↔ ArkTS subscribe@218)、core_crash(emit 多处 ↔ ArkTS case@413)、engine_state/fps_update/audio_status/options_update/pixel_format_update/geometry_update/disk_control/rumble/sensor_state 全对齐。**仅 core_error 单事件 + 枚举版 Emit 是死代码**，事件名一致性除此之外全对齐。EventBridge 跨语言边界确认通过。**2026-06-06 用户决策(a)删死代码并实施**：删 `event_bridge.h` `EventType::CORE_ERROR` 枚举值 + `event_bridge.cpp` GetEventName case + GetEventType reverse 映射（全仓 0 emit callsite、ArkTS 0 监听，纯删除）。cxx-build PASS（libentry.so 编译通过，证明枚举删除无遗漏引用），CORE_ERROR 全仓 0 残留。**(b) 枚举版 Emit(EventType)+GetEventName vs deprecated 字符串版 Emit(string) 的取舍未决策**——21 个 emit callsite 仍全走字符串版，保留 open 待后续（涉"哪版为正"的接口架构选择） |
+| 状态 | (a) core_error 死事件 fixed；(b) **closed**（2026-06-08 实证推翻"死代码"定性,见备注末段） |
+| 备注 | **EventBridge 核心功能健康**：本核对证实 12/13 事件接线完整——core_message(emit `libretro_engine:2475` ↔ ArkTS subscribe@218)、core_crash(emit 多处 ↔ ArkTS case@413)、engine_state/fps_update/audio_status/options_update/pixel_format_update/geometry_update/disk_control/rumble/sensor_state 全对齐。**仅 core_error 单事件 + 枚举版 Emit 是死代码**，事件名一致性除此之外全对齐。EventBridge 跨语言边界确认通过。**2026-06-06 用户决策(a)删死代码并实施**：删 `event_bridge.h` `EventType::CORE_ERROR` 枚举值 + `event_bridge.cpp` GetEventName case + GetEventType reverse 映射（全仓 0 emit callsite、ArkTS 0 监听，纯删除）。cxx-build PASS（libentry.so 编译通过，证明枚举删除无遗漏引用），CORE_ERROR 全仓 0 残留。**(b) 枚举版 Emit(EventType)+GetEventName vs deprecated 字符串版 Emit(string) 的取舍未决策**——21 个 emit callsite 仍全走字符串版，保留 open 待后续（涉"哪版为正"的接口架构选择）。**2026-06-08 实证关单 (b)**：原"枚举版 `Emit(EventType)`+`GetEventName` 0 使用 = 死代码"系**误判**——字符串版 `Emit(const std::string&)`（`event_bridge.cpp:122`）内部 `Emit(GetEventType(event),...)` **转发到枚举版**（`:126`），枚举版再 `GetEventName(event)`（`:168`）转回字符串塞 `EventData`，且 throttle 用 `int eventKey=static_cast<int>(event)`（`:140`）做 map key。即两者是 string→enum→string **转发链**，枚举版 + `GetEventName` **每次 Emit 都执行**，绝非死代码。"0 使用"实为"0 个外部直接 callsite"（枚举版是内部实现层，本就不需外部直调），被误读成死代码。故**不存在"哪版为正"二选一，无需架构决策 → closed**。grep+read 实证：`find_references`/裸 grep 对 `Emit(` 全命中字符串字面量调用，但漏看了字符串版→枚举版的内部转发（"空/少外部 callsite ≠ 死代码"，呼应 memory `feedback_mcp_tools_fail_on_ets`）。 |
 
 ### D016 — LibretroGamePage.loadRuntimeRenderSettings async 竞态：await 后写 @State 漏 pageActive 守卫（已修）
 
@@ -228,8 +228,8 @@
 | 位置 | 已修单点：`entry/src/main/ets/pages/SaveStatePage.ets` `loadSave`（L308，修前 L318 await `refactoredLoadStateAsync` 后直接 `showToastMessage` 写 @State toastMessage/showToast 无守卫）。**系统性面**：全 `entry/src/main/ets/pages/**` 的 async 方法中"await 后写 @State 漏 pageActive/token 守卫"的零散遗漏 |
 | 影响 | P3（单点）/ **P2（系统性）** — 单点 loadSave 危害最轻（仅 toast，且 toast 有 setTimeout 自动隐藏+守卫）。**系统性问题**：逐方法细查 3 个页面（LibretroGamePage→D016、SettingsPage→D017、SaveStatePage→D018）**每页都有 1 处同类遗漏**——项目有 pageActive/token 守卫范式但落实不完整，是"整页有守卫、个别方法 inline await 漏守卫"的隐蔽模式。剩余未细查页面（RomManagerPage async=15、LibraryDetailPage、MetadataEditPage、CoreManagerPage 等）大概率仍有零散遗漏 |
 | 拟修 | 单点已修：loadSave await 后加 `if(!this.pageActive){return}`（主路径；catch 内 showToast 双重低概率未加）。**系统性需决策**：(a) 人工统一审计剩余页面所有 async 方法补守卫（工作量中等，逐页逐方法）；(b) 建立 async helper 范式（如 `await this.guardedAwait(promise, token)` 封装"await+守卫"）从源头防遗漏；(c) gc 加启发式扫描 pattern（async 方法体内 await 后 `this.<@State字段>=` 且无 pageActive/isCurrent 守卫，human-review，类似 ForEach Pattern 3 的启发式+人工复核）。逐个手修是打地鼠，应统一处理 |
-| 状态 | open（loadSave 单点 fixed；系统性范式落实待统一方案） |
-| 备注 | **2026-06-06**：本会话逐方法细查挖到 D016/D017/D018 三连同根，证明是系统性而非孤立。已修 3 处代表性单点（覆盖 use-after-free 高风险的 LibretroGamePage 渲染设置 + SettingsPage 偏好 + SaveStatePage toast）。**收口此角度的逐个手修**——边际递减（打地鼠），转为记录系统性 debt 供统一方案决策。regression guard PASS；未编译/未真机。关联 `[[D016]]` `[[D017]]`。**2026-06-06 拟修(c) gc 检测工具已落地**：`scripts/gc/check_async_state_guard.pl`（平衡括号取方法体 + 逐行状态机，识别 pageActive/isCurrent*()/token=== 三类守卫）+ 集成 `scan_code_drift.sh` Pattern 7。已修的 D016/D017/D018 不再报（防回归验证通过）。全项目扫出 7 启发式候选，human-review 结论：**均非需立即修**——5 个测试/诊断页（CoreLoaderTest/TestGambatte，非生产路径）+ startOrSwitchGame(switchProgress 进度更新设计性) + MultiplayerInputPage.refreshDevices(`await Promise.resolve()` microtask yield，竞态窗口≈0)。即 D016/D017/D018 已覆盖生产页真竞态，剩余候选为低危/误报。防回归机制就位，(a)人工全审计/(b)helper 范式仍可选 |
+| 状态 | **closed**（loadSave 单点 fixed；系统性面 2026-06-08 经 D028 修复后的 perl 全扫证伪，详见备注末段；(b) helper 范式降为可选 backlog） |
+| 备注 | **2026-06-06**：本会话逐方法细查挖到 D016/D017/D018 三连同根，证明是系统性而非孤立。已修 3 处代表性单点（覆盖 use-after-free 高风险的 LibretroGamePage 渲染设置 + SettingsPage 偏好 + SaveStatePage toast）。**收口此角度的逐个手修**——边际递减（打地鼠），转为记录系统性 debt 供统一方案决策。regression guard PASS；未编译/未真机。关联 `[[D016]]` `[[D017]]`。**2026-06-06 拟修(c) gc 检测工具已落地**：`scripts/gc/check_async_state_guard.pl`（平衡括号取方法体 + 逐行状态机，识别 pageActive/isCurrent*()/token=== 三类守卫）+ 集成 `scan_code_drift.sh` Pattern 7。已修的 D016/D017/D018 不再报（防回归验证通过）。全项目扫出 7 启发式候选，human-review 结论：**均非需立即修**——5 个测试/诊断页（CoreLoaderTest/TestGambatte，非生产路径）+ startOrSwitchGame(switchProgress 进度更新设计性) + MultiplayerInputPage.refreshDevices(`await Promise.resolve()` microtask yield，竞态窗口≈0)。即 D016/D017/D018 已覆盖生产页真竞态，剩余候选为低危/误报。防回归机制就位，(a)人工全审计/(b)helper 范式仍可选。**2026-06-08 系统性面关单**：[[D028]] 揭示并修复了 `check_async_state_guard.pl` 的 V2 静默死亡——上行"防回归机制就位"实为**假绿**（@State→@Local 迁移后恒 `methods=0`，从未真扫）。D028 修复后全仓 **55 个 async-await 方法全扫**（非抽样、覆盖全部 .ets），仅 7 候选且与上述 human-review 同批，**无新生产页真竞态**。原担心的"剩余未细查页面大概率仍有零散遗漏"经全扫**证伪**。系统性"零散遗漏"核心担忧消解 → closed；(b) helper 范式（`guardedAwait`）保留为可选 DX 增强 backlog，非债务。 |
 
 ### D021 — inputDebugTracker 死代码链路（已清理）
 
@@ -273,7 +273,73 @@
 | 影响 | P3 — 实时音频反模式（回调内持可被非 RT 线程争用的锁 → 优先级反转风险）；但模拟器 `workgroup_disabled_` 短路这些锁路径不触发，**真机 workgroup 正常时才有意义** |
 | 拟修 | **defer（高风险盲改）**：audit 修法 = workgroup handle/token 改原子读 + 去 state_mutex_；但改实时回调无真机验证 = 高风险，audit 自身亦判"优先级排最后/非当前症状" |
 | 状态 | open（deferred） |
-| 备注 | **2026-06-08 用户决策 defer**。等有真机调试条件再做。详见 audio-adversarial audit F1（外网坐实的 RT 铁律反模式）。robustness note：Reset 同采样率复用路径不重选 profile，同属该 audit 的次要发现。 |
+| 备注 | **2026-06-08 用户决策 defer**。等有真机调试条件再做。详见 audio-adversarial audit F1（外网坐实的 RT 铁律反模式）。robustness note：Reset 同采样率复用路径不重选 profile，同属该 audit 的次要发现。**2026-06-08 5 天质检 C-F2 纠正定性**：此 PI 是**真机专属**隐患（模拟器 workgroup_disabled_ 短路反而免疫），且回调持 state_mutex_ 时调的是 `OH_AudioWorkgroup_Start/Stop`（HAL 调用非纯内存）→ 每帧持锁跨 HAL 与 rebuffer 争锁。原"真机预期 RT 恢复即顺"的方向反了——真机才是唯一受害者。详见 `docs/audit/2026-06-08-5day-recheck/00-SUMMARY.md`。 |
+
+### D025 — 音频延迟可调设置在模拟器恒被 profile 地板钳死（placebo dead config + 误导用户）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / 5 天质检 C-F1（`docs/audit/2026-06-08-5day-recheck/00-SUMMARY.md`） |
+| 位置 | `entry/src/main/cpp/platform/audio/audio_bridge.cpp:77-103`（SetMinimumLatencyMs）+ `:108`(kMinBufferMsEmulator=250)；UI `entry/src/main/ets/pages/SettingsPage.ets:~1163`（承诺文案）；生产调用 `LibretroGamePage.ets:291/1018` |
+| 影响 | P1 — D019 加的音频延迟可调（UI 预设 16/48/96ms，上限 200ms）全部 < D020 profile 缓冲地板（device 100ms=4800帧 / emulator 250ms=12000帧）。`SetMinimumLatencyMs` 逻辑 `target=max(target,floor)` 且 L100 只升不降 → 模拟器上**任何 UI 值（≤200ms<250ms 地板）恒被钳死、对缓冲深度零影响**，恰是 underrun 发生的平台；但 SettingsPage 仍向用户承诺"调大抗 underrun"= placebo。真正起作用的是 D020 hardcoded profile，与用户档无关 |
+| 拟修 | 二选一：(a) 改 SettingsPage 承诺文案诚实（标注"模拟器受 profile 地板限制，此项不生效"）；(b) 让 UI 上限能真正抬高 emulator 地板（>250ms）。**这是面向用户的误导，非纯内部 debt** |
+| 状态 | fixed（2026-06-08 根治,本地落地,未真机）|
+| 备注 | **根治（用户决策"两者都做"）**：presets `[16,48,96]`→`[48,128,300]`（高缓冲 300ms > emulator 250ms 地板,真生效）+ `MAX_AUDIO_LATENCY_MS` 200→400 + `SettingsPage.ets:1163` 文案标注平台地板（`RuntimeAudioSettingsRepository.ets`）。默认仍 48ms 不变真机手感。**未编译/未真机**,需 DevEco + 模拟器实测抗 underrun。原核查：主 AI 实物数学证实：emulator 地板 48000×250/1000=12000 帧 > UI 上限 200ms 的 9600 帧，恒钳。 |
+
+### D026 — LibretroNewArchTestPage coreCheck/soakState V2 静默不刷新（裸 interface + 字段就地 mutate）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / 5 天质检 A-Q1（V2 迁移 ddb9ad7 衍生） |
+| 位置 | `entry/src/main/ets/pages/LibretroNewArchTestPage.ets:186`（`@Local coreCheck: CoreCheckState`，interface@131）+ mutate `:739-754`；`:187`（`@Local soakState: RuntimeSoakState`）+ mutate `:771-774` |
+| 影响 | P2（限 dev 诊断页，爆炸半径低）— V2 下 @Local 持裸 interface 对象，字段就地 mutate（`this.coreCheck.running=`/`.text=`）不触发 re-render（interface 不能带 @Trace）→"验证核心符号"按钮结果 + 压力测试倒计时**静默不更新**。同页 audioStatus/stats 走整体替换 `this.x={...}` 故安全 |
+| 拟修 | coreCheck/soakState 的类型类改 `@ObservedV2` class + 字段 @Trace（参 PerfDisplayState 正范式），或 mutation 改整体替换 `this.coreCheck={...新对象...}` |
+| 状态 | fixed（2026-06-08 根治,本地落地,未编译/未真机）|
+| 备注 | **根治**：`CoreCheckState`(局部 interface)→`@ObservedV2 class`+`@Trace` 字段（mutation 不变,build 读 @Trace 字段建立依赖）；`soakState`(共享 DTO RuntimeSoakState,不宜改 class)→`applySoakState` 整体替换 `this.soakState={...}`。**未编译/未真机**(需 DevEco,quick_signals 不覆盖 .ets)。原核查：主 AI 实物证实（CoreCheckState 是裸 interface 非 @ObservedV2，grep `this.coreCheck=` 整体替换 0 命中）。真机点按钮即复现（spinner 不出/倒计时不动）。未编译/未真机。 |
+
+### D027 — CompleteSwitchGame 等 3 处 async Complete 漏 napi_cancelled 严格守卫（D003 正范式不完整）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / 5 天质检 B-Q3 |
+| 位置 | `entry/src/main/cpp/app/napi/engine_lifecycle_napi.cpp:845`（CompleteSwitchGame，**生产切游戏路径**）；`engine_query_napi.cpp:60`（CompleteWaitForState）；`core_loader_napi.cpp:587`（CompleteTestCoreLoader） |
+| 影响 | P2 — napi_cancelled 处理仓内分裂两套：5 函数严格 early-return（D003 GetRawFileList/StopEngine + state GetSaveStateSize/SaveState/LoadState，cancelled 不调任何 napi_*）vs 3 函数弱范式（非 ok 路径仍调 napi_*）。`CompleteSwitchGame:851` `status!=napi_ok` 不 early-return，落到 `:880 MakeErrorResult`+`:883 ResolveDeferredChecked` → env teardown(napi_cancelled) 时仍对已销毁 env 调 napi_* = **正是 D003 要消除的 UB**，且是生产路径最暴露。D003 备注"对齐 engine_state 正范式"**夸大**（漏这 3 个） |
+| 拟修 | CompleteSwitchGame（至少）补 D003 严格 `if(status==napi_cancelled){释放 work+native;delete ctx;return;}` early-return；或统一 3 函数范式。**改 app/napi 须 dispatch napi-boundary-reviewer**。未真机 |
+| 状态 | fixed（2026-06-08 根治,cxx-build PASS,未真机）|
+| 备注 | **根治**：`CompleteSwitchGame` 补严格 `napi_cancelled` early-return（释放 progressTsfn/work + delete ctx,不再落 MakeErrorResult），对齐 `engine_state_napi.cpp:33` 正范式；cxx-build PASS。napi-boundary-reviewer agent 3 次 gateway 失败 → **主 AI inline 复核 PASS**（逐 SwitchGameAsyncContext 成员核资源完整/无 double-free/守卫位置正确）。**收敛 scope**：WaitForState/TestCoreLoader 保留 T1-F1/F6 的 reject-on-cancel（更轻、有意为之的另一哲学,不在不确定 UB 依据上改）。原核查：主 AI inline 核（napi agent 两次 launch 失败转主 AI）。严重度取决于"napi_* on napi_cancelled 是否真 UB"——D003 自身断言 UB，故按其标准这 3 处是残留。 |
+
+### D028 — gc Pattern 7（check_async_state_guard.pl）V2 迁移后静默死亡（防回归形同虚设）
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / 5 天质检 F-1（换角度：验证工具自身正确性） |
+| 位置 | `scripts/gc/check_async_state_guard.pl:28,31`（`while(/\@State.../)` + `next unless %state_fields`）；接入 `scripts/gc/scan_code_drift.sh:100-109`（Pattern 7） |
+| 影响 | P2 — 该工具是 D018"async-@State 守卫"的防回归机制（tracker D018 称"防回归机制就位"）。但它 key 在 `@State` 上，而 V2 迁移（ddb9ad7，06-07）把全仓 `@State`→`@Local`（实际 @State 残留=0）→ `next unless %state_fields` **跳过每个文件，恒输出 `methods=0 NO_GUARD=0`**（已实跑证实）。它要守的"await 后写 @Local 漏 pageActive 守卫"竞态在 V2 代码里依然存在却**无人检测**；scan_code_drift 报表 Pattern 7 标"P2 (human-review)"假绿。**迁移静默废掉了守卫，"0 命中"被当"全清白"** |
+| 拟修 | `check_async_state_guard.pl:28` 正则 `@State` → `@(?:State\|Local)`（@State 字段名收集改收 @Local）；同步 scan_code_drift Pattern 7 注释；重跑 human-review（D018 当时的 7 候选会以 @Local 重现）。顺带 Pattern 1（@State complex types，L16-20）同样迁移后恒 0、moot，可降级或改 @Local |
+| 状态 | fixed（2026-06-08 根治,实跑验证）|
+| 备注 | **根治**：`check_async_state_guard.pl:28` 正则 `@State`→`@(?:State\|Local)`（收集 @Local 字段名）。**重跑验证复活**：`methods=0 NO_GUARD=0` → `methods=55 NO_GUARD=7`,且这 7 候选**正是 D018 当时 human-review 过的同一批**（CoreLoaderTest/TestGambatte×4 测试页 + startOrSwitchGame 设计性 + MultiplayerInputPage microtask）→ 工具复活且无新真竞态混入。原核查：实跑证实 `perl check_async_state_guard.pl pages/*.ets` → `methods=0 NO_GUARD=0`。对照：check_foreach_keygen.pl（装饰器无关）健康 `total ForEach=51 NO_KEY=0`；check_core_compatibility.sh（M3）正常 30cores/35roms/65entries。memory `feedback_string_match_trace_inputs`（字符串匹配函数必须拿真实输入手算防静默 0 命中）。 |
+
+### D029 — FramePacer::SetTargetFps 非原子 bool 跨线程 race
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / 5 天质检 C-F3 |
+| 位置 | `entry/src/main/cpp/core/engine/frame_pacer.h:82-88`（SetTargetFps 写 `deadline_initialized_`/`frame_started_`）；读写方 BeginFrame/EndFrame（RenderThread）；SetTargetFps 调用方 `libretro_engine.cpp`（Engine 线程） |
+| 影响 | P3 — `SetTargetFps`（Engine 线程）写非原子 `deadline_initialized_`/`frame_started_`（plain bool），`BeginFrame`/`EndFrame`（RenderThread）读写同成员 → 跨线程非原子 bool race（formally UB，实际偶发一帧抖动）。`target_frame_time_us_` 已原子化说明有人意识到跨线程，但漏了同函数顺带写的两个 bool。预存 bug，帧率撤销链（14b4759→60e3538）改紧邻代码未碰它 |
+| 拟修 | 两 bool 改 `std::atomic<bool>`（低成本），或 SetTargetFps 改走 Engine 消息队列由 RenderThread 自己应用 |
+| 状态 | fixed（2026-06-08 根治,cxx-build PASS,未真机）|
+| 备注 | **根治**：`frame_pacer.h` 两 bool（deadline_initialized_/frame_started_）+ `libretro_engine.h` targetFps_/audioSampleRate_ → `std::atomic`。cxx-build PASS——过程中 cxx-build 抓出 atomic&lt;double&gt; 不能传变参 LOGF（1751/1758）+ 三元歧义（1190），加 `.load()` 修正（正印证"未编译盲区":连 C++ 改动都靠编译才暴露）。原核查：C-F4（`libretro_engine.h:201,381` targetFps_ plain double 跨线程，aarch64 实际原子低危）同类，一并记此。注：C-F3/F4 均为预存，非本窗口新引入。 |
+
+### D030 — CI codelinter gate 仅 @performance 规则集，ArkTS correctness 零覆盖 + 36 处 custom-component 滥用存量
+
+| Key | 值 |
+|---|---|
+| 引入 | 2026-06-08 / 5 天质检 ②（"关闭 .ets 编译盲区"调研副产物）|
+| 位置 | `.github/workflows/harmonyos-pr-ci.yml:81` / `-release.yml:84` / `-full-ci.yml:173`：`codelinter -e error -f json -o report.json .`（无 `-c`）；仓库无 `code-linter.json5`；codelinter 默认配置 `…/command-line-tools/codelinter/linter/arkPerfCheck/code-linter.json5` ruleSet = `@performance/recommended` + `@cross-device-app-dev/recommended` |
+| 影响 | **(a) P2（CI gate 名实不符）** — CI "Code Linter Gate" 仅跑 @performance/@cross-device，**不含 @typescript-eslint** → 对 .ets 语法/类型 correctness（no-any/no-var/V1V2 误用）**零覆盖**（实测注入 `any` 探针 0 命中）；.ets 编译级错误实际只靠后续 Build HAP(hvigorw) 兜底，codelinter gate 对 correctness 是装饰性。**(b) P3（存量性能）** — 全 ets 扫：0 error，38 warn，其中 **36 处 `@performance/avoid-overusing-custom-component-check`**（自定义组件滥用，渲染性能）+ 1 reusable-component + 1 reuse-date-instances。 |
+| 拟修 | **需决策（非自主）**：(a) 启用 ArkTS correctness 须建项目根 `code-linter.json5` 加 `plugin:@typescript-eslint/recommended` → 会让 CI 对存量 91 .ets 全量校验，大概率爆批量违规致 CI 变红 + 需逐一修/降级（产品级工作量 + CI 红绿影响，故不自主开启）。**本地 CLI 实测无法激活该 ruleSet**（单文件扫缺 hvigor 类型上下文，绝对/相对 `-c` 均 0 命中）→ 真编译/类型盲区只能靠 hvigor(DevEco 复编)，无轻量 CLI 替代。(b) 36 处 custom-component 滥用属性能优化，可单列 backlog 逐页评估。 |
+| 状态 | open（finding 记录；(a) 启用 correctness 待决策 / (b) 36 处性能存量待评估）|
+| 备注 | **② 调研诚实结论**：用户期望"像 C++ cxx-build 一样让 .ets 落地前被编译验证"，实证证明**现有工具不可达成**——codelinter = AST lint（默认仅 performance，correctness 需配置且本地 CLI 激活不了），hvigor = 真编译但重 + 违反"代理不编译"约定。**交付物**：按需工具 `scripts/ci/check_arkts_codelinter.sh`（performance 维度，诚实定位，非编译验证）。codelinter 正确本地调用：`cmd //c "codelinter …"`（Git Bash `/c` 被 MSYS 当 `C:\` 路径转换坑，须**双斜杠** `//c`）+ 解析 JSON severity（`-e error` 对 warn-only 仍 exit=1，**exit code 不可裸信**）。memory `feedback_local_rule_may_lag_upstream`（判定前查上游 = 本条用 web-search 核实 ruleSet 机制）+ 新 memory `feedback_codelinter_capability_boundary`。 |
 
 ---
 

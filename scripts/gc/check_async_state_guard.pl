@@ -23,9 +23,12 @@ for my $f (@ARGV) {
   my $s = <$fh>;
   close($fh);
 
-  # 1. 收集本文件 @State 字段名(@State [private] name[: Type])
+  # 1. 收集本文件可写状态字段名(@State[V1] / @Local[V2] [private] name[: Type])
+  #    [2026-06-08 D028] V2 全量迁移把 @State→@Local,原只收 @State 致迁移后恒空跳过
+  #    (静默死亡)。改收 @State|@Local 两者,@Local 是 V2 对应 V1 @State 的可写本地状态。
+  #    @Param(只读)/@Provider/@Consumer(本项目 0 用)不纳入"写状态"检测。
   my %state_fields;
-  while ($s =~ /\@State\s+(?:private\s+)?(\w+)/g) {
+  while ($s =~ /\@(?:State|Local)\s+(?:private\s+)?(\w+)/g) {
     $state_fields{$1} = 1;
   }
   next unless %state_fields;

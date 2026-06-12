@@ -225,8 +225,10 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
     return false;
   }
 
-  // 设置音量为 1.0
-  OH_AudioRenderer_SetVolume(renderer_, 1.0f);
+  if (!SetVolume(volume_.load())) {
+    LOGF(LOG_WARN, "%{public}s Failed to apply initial audio volume",
+         kAudioChainPrefix);
+  }
 
   // 5. Phase 3.3+ - 创建音频工作组 (官方推荐优化)
   OH_AudioCommon_Result workgroup_result =
@@ -256,6 +258,37 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
        "latency mode: NORMAL",
        kAudioChainPrefix, sample_rate_, channel_count_);
 
+  return true;
+}
+
+bool AudioPlayer::SetVolume(float volume) {
+  float safe_volume = volume;
+  if (safe_volume < 0.0f) {
+    safe_volume = 0.0f;
+  } else if (safe_volume > 1.0f) {
+    safe_volume = 1.0f;
+  }
+
+  OH_AudioRenderer *renderer = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    volume_.store(safe_volume);
+    renderer = renderer_;
+  }
+  if (!renderer) {
+    return true;
+  }
+
+  const OH_AudioStream_Result result =
+      OH_AudioRenderer_SetVolume(renderer, safe_volume);
+  if (result != AUDIOSTREAM_SUCCESS) {
+    LOGF(LOG_ERROR,
+         "%{public}s Failed to set audio volume: %{public}d "
+         "(volume_ppm=%{public}d)",
+         kAudioChainPrefix, result,
+         static_cast<int32_t>(safe_volume * 1000000.0f));
+    return false;
+  }
   return true;
 }
 

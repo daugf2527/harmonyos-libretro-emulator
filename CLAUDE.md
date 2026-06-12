@@ -35,6 +35,12 @@ older clients pull them in on demand when Claude works under those paths.
   bash scripts/ci/check_repo_hygiene.sh
   bash scripts/ci/check_regression_guards.sh
   ```
+- **ArkTS 性能/规范按需检查** (codelinter; ~34s 全 ets / ~20s 每文件; **非编译验证**):
+  ```bash
+  bash scripts/ci/check_arkts_codelinter.sh            # 全 ets 目录
+  bash scripts/ci/check_arkts_codelinter.sh <f.ets>…   # 指定文件(增量)
+  ```
+  补 quick_signals 对 .ets 的性能/AST 规范盲区(cxx-build 只覆盖 C++)。**能力边界**: codelinter 默认仅 `@performance` 规则集，**不抓** ArkTS 语法/类型 error(no-any / V1V2 误用)；correctness 需项目根 `code-linter.json5` 加 `@typescript-eslint` 且本地 CLI 激活不了 → **编译/类型盲区仍只能靠 hvigor/DevEco 复编**。Git Bash 调 codelinter 须 `cmd //c`(双斜杠)。详见 tech-debt-tracker D030 + memory `feedback_codelinter_capability_boundary`。
 - **PR validation**: `.github/workflows/harmonyos-pr-ci.yml` (HarmonyOS CLI tools, `codelinter`, HAP smoke).
 - **Release**: push `v*` tag → `.github/workflows/harmonyos-release.yml` builds + signs + publishes GitHub Release.
 
@@ -89,15 +95,17 @@ older clients pull them in on demand when Claude works under those paths.
 | `entry/src/main/cpp/app/napi/**` 改动 | `cclsp__find_references` + `cclsp__get_incoming_calls` | 纯 Grep 会漏 ArkTS 侧 EventBridge / TSFN 引用 |
 | `core/engine/libretro_engine.cpp` 状态机 | `cclsp__find_workspace_symbols` | 跨文件 enum / struct 引用 |
 | NativeBuffer / Resource lifecycle 配对 | `ast-grep__find_code` | `OH_NativeBuffer_*` / `OH_NativeWindow_*` callsite 配对扫描 |
-| C++ 类型 / 接口改动 | `cclsp__find_references` + `cclsp__get_diagnostics_for_file` | 下游 type warning |
+| C++ 类型 / 接口改动 | `cclsp__find_references` + cxx-build 复编 | 下游 type warning（注：cclsp **无** diagnostics 工具；C++ 诊断靠编译，见下方实证边界） |
 | ets 文件符号总览 / 找符号 | `serena__get_symbols_overview` + `serena__find_symbol` | cclsp 不覆盖 ets;ets LSP 走 serena |
 | 多文件 audit / cross-cutting review | `serena__find_referencing_symbols` | 跨文件批量查引用 |
 
-### 何时**可以**退回 Read/Grep
+### 何时**可以/应该**退回 Read/Grep（分语言实证版，2026-06-08 5天质检实测校准）
 
-- **citation 验证**（"这 5 行字节真的在那位置吗"——pure text 对比，LSP 杀鸡用牛刀）—— 见 `.claude/skills/closed-loop/SKILL.md` Step 2/7
-- 单文件一次性 lookup
-- 文档 / 注释类（非代码）
+> 旧版写"MCP 能给更精确答案处用 Grep = 选型错误"是一刀切。实测此 **ArkTS+C++ 混合仓**该按语言分层，Grep 在 .ets 与文本场景往往是**正确**选择，不是 fallback。详见 memory `feedback_mcp_tools_fail_on_ets`。
+
+- **ArkTS `.ets` 的结构/诊断查询**：serena LSP 诊断（`get_diagnostics_for_file`）+ ast-grep 结构匹配（`find_code`/`dump_syntax_tree`）对 `.ets` **一律失效**——不认 ArkUI `struct`/`@ComponentV2`，serena 报 `invalid AST -32001`、ast-grep 返回空（**假阴性**，连已知存在的 `this.x.f=v` 都查不到）。`.ets` 只能：serena **符号级**（`find_symbol`/`get_symbols_overview`，这层 OK）+ **Grep/Read** + 真机/DevEco 编译。
+- **C++ 符号查询的空结果**：cclsp/codegraph **空 callers/references ≠ 不存在**（实测连活着的 `GetEventName`/`Emit` 都查不到）。**绝不据 MCP 空结果下"死代码/无引用"结论**——必须 Grep 实物兜底。
+- **citation 验证**（"这几行字节真的在那位置吗"——pure text 对比，LSP 杀鸡用牛刀）/ 单文件一次性 lookup / 文档注释类 / 配对·banned-pattern·文本匹配
 - LSP 索引未跑 / MCP 暂时不可用（fallback）
 
 ### 工具协同准则

@@ -848,6 +848,25 @@ static void CompleteSwitchGame(napi_env env, napi_status status, void *data) {
     return;
   }
 
+  // [2026-06-08 D027] T8-B-F4 cancel guard:env teardown 时 status==napi_cancelled,
+  // 调创建 JS 值/settle promise 的 napi_*(下方 MakeErrorResult=napi_create_object /
+  // ResolveDeferredChecked)对已销毁 env 是 UB。此前生产切游戏路径漏此守卫,直落 L880
+  // MakeErrorResult。补严格 early-return,仅释放 native 资源(progressTsfn/work)+ delete ctx,
+  // 对齐 engine_state_napi.cpp:33 正范式。
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] SwitchGameAsync cancelled; skipping NAPI calls");
+    if (ctx->progressTsfn) {
+      napi_release_threadsafe_function(ctx->progressTsfn, napi_tsfn_release);
+      ctx->progressTsfn = nullptr;
+    }
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
   if (status != napi_ok) {
     GetEngine()->SetLastErrorInfo("switch_async_work_failed",
                                   "SwitchGameAsync",

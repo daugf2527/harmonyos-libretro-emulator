@@ -4,12 +4,14 @@ import { fileIo as fs } from '@kit.CoreFileKit'
 export interface RuntimeRenderSettingsProfile {
   version: number
   scalingMode: number
+  swapInterval: number
   softwareMaxPresetIndex: number
+  aiUpscaleEnabled: boolean
   hwRenderAllowed: boolean
   updatedAt: number
 }
 
-const RUNTIME_RENDER_SETTINGS_VERSION = 1
+const RUNTIME_RENDER_SETTINGS_VERSION = 2
 const RUNTIME_RENDER_SETTINGS_DIR_NAME = 'runtime'
 const RUNTIME_RENDER_SETTINGS_FILE_NAME = 'render_settings.json'
 
@@ -17,7 +19,9 @@ export function createDefaultRuntimeRenderSettingsProfile(): RuntimeRenderSettin
   return {
     version: RUNTIME_RENDER_SETTINGS_VERSION,
     scalingMode: 2,
+    swapInterval: 1,
     softwareMaxPresetIndex: 1,
+    aiUpscaleEnabled: false,
     hwRenderAllowed: true,
     updatedAt: 0
   }
@@ -48,7 +52,9 @@ export async function saveRuntimeRenderSettingsProfile(
   const nextProfile: RuntimeRenderSettingsProfile = {
     version: RUNTIME_RENDER_SETTINGS_VERSION,
     scalingMode: normalized.scalingMode,
+    swapInterval: normalized.swapInterval,
     softwareMaxPresetIndex: normalized.softwareMaxPresetIndex,
+    aiUpscaleEnabled: normalized.aiUpscaleEnabled,
     hwRenderAllowed: normalized.hwRenderAllowed,
     updatedAt: Date.now()
   }
@@ -78,7 +84,9 @@ export function normalizeRuntimeRenderSettingsProfile(
   return {
     version: RUNTIME_RENDER_SETTINGS_VERSION,
     scalingMode: clampRenderMode(profile?.scalingMode),
+    swapInterval: clampSwapInterval(profile?.swapInterval),
     softwareMaxPresetIndex: clampSoftwarePresetIndex(profile?.softwareMaxPresetIndex),
+    aiUpscaleEnabled: profile?.aiUpscaleEnabled === true,
     hwRenderAllowed: profile?.hwRenderAllowed !== false,
     updatedAt: Number(profile?.updatedAt) || 0
   }
@@ -115,6 +123,14 @@ function clampRenderMode(mode: number | undefined): number {
     return 2
   }
   return safeMode
+}
+
+function clampSwapInterval(interval: number | undefined): number {
+  const safeInterval = Math.floor(Number(interval) || 0)
+  if (safeInterval <= 0) {
+    return 0
+  }
+  return 1
 }
 
 function clampSoftwarePresetIndex(index: number | undefined): number {
