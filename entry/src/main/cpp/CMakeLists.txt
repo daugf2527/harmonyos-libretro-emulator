@@ -7,6 +7,13 @@ set(CMAKE_CXX_STANDARD 14)
 
 set(NATIVERENDER_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR})
 
+set(IS_OHOS_CMAKE_BUILD FALSE)
+if(DEFINED CMAKE_SYSROOT AND NOT "${CMAKE_SYSROOT}" STREQUAL "")
+    set(IS_OHOS_CMAKE_BUILD TRUE)
+elseif(DEFINED OHOS_ARCH AND NOT "${OHOS_ARCH}" STREQUAL "")
+    set(IS_OHOS_CMAKE_BUILD TRUE)
+endif()
+
 include_directories(${NATIVERENDER_ROOT_PATH}
                     ${NATIVERENDER_ROOT_PATH}/core
                     ${NATIVERENDER_ROOT_PATH}/include
@@ -69,7 +76,7 @@ set(PLATFORM_SYNC_SOURCES
     platform/sync/native_vsync_driver.cpp
 )
 
-if ("${OHOS_ARCH}" STREQUAL "arm64-v8a" OR "${OHOS_ARCH}" STREQUAL "armeabi-v7a")
+if("${OHOS_ARCH}" STREQUAL "arm64-v8a" OR "${OHOS_ARCH}" STREQUAL "armeabi-v7a")
     list(APPEND PLATFORM_GRAPHICS_SOURCES platform/graphics/pixel_converter_neon.cpp)
 else()
     list(APPEND PLATFORM_GRAPHICS_SOURCES platform/graphics/pixel_converter_scalar.cpp)
@@ -103,99 +110,116 @@ set(APP_NAPI_SOURCES
     app/napi/input_mapping_napi.cpp
 )
 
-add_library(entry SHARED
-    ${COMMON_SOURCES}
-    ${CORE_SOURCES}
-    ${REFACTORED_ENGINE_SOURCES}
-    ${PLATFORM_AUDIO_SOURCES}
-    ${PLATFORM_GRAPHICS_SOURCES}
-    ${PLATFORM_SYNC_SOURCES}
-    ${PLATFORM_RESOURCE_SOURCES}
-    ${APP_FRAMEWORK_SOURCES}
-    ${APP_NAPI_SOURCES}
-)
-
-find_library(
-    # Sets the name of the path variable.
-    hilog-lib
-    # Specifies the name of the NDK library that
-    # you want CMake to locate.
-    hilog_ndk.z
-)
-
 # ========== 测试可执行目标 (独立于 libentry.so) ==========
 # 启用方式: cmake -DBUILD_LIBRETRO_TESTS=ON ...
-# 默认 OFF: HAP 构建不引入测试,避免污染发布产物。
-# CI 应在独立 step 中以 ON 构建并执行 libretro_tests。
+# 默认 OFF: HAP 构建不引入测试，避免污染发布产物。
+# CI 在独立 step 中以 ON 构建 libretro_tests 源文件编译检查。
 option(BUILD_LIBRETRO_TESTS "Build libretro unit/integration tests" OFF)
 if(BUILD_LIBRETRO_TESTS)
-    add_executable(libretro_tests
+    set(LIBRETRO_TEST_SOURCES
         tests/unit/core_loader_test.cpp
+    )
+    if(IS_OHOS_CMAKE_BUILD)
+        list(APPEND LIBRETRO_TEST_SOURCES
         tests/integration/test_gambatte_load.cpp
         tests/integration/test_gambatte_rom.cpp
+        )
+    else()
+        message(STATUS "Building host libretro_tests without HarmonyOS NAPI/rawfile integration sources")
+    endif()
+
+    add_library(libretro_tests STATIC
+        ${LIBRETRO_TEST_SOURCES}
     )
-    target_link_libraries(libretro_tests PRIVATE
-        ${hilog-lib}
-        libace_napi.z.so
-        librawfile.z.so
-        dl
-    )
+    if(NOT IS_OHOS_CMAKE_BUILD)
+        target_include_directories(libretro_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests/host_stubs
+        )
+    endif()
 endif()
 
-target_link_libraries(entry PUBLIC ${hilog-lib})
-target_link_libraries(entry PUBLIC libace_napi.z.so)
-target_link_libraries(entry PUBLIC libace_ndk.z.so)
-target_link_libraries(entry PUBLIC libnative_window.so)
-target_link_libraries(entry PUBLIC libnative_vsync.so)
-target_link_libraries(entry PUBLIC libnative_buffer.so)
-target_link_libraries(entry PUBLIC libohaudio.so)  # Phase 3.3 - 音频播放库
-target_link_libraries(entry PUBLIC libohfileuri.so)  # Phase 3.6 - 文件 URI 库
-target_link_libraries(entry PUBLIC librawfile.z.so)  # Rawfile 资源管理器库
-target_link_libraries(entry PUBLIC libEGL.so)
-target_link_libraries(entry PUBLIC libGLESv3.so)
-target_link_libraries(entry PUBLIC dl) # Link dl to ensure dlopen/dlsym are available
+if(IS_OHOS_CMAKE_BUILD)
+    add_library(entry SHARED
+        ${COMMON_SOURCES}
+        ${CORE_SOURCES}
+        ${REFACTORED_ENGINE_SOURCES}
+        ${PLATFORM_AUDIO_SOURCES}
+        ${PLATFORM_GRAPHICS_SOURCES}
+        ${PLATFORM_SYNC_SOURCES}
+        ${PLATFORM_RESOURCE_SOURCES}
+        ${APP_FRAMEWORK_SOURCES}
+        ${APP_NAPI_SOURCES}
+    )
 
-# ========== HMS (Huawei Mobile Services) Library Configuration ==========
-# Logic to automatically locate HMS Native SDK based on the OpenHarmony SDK path.
-# CMAKE_SYSROOT usually points to .../openharmony/native/sysroot
-get_filename_component(SDK_NATIVE_DIR ${CMAKE_SYSROOT} DIRECTORY) # .../native
-get_filename_component(SDK_ROOT_DIR ${SDK_NATIVE_DIR} DIRECTORY)  # .../openharmony
-get_filename_component(SDK_BASE_DIR ${SDK_ROOT_DIR} DIRECTORY)    # .../default
-set(HMS_ROOT_PATH "${SDK_BASE_DIR}/hms/native/sysroot/usr")
+    find_library(
+        # Sets the name of the path variable.
+        hilog-lib
+        # Specifies the name of the NDK library that
+        # you want CMake to locate.
+        hilog_ndk.z
+    )
 
-# Add HMS include directories (for XEngine headers)
-include_directories("${HMS_ROOT_PATH}/include")
+    target_link_libraries(entry PUBLIC ${hilog-lib})
+    target_link_libraries(entry PUBLIC libace_napi.z.so)
+    target_link_libraries(entry PUBLIC libace_ndk.z.so)
+    target_link_libraries(entry PUBLIC libnative_window.so)
+    target_link_libraries(entry PUBLIC libnative_vsync.so)
+    target_link_libraries(entry PUBLIC libnative_buffer.so)
+    target_link_libraries(entry PUBLIC libohaudio.so)  # Phase 3.3 - 音频播放库
+    target_link_libraries(entry PUBLIC libohfileuri.so)  # Phase 3.6 - 文件 URI 库
+    target_link_libraries(entry PUBLIC librawfile.z.so)  # Rawfile 资源管理器库
+    target_link_libraries(entry PUBLIC libEGL.so)
+    target_link_libraries(entry PUBLIC libGLESv3.so)
+    target_link_libraries(entry PUBLIC dl) # Link dl to ensure dlopen/dlsym are available
 
-# Determine architecture-specific library path
-if("${OHOS_ARCH}" STREQUAL "arm64-v8a")
-    set(HMS_ARCH_DIR "aarch64-linux-ohos")
-elseif("${OHOS_ARCH}" STREQUAL "x86_64")
-    set(HMS_ARCH_DIR "x86_64-linux-ohos")
+    # ========== HMS (Huawei Mobile Services) Library Configuration ==========
+    # Logic to automatically locate HMS Native SDK based on the OpenHarmony SDK path.
+    # CMAKE_SYSROOT usually points to .../openharmony/native/sysroot
+    if(DEFINED CMAKE_SYSROOT AND NOT "${CMAKE_SYSROOT}" STREQUAL "")
+        get_filename_component(SDK_NATIVE_DIR "${CMAKE_SYSROOT}" DIRECTORY) # .../native
+        get_filename_component(SDK_ROOT_DIR "${SDK_NATIVE_DIR}" DIRECTORY)  # .../openharmony
+        get_filename_component(SDK_BASE_DIR "${SDK_ROOT_DIR}" DIRECTORY)    # .../default
+        set(HMS_ROOT_PATH "${SDK_BASE_DIR}/hms/native/sysroot/usr")
+
+        # Add HMS include directories (for XEngine headers)
+        include_directories("${HMS_ROOT_PATH}/include")
+
+        # Determine architecture-specific library path
+        if("${OHOS_ARCH}" STREQUAL "arm64-v8a")
+            set(HMS_ARCH_DIR "aarch64-linux-ohos")
+        elseif("${OHOS_ARCH}" STREQUAL "x86_64")
+            set(HMS_ARCH_DIR "x86_64-linux-ohos")
+        else()
+            set(HMS_ARCH_DIR "arm-linux-ohos")
+        endif()
+    else()
+        message(STATUS "Skipping HMS SDK path setup because CMAKE_SYSROOT is empty")
+    endif()
+
+    # Find libxengine.so explicitly - REMOVED for dlopen support
+    # find_library(
+    #     xengine-lib
+    #     xengine
+    #     PATHS "${HMS_ROOT_PATH}/lib/${HMS_ARCH_DIR}"
+    #     NO_DEFAULT_PATH
+    # )
+
+    # if(xengine-lib)
+    #     message(STATUS "Found libxengine: ${xengine-lib}")
+    #     target_link_libraries(entry PUBLIC ${xengine-lib})
+    # else()
+    #     message(WARNING "libxengine not found in ${HMS_ROOT_PATH}/lib/${HMS_ARCH_DIR}")
+    # endif()
+
+    # Link other libraries
+    # QoS: official guide recommends direct link because libqos.so is in NDK link path.
+    target_link_libraries(entry PUBLIC libqos.so)
+
+    # Dynamic loading only - no link time dependency
+    # target_link_libraries(entry PUBLIC libxengine.so)
 else()
-    set(HMS_ARCH_DIR "arm-linux-ohos")
+    message(STATUS "Skipping entry target because OHOS toolchain variables are not set")
 endif()
-
-# Find libxengine.so explicitly - REMOVED for dlopen support
-# find_library(
-#     xengine-lib
-#     xengine
-#     PATHS "${HMS_ROOT_PATH}/lib/${HMS_ARCH_DIR}"
-#     NO_DEFAULT_PATH
-# )
-
-# if(xengine-lib)
-#     message(STATUS "Found libxengine: ${xengine-lib}")
-#     target_link_libraries(entry PUBLIC ${xengine-lib})
-# else()
-#     message(WARNING "libxengine not found in ${HMS_ROOT_PATH}/lib/${HMS_ARCH_DIR}")
-# endif()
-
-# Link other libraries
-# QoS: official guide recommends direct link because libqos.so is in NDK link path.
-target_link_libraries(entry PUBLIC libqos.so)
-
-# Dynamic loading only - no link time dependency
-# target_link_libraries(entry PUBLIC libxengine.so)
 
 # ========== 三方 .so 库打包配置 (华为官方方案) ==========
 # 参考: https://gitee.com/harmonyos_samples/NativeSoIntegration
