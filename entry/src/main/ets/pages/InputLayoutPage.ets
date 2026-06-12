@@ -97,7 +97,11 @@ struct InputLayoutPage {
 
   aboutToAppear(): void {
     this.pageActive = true
-    display.on('foldStatusChange', this.foldStatusListener)
+    try {
+      display.on('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('InputLayoutPage', 'Fold', `foldStatusChange on failed: ${err}`)
+    }
     this.detectFoldMode()
     void this.loadSavedLayout()
   }
@@ -105,7 +109,11 @@ struct InputLayoutPage {
   aboutToDisappear(): void {
     this.pageActive = false
     this.pageTaskToken += 1
-    display.off('foldStatusChange', this.foldStatusListener)
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('InputLayoutPage', 'Fold', `foldStatusChange off failed: ${err}`)
+    }
     if (this.savedToastTimer !== -1) {
       clearTimeout(this.savedToastTimer)
       this.savedToastTimer = -1

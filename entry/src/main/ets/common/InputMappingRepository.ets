@@ -89,9 +89,16 @@ export async function saveInputMappingProfile(
   try {
     file = await fs.open(path, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     await fs.write(file.fd, text)
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.error('InputMappingRepository', 'Save', `保存配置失败: ${message}`)
+    throw err as Error
   } finally {
     if (file) {
-      await fs.close(file.fd)
+      try {
+        await fs.close(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
   LogHelper.info('InputMappingRepository', 'Save', `配置已保存: ${profile.mappings.length} 个映射`)

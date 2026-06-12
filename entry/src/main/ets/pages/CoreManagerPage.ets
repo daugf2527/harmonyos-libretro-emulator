@@ -50,14 +50,22 @@ struct CoreManagerPage {
   aboutToAppear(): void {
     this.pageActive = true
     this.updateFoldDisplayMode()
-    display.on('foldStatusChange', this.foldStatusListener)
+    try {
+      display.on('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('CoreManagerPage', 'Fold', `foldStatusChange on failed: ${err}`)
+    }
     void this.refreshCoreStatus()
   }
 
   aboutToDisappear(): void {
     this.pageActive = false
     this.coreRefreshToken += 1
-    display.off('foldStatusChange', this.foldStatusListener)
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('CoreManagerPage', 'Fold', `foldStatusChange off failed: ${err}`)
+    }
   }
 
   private updateFoldDisplayMode(): void {

@@ -175,11 +175,11 @@ function readTimestampFromFileName(fileName: string): number {
 }
 
 async function readArrayBufferFromFile(path: string): Promise<ArrayBuffer> {
-  const stat = await fs.stat(path)
-  const byteLength = Number(stat.size) || 0
-  const data = new ArrayBuffer(byteLength)
   let file: fs.File | undefined = undefined
   try {
+    const stat = await fs.stat(path)
+    const byteLength = Number(stat.size) || 0
+    const data = new ArrayBuffer(byteLength)
     file = await fs.open(path, fs.OpenMode.READ_ONLY)
     const readOptions: ReadOptions = {
       offset: 0,

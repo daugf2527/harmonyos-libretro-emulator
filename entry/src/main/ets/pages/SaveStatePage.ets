@@ -68,7 +68,11 @@ struct SaveStatePage {
   aboutToAppear(): void {
     this.pageActive = true
     this.currentRomFile = this.resolveCurrentRomFile()
-    display.on('foldStatusChange', this.foldStatusListener)
+    try {
+      display.on('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('SaveStatePage', 'Fold', `foldStatusChange on failed: ${err}`)
+    }
     this.detectFoldMode()
     void this.refreshSaveItems()
   }
@@ -76,7 +80,11 @@ struct SaveStatePage {
   aboutToDisappear(): void {
     this.pageActive = false
     this.pageTaskToken += 1
-    display.off('foldStatusChange', this.foldStatusListener)
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('SaveStatePage', 'Fold', `foldStatusChange off failed: ${err}`)
+    }
     if (this.toastTimer !== -1) {
       clearTimeout(this.toastTimer)
       this.toastTimer = -1

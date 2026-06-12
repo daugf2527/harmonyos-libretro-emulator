@@ -79,12 +79,20 @@ struct OnboardingPage {
   aboutToAppear() {
     this.lifecycle.activate()
     this.updateFoldDisplayMode()
-    display.on('foldStatusChange', this.foldStatusListener)
+    try {
+      display.on('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('OnboardingPage', 'FoldDetect', `foldStatusChange on failed: ${err}`)
+    }
     void this.refreshImportReadiness()
   }
 
   aboutToDisappear() {
-    display.off('foldStatusChange', this.foldStatusListener)
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('OnboardingPage', 'FoldDetect', `foldStatusChange off failed: ${err}`)
+    }
     this.lifecycle.deactivate()
   }
 

@@ -275,14 +275,22 @@ struct SettingsPage {
   aboutToAppear(): void {
     this.pageActive = true
     this.detectFoldableMode()
-    display.on('foldStatusChange', this.foldStatusListener)
+    try {
+      display.on('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('SettingsPage', 'Fold', `foldStatusChange on failed: ${err}`)
+    }
     void this.refreshPageData()
   }
 
   aboutToDisappear(): void {
     this.pageActive = false
     this.refreshToken += 1
-    display.off('foldStatusChange', this.foldStatusListener)
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('SettingsPage', 'Fold', `foldStatusChange off failed: ${err}`)
+    }
   }
 
   private detectFoldableMode(): void {

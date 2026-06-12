@@ -115,7 +115,11 @@ struct ImportEntryPage {
     } catch (err) {
       LogHelper.error('ImportEntryPage', 'FoldDetect', `getFoldDisplayMode failed: ${err}`)
     }
-    display.on('foldDisplayModeChange', this.foldDisplayModeListener)
+    try {
+      display.on('foldDisplayModeChange', this.foldDisplayModeListener)
+    } catch (err) {
+      LogHelper.error('ImportEntryPage', 'FoldDetect', `foldDisplayModeChange on failed: ${err}`)
+    }
     if (this.hasGames) {
       this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
         LogHelper.error('ImportEntryPage', 'Route', `replaceUrl failed: ${err.message}`)
@@ -126,7 +130,11 @@ struct ImportEntryPage {
   aboutToDisappear(): void {
     this.pageActive = false
     this.stopScan()
-    display.off('foldDisplayModeChange', this.foldDisplayModeListener)
+    try {
+      display.off('foldDisplayModeChange', this.foldDisplayModeListener)
+    } catch (err) {
+      LogHelper.error('ImportEntryPage', 'FoldDetect', `foldDisplayModeChange off failed: ${err}`)
+    }
   }
 
   private stopScan(): void {
