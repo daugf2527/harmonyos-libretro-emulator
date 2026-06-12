@@ -110,7 +110,7 @@ export struct LibraryGameSections {
     .width('100%')
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.None)
-    .onScroll((_scrollOffset: number, _scrollState: ScrollState) => {
+    .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
       this.onListScrolled?.(Math.max(0, Number(this.listScroller.currentOffset().yOffset)))
     })
     .onReachEnd(() => {

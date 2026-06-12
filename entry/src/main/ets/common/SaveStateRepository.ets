@@ -416,6 +416,8 @@ async function encodeSaveStateThumbnail(
   }
   try {
     return await imagePacker.packToData(pixelMap, packingOption)
+  } catch (err) {
+    throw err as Error
   } finally {
     await pixelMap.release()
     await imagePacker.release()
