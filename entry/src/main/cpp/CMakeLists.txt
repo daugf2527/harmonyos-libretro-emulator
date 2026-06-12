@@ -69,7 +69,7 @@ set(PLATFORM_SYNC_SOURCES
     platform/sync/native_vsync_driver.cpp
 )
 
-if (${OHOS_ARCH} STREQUAL "arm64-v8a" OR ${OHOS_ARCH} STREQUAL "armeabi-v7a")
+if ("${OHOS_ARCH}" STREQUAL "arm64-v8a" OR "${OHOS_ARCH}" STREQUAL "armeabi-v7a")
     list(APPEND PLATFORM_GRAPHICS_SOURCES platform/graphics/pixel_converter_neon.cpp)
 else()
     list(APPEND PLATFORM_GRAPHICS_SOURCES platform/graphics/pixel_converter_scalar.cpp)
@@ -167,9 +167,9 @@ set(HMS_ROOT_PATH "${SDK_BASE_DIR}/hms/native/sysroot/usr")
 include_directories("${HMS_ROOT_PATH}/include")
 
 # Determine architecture-specific library path
-if(${OHOS_ARCH} STREQUAL "arm64-v8a")
+if("${OHOS_ARCH}" STREQUAL "arm64-v8a")
     set(HMS_ARCH_DIR "aarch64-linux-ohos")
-elseif(${OHOS_ARCH} STREQUAL "x86_64")
+elseif("${OHOS_ARCH}" STREQUAL "x86_64")
     set(HMS_ARCH_DIR "x86_64-linux-ohos")
 else()
     set(HMS_ARCH_DIR "arm-linux-ohos")
@@ -219,12 +219,12 @@ target_link_libraries(entry PUBLIC libqos.so)
 # arm64-v8a: NEON 默认启用,添加编译优化选项
 # armeabi-v7a: 需要显式启用 NEON (当前项目不使用)
 
-if (${OHOS_ARCH} STREQUAL "arm64-v8a")
+if ("${OHOS_ARCH}" STREQUAL "arm64-v8a")
     # 添加优化选项
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -ftree-vectorize -fvisibility=hidden -ffunction-sections -fdata-sections")
     message(STATUS "NEON optimization enabled for arm64-v8a")
     message(STATUS "   Compiler flags: ${CMAKE_CXX_FLAGS}")
-elseif (${OHOS_ARCH} STREQUAL "armeabi-v7a")
+elseif ("${OHOS_ARCH}" STREQUAL "armeabi-v7a")
     # armeabi-v7a 需要显式启用 NEON
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mfpu=neon -mfloat-abi=softfp -O3 -fvisibility=hidden -ffunction-sections -fdata-sections")
     message(STATUS "NEON optimization enabled for armeabi-v7a")
