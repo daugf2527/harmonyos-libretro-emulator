@@ -10,9 +10,6 @@ concurrency:
   group: harmonyos-pr-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   pr-build-gate:
     name: PR Build Gate
@@ -21,10 +18,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.3
 
       - name: Setup Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5.2.0
         with:
           distribution: temurin
           java-version: "17"
@@ -97,7 +94,7 @@ jobs:
         run: bash scripts/test/check_core_compatibility.sh
 
       - name: Upload M3 Test Manifest
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: harmonyos-pr-m3-manifest
           path: build/test-manifest.json
@@ -211,7 +208,7 @@ jobs:
           }
 
       - name: Upload HAP Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: harmonyos-pr-hap
           path: ${{ steps.build.outputs.primary_hap }}
@@ -219,7 +216,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Code Linter Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: harmonyos-pr-codelinter-report
           path: ${{ runner.temp }}/codelinter-report
