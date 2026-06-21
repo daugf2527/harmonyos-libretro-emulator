@@ -3,6 +3,7 @@ import {
   isVirtualPortActive,
   PortAssignState
 } from './InputPortRouting'
+import LogHelper from './LogHelper'
 
 export interface RuntimeInputCommandApi {
   refactoredSendInput(port: number, keyId: number, pressed: boolean): boolean
@@ -16,11 +17,17 @@ const nativeApi = testNapi as RuntimeInputCommandApi
 // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. 0 = core hasn't declared, callers
 // should fall back to the full layout instead of hiding everything.
 export function getRuntimeInputDescriptorMask(): number {
-  if (nativeApi.refactoredGetInputDescriptorMask === undefined) {
+  if (!testNapi || nativeApi.refactoredGetInputDescriptorMask === undefined) {
     return 0
   }
-  const mask = nativeApi.refactoredGetInputDescriptorMask()
-  return Number.isFinite(mask) ? (mask & 0xFFFF) : 0
+  try {
+    const mask = nativeApi.refactoredGetInputDescriptorMask()
+    return Number.isFinite(mask) ? (mask & 0xFFFF) : 0
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('RuntimeInputCommand', 'Input', `读取输入描述符掩码失败: ${message}`)
+    return 0
+  }
 }
 
 export function sendRuntimeButton(
@@ -32,7 +39,16 @@ export function sendRuntimeButton(
   if (!isVirtualPortActive(assignments, port)) {
     return false
   }
-  return nativeApi.refactoredSendInput(port, buttonId, pressed)
+  try {
+    if (!testNapi) {
+      return false
+    }
+    return nativeApi.refactoredSendInput(port, buttonId, pressed)
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('RuntimeInputCommand', 'Input', `发送数字按键失败: ${message}`)
+    return false
+  }
 }
 
 export function sendRuntimeAnalog(
@@ -45,8 +61,17 @@ export function sendRuntimeAnalog(
   if (!isVirtualPortActive(assignments, port)) {
     return false
   }
-  const xOk = nativeApi.refactoredSendAnalog(port, index, 0, normalizeAnalogValue(x))  // Audit C-F1
-  return xOk && nativeApi.refactoredSendAnalog(port, index, 1, normalizeAnalogValue(y))
+  try {
+    if (!testNapi) {
+      return false
+    }
+    const xOk = nativeApi.refactoredSendAnalog(port, index, 0, normalizeAnalogValue(x))  // Audit C-F1
+    return xOk && nativeApi.refactoredSendAnalog(port, index, 1, normalizeAnalogValue(y))
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('RuntimeInputCommand', 'Input', `发送模拟摇杆失败: ${message}`)
+    return false
+  }
 }
 
 function normalizeAnalogValue(value: number): number {
