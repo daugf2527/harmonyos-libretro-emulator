@@ -883,21 +883,31 @@ bool AudioBridge::Pause() {
     return false;
   }
 
-  is_started_ = false; // Stop logical
-  buffering_ = false;
-  running_.store(false, std::memory_order_release);
-  recover_streak_ = 0;
-  if (ring_buffer_) {
-    ring_buffer_->Clear();
-  }
-
-  bool success = audio_player_->Pause();
+  const bool was_started = is_started_;
+  const bool was_buffering = buffering_;
+  const uint32_t previous_recover_streak = recover_streak_;
+  const bool success = audio_player_->Pause();
   if (success) {
+    is_started_ = false;
+    buffering_ = false;
+    running_.store(false, std::memory_order_release);
+    recover_streak_ = 0;
+    if (ring_buffer_) {
+      ring_buffer_->Clear();
+    }
     ResetAdaptiveBufferBoostLocked();
     SetRunState(AudioRunState::PAUSED, "pause_success");
     LOGF(LOG_INFO, "%{public}s AudioBridge paused", kAudioChainPrefix);
   } else {
+    is_started_ = was_started;
+    buffering_ = was_buffering;
+    running_.store(was_started, std::memory_order_release);
+    recover_streak_ = previous_recover_streak;
     SetRunState(AudioRunState::RECOVERING, "pause_failed");
+    LOGF(LOG_WARN,
+         "%{public}s AudioBridge pause failed: logical state preserved "
+         "(started=%{public}d, buffering=%{public}d)",
+         kAudioChainPrefix, was_started ? 1 : 0, was_buffering ? 1 : 0);
   }
 
   return success;
@@ -909,17 +919,19 @@ bool AudioBridge::Stop() {
     return false;
   }
 
-  is_started_ = false; // Stop logical
-  buffering_ = false;
-  // 通知停止，以唤醒等待的读写方
-  running_.store(false, std::memory_order_release);
-  recover_streak_ = 0;
-  if (ring_buffer_) {
-    ring_buffer_->Clear();
-  }
-
-  bool success = audio_player_->Stop();
+  const bool was_started = is_started_;
+  const bool was_buffering = buffering_;
+  const uint32_t previous_recover_streak = recover_streak_;
+  const bool success = audio_player_->Stop();
   if (success) {
+    is_started_ = false; // Stop logical
+    buffering_ = false;
+    // 通知停止，以唤醒等待的读写方
+    running_.store(false, std::memory_order_release);
+    recover_streak_ = 0;
+    if (ring_buffer_) {
+      ring_buffer_->Clear();
+    }
     ResetAdaptiveBufferBoostLocked();
     SetRunState(AudioRunState::PAUSED, "stop_success");
     LOGF(LOG_INFO, "%{public}s AudioBridge stopped", kAudioChainPrefix);
@@ -938,7 +950,15 @@ bool AudioBridge::Stop() {
     }
   }
   if (!success) {
+    is_started_ = was_started;
+    buffering_ = was_buffering;
+    running_.store(was_started, std::memory_order_release);
+    recover_streak_ = previous_recover_streak;
     SetRunState(AudioRunState::RECOVERING, "stop_failed");
+    LOGF(LOG_WARN,
+         "%{public}s AudioBridge stop failed: logical state preserved "
+         "(started=%{public}d, buffering=%{public}d)",
+         kAudioChainPrefix, was_started ? 1 : 0, was_buffering ? 1 : 0);
   }
   return success;
 }
