@@ -1692,6 +1692,18 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
                    "rate=%{public}.2f",
                    kAudioChainPrefix, reset_ok ? 1 : 0,
                    avInfo.timing.sample_rate);
+              if (!reset_ok) {
+                LOGF(LOG_ERROR,
+                     " [NEW] LoadRom(no-game) Failed: AudioBridge reset failed");
+                currentGameData_.reset();
+                eventBridge_.Emit("core_crash",
+                                  "{\"reason\": \"audio_bridge_reset_failed\"}",
+                                  true);
+                SetLastErrorInfo("audio_bridge_reset_failed", "LoadRom",
+                                 "AudioBridge reset failed for no-game core");
+                TransitionTo(EngineState::ERROR);
+                break;
+              }
             }
 
             ClearLastErrorInfo();
@@ -1840,6 +1852,18 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
                "rate=%{public}.2f",
                kAudioChainPrefix, reset_ok ? 1 : 0,
                avInfo.timing.sample_rate);
+          if (!reset_ok) {
+            LOGF(LOG_ERROR,
+                 " [NEW] LoadRom Failed: AudioBridge reset failed");
+            currentGameData_.reset();
+            eventBridge_.Emit("core_crash",
+                              "{\"reason\": \"audio_bridge_reset_failed\"}",
+                              true);
+            SetLastErrorInfo("audio_bridge_reset_failed", "LoadRom",
+                             "AudioBridge reset failed after retro_load_game");
+            TransitionTo(EngineState::ERROR);
+            break;
+          }
         }
 
         // ...
