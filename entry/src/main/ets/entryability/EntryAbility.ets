@@ -43,13 +43,12 @@ export default class EntryAbility extends UIAbility {
     }
 
     // Initialize Input Mapping Service (does not trigger libentry.so load)
-    try {
-      void getInputMappingService().initialize(this.context);
+    void getInputMappingService().initialize(this.context).then(() => {
       LogHelper.info('EntryAbility', 'InputMapping', 'Input Mapping Service initialized');
-    } catch (e) {
-      const message = (e as Error)?.message || String(e);
+    }).catch((e: Error) => {
+      const message = e?.message || String(e);
       LogHelper.warn('EntryAbility', 'InputMapping', `Input Mapping Service init failed: ${message}`);
-    }
+    });
   }
 
   onDestroy(): void {
