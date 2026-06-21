@@ -37,6 +37,11 @@ static napi_value SetSwapInterval(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], interval, "SetSwapInterval", "interval")) {
     return MakeBool(env, false);
   }
+  if (interval != 0 && interval != 1) {
+    GetEngine()->SetLastErrorInfo("swap_interval_invalid", "SetSwapInterval",
+                                  "Swap interval must be 0 or 1");
+    return MakeBool(env, false);
+  }
 
   GetEngine()->SetSwapInterval(static_cast<int>(interval));
   return MakeBool(env, true);
@@ -151,15 +156,25 @@ static napi_value SetAudioSyncMode(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], mode, "SetAudioSyncMode", "mode")) {
     return MakeBool(env, false);
   }
+  if (mode != 0 && mode != 1) {
+    GetEngine()->SetLastErrorInfo("audio_sync_mode_invalid",
+                                  "SetAudioSyncMode",
+                                  "Audio sync mode must be 0 or 1");
+    return MakeBool(env, false);
+  }
 
   auto *audioBridge = libretro::AudioBridge::GetInstance();
-  if (audioBridge) {
-    auto syncMode = (mode == 0) ? libretro::AudioBridge::SyncMode::NON_BLOCKING
-                                : libretro::AudioBridge::SyncMode::AUDIO_BLOCKING;
-    // Audit T1-F4: SetSyncMode is sync_mode_.store() (std::atomic) — safe to call from NAPI thread
-    audioBridge->SetSyncMode(syncMode);
-    LOGF(LOG_INFO, "[NEW] SetAudioSyncMode: %{public}d", mode);
+  if (!audioBridge) {
+    GetEngine()->SetLastErrorInfo("audio_bridge_unavailable",
+                                  "SetAudioSyncMode",
+                                  "AudioBridge instance is unavailable");
+    return MakeBool(env, false);
   }
+  auto syncMode = (mode == 0) ? libretro::AudioBridge::SyncMode::NON_BLOCKING
+                              : libretro::AudioBridge::SyncMode::AUDIO_BLOCKING;
+  // Audit T1-F4: SetSyncMode is sync_mode_.store() (std::atomic) — safe to call from NAPI thread
+  audioBridge->SetSyncMode(syncMode);
+  LOGF(LOG_INFO, "[NEW] SetAudioSyncMode: %{public}d", mode);
 
   return MakeBool(env, true);
   NAPI_TRY_CATCH_END(env, nullptr)
