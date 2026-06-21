@@ -2825,6 +2825,17 @@ void LibretroEngine::TransitionTo(EngineState newState) {
          kAudioChainPrefix, ok ? 1 : 0, bridge->IsRunning() ? 1 : 0,
          bridge->IsPlaying() ? 1 : 0,
          static_cast<int>(bridge->GetSyncMode()));
+    if (!ok) {
+      eventBridge_.Emit("core_crash",
+                        "{\"reason\": \"audio_bridge_start_failed\", "
+                        "\"step\": \"TransitionTo\", "
+                        "\"message\": \"AudioBridge failed to enter running state\"}",
+                        true);
+      SetLastErrorInfo("audio_bridge_start_failed", "TransitionTo",
+                       "AudioBridge failed to enter running state");
+      TransitionTo(EngineState::ERROR);
+      return;
+    }
   } else if (newState == EngineState::PAUSED ||
              newState == EngineState::STOPPING) {
     const bool ok = bridge->Pause();
