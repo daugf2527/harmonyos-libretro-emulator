@@ -1,4 +1,3 @@
-import testNapi from 'libentry.so'
 import { common } from '@kit.AbilityKit'
 import { display } from '@kit.ArkUI'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
@@ -16,14 +15,10 @@ import {
 } from '../common/SaveStateRepository'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
-import { RuntimeSaveStateBundle } from '../common/RuntimeSessionController'
-
-interface SaveStateNapi {
-  refactoredSaveStateAsync(): Promise<ArrayBuffer | null>
-  refactoredSaveStateBundleAsync(): Promise<RuntimeSaveStateBundle>
-  refactoredLoadState(data: ArrayBuffer): boolean
-  refactoredLoadStateAsync(data: ArrayBuffer): Promise<boolean>
-}
+import {
+  runtimeSessionController,
+  RuntimeSaveStateBundle
+} from '../common/RuntimeSessionController'
 
 interface SaveSlotItem {
   id: string
@@ -40,8 +35,6 @@ interface SaveSlotItem {
 interface SaveStateRouteParams {
   romFile?: string
 }
-
-const nativeApi = testNapi as SaveStateNapi
 
 @Entry
 @ComponentV2
@@ -304,7 +297,7 @@ struct SaveStatePage {
       return
     }
     try {
-      const bundle = await nativeApi.refactoredSaveStateBundleAsync()
+      const bundle = await runtimeSessionController.saveStateBundleAsync()
       if (!this.isCurrentPageTask(token)) {
         return
       }
@@ -342,7 +335,7 @@ struct SaveStatePage {
     try {
       const stateData = readSaveStateData(context, fileName)
       // 与 quickSave() 保持一致，避免同步 NAPI 调用阻塞 UI 线程。
-      const loaded = await nativeApi.refactoredLoadStateAsync(stateData)
+      const loaded = await runtimeSessionController.loadStateAsync(stateData)
       // D018: await 后页面可能已销毁,写 @State(toast)前检查 pageActive,与同页
       // confirmDelete/quickSave 的 isCurrentPageTask 守卫一致(此处用 pageActive)。
       if (!this.pageActive) {
