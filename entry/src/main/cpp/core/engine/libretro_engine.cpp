@@ -1021,40 +1021,27 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
       std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
       pendingFilesDir_ = filesDir;
     }
-    if (messageQueue_.IsClosed()) {
+    bool applyOk = false;
+    const bool dispatched = ExecuteSyncTask(
+        [this, &filesDir, &applyOk]() { applyOk = ApplyFilesDir(filesDir); },
+        kSyncTaskTimeoutMs);
+    if (!dispatched) {
       std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
       pendingFilesDir_.clear();
-      LOGF(LOG_WARN, "[NEW] SetFilesDir dropped: message queue closed");
-      SetLastErrorInfo("files_dir_queue_closed", "SetFilesDir",
-                       "SetFilesDir queue closed");
+      SetLastErrorInfo("files_dir_sync_dispatch_failed", "SetFilesDir",
+                       "failed to dispatch SetFilesDir sync task");
       return false;
     }
-    if (!messageQueue_.Push(EngineMessage::MakeLoadMessage(
-            MessageType::SetFilesDir, filesDir))) {
+    if (!applyOk) {
       std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
       pendingFilesDir_.clear();
-      LOGF(LOG_WARN, "[NEW] SetFilesDir dropped: message queue closed");
-      SetLastErrorInfo("files_dir_queue_closed", "SetFilesDir",
-                       "SetFilesDir queue closed");
       return false;
     }
     return true;
   }
 
   // 引擎未运行时可直接设置（无并发读写）
-  if (!envState_.SetBaseDir(filesDir)) {
-    LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set from ArkTS failed");
-    SetLastErrorInfo("files_dir_env_set_failed", "SetFilesDir",
-                     "EnvState::SetBaseDir failed");
-    return false;
-  }
-  {
-    std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
-    pendingFilesDir_.clear();
-  }
-  LOGF(LOG_INFO, "[NEW] EnvState BaseDir set from ArkTS: %{public}s",
-       security::DescribePathForLog(filesDir).c_str());
-  return true;
+  return ApplyFilesDir(filesDir);
 }
 
 std::string LibretroEngine::GetFilesDir() const {
@@ -1095,6 +1082,25 @@ bool LibretroEngine::ExecuteSyncTask(const std::function<void()> &task,
     LOGF(LOG_ERROR, "[NEW] SyncTask timeout after %{public}u ms", timeoutMs);
     return false;
   }
+  return true;
+}
+
+bool LibretroEngine::ApplyFilesDir(const std::string &filesDir) {
+  if (!envState_.SetBaseDir(filesDir)) {
+    LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set failed: %{public}s",
+         security::DescribePathForLog(filesDir).c_str());
+    SetLastErrorInfo("files_dir_env_set_failed", "SetFilesDir",
+                     "EnvState::SetBaseDir failed");
+    return false;
+  }
+  {
+    std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+    if (pendingFilesDir_ == filesDir) {
+      pendingFilesDir_.clear();
+    }
+  }
+  LOGF(LOG_INFO, "[NEW] EnvState BaseDir set: %{public}s",
+       security::DescribePathForLog(filesDir).c_str());
   return true;
 }
 
@@ -1892,28 +1898,22 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
   } break;
   case MessageType::SetFilesDir: {
     const std::string requestPath = msg.payload.loadPath.path;
-    auto clearPendingIfMatched = [this, &requestPath]() {
-      std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
-      if (pendingFilesDir_ == requestPath) {
-        pendingFilesDir_.clear();
-      }
-    };
-
     EngineState st = state_.load();
     if (IsCoreLoadedState(st) || st == EngineState::LOADING ||
         st == EngineState::STOPPING) {
       LOGF(LOG_WARN, "[NEW] SetFilesDir ignored after core loaded: %{public}s",
            security::DescribePathForLog(msg.payload.loadPath.path).c_str());
-      clearPendingIfMatched();
+      {
+        std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+        if (pendingFilesDir_ == requestPath) {
+          pendingFilesDir_.clear();
+        }
+      }
+      SetLastErrorInfo("files_dir_set_ignored_state", "SetFilesDir",
+                       "SetFilesDir ignored due current engine state");
       break;
     }
-    if (!envState_.SetBaseDir(msg.payload.loadPath.path)) {
-      LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set from Engine thread failed");
-    } else {
-      LOGF(LOG_INFO, "[NEW] EnvState BaseDir set from Engine thread: %{public}s",
-           security::DescribePathForLog(msg.payload.loadPath.path).c_str());
-    }
-    clearPendingIfMatched();
+    (void)ApplyFilesDir(requestPath);
     break;
   }
   case MessageType::WindowCreated:

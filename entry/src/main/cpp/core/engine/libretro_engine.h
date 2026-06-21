@@ -309,6 +309,7 @@ private:
   void TransitionTo(EngineState newState);
   void UnloadGameIfNeeded(const char *reason);
   void DetectCoreQuirks();
+  bool ApplyFilesDir(const std::string &filesDir);
   bool ExecuteSyncTask(const std::function<void()> &task, uint32_t timeoutMs);
 
   // --- 成员变量 ---
