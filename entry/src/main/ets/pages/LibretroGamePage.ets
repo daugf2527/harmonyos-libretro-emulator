@@ -372,21 +372,36 @@ struct LibretroGamePage {
     if (!context) {
       return;
     }
-    const profile = await loadRuntimeRenderSettingsProfile(context);
-    // T8-C-F5 同范式:本方法由 aboutToAppear fire-and-forget 触发,await 配置读取
-    // 期间用户可能退出页面(aboutToDisappear 置 pageActive=false 并销毁),写
-    // @State(scalingMode/softwareMaxPresetIndex/hwRenderAllowed)前必须检查
-    // pageActive,否则向已销毁页面 setState。对照 quickSave/quickLoad 已有此守卫,
-    // 本方法此前遗漏(D016)。
-    if (!this.pageActive) {
-      return;
+    try {
+      const profile = await loadRuntimeRenderSettingsProfile(context);
+      // T8-C-F5 同范式:本方法由 aboutToAppear fire-and-forget 触发,await 配置读取
+      // 期间用户可能退出页面(aboutToDisappear 置 pageActive=false 并销毁),写
+      // @State(scalingMode/softwareMaxPresetIndex/hwRenderAllowed)前必须检查
+      // pageActive,否则向已销毁页面 setState。对照 quickSave/quickLoad 已有此守卫,
+      // 本方法此前遗漏(D016)。
+      if (!this.pageActive) {
+        return;
+      }
+      this.renderSettingsProfile = profile;
+      this.scalingMode = profile.scalingMode;
+      this.swapInterval = profile.swapInterval;
+      this.softwareMaxPresetIndex = profile.softwareMaxPresetIndex;
+      this.aiUpscaleEnabled = profile.aiUpscaleEnabled;
+      this.hwRenderAllowed = profile.hwRenderAllowed;
+    } catch (err) {
+      if (!this.pageActive) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Render', `读取运行时渲染配置失败: ${message}`);
+      const fallback = createDefaultRuntimeRenderSettingsProfile();
+      this.renderSettingsProfile = fallback;
+      this.scalingMode = fallback.scalingMode;
+      this.swapInterval = fallback.swapInterval;
+      this.softwareMaxPresetIndex = fallback.softwareMaxPresetIndex;
+      this.aiUpscaleEnabled = fallback.aiUpscaleEnabled;
+      this.hwRenderAllowed = fallback.hwRenderAllowed;
     }
-    this.renderSettingsProfile = profile;
-    this.scalingMode = profile.scalingMode;
-    this.swapInterval = profile.swapInterval;
-    this.softwareMaxPresetIndex = profile.softwareMaxPresetIndex;
-    this.aiUpscaleEnabled = profile.aiUpscaleEnabled;
-    this.hwRenderAllowed = profile.hwRenderAllowed;
   }
 
   private async loadRuntimeAudioSettings(): Promise<void> {
@@ -394,17 +409,31 @@ struct LibretroGamePage {
     if (!context) {
       return;
     }
-    const profile = await loadRuntimeAudioSettingsProfile(context);
-    // await 后页面可能已销毁(D016 范式);audioSettingsProfile 虽为 private(无
-    // re-render),仍守卫保持一致 + 避免向已销毁页面写。
-    if (!this.pageActive) {
-      return;
-    }
-    this.audioSettingsProfile = profile;
-    runtimeAudioSettingsController.setVolumePercent(profile.volumePercent);
-    // 若游戏已在运行(用户改设置后返回游戏页等场景),立即应用新延迟。
-    if (this.gameRunning) {
-      runtimeAudioSettingsController.setMinimumAudioLatency(profile.latencyMs);
+    try {
+      const profile = await loadRuntimeAudioSettingsProfile(context);
+      // await 后页面可能已销毁(D016 范式);audioSettingsProfile 虽为 private(无
+      // re-render),仍守卫保持一致 + 避免向已销毁页面写。
+      if (!this.pageActive) {
+        return;
+      }
+      this.audioSettingsProfile = profile;
+      runtimeAudioSettingsController.setVolumePercent(profile.volumePercent);
+      // 若游戏已在运行(用户改设置后返回游戏页等场景),立即应用新延迟。
+      if (this.gameRunning) {
+        runtimeAudioSettingsController.setMinimumAudioLatency(profile.latencyMs);
+      }
+    } catch (err) {
+      if (!this.pageActive) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Audio', `读取运行时音频配置失败: ${message}`);
+      const fallback = createDefaultRuntimeAudioSettingsProfile();
+      this.audioSettingsProfile = fallback;
+      runtimeAudioSettingsController.setVolumePercent(fallback.volumePercent);
+      if (this.gameRunning) {
+        runtimeAudioSettingsController.setMinimumAudioLatency(fallback.latencyMs);
+      }
     }
   }
 
