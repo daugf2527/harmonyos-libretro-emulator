@@ -14,6 +14,19 @@ void SetStateError(const char *reason, const char *step, const char *message) {
   engine->SetLastErrorInfo(reason, step, message);
 }
 
+void EnsureStateErrorIfEmpty(const char *reason, const char *step,
+                             const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  auto err = engine->GetLastErrorInfo();
+  if (!err.reason.empty()) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
 bool IsValidCheatCode(const char *code) {
   if (!code) {
     return false;
@@ -192,6 +205,10 @@ static napi_value LoadState(napi_env env, napi_callback_info info) {
   std::vector<uint8_t> stateData(static_cast<uint8_t *>(data),
                                   static_cast<uint8_t *>(data) + length);
   bool ok = GetEngine()->LoadState(stateData);
+  if (!ok) {
+    EnsureStateErrorIfEmpty("load_state_failed", "LoadState",
+                            "LoadState returned false");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -248,6 +265,10 @@ static napi_value ResetCore(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] ResetCore called");
   const bool ok = GetEngine()->ResetCore();
+  if (!ok) {
+    EnsureStateErrorIfEmpty("reset_core_failed", "ResetCore",
+                            "ResetCore returned false");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -255,6 +276,10 @@ static napi_value ResetCore(napi_env env, napi_callback_info info) {
 static napi_value CheatReset(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   const bool ok = GetEngine()->CheatReset();
+  if (!ok) {
+    EnsureStateErrorIfEmpty("cheat_reset_failed", "CheatReset",
+                            "CheatReset returned false");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -289,6 +314,10 @@ static napi_value CheatSet(napi_env env, napi_callback_info info) {
   }
 
   bool ok = GetEngine()->CheatSet(static_cast<unsigned>(index), enabled, code);
+  if (!ok) {
+    EnsureStateErrorIfEmpty("cheat_set_failed", "CheatSet",
+                            "CheatSet returned false");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
