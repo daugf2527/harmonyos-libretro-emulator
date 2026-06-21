@@ -2,6 +2,19 @@
 #include "interfaces/graphics/i_renderer.h"
 #include "platform/audio/audio_bridge.h"
 
+namespace {
+
+void SetVideoAudioError(const char *reason, const char *step,
+                        const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
+} // namespace
+
 static napi_value SetScalingMode(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
@@ -14,12 +27,23 @@ static napi_value SetScalingMode(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], mode, "SetScalingMode", "mode")) {
     return MakeBool(env, false);
   }
+  if (mode < 0 || mode > 2) {
+    SetVideoAudioError("scaling_mode_invalid", "SetScalingMode",
+                       "Scaling mode must be 0, 1, or 2");
+    return MakeBool(env, false);
+  }
 
   auto *renderer = GetEngine()->GetRendererInterface();
   if (!renderer) {
+    SetVideoAudioError("renderer_unavailable", "SetScalingMode",
+                       "Renderer interface is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = renderer->SetScalingMode(mode);
+  if (!ok) {
+    SetVideoAudioError("scaling_mode_apply_failed", "SetScalingMode",
+                       "Renderer rejected the requested scaling mode");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -65,14 +89,24 @@ static napi_value SetSoftwareMaxResolution(napi_env env, napi_callback_info info
     LOGF(LOG_ERROR,
          "[NEW] SetSoftwareMaxResolution invalid: %{public}dx%{public}d", w,
          h);
+    SetVideoAudioError("software_resolution_invalid",
+                       "SetSoftwareMaxResolution",
+                       "Software max resolution must be positive");
     return MakeBool(env, false);
   }
 
   auto *renderer = GetEngine()->GetRendererInterface();
   if (!renderer) {
+    SetVideoAudioError("renderer_unavailable", "SetSoftwareMaxResolution",
+                       "Renderer interface is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = renderer->SetSoftwareMaxResolution(w, h);
+  if (!ok) {
+    SetVideoAudioError("software_resolution_apply_failed",
+                       "SetSoftwareMaxResolution",
+                       "Renderer rejected the requested software resolution");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -93,9 +127,15 @@ static napi_value SetAIUpscale(napi_env env, napi_callback_info info) {
 
   auto *renderer = GetEngine()->GetRendererInterface();
   if (!renderer) {
+    SetVideoAudioError("renderer_unavailable", "SetAIUpscale",
+                       "Renderer interface is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = renderer->SetAIUpscale(enabled);
+  if (!ok) {
+    SetVideoAudioError("ai_upscale_apply_failed", "SetAIUpscale",
+                       "Renderer rejected the AI upscale setting");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -116,9 +156,15 @@ static napi_value SetHwRenderAllowed(napi_env env, napi_callback_info info) {
 
   auto *renderer = GetEngine()->GetRendererInterface();
   if (!renderer) {
+    SetVideoAudioError("renderer_unavailable", "SetHwRenderAllowed",
+                       "Renderer interface is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = renderer->SetHwRenderAllowed(enabled);
+  if (!ok) {
+    SetVideoAudioError("hw_render_apply_failed", "SetHwRenderAllowed",
+                       "Renderer rejected the hardware render setting");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -200,9 +246,16 @@ static napi_value SetAudioVolume(napi_env env, napi_callback_info info) {
 
   auto *audioBridge = libretro::AudioBridge::GetInstance();
   if (!audioBridge) {
+    SetVideoAudioError("audio_bridge_unavailable", "SetAudioVolume",
+                       "AudioBridge instance is unavailable");
     return MakeBool(env, false);
   }
-  return MakeBool(env, audioBridge->SetVolumePercent(percent));
+  const bool ok = audioBridge->SetVolumePercent(percent);
+  if (!ok) {
+    SetVideoAudioError("audio_volume_apply_failed", "SetAudioVolume",
+                       "AudioBridge rejected the requested volume");
+  }
+  return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
