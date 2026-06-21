@@ -84,8 +84,16 @@ bool RenderThread::Start() {
   }
   frameQueue_.Clear();
 
-  // std::thread 构造失败时必须回滚 running_，否则后续 Start/Stop 会误判线程已运行。
-  renderThread_ = std::thread(&RenderThread::ThreadMain, this);
+  // Start() 对外返回 bool；线程启动异常必须在这里收敛成 false。
+  try {
+    renderThread_ = std::thread(&RenderThread::ThreadMain, this);
+  } catch (const std::exception &e) {
+    LOGF(LOG_ERROR, "RenderThread start failed: %{public}s", e.what());
+    return false;
+  } catch (...) {
+    LOGF(LOG_ERROR, "RenderThread start failed: unknown exception");
+    return false;
+  }
   runningGuard.release();
   return true;
 }
