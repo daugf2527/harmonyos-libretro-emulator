@@ -2844,6 +2844,19 @@ void LibretroEngine::TransitionTo(EngineState newState) {
          "running=%{public}d, playing=%{public}d",
          kAudioChainPrefix, static_cast<int>(newState), ok ? 1 : 0,
          bridge->IsRunning() ? 1 : 0, bridge->IsPlaying() ? 1 : 0);
+    if (!ok) {
+      eventBridge_.Emit("core_crash",
+                        "{\"reason\": \"audio_bridge_pause_failed\", "
+                        "\"step\": \"TransitionTo\", "
+                        "\"message\": \"AudioBridge failed to pause for engine state change\"}",
+                        true);
+      SetLastErrorInfo("audio_bridge_pause_failed", "TransitionTo",
+                       "AudioBridge failed to pause for engine state change");
+      if (newState == EngineState::PAUSED) {
+        TransitionTo(EngineState::ERROR);
+      }
+      return;
+    }
   } else if (newState == EngineState::STOPPED) {
     const bool ok = bridge->Stop();
     LOGF(LOG_INFO,
@@ -2851,6 +2864,16 @@ void LibretroEngine::TransitionTo(EngineState newState) {
          "running=%{public}d, playing=%{public}d",
          kAudioChainPrefix, ok ? 1 : 0, bridge->IsRunning() ? 1 : 0,
          bridge->IsPlaying() ? 1 : 0);
+    if (!ok) {
+      eventBridge_.Emit("core_crash",
+                        "{\"reason\": \"audio_bridge_stop_failed\", "
+                        "\"step\": \"TransitionTo\", "
+                        "\"message\": \"AudioBridge failed to stop during engine shutdown\"}",
+                        true);
+      SetLastErrorInfo("audio_bridge_stop_failed", "TransitionTo",
+                       "AudioBridge failed to stop during engine shutdown");
+      return;
+    }
   }
 }
 
