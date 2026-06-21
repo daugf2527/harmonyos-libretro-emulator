@@ -345,27 +345,40 @@ struct SettingsPage {
       return
     }
 
-    const renderProfile = await loadRuntimeRenderSettingsProfile(context)
-    if (!this.isCurrentRefresh(token)) {
-      return
+    try {
+      const renderProfile = await loadRuntimeRenderSettingsProfile(context)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.renderProfile = renderProfile
+      const audioProfile = await loadRuntimeAudioSettingsProfile(context)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.audioProfile = audioProfile
+      const visualProfile = await loadRuntimeVisualSettingsProfile(context)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.visualProfile = visualProfile
+      const inputPreferences = await loadRuntimeInputPreferencesProfile(context)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.inputPreferences = inputPreferences
+      this.refreshAdvancedStatus()
+    } catch (err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('SettingsPage', 'Settings', `读取运行时设置失败: ${message}`)
+      this.renderProfile = createDefaultRuntimeRenderSettingsProfile()
+      this.inputPreferences = createDefaultRuntimeInputPreferencesProfile()
+      this.visualProfile = createDefaultRuntimeVisualSettingsProfile()
+      this.audioProfile = createDefaultRuntimeAudioSettingsProfile()
+      this.advancedStatusText = '运行时设置读取失败，已回退默认值'
     }
-    this.renderProfile = renderProfile
-    const audioProfile = await loadRuntimeAudioSettingsProfile(context)
-    if (!this.isCurrentRefresh(token)) {
-      return
-    }
-    this.audioProfile = audioProfile
-    const visualProfile = await loadRuntimeVisualSettingsProfile(context)
-    if (!this.isCurrentRefresh(token)) {
-      return
-    }
-    this.visualProfile = visualProfile
-    const inputPreferences = await loadRuntimeInputPreferencesProfile(context)
-    if (!this.isCurrentRefresh(token)) {
-      return
-    }
-    this.inputPreferences = inputPreferences
-    this.refreshAdvancedStatus()
 
     const inputDevices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
     const externalNames: string[] = []
@@ -503,12 +516,21 @@ struct SettingsPage {
     if (!context) {
       return
     }
-    const savedProfile = await saveRuntimeRenderSettingsProfile(context, profile)
-    if (!this.isCurrentRefresh(token)) {
-      return
+    try {
+      const savedProfile = await saveRuntimeRenderSettingsProfile(context, profile)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.renderProfile = savedProfile
+      this.refreshAdvancedStatus()
+    } catch (err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('SettingsPage', 'Render', `保存运行时渲染配置失败: ${message}`)
+      this.runtimeApplyStatusText = '运行时渲染配置保存失败'
     }
-    this.renderProfile = savedProfile
-    this.refreshAdvancedStatus()
   }
 
   private setRuntimeApplyStatus(actionLabel: string, ok: boolean): void {
@@ -643,11 +665,20 @@ struct SettingsPage {
       return
     }
     const token = this.beginRefresh()
-    const saved = await saveRuntimeAudioSettingsProfile(context, profile)
-    if (!this.isCurrentRefresh(token)) {
-      return
+    try {
+      const saved = await saveRuntimeAudioSettingsProfile(context, profile)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.audioProfile = saved
+    } catch (err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('SettingsPage', 'Audio', `保存运行时音频配置失败: ${message}`)
+      this.runtimeApplyStatusText = '运行时音频配置保存失败'
     }
-    this.audioProfile = saved
   }
 
   private async cycleSoftwareResolutionPreset(): Promise<void> {

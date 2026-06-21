@@ -84,7 +84,7 @@ export async function saveInputMappingProfile(
 ): Promise<void> {
   const dirPath = buildMappingDirPath(context.filesDir)
   try {
-    await fs.mkdir(dirPath)
+    await fs.mkdir(dirPath, true)
   } catch (err) {
     // Directory may already exist
   }

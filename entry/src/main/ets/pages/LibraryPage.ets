@@ -597,11 +597,20 @@ struct LibraryPage {
     if (!this.isCurrentPageAction(actionToken)) {
       return
     }
-    await removeLibraryRecord(context, item.romFile)
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
+    try {
+      await removeLibraryRecord(context, item.romFile)
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      await this.refreshLibraryGames()
+    } catch (err) {
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryPage', 'Delete', `删除库记录失败: ${message}`)
+      this.showToastMessage(ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_WRITE_ERROR.numericCode))
     }
-    await this.refreshLibraryGames()
   }
 
   private launchFromContext(): void {
@@ -654,20 +663,29 @@ struct LibraryPage {
     }
     const nextCoverKey = this.getNextCoverKey(target)
     const nextCoverColor = this.resolveCoverColorByKey(nextCoverKey)
-    const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
-    }
-    if (!updated) {
+    try {
+      const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      if (!updated) {
+        this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+        return
+      }
+      this.highlightedRecentGameId = updated.id
+      await this.refreshLibraryGames()
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      this.showToastMessage('已切换内置封面 COVER_UPDATED')
+    } catch (err) {
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryPage', 'Cover', `更新封面失败: ${message}`)
       this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
-      return
     }
-    this.highlightedRecentGameId = updated.id
-    await this.refreshLibraryGames()
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
-    }
-    this.showToastMessage('已切换内置封面 COVER_UPDATED')
   }
 
   private openDetails(item: LibraryRecord): void {

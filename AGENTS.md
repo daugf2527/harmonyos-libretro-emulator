@@ -35,7 +35,7 @@
 
 ## 高效工具使用与全局分析流程
 - 先定义任务成功标准：明确要解决的症状、要产出的文件、可接受的验证命令；不清楚时先只读探索，不先改代码。
-- 工具优先级：语义/上下文检索（MCP/fast-context）→ 结构化搜索（`rg`/smart_search）→ 批量读文件 → shell 兜底；互不依赖的只读操作可并行。
+- 工具优先级：`codegraph`（C/C++ 调用图/影响面）→ `serena`（跨语言符号/引用）→ `ast-grep`（结构化/配对扫描）→ `rg` / `rg --files`（文本与文件定位）→ 批量读文件 → shell 兜底；`fast-context` 仅作语义补盲，不作为主证据；互不依赖的只读操作可并行。
 - 证据链优先：判断必须落到源码、SDK、官方文档、运行日志或配置中的可引用证据；报告问题时给出文件路径和行号，不只写结论。
 - API 更新流程：先确认当前 `targetSdkVersion`/`compatibleSdkVersion`、本地 SDK `.d.ts/.h` 声明和官方文档；改 native/ArkTS API 时同步 NAPI 注册、`index.d.ts`、本 AGENTS 导出清单和漂移检查脚本。
 - 全局质量分析默认只读：排除 `deprecated/legacy/`、`entry/build/`、raw ROM/二进制资源；先跑已有 drift/lint/hygiene 脚本，再用定向搜索补盲区。

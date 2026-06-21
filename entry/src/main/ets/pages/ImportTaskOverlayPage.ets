@@ -280,15 +280,27 @@ struct ImportTaskOverlayPage {
       return
     }
 
-    const conflictSummary = await inspectRomImportConflicts(context, uris)
-    if (!this.isCurrentImportTask(token)) {
-      return
+    try {
+      const conflictSummary = await inspectRomImportConflicts(context, uris)
+      if (!this.isCurrentImportTask(token)) {
+        return
+      }
+      if (conflictSummary.conflictCount > 0) {
+        this.applyConflictSummary(conflictSummary)
+        return
+      }
+      await this.startActualImport(uris, token)
+    } catch (err) {
+      if (!this.isCurrentImportTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('ImportTaskOverlayPage', 'Import', `准备导入任务失败: ${message}`)
+      this.applyImportResult(this.buildFailedImportResult(uris.length, false))
+      this.resultTitleText = '导入准备失败'
+      this.resultMessageText = '无法读取冲突信息或导入上下文'
+      this.resultDetailText = '请返回上一页重新选择文件'
     }
-    if (conflictSummary.conflictCount > 0) {
-      this.applyConflictSummary(conflictSummary)
-      return
-    }
-    await this.startActualImport(uris, token)
   }
 
   private applyConflictSummary(summary: RomImportConflictSummary): void {
@@ -343,18 +355,30 @@ struct ImportTaskOverlayPage {
     this.resultItems = []
     this.progressPercent = 0
     this.importedNamesPreviewText = ''
-    const result = await importRomUris(context, uris, (progress: RomImportProgress) => {
-      if (this.isCurrentImportTask(token)) {
-        this.applyActualImportProgress(progress)
+    try {
+      const result = await importRomUris(context, uris, (progress: RomImportProgress) => {
+        if (this.isCurrentImportTask(token)) {
+          this.applyActualImportProgress(progress)
+        }
+      }, {
+        overwriteExisting: false,
+        shouldCancel: () => this.cancelRequested || !this.isCurrentImportTask(token)
+      })
+      if (!this.isCurrentImportTask(token)) {
+        return
       }
-    }, {
-      overwriteExisting: false,
-      shouldCancel: () => this.cancelRequested || !this.isCurrentImportTask(token)
-    })
-    if (!this.isCurrentImportTask(token)) {
-      return
+      this.applyImportResult(result)
+    } catch (err) {
+      if (!this.isCurrentImportTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('ImportTaskOverlayPage', 'Import', `执行导入失败: ${message}`)
+      this.applyImportResult(this.buildFailedImportResult(uris.length, this.cancelRequested))
+      this.resultTitleText = this.cancelRequested ? '导入已取消' : '导入失败'
+      this.resultMessageText = this.cancelRequested ? '导入任务已取消' : '导入过程中发生错误'
+      this.resultDetailText = '请检查文件格式或稍后重试'
     }
-    this.applyImportResult(result)
   }
 
   private async restartActualImportWithOverwrite(): Promise<void> {
@@ -377,18 +401,46 @@ struct ImportTaskOverlayPage {
     this.resultItems = []
     this.progressPercent = 0
     this.importedNamesPreviewText = ''
-    const result = await importRomUris(context, this.currentImportUris, (progress: RomImportProgress) => {
-      if (this.isCurrentImportTask(token)) {
-        this.applyActualImportProgress(progress)
+    try {
+      const result = await importRomUris(context, this.currentImportUris, (progress: RomImportProgress) => {
+        if (this.isCurrentImportTask(token)) {
+          this.applyActualImportProgress(progress)
+        }
+      }, {
+        overwriteExisting: true,
+        shouldCancel: () => this.cancelRequested || !this.isCurrentImportTask(token)
+      })
+      if (!this.isCurrentImportTask(token)) {
+        return
       }
-    }, {
-      overwriteExisting: true,
-      shouldCancel: () => this.cancelRequested || !this.isCurrentImportTask(token)
-    })
-    if (!this.isCurrentImportTask(token)) {
-      return
+      this.applyImportResult(result)
+    } catch (err) {
+      if (!this.isCurrentImportTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('ImportTaskOverlayPage', 'Import', `覆盖导入失败: ${message}`)
+      this.applyImportResult(this.buildFailedImportResult(this.currentImportUris.length, this.cancelRequested))
+      this.resultTitleText = this.cancelRequested ? '导入已取消' : '覆盖导入失败'
+      this.resultMessageText = this.cancelRequested ? '导入任务已取消' : '覆盖已有文件时发生错误'
+      this.resultDetailText = '请检查磁盘空间、文件权限或稍后重试'
     }
-    this.applyImportResult(result)
+  }
+
+  private buildFailedImportResult(selectedCount: number, canceled: boolean): RomImportResult {
+    return {
+      selectedCount,
+      importedCount: 0,
+      overwrittenCount: 0,
+      skippedCount: 0,
+      failedCount: canceled ? 0 : selectedCount,
+      canceled,
+      importedNames: [],
+      overwrittenNames: [],
+      skippedNames: [],
+      failedNames: [],
+      items: []
+    }
   }
 
   private applyActualImportProgress(progress: RomImportProgress): void {

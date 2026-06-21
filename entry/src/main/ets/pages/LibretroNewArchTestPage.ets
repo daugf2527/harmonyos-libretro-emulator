@@ -196,6 +196,7 @@ struct LibretroNewArchTestPage {
   private xComponentId: string = 'new_arch_xcomponent';
   private eventScope: EventHubScope | undefined = undefined;
   private inputDebugTimer: number = -1;
+  private pageActive: boolean = false;
   private uiTouchCount: number = 0;
   private uiMouseCount: number = 0;
   private uiKeyCount: number = 0;
@@ -250,6 +251,9 @@ struct LibretroNewArchTestPage {
     this.log(`refactoredStartEngine 返回: ${startResult.success}`);
     if (!startResult.success) { this.status = '启动失败'; return; }
     const started = await nativeApi.refactoredWaitForStateAsync(EngineState.STARTING, 5000);
+    if (!this.pageActive) {
+      return;
+    }
     this.status = started ? '引擎已启动' : '启动超时';
   };
   private onSetFilesDir = (): void => {
@@ -270,6 +274,9 @@ struct LibretroNewArchTestPage {
     this.log(`refactoredLoadCore 返回: ${coreResult.success}`);
     if (!coreResult.success) { this.status = '核心加载失败'; return; }
     const loaded = await nativeApi.refactoredWaitForStateAsync(EngineState.CORE_LOADED, 5000);
+    if (!this.pageActive) {
+      return;
+    }
     if (!loaded) {
       const err = nativeApi.refactoredGetLastErrorInfo();
       const detail = err && err.reason ? `原因: ${err.reason}` : '原因未知';
@@ -287,6 +294,9 @@ struct LibretroNewArchTestPage {
     this.log(`refactoredLoadRom 返回: ${romResult.success}`);
     if (!romResult.success) { this.status = 'ROM加载失败'; return; }
     const running = await nativeApi.refactoredWaitForStateAsync(EngineState.RUNNING, 5000);
+    if (!this.pageActive) {
+      return;
+    }
     if (!running) {
       const err = nativeApi.refactoredGetLastErrorInfo();
       const detail = err && err.reason ? `原因: ${err.reason}` : '原因未知';
@@ -310,9 +320,15 @@ struct LibretroNewArchTestPage {
   private onStopEngine = async (): Promise<void> => {
     this.log('调用 refactoredStopEngine');
     const ok: boolean = await nativeApi.refactoredStopEngineAsync();
+    if (!this.pageActive) {
+      return;
+    }
     this.log(`refactoredStopEngine 返回: ${ok}`);
     if (!ok) { this.status = '停止失败'; return; }
     const stopped = await nativeApi.refactoredWaitForStateAsync(EngineState.STOPPED, 5000);
+    if (!this.pageActive) {
+      return;
+    }
     this.status = stopped ? '已停止' : '停止超时';
   };
   private onQueryState = (): void => {
@@ -464,6 +480,7 @@ struct LibretroNewArchTestPage {
   };
 
   aboutToAppear() {
+    this.pageActive = true;
     this.log('页面加载');
 
     try {
@@ -503,6 +520,7 @@ struct LibretroNewArchTestPage {
   }
 
   aboutToDisappear() {
+    this.pageActive = false;
     if (this.eventScope) {
       this.eventScope.dispose();
       this.eventScope = undefined;
@@ -798,13 +816,21 @@ struct LibretroNewArchTestPage {
         return;
       }
       const result = await runtimeCoreDiagnosticController.testCoreLoader(corePath);
+      if (!this.pageActive) {
+        return;
+      }
       this.coreCheck.text = result;
     } catch (e) {
+      if (!this.pageActive) {
+        return;
+      }
       const msg = (e as Error)?.message || String(e);
       this.coreCheck.text = `Failed: ${msg}`;
       LogHelper.error('NewArchTest', 'Core', `符号验证异常: ${msg}`);
     } finally {
-      this.coreCheck.running = false;
+      if (this.pageActive) {
+        this.coreCheck.running = false;
+      }
     }
   }
 

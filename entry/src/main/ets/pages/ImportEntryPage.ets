@@ -166,22 +166,31 @@ struct ImportEntryPage {
       return
     }
 
-    const uris = await pickRomUris(context)
-    if (!this.pageActive) {
-      return
-    }
-    this.isScanning = false
-    this.particleBoosted = false
-    if (!uris || uris.length === 0) {
-      this.scanProgress = 0
-      this.scanStatusText = '未选择文件'
-      return
-    }
+    try {
+      const uris = await pickRomUris(context)
+      if (!this.pageActive) {
+        return
+      }
+      this.isScanning = false
+      this.particleBoosted = false
+      if (!uris || uris.length === 0) {
+        this.scanProgress = 0
+        this.scanStatusText = '未选择文件'
+        return
+      }
 
-    setPendingImportUris(uris)
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/ImportTaskOverlayPage' }).catch((err: Error) => {
-      LogHelper.error('ImportEntryPage', 'Route', `pushUrl failed: ${err.message}`)
-    })
+      setPendingImportUris(uris)
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/ImportTaskOverlayPage' }).catch((err: Error) => {
+        LogHelper.error('ImportEntryPage', 'Route', `pushUrl failed: ${err.message}`)
+      })
+    } catch (err) {
+      if (!this.pageActive) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('ImportEntryPage', 'Import', `选择导入文件失败: ${message}`)
+      this.resetImportState('文件选择失败')
+    }
   }
 
   private resetImportState(statusText: string): void {

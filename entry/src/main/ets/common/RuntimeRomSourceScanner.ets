@@ -22,6 +22,7 @@ interface BundledRomEntry {
 const nativeApi = testNapi as RuntimeRomSourceNapi
 
 const BUNDLED_ROM_ROOT_DIR = 'roms'
+const BUNDLED_ROM_SUBDIRS: string[] = ['', 'gba', 'nes', 'snes', 'gb_gbc', 'md', 'nds', 'misc', 'arcade']
 
 function normalizeBundledRawPath(path: string): string {
   const normalized = path.replace(/\\/g, '/').trim()
@@ -42,6 +43,10 @@ async function listBundledRomEntries(
 ): Promise<BundledRomEntry[] | undefined> {
   const result: BundledRomEntry[] = []
   const seenRelativePaths: Set<string> = new Set()
+  const groupedEntries: Map<string, BundledRomEntry[]> = new Map()
+  BUNDLED_ROM_SUBDIRS.forEach((dir: string) => {
+    groupedEntries.set(dir, [])
+  })
   let rawList: string[] = []
   try {
     rawList = await nativeApi.refactoredGetRawFileListAsync(context.resourceManager, BUNDLED_ROM_ROOT_DIR)
@@ -64,9 +69,28 @@ async function listBundledRomEntries(
     if (getPreferredCoreIdForFile(fileName).length === 0) {
       return
     }
-    result.push({
+    const entry: BundledRomEntry = {
       fileName,
       relativePath
+    }
+    const slash = relativePath.indexOf('/')
+    const subDir = slash >= 0 ? relativePath.substring(0, slash) : ''
+    const bucket = groupedEntries.get(subDir)
+    if (bucket) {
+      bucket.push(entry)
+      return
+    }
+    result.push(entry)
+  })
+  BUNDLED_ROM_SUBDIRS.forEach((subDir: string) => {
+    const bucket = groupedEntries.get(subDir) || []
+    LogHelper.info(
+      'RuntimeRomSourceScanner',
+      'Scan',
+      `${BUNDLED_ROM_ROOT_DIR}/${subDir.length > 0 ? subDir : '.'}: ${bucket.length} 个候选 ROM`
+    )
+    bucket.forEach((entry: BundledRomEntry) => {
+      result.push(entry)
     })
   })
   LogHelper.info(

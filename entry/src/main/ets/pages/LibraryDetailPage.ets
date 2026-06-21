@@ -217,17 +217,26 @@ struct LibraryDetailPage {
       this.showToastMessage('上下文不可用 CONTEXT_MISSING')
       return
     }
-    const record = await getLibraryRecordByRomFile(context, romFile)
-    if (!this.isCurrentPageTask(token)) {
-      return
+    try {
+      const record = await getLibraryRecordByRomFile(context, romFile)
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      if (!record) {
+        this.showToastMessage('条目不存在 RECORD_NOT_FOUND')
+        return
+      }
+      this.libraryRecord = record
+      this.invalidateDerivedCaches()
+      this.applyTelemetrySnapshot(record)
+    } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryDetailPage', 'Data', `读取详情条目失败: ${message}`)
+      this.showToastMessage('详情读取失败 DETAIL_LOAD_FAIL')
     }
-    if (!record) {
-      this.showToastMessage('条目不存在 RECORD_NOT_FOUND')
-      return
-    }
-    this.libraryRecord = record
-    this.invalidateDerivedCaches()
-    this.applyTelemetrySnapshot(record)
   }
 
   private resolveRequestedRomFile(): string {
@@ -249,6 +258,9 @@ struct LibraryDetailPage {
       clearTimeout(this.toastTimer)
     }
     this.toastTimer = setTimeout(() => {
+      if (!this.pageActive) {
+        return
+      }
       this.showToast = false
       this.toastTimer = -1
     }, 2600)
@@ -358,19 +370,28 @@ struct LibraryDetailPage {
     }
     const nextCoverKey = this.getNextCoverKey(target)
     const nextCoverColor = this.resolveCoverColorByKey(nextCoverKey)
-    const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
-    if (!this.isCurrentPageTask(token)) {
-      return
-    }
-    if (!updated) {
+    try {
+      const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      if (!updated) {
+        this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+        return
+      }
+      this.libraryRecord = updated
+      this.invalidateDerivedCaches()
+      this.applyTelemetrySnapshot(updated)
+      this.showActionMenu = false
+      this.showToastMessage('已切换内置封面 COVER_UPDATED')
+    } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryDetailPage', 'Cover', `更新封面失败: ${message}`)
       this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
-      return
     }
-    this.libraryRecord = updated
-    this.invalidateDerivedCaches()
-    this.applyTelemetrySnapshot(updated)
-    this.showActionMenu = false
-    this.showToastMessage('已切换内置封面 COVER_UPDATED')
   }
 
   private async deleteSaveFiles(): Promise<void> {
@@ -390,6 +411,9 @@ struct LibraryDetailPage {
         cleanLibraryFileName(target.fileName),
         () => this.isCurrentPageTask(token)
       )
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
       if (result.cancelled) {
         return
       }
@@ -401,6 +425,9 @@ struct LibraryDetailPage {
       this.showActionMenu = false
       this.showToastMessage(`已删除 ${result.deletedCount} 个存档 SAVE_PURGED`)
     } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryDetailPage', 'Save', `删除存档失败: ${message}`)
       this.showToastMessage('存档删除失败 SAVE_PURGE_FAIL')

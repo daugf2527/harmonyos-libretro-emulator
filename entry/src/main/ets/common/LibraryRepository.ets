@@ -849,7 +849,7 @@ function buildIndexPath(filesDir: string): string {
 
 async function ensureDirExists(path: string): Promise<void> {
   try {
-    await fs.mkdir(path)
+    await fs.mkdir(path, true)
   } catch (err) {
     return
   }

@@ -933,7 +933,7 @@ async function deletePathIfExists(path: string): Promise<void> {
 
 async function ensureDirExists(path: string): Promise<void> {
   try {
-    await fs.mkdir(path)
+    await fs.mkdir(path, true)
   } catch (err) {
     return
   }

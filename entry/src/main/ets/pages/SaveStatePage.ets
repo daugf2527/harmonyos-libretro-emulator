@@ -333,6 +333,7 @@ struct SaveStatePage {
   }
 
   private async loadSave(fileName: string): Promise<void> {
+    const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
       this.showToastMessage(ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_LOAD_FAILED.numericCode))
@@ -353,6 +354,9 @@ struct SaveStatePage {
           : ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_LOAD_FAILED.numericCode)
       )
     } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
       const message = (err as Error).message || String(err)
       LogHelper.error('SaveStatePage', 'Save', `读取即时存档失败: ${message}`)
       // 使用错误码提供具体错误信息

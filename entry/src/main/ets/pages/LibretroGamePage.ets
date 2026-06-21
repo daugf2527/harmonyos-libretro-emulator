@@ -537,7 +537,11 @@ struct LibretroGamePage {
       hwRenderAllowed: this.hwRenderAllowed,
       updatedAt: this.renderSettingsProfile.updatedAt
     };
-    this.renderSettingsProfile = await saveRuntimeRenderSettingsProfile(context, this.renderSettingsProfile);
+    const savedProfile = await saveRuntimeRenderSettingsProfile(context, this.renderSettingsProfile);
+    if (!this.pageActive) {
+      return;
+    }
+    this.renderSettingsProfile = savedProfile;
   }
 
   private getCurrentRuntimeRomFile(): string {
@@ -2848,6 +2852,7 @@ struct LibretroGamePage {
         void runtimeSessionController.stopAsync();
       }
       this.switching = false;
+      let nextSwitch: PendingSwitch | undefined = undefined;
       if (this.pendingSwitch) {
         const pending = this.pendingSwitch;
         this.pendingSwitch = undefined;
@@ -2865,8 +2870,9 @@ struct LibretroGamePage {
             this.switchError = `切换失败: ${this.switchError || '未知错误'} (已重试 ${pending.retryCount} 次)`;
             return;
           }
-          // 增加重试计数
-          this.pendingSwitch = {
+          // 同一请求的失败重试直接作为下一次切换执行，避免把重试再次留在
+          // pending 队列里并在成功后触发重复切换。
+          nextSwitch = {
             coreIndex: pending.coreIndex,
             romIndex: pending.romIndex,
             retryCount: pending.retryCount + 1
@@ -2876,15 +2882,18 @@ struct LibretroGamePage {
             'Engine',
             `切换失败，准备重试 (${pending.retryCount + 1}/${this.maxSwitchRetries})`
           );
+        } else {
+          nextSwitch = pending;
         }
-
+      }
+      if (nextSwitch) {
         // 执行 pending 切换
-        this.selectedCoreIndex = pending.coreIndex;
+        this.selectedCoreIndex = nextSwitch.coreIndex;
         this.updateRomOptions();
         const availableRoms = this.getAvailableRoms();
         this.selectedRomIndex =
-          pending.romIndex < availableRoms.length ? pending.romIndex : 0;
-        this.startOrSwitchGame(true);
+          nextSwitch.romIndex < availableRoms.length ? nextSwitch.romIndex : 0;
+        void this.startOrSwitchGame(true);
       }
     }
   }

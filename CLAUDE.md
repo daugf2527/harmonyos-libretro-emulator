@@ -199,7 +199,7 @@ Restart session and verify with `node --version` plus `/mcp` (all servers should
 
 1. First try: `mcp__web-search__web_search` 英文 query + `site:developer.huawei.com`。
 2. 单 URL 深读：`mcp__web-search__web_fetch` 传 url + prompt。
-3. 本机 SDK header 优先（OH_* API 契约直接读 `D:\Program Files\DevEco Studio\sdk\...\external_window.h` 等）—— 见 memory `feedback_websearch_fail_fallback_to_sdk_header`。
+3. 本机 SDK header 优先（OH_* API 契约直接读 `D:\command-line-tools\sdk\default\openharmony\...\external_window.h` 或 `D:\DevEco Studio\sdk\default\openharmony\...\external_window.h`）—— 见 memory `feedback_websearch_fail_fallback_to_sdk_header`。
 4. HarmonyOS API26 官方页面很多是 SPA；抓不到正文时，不要猜，回退到本机 SDK header、`docs/harmonyos-sdk-target.md` 和 API diff 页面。
 
 > firecrawl 工具组（scrape / search / parse 等 24 个）已于 2026-05-28 整体弃用，见 memory `feedback_firecrawl_deprecated`。
