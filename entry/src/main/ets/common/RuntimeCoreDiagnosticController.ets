@@ -46,7 +46,13 @@ export class RuntimeCoreDiagnosticController {
     if (!testNapi) {
       return 'Error: engine not ready'
     }
-    return nativeApi.testCoreLoader(path)
+    try {
+      return await nativeApi.testCoreLoader(path)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeCoreDiagnostic', 'Core', `核心符号探测失败: ${message}`)
+      return `Error: ${message}`
+    }
   }
 
   async inspectCoreCapabilities(
