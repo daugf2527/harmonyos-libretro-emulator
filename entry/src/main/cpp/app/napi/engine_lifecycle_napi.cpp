@@ -1121,9 +1121,14 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
       napi_release_threadsafe_function(ctx->progressTsfn, napi_tsfn_release);
       ctx->progressTsfn = nullptr;
     }
-    napi_value falseVal = MakeBool(env, false);
-    if (falseVal) {
-      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    GetEngine()->SetLastErrorInfo("switch_async_resource_name_failed",
+                                  "SwitchGameAsync",
+                                  "MakeString(resourceName) failed");
+    napi_value result = MakeErrorResult(
+        env, false, EngineErrorCodes::STATE_TRANSITION_FAILED,
+        "SwitchGameAsync: failed to create async resource name");
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
     }
     delete ctx;
     return promise;
@@ -1140,9 +1145,11 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
       napi_release_threadsafe_function(ctx->progressTsfn, napi_tsfn_release);
       ctx->progressTsfn = nullptr;
     }
-    napi_value falseVal = MakeBool(env, false);
-    if (falseVal) {
-      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    napi_value result = MakeErrorResult(
+        env, false, EngineErrorCodes::STATE_TRANSITION_FAILED,
+        "SwitchGameAsync: napi_create_async_work failed");
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
     }
     delete ctx;
     return promise;
@@ -1160,9 +1167,11 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     }
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
-    napi_value falseVal = MakeBool(env, false);
-    if (falseVal) {
-      (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
+    napi_value result = MakeErrorResult(
+        env, false, EngineErrorCodes::STATE_TRANSITION_FAILED,
+        "SwitchGameAsync: napi_queue_async_work failed");
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
     }
     delete ctx;
     return promise;
