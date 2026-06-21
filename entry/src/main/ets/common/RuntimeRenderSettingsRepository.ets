@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { fileIo as fs } from '@kit.CoreFileKit'
+import LogHelper from './LogHelper'
 
 export interface RuntimeRenderSettingsProfile {
   version: number
@@ -31,14 +32,16 @@ export async function loadRuntimeRenderSettingsProfile(
   context: common.UIAbilityContext
 ): Promise<RuntimeRenderSettingsProfile> {
   const path = buildRuntimeRenderSettingsPath(context.filesDir)
+  const text = await readOptionalText(path)
+  if (!text || text.length === 0) {
+    return createDefaultRuntimeRenderSettingsProfile()
+  }
   try {
-    const text = await fs.readText(path)
-    if (!text || text.length === 0) {
-      return createDefaultRuntimeRenderSettingsProfile()
-    }
     const parsed = JSON.parse(text) as Partial<RuntimeRenderSettingsProfile> | null
     return normalizeRuntimeRenderSettingsProfile(parsed)
-  } catch (_err) {
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('RuntimeRenderSettingsRepository', 'Load', `渲染配置损坏，已回退默认值: ${message}`)
     return createDefaultRuntimeRenderSettingsProfile()
   }
 }
@@ -157,5 +160,25 @@ async function ensureDirExists(path: string): Promise<void> {
     await fs.mkdir(path, true)
   } catch (_err) {
     return
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (_err) {
+    return ''
   }
 }

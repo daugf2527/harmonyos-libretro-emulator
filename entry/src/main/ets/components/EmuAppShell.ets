@@ -63,6 +63,8 @@ export struct EmuHeaderBar {
 }
 
 @ComponentV2
+// Canvas owns a per-instance rendering context; keep this boundary explicit.
+// homecheck-disable-next-line @performance/avoid-overusing-custom-component-check
 export struct EmuPrecisionGridBackdrop {
   private settings: RenderingContextSettings = new RenderingContextSettings(true)
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings)

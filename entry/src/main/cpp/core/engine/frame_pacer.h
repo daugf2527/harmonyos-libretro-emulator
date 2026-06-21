@@ -94,7 +94,7 @@ public:
 private:
   // [2026-06-07] 撤销模拟器渲染降频 30fps(原 commit 14b4759)。
   // 经用户实测权衡后决定恢复 60fps 显示:降频虽缓解模拟器音频 underrun,但牺牲了
-  // 输入→画面跟手度;且音频 underrun 本质是 API22 模拟器缺实时调度(workgroup/QoS)
+  // 输入→画面跟手度;且音频 underrun 本质是当前模拟器缺实时调度(workgroup/QoS)
   // 的平台问题,真机/5.0.5 不存在(真机本就 60fps)。故渲染节拍统一按 target fps,
   // 不再因模拟器(busy_wait_allowed_==false)封顶 30fps。如需回退降频见 git 14b4759。
   // 注:busy_wait_allowed_ 仍保留——它独立门控 EndFrame 的"纯 sleep vs 末尾自旋",

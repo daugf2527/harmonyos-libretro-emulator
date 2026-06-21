@@ -61,6 +61,7 @@ struct SaveStatePage {
   private pageTaskToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
   private readonly coverColors: string[] = ['#274530', '#27405E', '#4A3628', '#39364A']
+  private readonly formatDate: Date = new Date(0)
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
     this.detectFoldMode()
   }
@@ -238,7 +239,8 @@ struct SaveStatePage {
   }
 
   private formatDateTime(timestamp: number): string {
-    const date = new Date(timestamp)
+    this.formatDate.setTime(timestamp)
+    const date = this.formatDate
     const month = `${date.getMonth() + 1}`.padStart(2, '0')
     const day = `${date.getDate()}`.padStart(2, '0')
     const hour = `${date.getHours()}`.padStart(2, '0')

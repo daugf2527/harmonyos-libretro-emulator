@@ -191,6 +191,7 @@ struct LibretroNewArchTestPage {
   @Local coreCheck: CoreCheckState = new CoreCheckState();
   @Local soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
   private readonly soakController: RuntimeSoakTestController = new RuntimeSoakTestController();
+  private readonly logDate: Date = new Date();
 
   private xComponentId: string = 'new_arch_xcomponent';
   private eventScope: EventHubScope | undefined = undefined;
@@ -255,7 +256,7 @@ struct LibretroNewArchTestPage {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) { this.log('获取上下文失败'); return; }
     const filesDir = context.filesDir;
-    this.log(`调用 refactoredSetFilesDir: ${filesDir}`);
+    this.log(`调用 refactoredSetFilesDir: ${LogHelper.describePathForLog(filesDir)}`);
     const ok: boolean = nativeApi.refactoredSetFilesDir(filesDir);
     this.log(`refactoredSetFilesDir 返回: ${ok}`);
   };
@@ -264,7 +265,7 @@ struct LibretroNewArchTestPage {
     if (!context) { this.log('获取上下文失败'); return; }
     const abiPath = this.resolveAbiPath();
     const corePath = `${context.bundleCodeDir}/libs/${abiPath}/libgambatte_libretro.so`;
-    this.log(`调用 refactoredLoadCore: ${corePath}`);
+    this.log(`调用 refactoredLoadCore: ${LogHelper.describePathForLog(corePath)}`);
     const coreResult = nativeApi.refactoredLoadCore(corePath);
     this.log(`refactoredLoadCore 返回: ${coreResult.success}`);
     if (!coreResult.success) { this.status = '核心加载失败'; return; }
@@ -512,7 +513,8 @@ struct LibretroNewArchTestPage {
   }
 
   log(msg: string) {
-    const time = new Date().toLocaleTimeString();
+    this.logDate.setTime(Date.now());
+    const time = this.logDate.toLocaleTimeString();
     this.logs = [`[${time}] ${msg}`, ...this.logs.slice(0, 19)];
     LogHelper.info('NewArchTest', 'Test', msg);
   }
@@ -677,7 +679,7 @@ struct LibretroNewArchTestPage {
     this.syncAudioAlert();
 
     if (this.autoAdjust && this.audioStatus.underrun) {
-      const now = new Date().getTime();
+      const now = Date.now();
       if (now - this.lastAdjustTs > 2000) {
         this.latencyMs = Math.min(200, this.latencyMs + 20);
         nativeApi.refactoredSetMinimumAudioLatency(this.latencyMs);

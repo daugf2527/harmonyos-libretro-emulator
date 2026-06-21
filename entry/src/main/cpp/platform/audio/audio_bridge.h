@@ -94,9 +94,7 @@ public:
   // 平台实时调度能力(由引擎 GameLoop 入口 OH_QoS_SetThreadQoS 成败注入):
   // true=真机(有 RT,回调规整)→ 浅缓冲低延迟;false=模拟器(无 RT,回调抖)→ 深缓冲抗抖动。
   // 须在 AudioBridge::Initialize 之前调用方生效(引擎设 QoS 后即调,早于游戏加载)。
-  void SetRtSchedulingAvailable(bool available) {
-    rt_scheduling_available_.store(available, std::memory_order_relaxed);
-  }
+  void SetRtSchedulingAvailable(bool available);
 
 private:
   // --- 平台双 profile:缓冲深度 + DRC 带 ---
@@ -108,6 +106,8 @@ private:
   // DRC 带语义: 水位 < low 加速生产补水、> high 减速,把水位维持在带内。
   static constexpr int kMinBufferMsDevice = 100;
   static constexpr int kMinBufferMsEmulator = 250;
+  static constexpr int kAdaptiveBoostMsStep = 50;
+  static constexpr int kAdaptiveBoostMsMax = 150;
   static constexpr float kDrcLowThresholdDevice = 0.06f;    // ~82ms
   static constexpr float kDrcHighThresholdDevice = 0.11f;   // ~150ms
   static constexpr float kDrcLowThresholdEmulator = 0.12f;  // ~164ms
@@ -146,6 +146,7 @@ private:
   std::atomic<size_t> min_buffer_frames_{0};
   std::atomic<size_t> default_min_buffer_frames_{0};
   std::atomic<unsigned> minimum_latency_ms_{0};
+  std::atomic<unsigned> adaptive_buffer_boost_ms_{0};
   std::atomic<int> volume_percent_{100};
 
   // DRC 更新节流（从 static 移为成员变量，避免多线程数据竞争）
@@ -176,6 +177,9 @@ private:
   uint32_t recover_streak_{0};
 
   void SetRunState(AudioRunState state, const char *reason = nullptr);
+  void ApplyAudioProfileLocked();
+  void IncreaseAdaptiveBufferBoostLocked();
+  void ResetAdaptiveBufferBoostLocked();
 
   AudioBridge(const AudioBridge &) = delete;
   AudioBridge &operator=(const AudioBridge &) = delete;

@@ -33,6 +33,8 @@ struct CoreLoaderTest {
   @Local coreDescription: string = '';
   private bundleCodeDir: string = '';
   private abiPath: string = 'arm64';
+  private pageActive: boolean = false;
+  private testTaskToken: number = 0;
   private cores: CoreConfig[] = [
     {
       id: 'libretro_2048',
@@ -223,6 +225,8 @@ struct CoreLoaderTest {
   ];
 
   aboutToAppear() {
+    this.pageActive = true;
+
     // 获取沙箱路径 (官方推荐方式)
     let bundleCodeDir = this.getUIContext().getHostContext()!.bundleCodeDir;
 
@@ -237,9 +241,23 @@ struct CoreLoaderTest {
     });
     this.updateCorePath();
 
-    LogHelper.info('CoreLoaderTest', 'Init', `Bundle code dir: ${bundleCodeDir}`);
+    LogHelper.info('CoreLoaderTest', 'Init', `Bundle code dir: ${LogHelper.describePathForLog(bundleCodeDir)}`);
     LogHelper.info('CoreLoaderTest', 'Init', `ABI: ${abiPath}`);
-    LogHelper.info('CoreLoaderTest', 'Init', `Core path: ${this.corePath}`);
+    LogHelper.info('CoreLoaderTest', 'Init', `Core path: ${LogHelper.describePathForLog(this.corePath)}`);
+  }
+
+  aboutToDisappear() {
+    this.pageActive = false;
+    this.testTaskToken += 1;
+  }
+
+  private beginTestTask(): number {
+    this.testTaskToken += 1;
+    return this.testTaskToken;
+  }
+
+  private isCurrentTestTask(token: number): boolean {
+    return this.pageActive && token === this.testTaskToken;
   }
 
   build() {
@@ -354,14 +372,22 @@ struct CoreLoaderTest {
    * 运行 CoreLoader 测试
    */
   private async runTest() {
+    const token = this.beginTestTask();
     LogHelper.info('CoreLoaderTest', 'Test', 'Starting test...');
     this.isLoading = true;
     this.testResult = '正在测试...\n请查看日志输出';
 
     try {
       // 调用 Native 侧的测试函数 (传递沙箱路径)
-      LogHelper.info('CoreLoaderTest', 'Test', `Calling testCoreLoader with path: ${this.corePath}`);
+      LogHelper.info(
+        'CoreLoaderTest',
+        'Test',
+        `Calling testCoreLoader with path: ${LogHelper.describePathForLog(this.corePath)}`
+      );
       let result = await nativeApi.testCoreLoader(this.corePath);
+      if (!this.isCurrentTestTask(token)) {
+        return;
+      }
 
       LogHelper.info('CoreLoaderTest', 'Test', `Test result: ${result}`);
       this.testResult = result;
@@ -373,11 +399,16 @@ struct CoreLoaderTest {
         LogHelper.error('CoreLoaderTest', 'Test', 'Test FAILED');
       }
     } catch (error) {
+      if (!this.isCurrentTestTask(token)) {
+        return;
+      }
       let errorMsg = `Exception: ${error}`;
       LogHelper.error('CoreLoaderTest', 'Test', errorMsg);
       this.testResult = `Failed: ${errorMsg}`;
     } finally {
-      this.isLoading = false;
+      if (this.isCurrentTestTask(token)) {
+        this.isLoading = false;
+      }
     }
   }
 

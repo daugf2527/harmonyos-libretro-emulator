@@ -1141,6 +1141,8 @@ struct ImportTaskOverlayPage {
 
 @Preview
 @ComponentV2
+// Preview-only wrapper keeps DevEco preview isolated from the entry page.
+// homecheck-disable-next-line @performance/avoid-overusing-custom-component-check
 struct ImportTaskOverlayPagePreview {
   build() {
     ImportTaskOverlayPage()

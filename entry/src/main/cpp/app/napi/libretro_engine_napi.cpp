@@ -7,5 +7,5 @@ void RegisterLibretroRefactoredNapi(napi_env env, napi_value exports) {
   RegisterStateNapi(env, exports);
   RegisterDiskNapi(env, exports);
   RegisterQueryNapi(env, exports);
-  LOGF(LOG_INFO, " [NEW] LibretroRefactored NAPI registered (58 functions, 6 modules)"); // Audit T1-F7: updated count
+  LOGF(LOG_INFO, " [NEW] LibretroRefactored NAPI registered (63 functions, 6 modules)");
 }

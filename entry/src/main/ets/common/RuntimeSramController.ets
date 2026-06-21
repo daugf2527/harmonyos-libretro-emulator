@@ -50,7 +50,7 @@ export class RuntimeSramController {
       LogHelper.info(
         'RuntimeSram',
         'SRAM',
-        `运行态 SRAM 备份已写入: rom=${romFile} file=${saved.fileName} bytes=${saved.byteLength}`
+        `运行态 SRAM 备份已写入: rom=${LogHelper.describePathForLog(romFile)} file=${LogHelper.describePathForLog(saved.fileName)} bytes=${saved.byteLength}`
       )
       return '电池存档已导出'
     } catch (err) {
@@ -97,7 +97,7 @@ export class RuntimeSramController {
     try {
       const data = await readRuntimeSramBackup(context, romFile, fileName)
       const applied = this.setCurrentSram(data)
-      LogHelper.info('RuntimeSram', 'SRAM', `运行态 SRAM 载入: file=${fileName} ok=${applied}`)
+      LogHelper.info('RuntimeSram', 'SRAM', `运行态 SRAM 载入: file=${LogHelper.describePathForLog(fileName)} ok=${applied}`)
       return applied ? '电池存档已载入' : '当前核心未接受 SRAM 写入'
     } catch (err) {
       const message = (err as Error).message || String(err)
@@ -123,7 +123,7 @@ export class RuntimeSramController {
 
     try {
       await deleteRuntimeSramBackup(context, romFile, fileName)
-      LogHelper.info('RuntimeSram', 'SRAM', `运行态 SRAM 备份已删除: file=${fileName}`)
+      LogHelper.info('RuntimeSram', 'SRAM', `运行态 SRAM 备份已删除: file=${LogHelper.describePathForLog(fileName)}`)
       return '电池存档已删除'
     } catch (err) {
       const message = (err as Error).message || String(err)

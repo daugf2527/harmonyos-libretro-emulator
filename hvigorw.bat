@@ -18,6 +18,7 @@ if errorlevel 1 set "PATH=%POWERSHELL_DIR%;%PATH%"
 
 if defined HARMONY_HVIGORW_BIN if exist "%HARMONY_HVIGORW_BIN%" goto run_hvigor
 if defined HARMONY_COMMANDLINE_TOOLS_HOME if exist "%HARMONY_COMMANDLINE_TOOLS_HOME%\bin\hvigorw.bat" set "HARMONY_HVIGORW_BIN=%HARMONY_COMMANDLINE_TOOLS_HOME%\bin\hvigorw.bat"
+if not defined HARMONY_HVIGORW_BIN if exist "D:\command-line-tools\bin\hvigorw.bat" set "HARMONY_HVIGORW_BIN=D:\command-line-tools\bin\hvigorw.bat"
 if not defined HARMONY_HVIGORW_BIN if exist "D:\hongmeng\command-line-tools\bin\hvigorw.bat" set "HARMONY_HVIGORW_BIN=D:\hongmeng\command-line-tools\bin\hvigorw.bat"
 
 :run_hvigor

@@ -75,6 +75,42 @@ older clients pull them in on demand when Claude works under those paths.
 - Deprecated code lives only in `deprecated/legacy/` (excluded from mainline, also in `.claudeignore`).
 - All changes must pass regression guards (`scripts/ci/check_regression_guards.sh`).
 
+## AI Execution SOP
+
+When Claude takes a task in this repo, follow this order:
+
+1. Read task-adjacent truth first:
+   - `build-profile.json5`
+   - `entry/src/main/module.json5`
+   - `docs/harmonyos-sdk-target.md`
+2. Classify the issue before editing:
+   - ArkTS/UI
+   - NAPI contract
+   - engine lifecycle/state machine
+   - video / XComponent / NativeWindow
+   - audio / OHAudio
+   - resource loading / rawfile
+   - file security / core loading
+3. Find at least 3 nearby patterns before introducing a new approach.
+4. Keep edits local to one layer unless the contract itself changed.
+5. If a contract changed, update all dependent surfaces in the same turn:
+   - native export registration
+   - `entry/src/main/cpp/types/libentry/index.d.ts`
+   - ArkTS call sites
+   - repo docs/inventory when applicable
+6. State verification boundaries explicitly. If no hvigor/device/emulator validation ran, say so.
+
+## Where To Look First
+
+- ArkTS page behavior: `entry/src/main/ets/pages/`, `components/`, `common/`
+- NAPI exports: `entry/src/main/cpp/app/napi/`, `module_init.cpp`, `libretro_engine_napi.cpp`
+- Type contract: `entry/src/main/cpp/types/libentry/index.d.ts`
+- Engine state/lifecycle: `entry/src/main/cpp/core/engine/libretro_engine.cpp`
+- Video path: `core/engine/video_pipeline.*`, `platform/graphics/`, `core/engine/window_*`
+- Audio path: `platform/audio/audio_bridge.cpp`, `audio_player.cpp`, `ring_buffer.*`
+- Resource/core loading: `platform/resource/`, `core/libretro/core_loader.*`, `common/file_security.*`
+- Input path: `core/engine/input_manager.*`, `input_snapshot.h`, `app/napi/engine_input_napi.cpp`
+
 ## MCP / Skill 工具决策树
 
 **按语言 + 用途分工**（消除 "cclsp 优先 / serena 备选" 二选一歧义）：
@@ -136,8 +172,13 @@ Restart session and verify with `node --version` plus `/mcp` (all servers should
 - python3 `/c/Users/newwo/bin/python3` (v3.8.1)
 - node/npm `D:\nodejs` (v22.22.0 / v10.8.2)
 - PowerShell `C:\Windows\System32\WindowsPowerShell\v1.0`
-- DevEco Studio `D:\Program Files\DevEco Studio\bin`
-- HarmonyOS CLI `D:\hongmeng\command-line-tools\bin`
+- DevEco Studio `D:\DevEco Studio\bin`
+- HarmonyOS CLI `D:\command-line-tools\bin`
+
+**API26 current baseline**:
+- `targetSdkVersion` / `compatibleSdkVersion`: `26.0.0`
+- primary SDK doc: `docs/harmonyos-sdk-target.md`
+- do not default back to old API22 toolchains under `D:\hongmeng\command-line-tools` or `D:\Program Files\DevEco Studio`
 
 **statusline**: `~/.claude/statusline.sh` uses pure bash JSON parsing (grep + sed) to avoid node/jq dependency.
 
@@ -154,13 +195,20 @@ Restart session and verify with `node --version` plus `/mcp` (all servers should
 | W7 | MCP server OAuth 后启动超时 | 启动前 `$env:MCP_TIMEOUT=10000` |
 | W9 | 不知 Claude Code 健康状态 | 会话内 `/doctor`；命令行 `claude doctor` |
 
-## Web research tips (developer.huawei.com)
+## Web research tips (developer.huawei.com / API26)
 
 1. First try: `mcp__web-search__web_search` 英文 query + `site:developer.huawei.com`。
 2. 单 URL 深读：`mcp__web-search__web_fetch` 传 url + prompt。
 3. 本机 SDK header 优先（OH_* API 契约直接读 `D:\Program Files\DevEco Studio\sdk\...\external_window.h` 等）—— 见 memory `feedback_websearch_fail_fallback_to_sdk_header`。
+4. HarmonyOS API26 官方页面很多是 SPA；抓不到正文时，不要猜，回退到本机 SDK header、`docs/harmonyos-sdk-target.md` 和 API diff 页面。
 
 > firecrawl 工具组（scrape / search / parse 等 24 个）已于 2026-05-28 整体弃用，见 memory `feedback_firecrawl_deprecated`。
+
+## Multi-device boundary
+
+- Current module target is `phone` only (`entry/src/main/module.json5`).
+- Do not expand a task into distributed/multi-device adaptation unless the user explicitly asks for it or `deviceTypes` changes.
+- For HarmonyOS new system capabilities, treat them as optional extension points first, not implied requirements for current fixes.
 
 ## 代码搜索工具策略
 

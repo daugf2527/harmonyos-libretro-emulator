@@ -24,6 +24,11 @@ interface RuntimeCheatStore {
 const RUNTIME_CHEAT_STORE_VERSION = 1
 const RUNTIME_CHEAT_DIR_NAME = 'runtime'
 const RUNTIME_CHEAT_FILE_NAME = 'cheats.json'
+const MAX_RUNTIME_CHEAT_ITEMS = 1024
+const MAX_RUNTIME_CHEAT_CODE_LENGTH = 240
+const MAX_RUNTIME_CHEAT_LABEL_LENGTH = 80
+const MAX_RUNTIME_CHEAT_ID_LENGTH = 96
+const MAX_RUNTIME_CHEAT_ROM_FILE_LENGTH = 512
 
 export function createRuntimeCheatItem(
   label: string,
@@ -124,11 +129,11 @@ async function loadRuntimeCheatStore(
   context: common.UIAbilityContext
 ): Promise<RuntimeCheatStore> {
   const path = buildRuntimeCheatPath(context.filesDir)
+  const text = await readOptionalText(path)
+  if (!text || text.length === 0) {
+    return createDefaultRuntimeCheatStore()
+  }
   try {
-    const text = await fs.readText(path)
-    if (!text || text.length === 0) {
-      return createDefaultRuntimeCheatStore()
-    }
     const parsed = JSON.parse(text) as Partial<RuntimeCheatStore> | null
     return normalizeRuntimeCheatStore(parsed)
   } catch (_err) {
@@ -194,6 +199,9 @@ function normalizeRuntimeCheatRomEntry(
 function normalizeRuntimeCheatItems(items: RuntimeCheatItem[]): RuntimeCheatItem[] {
   const normalizedItems: RuntimeCheatItem[] = []
   items.forEach((item: RuntimeCheatItem, index: number) => {
+    if (normalizedItems.length >= MAX_RUNTIME_CHEAT_ITEMS) {
+      return
+    }
     const normalized = normalizeRuntimeCheatItem(item, index)
     if (normalized.code.length > 0) {
       normalizedItems.push(normalized)
@@ -207,8 +215,8 @@ function normalizeRuntimeCheatItem(
   index: number
 ): RuntimeCheatItem {
   const updatedAt = normalizeUpdatedAt(item?.updatedAt)
-  const label = typeof item?.label === 'string' ? item.label.trim() : ''
-  const code = typeof item?.code === 'string' ? item.code.trim() : ''
+  const label = normalizeTextField(item?.label, MAX_RUNTIME_CHEAT_LABEL_LENGTH)
+  const code = normalizeCheatCode(item?.code)
 
   return {
     id: normalizeCheatId(item?.id, index, updatedAt),
@@ -224,8 +232,9 @@ function normalizeCheatId(
   index: number,
   updatedAt: number
 ): string {
-  if (typeof id === 'string' && id.trim().length > 0) {
-    return id.trim()
+  const normalizedId = normalizeTextField(id, MAX_RUNTIME_CHEAT_ID_LENGTH)
+  if (normalizedId.length > 0) {
+    return normalizedId
   }
   return `runtime-cheat-${updatedAt}-${index}`
 }
@@ -236,7 +245,34 @@ function normalizeUpdatedAt(updatedAt: number | undefined): number {
 }
 
 function normalizeRomFile(romFile: string | undefined): string {
-  return typeof romFile === 'string' ? romFile.trim() : ''
+  const normalized = normalizeTextField(romFile, MAX_RUNTIME_CHEAT_ROM_FILE_LENGTH)
+  if (normalized.includes('\u0000') || normalized.includes('..') || normalized.includes('\\')) {
+    return ''
+  }
+  return normalized
+}
+
+function normalizeTextField(value: string | undefined, maxLength: number): string {
+  if (typeof value !== 'string') {
+    return ''
+  }
+  const withoutControls = value.replace(/[\u0000-\u001F\u007F]/g, '').trim()
+  return withoutControls.length > maxLength ? withoutControls.substring(0, maxLength) : withoutControls
+}
+
+function normalizeCheatCode(code: string | undefined): string {
+  if (typeof code !== 'string') {
+    return ''
+  }
+  let normalized = ''
+  const trimmed = code.trim()
+  for (let index = 0; index < trimmed.length && normalized.length < MAX_RUNTIME_CHEAT_CODE_LENGTH; index++) {
+    const charCode = trimmed.charCodeAt(index)
+    if (charCode >= 0x20 && charCode <= 0x7E) {
+      normalized += trimmed.charAt(index)
+    }
+  }
+  return normalized
 }
 
 function buildRuntimeCheatDirPath(filesDir: string): string {
@@ -252,5 +288,25 @@ async function ensureDirExists(path: string): Promise<void> {
     await fs.mkdir(path, true)
   } catch (_err) {
     return
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (_err) {
+    return ''
   }
 }

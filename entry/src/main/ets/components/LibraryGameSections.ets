@@ -37,6 +37,33 @@ class LibraryDataSource implements IDataSource {
   }
 }
 
+function buildLibraryRecordKey(item: LibraryRecord): string {
+  return `${item.sourceType}:${item.romFile}:${item.id}`
+}
+
+@ReusableV2
+@ComponentV2
+struct LibraryGameListItem {
+  @Param title: string = ''
+  @Param subtitle: string = ''
+  @Param platform: string = ''
+  @Param coverColor: string = '#2C2C2C'
+  @Param coverKey: string = ''
+  @Param coverUrl: string = ''
+
+  build() {
+    GameCard({
+      title: this.title,
+      subtitle: this.subtitle,
+      platform: this.platform,
+      coverColor: this.coverColor,
+      coverKey: this.coverKey,
+      coverUrl: this.coverUrl,
+      variant: 'list'
+    })
+  }
+}
+
 export interface LibraryGameSectionsState {
   recentGames: LibraryRecord[]
   games: LibraryRecord[]
@@ -87,19 +114,19 @@ export struct LibraryGameSections {
 
       LazyForEach(this.allGamesDataSource, (item: LibraryRecord) => {
         ListItem() {
-          GameCard({
+          LibraryGameListItem({
             title: item.title,
             subtitle: item.subtitle,
             platform: item.platform,
             coverColor: item.coverColor,
             coverKey: item.coverKey,
-            variant: 'list'
+            coverUrl: item.coverUrl ?? ''
           })
             .onTouch((event: TouchEvent) => {
               this.onCardTouch?.(event, item)
             })
         }
-      }, (item: LibraryRecord) => item.id)
+      }, (item: LibraryRecord) => buildLibraryRecordKey(item))
 
       if (this.bottomLoaderActive || (this.games.length === 0 && this.recentGames.length === 0)) {
         ListItem() {
@@ -110,6 +137,7 @@ export struct LibraryGameSections {
     .width('100%')
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.None)
+    .cachedCount(2)
     .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
       this.onListScrolled?.(Math.max(0, Number(this.listScroller.currentOffset().yOffset)))
     })
@@ -143,7 +171,7 @@ export struct LibraryGameSections {
         .onTouch((event: TouchEvent) => {
           this.onCardTouch?.(event, item)
         })
-      }, (item: LibraryRecord) => item.id)
+      }, (item: LibraryRecord) => buildLibraryRecordKey(item))
     }
     .width('100%')
   }

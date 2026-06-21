@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { fileIo as fs } from '@kit.CoreFileKit'
+import LogHelper from './LogHelper'
 
 export interface RuntimeInputPreferencesProfile {
   version: number
@@ -25,14 +26,16 @@ export async function loadRuntimeInputPreferencesProfile(
   context: common.UIAbilityContext
 ): Promise<RuntimeInputPreferencesProfile> {
   const path = buildRuntimeInputPreferencesPath(context.filesDir)
+  const text = await readOptionalText(path)
+  if (!text || text.length === 0) {
+    return createDefaultRuntimeInputPreferencesProfile()
+  }
   try {
-    const text = await fs.readText(path)
-    if (!text || text.length === 0) {
-      return createDefaultRuntimeInputPreferencesProfile()
-    }
     const parsed = JSON.parse(text) as Partial<RuntimeInputPreferencesProfile> | null
     return normalizeRuntimeInputPreferencesProfile(parsed)
-  } catch (_err) {
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('RuntimeInputPreferencesRepository', 'Load', `输入偏好配置损坏，已回退默认值: ${message}`)
     return createDefaultRuntimeInputPreferencesProfile()
   }
 }
@@ -93,5 +96,25 @@ async function ensureDirExists(path: string): Promise<void> {
     await fs.mkdir(path, true)
   } catch (_err) {
     return
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (_err) {
+    return ''
   }
 }

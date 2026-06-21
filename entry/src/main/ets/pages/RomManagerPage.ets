@@ -1,5 +1,4 @@
 import { common } from '@kit.AbilityKit'
-import { fileIo as fs } from '@kit.CoreFileKit'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuColors, EmuSpacing, EmuTypography, EmuStateColors } from '../common/EmuUiTokens'
 import {
@@ -16,6 +15,7 @@ import { scanLibraryRomSources } from '../common/RuntimeRomSourceScanner'
 import {
   pickRomUris,
   importRomUris,
+  deleteImportedRomFile,
   RomImportProgress,
   RomImportResult
 } from '../common/RomImportService'
@@ -398,7 +398,7 @@ struct RomManagerPage {
     }
 
     try {
-      await fs.unlink(item.filePath)
+      await deleteImportedRomFile(context, item.filePath)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('RomManagerPage', 'Delete', `删除文件失败: ${message}`)

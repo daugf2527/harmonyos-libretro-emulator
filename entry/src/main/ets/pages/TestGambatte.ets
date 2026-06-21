@@ -136,6 +136,10 @@ struct TestGambatte {
   @Local currentFps: number = 0;
 
   private eventScope: EventHubScope | undefined = undefined;
+  private pageActive: boolean = false;
+  private testTaskToken: number = 0;
+  private autoTestTaskToken: number = 0;
+  private coreCheckTaskToken: number = 0;
 
   // 可用的核心列表
   private cores: CoreConfig[] = [
@@ -364,6 +368,8 @@ struct TestGambatte {
 
   // 组件初始化
   aboutToAppear() {
+    this.pageActive = true;
+
     // 初始化核心选项
     this.coreOptions = this.cores.map((core): SelectOption => {
       return { value: core.name };
@@ -385,10 +391,41 @@ struct TestGambatte {
   }
 
   aboutToDisappear() {
+    this.pageActive = false;
+    this.testTaskToken += 1;
+    this.autoTestTaskToken += 1;
+    this.coreCheckTaskToken += 1;
     if (this.eventScope) {
       this.eventScope.dispose();
       this.eventScope = undefined;
     }
+  }
+
+  private beginTestTask(): number {
+    this.testTaskToken += 1;
+    return this.testTaskToken;
+  }
+
+  private isCurrentTestTask(token: number): boolean {
+    return this.pageActive && token === this.testTaskToken;
+  }
+
+  private beginAutoTestTask(): number {
+    this.autoTestTaskToken += 1;
+    return this.autoTestTaskToken;
+  }
+
+  private isCurrentAutoTestTask(token: number): boolean {
+    return this.pageActive && token === this.autoTestTaskToken;
+  }
+
+  private beginCoreCheckTask(): number {
+    this.coreCheckTaskToken += 1;
+    return this.coreCheckTaskToken;
+  }
+
+  private isCurrentCoreCheckTask(token: number): boolean {
+    return this.pageActive && token === this.coreCheckTaskToken;
   }
 
   // 更新 ROM 选项列表
@@ -457,7 +494,7 @@ struct TestGambatte {
         .height(45)
         .margin({ bottom: 20 })
         .backgroundColor(this.coreCheckRunning ? Color.Gray : '#546E7A')
-        .enabled(!this.coreCheckRunning)
+        .enabled(!this.coreCheckRunning && !this.testRunning && !this.autoTesting)
         .onClick(() => {
           void this.runCoreCheck();
         })
@@ -500,7 +537,7 @@ struct TestGambatte {
         .height(50)
         .margin({ top: 10 })
         .backgroundColor(this.testRunning ? Color.Gray : '#4CAF50')
-        .enabled(!this.testRunning && !this.autoTesting && this.romOptions.length > 0)
+        .enabled(!this.testRunning && !this.autoTesting && !this.coreCheckRunning && this.romOptions.length > 0)
         .onClick(() => {
           this.runTest();
         })
@@ -512,7 +549,7 @@ struct TestGambatte {
         .height(50)
         .margin({ top: 10 })
         .backgroundColor(this.autoTesting ? '#FF9800' : '#673AB7')
-        .enabled(!this.testRunning && !this.autoTesting)
+        .enabled(!this.testRunning && !this.autoTesting && !this.coreCheckRunning)
         .onClick(() => {
           this.startAutoTest();
         })
@@ -706,6 +743,10 @@ struct TestGambatte {
 
   // 运行测试
   async runTest() {
+    if (this.testRunning || this.autoTesting || this.coreCheckRunning) {
+      return;
+    }
+    const token = this.beginTestTask();
     const core = this.cores[this.selectedCoreIndex];
     const availableRoms = this.getAvailableRoms();
     const rom = availableRoms[this.selectedRomIndex];
@@ -738,16 +779,22 @@ struct TestGambatte {
       const cacheDir = context.cacheDir;
       const xComponentId = 'libretro_test'; // 虚拟ID，用于后端测试
 
-      LogHelper.info('TestGambatte', 'Core', `核心路径: ${corePath}`);
-      LogHelper.info('TestGambatte', 'ROM', `ROM 文件: ${rom.file}`);
+      LogHelper.info('TestGambatte', 'Core', `核心路径: ${LogHelper.describePathForLog(corePath)}`);
+      LogHelper.info('TestGambatte', 'ROM', `ROM 文件: ${LogHelper.describePathForLog(rom.file)}`);
       
       LogHelper.info('TestGambatte', 'Test', '--- NewArch Test Start ---');
       const timeoutMs = 5000;
       nativeApi.refactoredClearLastErrorInfo();
 
       const stopOk = await nativeApi.refactoredStopEngineAsync();
+      if (!this.isCurrentTestTask(token)) {
+        return;
+      }
       if (stopOk) {
         const stopped = await this.waitEngineQuiesced(timeoutMs);
+        if (!this.isCurrentTestTask(token)) {
+          return;
+        }
         if (!stopped) {
           throw new Error('停止超时');
         }
@@ -771,6 +818,9 @@ struct TestGambatte {
         EngineState.CORE_LOADED,
         timeoutMs
       );
+      if (!this.isCurrentTestTask(token)) {
+        return;
+      }
       if (!coreReady) {
         throw new Error(this.formatLastError('LoadCore'));
       }
@@ -785,6 +835,9 @@ struct TestGambatte {
         EngineState.RUNNING,
         timeoutMs
       );
+      if (!this.isCurrentTestTask(token)) {
+        return;
+      }
       if (!running) {
         throw new Error(this.formatLastError('LoadRom'));
       }
@@ -797,6 +850,9 @@ struct TestGambatte {
       LogHelper.info('TestGambatte', 'Engine', 'NewArch 请求已提交');
 
     } catch (error) {
+      if (!this.isCurrentTestTask(token)) {
+        return;
+      }
       const err = error as Error;
       this.testStatus = '测试异常';
       this.lastTestResult = {
@@ -805,15 +861,18 @@ struct TestGambatte {
       };
       LogHelper.error('TestGambatte', 'Test', `测试异常: ${err.message}`);
     } finally {
-      this.testRunning = false;
+      if (this.isCurrentTestTask(token)) {
+        this.testRunning = false;
+      }
     }
   }
 
   // 自动化测试逻辑
   async startAutoTest() {
-    if (this.autoTesting) {
+    if (this.testRunning || this.autoTesting || this.coreCheckRunning) {
       return;
     }
+    const token = this.beginAutoTestTask();
     
     this.autoTesting = true;
     this.autoTestResults = [];
@@ -839,38 +898,59 @@ struct TestGambatte {
     LogHelper.info('TestGambatte', 'AutoTest', `开始自动化测试，队列长度: ${testQueue.length}`);
 
     // 2. 顺序执行测试
-    await testQueue.reduce(async (prev, item, index) => {
-      await prev;
-      const indexStr = `(${index + 1}/${testQueue.length})`;
-      this.autoTestCurrentInfo = `${indexStr} ${item.core.name}`;
+    try {
+      await testQueue.reduce(async (prev, item, index) => {
+        await prev;
+        if (!this.isCurrentAutoTestTask(token)) {
+          return;
+        }
+        const indexStr = `(${index + 1}/${testQueue.length})`;
+        this.autoTestCurrentInfo = `${indexStr} ${item.core.name}`;
 
-      try {
-        const result = await this.runSingleTestCase(item.core, item.rom);
-        this.autoTestResults.push(result);
-      } catch (e) {
-        const err = e as Error;
-        this.autoTestResults.push(this.makeFailResult(
-          item.core.name,
-          item.rom?.name || 'No ROM',
-          'run_single_case',
-          'auto_test_exception',
-          `执行异常: ${err.message}`,
-          AutoTestDomain.LIFECYCLE
-        ));
-        LogHelper.error('TestGambatte', 'AutoTest', `测试项异常: ${err.message}`);
+        try {
+          const result = await this.runSingleTestCase(item.core, item.rom, token);
+          if (!this.isCurrentAutoTestTask(token)) {
+            return;
+          }
+          this.autoTestResults.push(result);
+        } catch (e) {
+          if (!this.isCurrentAutoTestTask(token)) {
+            return;
+          }
+          const err = e as Error;
+          this.autoTestResults.push(this.makeFailResult(
+            item.core.name,
+            item.rom?.name || 'No ROM',
+            'run_single_case',
+            'auto_test_exception',
+            `执行异常: ${err.message}`,
+            AutoTestDomain.LIFECYCLE
+          ));
+          LogHelper.error('TestGambatte', 'AutoTest', `测试项异常: ${err.message}`);
+        }
+
+        // 强制让 UI 渲染一帧
+        await this.sleep(500);
+      }, Promise.resolve());
+    } finally {
+      if (this.isCurrentAutoTestTask(token)) {
+        this.autoTesting = false;
       }
+    }
 
-      // 强制让 UI 渲染一帧
-      await this.sleep(500);
-    }, Promise.resolve());
-
-    this.autoTesting = false;
+    if (!this.isCurrentAutoTestTask(token)) {
+      return;
+    }
     this.testStatus = '自动化测试完成';
     this.autoTestCurrentInfo = '测试完成';
   }
 
   // 执行单个测试用例
-  async runSingleTestCase(core: CoreConfig, rom: RomConfig | null): Promise<AutoTestResult> {
+  async runSingleTestCase(
+    core: CoreConfig,
+    rom: RomConfig | null,
+    token?: number
+  ): Promise<AutoTestResult> {
     const romName = rom ? rom.name : (this.noGameCores.includes(core.id) ? '无需 ROM' : '无可用 ROM');
     
     // 检查是否跳过
@@ -889,8 +969,14 @@ struct TestGambatte {
     const timeoutMs = 5000;
     nativeApi.refactoredClearLastErrorInfo();
     const stopOk = await nativeApi.refactoredStopEngineAsync();
+    if (token !== undefined && !this.isCurrentAutoTestTask(token)) {
+      return this.makeSkipResult(core.name, romName, 'cancelled', 'page_inactive', '页面已离开');
+    }
     if (stopOk) {
       const stopped = await this.waitEngineQuiesced(timeoutMs);
+      if (token !== undefined && !this.isCurrentAutoTestTask(token)) {
+        return this.makeSkipResult(core.name, romName, 'cancelled', 'page_inactive', '页面已离开');
+      }
       if (!stopped) {
         return this.makeFailResult(
           core.name,
@@ -950,6 +1036,9 @@ struct TestGambatte {
         EngineState.CORE_LOADED,
         timeoutMs
       );
+      if (token !== undefined && !this.isCurrentAutoTestTask(token)) {
+        return this.makeSkipResult(core.name, romName, 'cancelled', 'page_inactive', '页面已离开');
+      }
       if (!coreReady) {
         return this.classifyFromLastError(
           core,
@@ -976,6 +1065,9 @@ struct TestGambatte {
           EngineState.RUNNING,
           timeoutMs
         );
+        if (token !== undefined && !this.isCurrentAutoTestTask(token)) {
+          return this.makeSkipResult(core.name, romName, 'cancelled', 'page_inactive', '页面已离开');
+        }
         if (!running) {
           return this.classifyFromLastError(
             core,
@@ -990,6 +1082,9 @@ struct TestGambatte {
           EngineState.RUNNING,
           timeoutMs
         );
+        if (token !== undefined && !this.isCurrentAutoTestTask(token)) {
+          return this.makeSkipResult(core.name, romName, 'cancelled', 'page_inactive', '页面已离开');
+        }
         if (!running) {
           return this.classifyFromLastError(
             core,
@@ -1003,12 +1098,18 @@ struct TestGambatte {
 
       // 3. 运行监控 (3秒)
       // 重置 FPS 计数
+      if (token !== undefined && !this.isCurrentAutoTestTask(token)) {
+        return this.makeSkipResult(core.name, romName, 'cancelled', 'page_inactive', '页面已离开');
+      }
       this.currentFps = 0;
       let maxFps = 0;
       
       // 采样 6 次，每次 500ms
       for (let i = 0; i < 6; i++) {
         await this.sleep(500);
+        if (token !== undefined && !this.isCurrentAutoTestTask(token)) {
+          return this.makeSkipResult(core.name, romName, 'cancelled', 'page_inactive', '页面已离开');
+        }
         if (this.currentFps > maxFps) {
           maxFps = this.currentFps;
         }
@@ -1242,9 +1343,10 @@ struct TestGambatte {
 
   // 验证核心符号
   async runCoreCheck() {
-    if (this.coreCheckRunning) {
+    if (this.coreCheckRunning || this.testRunning || this.autoTesting) {
       return;
     }
+    const token = this.beginCoreCheckTask();
     const core = this.cores[this.selectedCoreIndex];
     if (!core) {
       this.testStatus = '核心无效';
@@ -1269,8 +1371,11 @@ struct TestGambatte {
       const abiPath = this.resolveAbiPath();
       const corePath = `${bundleCodeDir}/libs/${abiPath}/${core.soFile}`;
 
-      LogHelper.info('TestGambatte', 'Core', `验证核心: ${corePath}`);
+      LogHelper.info('TestGambatte', 'Core', `验证核心: ${LogHelper.describePathForLog(corePath)}`);
       const result = await nativeApi.testCoreLoader(corePath);
+      if (!this.isCurrentCoreCheckTask(token)) {
+        return;
+      }
       this.testResult = result;
       if (result.startsWith('Success')) {
         this.testStatus = '核心验证通过';
@@ -1278,12 +1383,17 @@ struct TestGambatte {
         this.testStatus = '核心验证失败';
       }
     } catch (error) {
+      if (!this.isCurrentCoreCheckTask(token)) {
+        return;
+      }
       const msg = (error as Error)?.message || String(error);
       this.testResult = `Failed: ${msg}`;
       this.testStatus = '核心验证异常';
       LogHelper.error('TestGambatte', 'Core', `核心验证异常: ${msg}`);
     } finally {
-      this.coreCheckRunning = false;
+      if (this.isCurrentCoreCheckTask(token)) {
+        this.coreCheckRunning = false;
+      }
     }
   }
 

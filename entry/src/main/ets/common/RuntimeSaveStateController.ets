@@ -42,7 +42,7 @@ export class RuntimeSaveStateController {
       LogHelper.info(
         'RuntimeSaveState',
         'Save',
-        `运行态即时存档已写入: rom=${romFile} bytes=${bundle.stateData.byteLength} thumb=${bundle.thumbnailWidth}x${bundle.thumbnailHeight}`
+        `运行态即时存档已写入: rom=${LogHelper.describePathForLog(romFile)} bytes=${bundle.stateData.byteLength} thumb=${bundle.thumbnailWidth}x${bundle.thumbnailHeight}`
       )
       return '存档已写入'
     } catch (err) {
@@ -72,7 +72,7 @@ export class RuntimeSaveStateController {
       const stateData = readSaveStateData(context, item.fileName)
       // Use async version to avoid blocking main thread on load deserialization
       const loaded = await runtimeSessionController.loadStateAsync(stateData)
-      LogHelper.info('RuntimeSaveState', 'Save', `运行态即时读档: file=${item.fileName} ok=${loaded}`)
+      LogHelper.info('RuntimeSaveState', 'Save', `运行态即时读档: file=${LogHelper.describePathForLog(item.fileName)} ok=${loaded}`)
       return loaded ? '读档已加载' : '读档被拒绝'
     } catch (err) {
       const message = (err as Error).message || String(err)
@@ -114,7 +114,7 @@ export class RuntimeSaveStateController {
     try {
       const stateData = readSaveStateData(context, fileName)
       const loaded = await runtimeSessionController.loadStateAsync(stateData)
-      LogHelper.info('RuntimeSaveState', 'Save', `运行态指定读档: file=${fileName} ok=${loaded}`)
+      LogHelper.info('RuntimeSaveState', 'Save', `运行态指定读档: file=${LogHelper.describePathForLog(fileName)} ok=${loaded}`)
       return loaded ? '读档已加载' : '读档被拒绝'
     } catch (err) {
       const message = (err as Error).message || String(err)
@@ -135,7 +135,7 @@ export class RuntimeSaveStateController {
     }
     try {
       await deleteSaveStateItem(context, fileName)
-      LogHelper.info('RuntimeSaveState', 'Save', `运行态删除存档: file=${fileName}`)
+      LogHelper.info('RuntimeSaveState', 'Save', `运行态删除存档: file=${LogHelper.describePathForLog(fileName)}`)
       return '存档已删除'
     } catch (err) {
       const message = (err as Error).message || String(err)

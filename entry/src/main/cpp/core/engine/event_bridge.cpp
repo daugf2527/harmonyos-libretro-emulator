@@ -87,9 +87,10 @@ EventBridge::~EventBridge() { Release(); }
 bool EventBridge::Initialize(napi_env env, napi_value callback) {
   std::lock_guard<std::mutex> lock(mutex_);
   if (tsfn_) {
-    LOGF(LOG_WARN, "EventBridge already initialized. Aborting old TSFN and re-creating.");
-    napi_release_threadsafe_function(tsfn_, napi_tsfn_abort);  // Audit A-F4: abort mode drains pending EventData* before re-init
-    tsfn_ = nullptr;
+    // NAPI/ArkTS 在同一 env 上重复创建 TSFN 会触发 AddCleanupHook 警告。
+    // EventHub 生命周期按应用单例使用，此处直接幂等返回，沿用现有 TSFN。
+    LOGF(LOG_INFO, "EventBridge already initialized; reusing existing TSFN");
+    return true;
   }
 
   napi_value resource_name = nullptr;

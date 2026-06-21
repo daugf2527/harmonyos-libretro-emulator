@@ -14,7 +14,11 @@ export async function resolveRuntimeCorePath(bundleCodeDir: string, soFile: stri
     const abi = abiCandidates[index]
     const path = `${bundleCodeDir}/libs/${abi}/${soFile}`
     if (await fileExists(path)) {
-      LogHelper.info('LibretroGame', 'Engine', `Core path resolved: abi=${abi}, path=${path}`)
+      LogHelper.info(
+        'LibretroGame',
+        'Engine',
+        `Core path resolved: abi=${abi}, path=${LogHelper.describePathForLog(path)}`
+      )
       return path
     }
   }
@@ -22,7 +26,7 @@ export async function resolveRuntimeCorePath(bundleCodeDir: string, soFile: stri
   LogHelper.warn(
     'LibretroGame',
     'Engine',
-    `Core path fallback (not found): ${fallback}, abiList=${String(deviceInfo.abiList ?? '')}`
+    `Core path fallback (not found): ${LogHelper.describePathForLog(fallback)}, abiList=${String(deviceInfo.abiList ?? '')}`
   )
   return fallback
 }

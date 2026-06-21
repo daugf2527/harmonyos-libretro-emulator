@@ -1,6 +1,7 @@
 #include "engine_napi_common.h"
 #include "platform/audio/audio_bridge.h"
 #include "app/framework/plugin_manager.h"
+#include "common/file_security.h"
 
 static napi_value GetEngineState(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
@@ -188,7 +189,13 @@ static napi_value SetFilesDir(napi_env env, napi_callback_info info) {
     return MakeBool(env, false);
   }
 
-  LOGF(LOG_INFO, " [NEW] SetFilesDir: %{public}s", path);
+  LOGF(LOG_INFO, " [NEW] SetFilesDir: %{public}s",
+       security::DescribePathForLog(path).c_str());
+  if (!security::ValidateFilesDir(path)) {
+    GetEngine()->SetLastErrorInfo("files_dir_rejected", "SetFilesDir",
+                                  "filesDir is outside allowed directories");
+    return MakeBool(env, false);
+  }
   const bool ok = GetEngine()->SetFilesDir(path);
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)

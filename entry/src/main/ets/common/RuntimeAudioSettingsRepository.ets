@@ -1,5 +1,6 @@
 import { common } from '@kit.AbilityKit'
 import { fileIo as fs } from '@kit.CoreFileKit'
+import LogHelper from './LogHelper'
 
 export interface RuntimeAudioSettingsProfile {
   version: number
@@ -38,14 +39,16 @@ export async function loadRuntimeAudioSettingsProfile(
   context: common.UIAbilityContext
 ): Promise<RuntimeAudioSettingsProfile> {
   const path = buildRuntimeAudioSettingsPath(context.filesDir)
+  const text = await readOptionalText(path)
+  if (!text || text.length === 0) {
+    return createDefaultRuntimeAudioSettingsProfile()
+  }
   try {
-    const text = await fs.readText(path)
-    if (!text || text.length === 0) {
-      return createDefaultRuntimeAudioSettingsProfile()
-    }
     const parsed = JSON.parse(text) as Partial<RuntimeAudioSettingsProfile> | null
     return normalizeRuntimeAudioSettingsProfile(parsed)
-  } catch (_err) {
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('RuntimeAudioSettingsRepository', 'Load', `音频配置损坏，已回退默认值: ${message}`)
     return createDefaultRuntimeAudioSettingsProfile()
   }
 }
@@ -174,5 +177,25 @@ async function ensureDirExists(path: string): Promise<void> {
     await fs.mkdir(path, true)
   } catch (_err) {
     return
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (_err) {
+    return ''
   }
 }

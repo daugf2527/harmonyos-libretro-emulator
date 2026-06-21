@@ -172,8 +172,8 @@ bool AudioPlayer::Initialize(int32_t sample_rate, int32_t channel_count,
        kAudioChainPrefix, kAudioDiagPrefix, sample_rate_, channel_count_,
        frame_size, bytes_per_frame);
 
-  // 3. 设置写数据回调。HarmonyOS 6.0.2(API22) 使用专用 write-data
-  // callback，避免 legacy callback 与新版 callback 的优先级差异。
+  // 3. 设置写数据回调。API20+ 使用专用 write-data callback，
+  // 避免 legacy callback 与新版 callback 的优先级差异。
   OH_AudioRenderer_OnWriteDataCallback writeDataCb = OnWriteDataCallback;
   result = OH_AudioStreamBuilder_SetRendererWriteDataCallback(
       builder_, writeDataCb, this);
@@ -347,7 +347,6 @@ bool AudioPlayer::Pause() {
       return false;
     }
     if (!is_playing_) {
-      LOGF(LOG_WARN, "%{public}s Audio player not playing", kAudioChainPrefix);
       return true;
     }
   }
@@ -487,7 +486,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   if (player->running_ && !player->running_->load()) {
     int log_count = ++player->callback_invalid_log_count_;
     if (log_count <= 3 || (log_count % 120) == 0) {
-      LOGF(LOG_INFO, "%{public}s %{public}s [API22] running=false -> INVALID",
+      LOGF(LOG_INFO, "%{public}s %{public}s [OHAudio] running=false -> INVALID",
            kAudioChainPrefix, kAudioDiagPrefix);
     }
     return AUDIO_DATA_CALLBACK_RESULT_INVALID;
@@ -635,7 +634,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
     int log_count = ++player->callback_underrun_log_count_;
     if (log_count <= 5 || (log_count % 120) == 0) {
       LOGF(LOG_WARN,
-           "%{public}s %{public}s [API22] underrun: need=%{public}d "
+           "%{public}s %{public}s [OHAudio] underrun: need=%{public}d "
            "read=%{public}d miss=%{public}d size=%{public}d bytes "
            "usage=%{public}d%% underruns=%{public}d overruns=%{public}d "
            "running=%{public}d wg=%{public}d",
@@ -654,7 +653,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
     if (jitter_count <= 3 || (jitter_count % 120) == 0) {
       float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
       LOGF(LOG_WARN,
-           "%{public}s [API22] callback jitter: dt=%{public}lld ms, "
+           "%{public}s [OHAudio] callback jitter: dt=%{public}lld ms, "
            "frames=%{public}d read=%{public}zu (usage=%{public}.1f%%)",
            kAudioChainPrefix, (long long)delta_ms, frames_needed, frames_read,
            usage * 100.0f);
@@ -713,7 +712,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
             .count();
     if (diag_elapsed_ms >= 1000) {
       LOGF(LOG_INFO,
-           "%{public}s %{public}s [API22] callback_window: ms=%{public}lld, "
+           "%{public}s %{public}s [OHAudio] callback_window: ms=%{public}lld, "
            "callbacks=%{public}llu, need_frames=%{public}llu, "
            "read_frames=%{public}llu, miss_frames=%{public}llu, "
            "max_dt_ms=%{public}lld, max_cost_us=%{public}d, "
@@ -745,7 +744,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
     int log_count = ++player->callback_cost_log_count_;
     if (log_count <= 3 || (log_count % 120) == 0) {
       LOGF(LOG_WARN,
-           "%{public}s %{public}s [API22] callback slow: cost=%{public}d us, "
+           "%{public}s %{public}s [OHAudio] callback slow: cost=%{public}d us, "
            "dt=%{public}lld ms, frames=%{public}d, read=%{public}d",
            kAudioChainPrefix, kAudioDiagPrefix, cost_us, (long long)delta_ms,
            frames_needed, static_cast<int32_t>(frames_read));
@@ -769,7 +768,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
   if (player->callback_log_count_ <= 5 || (player->callback_log_count_ % 250) == 0) {
     float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
     LOGF(LOG_INFO,
-        "%{public}s [API22] dt=%{public}lld ms, frames=%{public}d "
+        "%{public}s [OHAudio] dt=%{public}lld ms, frames=%{public}d "
         "read=%{public}zu (signal=%{public}d, usage=%{public}.1f%%) -> VALID",
         kAudioChainPrefix, (long long)delta_ms, frames_needed, frames_read,
         has_sound, usage * 100.0f);
@@ -780,7 +779,7 @@ OH_AudioData_Callback_Result AudioPlayer::OnWriteDataCallback(
     float usage = player->ring_buffer_ ? player->ring_buffer_->GetUsage() : 0.0f;
     int32_t usage_percent = static_cast<int32_t>(usage * 100.0f + 0.5f);
     LOGF(LOG_INFO,
-         "%{public}s %{public}s [API22] size=%{public}d bytes, "
+         "%{public}s %{public}s [OHAudio] size=%{public}d bytes, "
          "bytes_per_frame=%{public}d, need=%{public}d, read=%{public}d, "
          "miss=%{public}d, usage=%{public}d%%, underruns=%{public}d, "
          "overruns=%{public}d, cost=%{public}d us, running=%{public}d",

@@ -1,4 +1,32 @@
 #include "engine_napi_common.h"
+#include <cstring>
+
+namespace {
+
+constexpr int32_t kMaxCheatIndex = 1023;
+constexpr size_t kMaxCheatCodeLength = 240;
+
+bool IsValidCheatCode(const char *code) {
+  if (!code) {
+    return false;
+  }
+
+  const size_t length = std::strlen(code);
+  if (length == 0 || length > kMaxCheatCodeLength) {
+    return false;
+  }
+
+  for (size_t i = 0; i < length; ++i) {
+    const auto ch = static_cast<unsigned char>(code[i]);
+    if (ch < 0x20 || ch > 0x7E) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+} // namespace
 
 static napi_value GetSaveStateSize(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
@@ -223,8 +251,12 @@ static napi_value CheatSet(napi_env env, napi_callback_info info) {
       !GetStringArg(env, args[2], code, sizeof(code), "CheatSet", "code")) {
     return MakeBool(env, false);
   }
-  if (index < 0) {
+  if (index < 0 || index > kMaxCheatIndex) {
     LOGF(LOG_ERROR, "[NEW] CheatSet invalid index: %{public}d", index);
+    return MakeBool(env, false);
+  }
+  if (!IsValidCheatCode(code)) {
+    LOGF(LOG_ERROR, "[NEW] CheatSet invalid code format");
     return MakeBool(env, false);
   }
 

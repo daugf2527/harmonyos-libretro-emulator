@@ -140,13 +140,13 @@ export default class LibretroSwitchCoordinator {
     }
 
     if (!nativeApi.refactoredSetFilesDir(req.filesDir)) {
-      const message = `SetFilesDir failed: dir=${req.filesDir}`;
+      const message = `SetFilesDir failed: dir=${LogHelper.describePathForLog(req.filesDir)}`;
       LogHelper.error('LibretroSwitch', 'Engine', message);
       return this.fail('load_core', 'set_files_dir_failed', message);
     }
 
     if (!nativeApi.refactoredLoadCore(req.corePath).success) {
-      const message = `LoadCore failed: core=${req.corePath}`;
+      const message = `LoadCore failed: core=${LogHelper.describePathForLog(req.corePath)}`;
       LogHelper.error('LibretroSwitch', 'Engine', message);
       return this.fail('load_core', 'load_core_failed', message);
     }
@@ -167,7 +167,7 @@ export default class LibretroSwitchCoordinator {
 
     if (req.romPath &&
         !nativeApi.refactoredLoadRom(req.romPath, req.resMgr).success) {
-      const message = `LoadRom failed: rom=${req.romPath}`;
+      const message = `LoadRom failed: rom=${LogHelper.describePathForLog(req.romPath)}`;
       LogHelper.error('LibretroSwitch', 'Engine', message);
       return this.fail('load_rom', 'load_rom_failed', message);
     }

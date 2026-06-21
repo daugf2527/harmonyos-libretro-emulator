@@ -60,11 +60,11 @@ export async function upsertGameMetadata(
 
 async function loadMetadataDocument(context: common.UIAbilityContext): Promise<GameMetadataDocument> {
   const path = buildMetadataPath(context.filesDir)
+  const text = await readOptionalText(path)
+  if (!text || text.length === 0) {
+    return createEmptyMetadataDocument()
+  }
   try {
-    const text = await fs.readText(path)
-    if (!text || text.length === 0) {
-      return createEmptyMetadataDocument()
-    }
     const parsed = JSON.parse(text) as Partial<GameMetadataDocument> | null
     const records: GameMetadataRecord[] = []
     if (parsed?.records) {
@@ -78,7 +78,7 @@ async function loadMetadataDocument(context: common.UIAbilityContext): Promise<G
     }
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('GameMetadataRepository', 'Load', `读取本地 metadata 失败: ${message}`)
+    LogHelper.warn('GameMetadataRepository', 'Load', `metadata 索引损坏，已回退为空: ${message}`)
     return createEmptyMetadataDocument()
   }
 }
@@ -157,5 +157,25 @@ async function ensureDirExists(path: string): Promise<void> {
     await fs.mkdir(path, true)
   } catch (err) {
     return
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (_err) {
+    return ''
   }
 }

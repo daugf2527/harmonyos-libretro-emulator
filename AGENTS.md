@@ -28,9 +28,49 @@
 - 日志规范：日志域使用 `0xD000-0xFFFF`；重定义前先 `#undef LOG_DOMAIN`；数值日志使用 `%{public}d/%{public}u/%{public}X`。
 - ArkTS/NAPI：返回匿名对象必须定义显式 `interface` 类型，避免 `Object/any`；跨语言数值建议 `Number()` 显式转换。
 - NativeWindow：避免强制设置 `SET_TIMEOUT=5`；如需设置，使用默认或 >= 1 帧周期。
+- Native Core 安全：`dlopen` 仅允许应用打包目录中的 core；用户可写目录中的第三方 core 必须先具备签名/哈希校验与隔离策略，禁止直接加入白名单。
 - 交互偏好：不写测试脚本；代理不主动编译/不运行，用户自己执行。代理可做静态检查，并必须明确“未编译/未真机”。
 - 交互要求：若当前环境明确提供专用确认工具，则通过该工具询问；否则正常中文询问。
 - 约定：旧架构（`deprecated/legacy/`）不参与后续检索与代码编辑（除非用户明确要求）。
+
+## 高效工具使用与全局分析流程
+- 先定义任务成功标准：明确要解决的症状、要产出的文件、可接受的验证命令；不清楚时先只读探索，不先改代码。
+- 工具优先级：语义/上下文检索（MCP/fast-context）→ 结构化搜索（`rg`/smart_search）→ 批量读文件 → shell 兜底；互不依赖的只读操作可并行。
+- 证据链优先：判断必须落到源码、SDK、官方文档、运行日志或配置中的可引用证据；报告问题时给出文件路径和行号，不只写结论。
+- API 更新流程：先确认当前 `targetSdkVersion`/`compatibleSdkVersion`、本地 SDK `.d.ts/.h` 声明和官方文档；改 native/ArkTS API 时同步 NAPI 注册、`index.d.ts`、本 AGENTS 导出清单和漂移检查脚本。
+- 全局质量分析默认只读：排除 `deprecated/legacy/`、`entry/build/`、raw ROM/二进制资源；先跑已有 drift/lint/hygiene 脚本，再用定向搜索补盲区。
+- 日志/告警处理先分类：应用自有日志优先，系统框架噪声只作为上下文；不要把平台诊断日志直接误判成业务 bug。
+- 修复优先级：P0 崩溃/数据损坏/API 契约漂移；P1 生命周期、线程同步、资源泄漏；P2 性能和可维护性；P3 风格和文档。
+- 验证口径：代理默认只做静态验证并报告命令输出；未执行 hvigor/真机时必须明确“未编译/未真机”。
+
+## AI 接手任务标准作业（必须执行）
+- 第一步先看上下文：读取 `build-profile.json5`、`entry/src/main/module.json5`、`docs/harmonyos-sdk-target.md`，确认当前 SDK 目标、设备类型、是否已切到 API26。
+- 第二步先分层定位：先判断问题属于 ArkTS UI、NAPI 契约、引擎状态机、视频、音频、资源加载、文件安全中的哪一层；不要混着改。
+- 第三步先找 3 处以上现有模式：实现前至少找 3 个相邻模块或同类函数作为参照，优先复用现有辅助类、日志风格、错误返回结构和锁边界。
+- 第四步再改代码：优先做最小补丁，先修根因，再补接口和文档；不要顺手做无关重构。
+- 第五步补齐契约面：凡是改到 NAPI export、ArkTS 调用签名、native 资源生命周期、线程同步边界，必须同步更新相邻契约文件或说明，不允许只改单点。
+- 第六步做静态验证：至少运行本仓已有的定向检查或搜索确认修改面；若未编译、未真机、未模拟器验证，结论里必须明确写出。
+
+## 按问题类型定位首查位置
+- UI 页面状态 / 交互异常：先看 `entry/src/main/ets/pages/`、`entry/src/main/ets/components/`、`entry/src/main/ets/common/`。
+- NAPI 导出 / ArkTS 调 native 签名不一致：先看 `entry/src/main/cpp/app/napi/`、`entry/src/main/cpp/types/libentry/index.d.ts`、`entry/src/main/cpp/app/napi/module_init.cpp`。
+- 生命周期 / 状态机 / 卡死 / 切换游戏问题：先看 `entry/src/main/cpp/core/engine/libretro_engine.cpp`、`core_state_manager.cpp`、`event_bridge.cpp`。
+- 画面不出 / 花屏 / 分辨率 / XComponent / NativeWindow：先看 `entry/src/main/cpp/core/engine/video_pipeline.*`、`platform/graphics/`、`core/engine/window_*`。
+- 音频延迟 / 爆音 / 静音 / underrun：先看 `entry/src/main/cpp/platform/audio/`，重点是 `audio_bridge.cpp`、`audio_player.cpp`、`ring_buffer.*`。
+- ROM / rawfile / core 加载 / 文件权限：先看 `entry/src/main/cpp/platform/resource/`、`core/libretro/core_loader.*`、`common/file_security.*`。
+- 输入 / 手柄 / 触控 / 键盘：先看 `entry/src/main/cpp/core/engine/input_manager.*`、`input_snapshot.h`、`app/napi/engine_input_napi.cpp` 和 ArkTS 输入页。
+
+## 变更类型与必须同步项
+- 改 `app/napi/**` export：同步检查 `module_init.cpp`、`libretro_engine_napi.cpp`、`entry/src/main/cpp/types/libentry/index.d.ts`、本文 `NAPI Export Inventory`、相关 ArkTS 调用点。
+- 改 ArkTS 调 native 返回对象：显式定义 `interface`，检查调用侧是否把 number/boolean/string 当成旧类型使用。
+- 改 NativeWindow / NativeBuffer 流程：确认 `RequestBuffer -> FromNativeWindowBuffer -> Map -> Unmap -> FlushBuffer` 配对完整，不引入 `mmap/munmap` 回退。
+- 改线程共享状态：明确哪个线程写、哪个线程读、锁的拥有者是谁；同一状态不要一半走原子一半走 mutex。
+- 改 SDK / target 版本或本机工具链路径：同步更新 `docs/harmonyos-sdk-target.md`、相关脚本路径、CLAUDE.md 环境说明。
+
+## 多设备与系统能力适配边界
+- 当前仓库 `entry/src/main/module.json5` 的 `deviceTypes` 仅为 `phone`；除非用户明确要求或模块配置变更，不默认引入多设备分布式能力改造。
+- HarmonyOS 新系统能力、API26 新特性、Accessory Kit、多设备协同等内容，默认只作为“未来可接入能力”评估，不应擅自扩大当前任务范围。
+- 涉及平台行为差异时，先以官方 API26 文档和本机 SDK header 为准，再决定是否需要抽象扩展点。
 
 ## ArkTS 编程规范（华为官方，检查要求）
 - 命名：类/枚举/命名空间用 UpperCamelCase；变量/方法/参数用 lowerCamelCase；常量/枚举值全大写+下划线；布尔名避免否定，优先 is/has/can/should 前缀；标识符用清晰英文，避免单字母/非标准缩写/中文拼音。

@@ -336,8 +336,8 @@ void GLESRenderer::DestroySurfaceOnly() {
 
     if (!eglDestroySurface(egl_display_, egl_surface_)) {
       EGLint err = eglGetError();
-      LOGF(LOG_ERROR,
-                   "eglDestroySurface failed: 0x%{public}x", err);
+      LOGF(LOG_WARN,
+           "eglDestroySurface failed during teardown: 0x%{public}x", err);
     }
     egl_surface_ = EGL_NO_SURFACE;
   }
@@ -368,8 +368,8 @@ bool GLESRenderer::RecreateSurface(OHNativeWindow *window) {
     last_swap_failure_kind_.store(
         static_cast<int>(SwapFailureKind::RECOVERABLE_SURFACE),
         std::memory_order_release);
-    LOGF(LOG_ERROR,
-                 "Failed to recreate EGL surface: 0x%{public}x", err);
+    LOGF(LOG_WARN,
+         "Failed to recreate EGL surface (recoverable): 0x%{public}x", err);
     return false;
   }
 
@@ -380,7 +380,7 @@ bool GLESRenderer::RecreateSurface(OHNativeWindow *window) {
     last_swap_failure_kind_.store(
         static_cast<int>(SwapFailureKind::RECOVERABLE_SURFACE),
         std::memory_order_release);
-    LOGF(LOG_ERROR,
+    LOGF(LOG_WARN,
          "Failed to make EGL current after surface recreate: 0x%{public}x", err);
     eglDestroySurface(egl_display_, egl_surface_);
     egl_surface_ = EGL_NO_SURFACE;
@@ -522,7 +522,7 @@ void GLESRenderer::Deinit() {
   }
 
   if (!contextCurrent) {
-    LOGF(LOG_ERROR,
+    LOGF(LOG_WARN,
          "EGL context not current during Deinit, releasing GL handles "
          "without glDelete* to avoid UB (resources will be reclaimed by "
          "EGL display teardown)");

@@ -1,4 +1,5 @@
 #include "engine_napi_common.h"
+#include "common/file_security.h"
 
 static napi_value DiskControlSetEjectState(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
@@ -70,6 +71,12 @@ static napi_value DiskControlReplaceImageIndex(napi_env env, napi_callback_info 
     return MakeBool(env, false);
   }
   if (index < 0) {
+    return MakeBool(env, false);
+  }
+  if (!security::ValidateDiskImagePath(path)) {
+    GetEngine()->SetLastErrorInfo("disk_image_path_rejected",
+                                  "DiskControlReplaceImageIndex",
+                                  "Disk image path is outside allowed directories");
     return MakeBool(env, false);
   }
   bool ok = GetEngine()->DiskControlReplaceImageIndex(static_cast<unsigned>(index), path);

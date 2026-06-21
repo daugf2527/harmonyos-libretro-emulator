@@ -2096,7 +2096,11 @@ struct LibretroGamePage {
     const availableRoms = this.getAvailableRoms()
     const romIndex = availableRoms.findIndex((rom: RuntimeRomConfig) => rom.file === request.romFile)
     if (romIndex < 0) {
-      LogHelper.warn('LibretroGame', 'Library', `未找到目标 ROM: ${request.romFile}`)
+      LogHelper.warn(
+        'LibretroGame',
+        'Library',
+        `未找到目标 ROM: ${LogHelper.describePathForLog(request.romFile)}`
+      )
       return
     }
 
@@ -2737,8 +2741,8 @@ struct LibretroGamePage {
         return;
       }
       this.inspectCurrentCoreCapabilities(corePath, token);
-      LogHelper.info('LibretroGame', 'Engine', `加载 Core: ${corePath}`);
-      LogHelper.info('LibretroGame', 'Engine', `加载 ROM: ${rom.file}`);
+      LogHelper.info('LibretroGame', 'Engine', `加载 Core: ${LogHelper.describePathForLog(corePath)}`);
+      LogHelper.info('LibretroGame', 'Engine', `加载 ROM: ${LogHelper.describePathForLog(rom.file)}`);
       const resolved = resolveRuntimeRomPathForSwitch(
         rom.file,
         resMgr,
@@ -2750,7 +2754,7 @@ struct LibretroGamePage {
       LogHelper.info(
         'LibretroGame',
         'Engine',
-        `Resolved ROM path: ${resolved.romPath}, useResMgr=${resolved.useResMgr}`
+        `Resolved ROM path: ${LogHelper.describePathForLog(resolved.romPath)}, useResMgr=${resolved.useResMgr}`
       );
       const result = await runtimeSessionController.switchGame({
         corePath,
@@ -2760,6 +2764,9 @@ struct LibretroGamePage {
         token,
         resourceManager: resolved.useResMgr ? resMgr : undefined,
         progressCallback: (progress: number, message: string) => {
+          if (!this.isCurrentSwitchTask(token)) {
+            return;
+          }
           this.switchProgress = progress;
           this.switchProgressText = message;
         }

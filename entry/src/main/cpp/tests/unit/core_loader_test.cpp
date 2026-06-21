@@ -9,6 +9,7 @@
  */
 
 #include "core/libretro/core_loader.h"
+#include "common/file_security.h"
 #include <hilog/log.h>
 #include <string>
 
@@ -31,7 +32,8 @@ namespace LibretroTest {
  */
 bool TestCoreLoader(const std::string &corePath) {
   LOGF(LOG_INFO, "========== CoreLoader Test Start ==========");
-  LOGF(LOG_INFO, "Core path: %{public}s", corePath.c_str());
+  LOGF(LOG_INFO, "Core path: %{public}s",
+       security::DescribePathForLog(corePath).c_str());
 
   // 1. 创建 CoreLoader 实例
   CoreLoader loader;

@@ -1,5 +1,4 @@
 import { common } from '@kit.AbilityKit'
-import { fileIo as fs } from '@kit.CoreFileKit'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav'
 import { LibraryContextMenuOverlay } from '../components/LibraryContextMenuOverlay'
@@ -40,6 +39,7 @@ import {
 } from '../common/LibrarySaveFilePurger'
 import { setPendingLibraryDetailRequest } from '../common/LibraryDetailBridge'
 import { scanLibraryRomSources } from '../common/RuntimeRomSourceScanner'
+import { deleteImportedRomFile } from '../common/RomImportService'
 import LogHelper from '../common/LogHelper'
 
 interface TouchPoint {
@@ -585,7 +585,7 @@ struct LibraryPage {
       return
     }
     try {
-      await fs.unlink(item.romFile)
+      await deleteImportedRomFile(context, item.romFile)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryPage', 'Delete', `删除文件失败: ${message}`)

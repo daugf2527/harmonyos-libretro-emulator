@@ -121,6 +121,8 @@ const DOCUMENTATION_BASENAMES: string[] = [
   'readme', 'license', 'licence', 'copying', 'changelog', 'changes', 'notes',
   'authors', 'contributors', 'install', 'todo', 'history', 'news', 'credits'
 ]
+const MAX_IMPORT_FILE_NAME_LENGTH = 120
+const IMPORTED_ROM_RELATIVE_DIR = 'roms/imported'
 
 export function getRomFileExtension(fileName: string): string {
   const dotIndex = fileName.lastIndexOf('.')
@@ -199,7 +201,10 @@ export function listSupportedSandboxRomFiles(files: string[]): string[] {
 }
 
 export async function listSandboxRomFiles(filesDir: string): Promise<string[]> {
-  const romDir = `${filesDir}/roms/imported`
+  const romDir = buildImportedRomDir(filesDir)
+  if (romDir.length === 0) {
+    return []
+  }
   try {
     const entries = await fs.listFile(romDir)
     if (!entries || entries.length === 0) {
@@ -211,6 +216,23 @@ export async function listSandboxRomFiles(filesDir: string): Promise<string[]> {
   } catch (err) {
     return []
   }
+}
+
+export function buildImportedRomFilePath(filesDir: string, fileName: string): string {
+  const romDir = buildImportedRomDir(filesDir)
+  const safeName = sanitizeImportFileName(fileName, '')
+  if (romDir.length === 0 || safeName.length === 0 || safeName !== fileName.trim()) {
+    return ''
+  }
+  return `${romDir}/${safeName}`
+}
+
+export async function deleteImportedRomFile(context: common.UIAbilityContext, romPath: string): Promise<void> {
+  const safePath = resolveImportedRomDeletePath(context.filesDir, romPath)
+  if (safePath.length === 0) {
+    throw new Error('ROM_DELETE_PATH_REJECTED')
+  }
+  await fs.unlink(safePath)
 }
 
 export async function pickRomUris(context: common.UIAbilityContext): Promise<string[]> {
@@ -239,7 +261,17 @@ export async function importRomUris(
     return result
   }
   result.selectedCount = uris.length
-  const romDir = `${context.filesDir}/roms/imported`
+  const romDir = buildImportedRomDir(context.filesDir)
+  if (romDir.length === 0) {
+    result.failedCount = uris.length
+    result.failedNames = uris.map((uri: string, index: number) => getFileNameFromUri(uri, index))
+    result.items = result.failedNames.map((fileName: string): RomImportItemResult => ({
+      fileName: fileName,
+      status: 'FAILED',
+      detail: 'IMPORT_DIR_REJECTED'
+    }))
+    return result
+  }
   await ensureDirExists(romDir)
   const importPlans = await buildImportFilePlans(uris)
   const totalBytes = importPlans.reduce((sum: number, item: ImportFilePlan) => sum + item.progressBytes, 0)
@@ -405,7 +437,7 @@ export async function importRomUris(
           }
           await deletePathIfExists(tempOverwritePath)
           const overwriteMessage = (err as Error).message || String(err)
-          LogHelper.error('RomImport', 'Copy', `覆盖文件失败 ${fileName}: ${overwriteMessage}`)
+          LogHelper.error('RomImport', 'Copy', `覆盖文件失败 ${LogHelper.describePathForLog(fileName)}: ${overwriteMessage}`)
           result.failedCount += 1
           result.failedNames.push(fileName)
           appendImportItemResult(result, fileName, 'FAILED', overwriteMessage)
@@ -509,7 +541,7 @@ export async function importRomUris(
       }
       const message = (err as Error).message || String(err)
       await deletePathIfExists(tempImportPath)
-      LogHelper.error('RomImport', 'Copy', `复制文件失败 ${fileName}: ${message}`)
+      LogHelper.error('RomImport', 'Copy', `复制文件失败 ${LogHelper.describePathForLog(fileName)}: ${message}`)
       result.failedCount += 1
       result.failedNames.push(fileName)
       appendImportItemResult(result, fileName, 'FAILED', message)
@@ -536,7 +568,13 @@ export async function inspectRomImportConflicts(
   context: common.UIAbilityContext,
   uris: string[]
 ): Promise<RomImportConflictSummary> {
-  const romDir = `${context.filesDir}/roms/imported`
+  const romDir = buildImportedRomDir(context.filesDir)
+  if (romDir.length === 0) {
+    return {
+      conflictCount: 0,
+      conflictNames: []
+    }
+  }
   await ensureDirExists(romDir)
   const plans = await buildImportFilePlans(uris)
   const conflictNames: string[] = []
@@ -662,11 +700,23 @@ async function resolveMultiFileDependencyNames(uri: string, fileName: string): P
   if (!MULTIFILE_ENTRY_EXTENSIONS.includes(ext)) {
     return []
   }
+  if (!(await pathExists(uri))) {
+    LogHelper.warn(
+      'RomImport',
+      'Dependency',
+      `多文件入口不存在 ${LogHelper.describePathForLog(fileName)}`
+    )
+    return []
+  }
   let text = ''
   try {
     text = await fs.readText(uri)
   } catch (err) {
-    LogHelper.warn('RomImport', 'Dependency', `读取多文件入口失败 ${fileName}: ${(err as Error).message || String(err)}`)
+    LogHelper.warn(
+      'RomImport',
+      'Dependency',
+      `读取多文件入口失败 ${LogHelper.describePathForLog(fileName)}: ${(err as Error).message || String(err)}`
+    )
     return []
   }
   if (ext === 'cue') {
@@ -802,10 +852,75 @@ async function copyFileFromUri(
 
 function sanitizeImportFileName(fileName: string, fallback: string): string {
   const decoded = fileName.trim()
-  const withoutPaths = decoded.replace(/[\\\/]/g, '')
-  const withoutTraversal = withoutPaths.replace(/\.\.+/g, '.')
-  const normalized = withoutTraversal.replace(/[:*?"<>|]/g, '_').trim()
+  let normalized = ''
+  for (let index = 0; index < decoded.length; index += 1) {
+    const char = decoded.charAt(index)
+    const code = decoded.charCodeAt(index)
+    if (code < 32 || code === 127 || char === '/' || char === '\\') {
+      continue
+    }
+    normalized += ':*?"<>|'.includes(char) ? '_' : char
+  }
+  normalized = normalized.replace(/\.\.+/g, '.').replace(/^\.+/, '').trim()
+  normalized = truncateImportFileName(normalized)
   return normalized.length > 0 ? normalized : fallback
+}
+
+function truncateImportFileName(fileName: string): string {
+  if (fileName.length <= MAX_IMPORT_FILE_NAME_LENGTH) {
+    return fileName
+  }
+  const dotIndex = fileName.lastIndexOf('.')
+  if (dotIndex > 0 && dotIndex < fileName.length - 1) {
+    const extension = fileName.substring(dotIndex)
+    if (extension.length < MAX_IMPORT_FILE_NAME_LENGTH - 1) {
+      return `${fileName.substring(0, MAX_IMPORT_FILE_NAME_LENGTH - extension.length)}${extension}`
+    }
+  }
+  return fileName.substring(0, MAX_IMPORT_FILE_NAME_LENGTH)
+}
+
+function buildImportedRomDir(filesDir: string): string {
+  const normalized = normalizeFsPath(filesDir)
+  if (normalized.length === 0 || normalized.includes('..')) {
+    return ''
+  }
+  return `${normalized}/${IMPORTED_ROM_RELATIVE_DIR}`
+}
+
+function resolveImportedRomDeletePath(filesDir: string, romPath: string): string {
+  const romDir = buildImportedRomDir(filesDir)
+  const normalizedPath = normalizeFsPath(romPath)
+  if (romDir.length === 0 || normalizedPath.length === 0) {
+    return ''
+  }
+  const rootPrefix = `${romDir}/`
+  if (!normalizedPath.startsWith(rootPrefix)) {
+    return ''
+  }
+  const fileName = normalizedPath.substring(rootPrefix.length)
+  if (
+    fileName.length === 0 ||
+    fileName.includes('/') ||
+    fileName.includes('\\') ||
+    fileName.includes('..') ||
+    fileName.endsWith('.importing')
+  ) {
+    return ''
+  }
+  const safeName = sanitizeImportFileName(fileName, '')
+  if (safeName.length === 0 || safeName !== fileName.trim()) {
+    return ''
+  }
+  return `${rootPrefix}${safeName}`
+}
+
+function normalizeFsPath(path: string): string {
+  let normalized = path.replace(/\\/g, '/').trim()
+  while (normalized.length > 1 && normalized.endsWith('/')) {
+    normalized = normalized.substring(0, normalized.length - 1)
+  }
+  return normalized
 }
 
 async function deletePathIfExists(path: string): Promise<void> {

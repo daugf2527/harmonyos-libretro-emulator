@@ -1,4 +1,5 @@
 #include "rawfile_rom_processor.h"
+#include "common/file_security.h"
 #include "rom_loader.h"
 #include "temp_file_manager.h"
 #include "../../common/cue_parser.h"
@@ -120,7 +121,7 @@ RawfileRomProcessor::Result RawfileRomProcessor::Process(
       common::ParseCueReferencedFiles(*result.data);
   if (referenced_files.empty()) {
     LOGF(LOG_WARN, "CUE referenced files empty: %{public}s",
-         input_path.c_str());
+         security::DescribePathForLog(input_path).c_str());
     return result;
   }
 
@@ -136,7 +137,7 @@ RawfileRomProcessor::Result RawfileRomProcessor::Process(
     std::string name;
     if (!SanitizeCuePath(raw_name, name)) {
       LOGF(LOG_WARN, "CUE referenced path rejected: %{public}s",
-           raw_name.c_str());
+           security::DescribePathForLog(raw_name).c_str());
       continue;
     }
     if (!seen.insert(name).second) {
@@ -156,7 +157,7 @@ RawfileRomProcessor::Result RawfileRomProcessor::Process(
         ROMLoader::LoadFromRawFile(ref_rawfile_path, resource_manager);
     if (!ref_result.success || ref_result.data.empty()) {
       LOGF(LOG_WARN, "CUE referenced file load failed: %{public}s",
-           ref_rawfile_path.c_str());
+           security::DescribePathForLog(ref_rawfile_path).c_str());
       continue;
     }
 

@@ -30,6 +30,7 @@ interface PickerSelectOptionsCompat {
 
 const MULTIFILE_ENTRY_EXTENSIONS: string[] = ['cue', 'm3u']
 const RUNTIME_DISK_IMAGE_IMPORT_DIR = 'runtime/disks/imported'
+const MAX_IMPORT_FILE_NAME_LENGTH = 120
 
 export async function importPickedRuntimeDiskImages(
   context: common.UIAbilityContext
@@ -250,13 +251,25 @@ async function resolveMultiFileDependencyNames(
   if (!MULTIFILE_ENTRY_EXTENSIONS.includes(ext)) {
     return []
   }
+  if (!(await pathExists(uri))) {
+    LogHelper.warn(
+      'RuntimeDiskImport',
+      'Dependency',
+      `多文件入口不存在 ${LogHelper.describePathForLog(fileName)}`
+    )
+    return []
+  }
 
   let text = ''
   try {
     text = await fs.readText(uri)
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('RuntimeDiskImport', 'Dependency', `读取多文件入口失败 ${fileName}: ${message}`)
+    LogHelper.warn(
+      'RuntimeDiskImport',
+      'Dependency',
+      `读取多文件入口失败 ${LogHelper.describePathForLog(fileName)}: ${message}`
+    )
     return []
   }
 
@@ -386,10 +399,32 @@ async function copyFileFromUri(
 
 function sanitizeImportFileName(fileName: string, fallback: string): string {
   const decoded = fileName.trim()
-  const withoutPaths = decoded.replace(/[\\\/]/g, '')
-  const withoutTraversal = withoutPaths.replace(/\.\.+/g, '.')
-  const normalized = withoutTraversal.replace(/[:*?"<>|]/g, '_').trim()
+  let normalized = ''
+  for (let index = 0; index < decoded.length; index += 1) {
+    const char = decoded.charAt(index)
+    const code = decoded.charCodeAt(index)
+    if (code < 32 || code === 127 || char === '/' || char === '\\') {
+      continue
+    }
+    normalized += ':*?"<>|'.includes(char) ? '_' : char
+  }
+  normalized = normalized.replace(/\.\.+/g, '.').replace(/^\.+/, '').trim()
+  normalized = truncateImportFileName(normalized)
   return normalized.length > 0 ? normalized : fallback
+}
+
+function truncateImportFileName(fileName: string): string {
+  if (fileName.length <= MAX_IMPORT_FILE_NAME_LENGTH) {
+    return fileName
+  }
+  const dotIndex = fileName.lastIndexOf('.')
+  if (dotIndex > 0 && dotIndex < fileName.length - 1) {
+    const extension = fileName.substring(dotIndex)
+    if (extension.length < MAX_IMPORT_FILE_NAME_LENGTH - 1) {
+      return `${fileName.substring(0, MAX_IMPORT_FILE_NAME_LENGTH - extension.length)}${extension}`
+    }
+  }
+  return fileName.substring(0, MAX_IMPORT_FILE_NAME_LENGTH)
 }
 
 async function deletePathIfExists(path: string): Promise<void> {

@@ -1,4 +1,5 @@
 #include "engine_napi_common.h"
+#include "common/file_security.h"
 #include "platform/resource/rawfile_rom_processor.h"
 #include <atomic>
 #include <chrono>
@@ -387,7 +388,14 @@ static napi_value LoadCore(napi_env env, napi_callback_info info) {
                            "Invalid path argument type");
   }
 
-  LOGF(LOG_INFO, " [NEW] LoadCore: %{public}s", path);
+  LOGF(LOG_INFO, " [NEW] LoadCore: %{public}s",
+       security::DescribePathForLog(path).c_str());
+  if (!security::ValidateCorePath(path)) {
+    GetEngine()->SetLastErrorInfo("core_path_rejected", "LoadCore",
+                                  "Core path is outside allowed directories");
+    return MakeErrorResult(env, false, EngineErrorCodes::CORE_LOAD_FAILED,
+                           "Core path is outside allowed directories");
+  }
   const bool ok = GetEngine()->LoadCore(path);
 
   if (!ok) {
@@ -425,7 +433,14 @@ static napi_value LoadRom(napi_env env, napi_callback_info info) {
   }
   std::string romPath(path);
 
-  LOGF(LOG_INFO, " [NEW] LoadRom: %{public}s", romPath.c_str());
+  LOGF(LOG_INFO, " [NEW] LoadRom: %{public}s",
+       security::DescribePathForLog(romPath).c_str());
+  if (!romPath.empty() && !security::ValidateRomPath(romPath)) {
+    GetEngine()->SetLastErrorInfo("rom_path_rejected", "LoadRom",
+                                  "ROM path is outside allowed directories");
+    return MakeErrorResult(env, false, EngineErrorCodes::ROM_LOAD_FAILED,
+                           "ROM path is outside allowed directories");
+  }
 
   std::shared_ptr<std::vector<uint8_t>> romData = nullptr;
   if (!LoadRomDataFromRawfileIfNeeded(env, romPath, (argc >= 2) ? args[1] : nullptr,
@@ -439,6 +454,12 @@ static napi_value LoadRom(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] LoadRom rawfile failed: %{public}s", message);
     return MakeErrorResult(env, false,
                            EngineErrorCodes::ROM_LOAD_FAILED, message);
+  }
+  if (!romPath.empty() && !security::ValidateRomPath(romPath)) {
+    GetEngine()->SetLastErrorInfo("rom_path_rejected", "LoadRom",
+                                  "Resolved ROM path is outside allowed directories");
+    return MakeErrorResult(env, false, EngineErrorCodes::ROM_LOAD_FAILED,
+                           "Resolved ROM path is outside allowed directories");
   }
 
   const bool ok = GetEngine()->LoadGame(romPath, romData);
@@ -925,17 +946,35 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
                     "SwitchGameAsync", "corePath")) {
     return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
   }
+  if (!security::ValidateCorePath(corePath)) {
+    GetEngine()->SetLastErrorInfo("core_path_rejected", "SwitchGameAsync",
+                                  "Core path is outside allowed directories");
+    return MakeResolvedErrorPromise(env, false, EngineErrorCodes::CORE_LOAD_FAILED,
+                                    "Core path is outside allowed directories");
+  }
 
   char romPath[1024];
   if (!GetStringArgAllowEmpty(env, args[1], romPath, sizeof(romPath),
                               "SwitchGameAsync", "romPath")) {
     return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
   }
+  if (romPath[0] != '\0' && !security::ValidateRomPath(romPath)) {
+    GetEngine()->SetLastErrorInfo("rom_path_rejected", "SwitchGameAsync",
+                                  "ROM path is outside allowed directories");
+    return MakeResolvedErrorPromise(env, false, EngineErrorCodes::ROM_LOAD_FAILED,
+                                    "ROM path is outside allowed directories");
+  }
 
   char filesDir[1024];
   if (!GetStringArg(env, args[2], filesDir, sizeof(filesDir),
                     "SwitchGameAsync", "filesDir")) {
     return MakeResolvedErrorPromise(env, false, NapiErrorCodes::INVALID_ARGUMENT_TYPE);
+  }
+  if (!security::ValidateFilesDir(filesDir)) {
+    GetEngine()->SetLastErrorInfo("files_dir_rejected", "SwitchGameAsync",
+                                  "filesDir is outside allowed directories");
+    return MakeResolvedErrorPromise(env, false, EngineErrorCodes::STATE_TRANSITION_FAILED,
+                                    "filesDir is outside allowed directories");
   }
 
   napi_value resMgrValue = nullptr;
@@ -1012,6 +1051,12 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
     // errorCode 而非靠字符串嗅探降级。
     return MakeResolvedErrorPromise(env, false, EngineErrorCodes::ROM_LOAD_FAILED,
                                     "SwitchGameAsync: failed to load ROM data");
+  }
+  if (!resolvedRomPath.empty() && !security::ValidateRomPath(resolvedRomPath)) {
+    GetEngine()->SetLastErrorInfo("rom_path_rejected", "SwitchGameAsync",
+                                  "Resolved ROM path is outside allowed directories");
+    return MakeResolvedErrorPromise(env, false, EngineErrorCodes::ROM_LOAD_FAILED,
+                                    "Resolved ROM path is outside allowed directories");
   }
 
   if (ShouldDedupSwitchRequest(std::string(corePath), resolvedRomPath)) {

@@ -41,6 +41,7 @@ const SAVE_STATE_MANIFEST_FILE = 'manifest.json'
 const SAVE_STATE_THUMBNAIL_SUFFIX = '.thumb.jpg'
 const SAVE_STATE_THUMBNAIL_FORMAT = 'image/jpeg'
 const SAVE_STATE_THUMBNAIL_QUALITY = 90
+const MAX_SAVE_FILE_NAME_LENGTH = 120
 
 export async function listSaveStateItems(context: common.UIAbilityContext): Promise<SaveStateManifestItem[]> {
   const document = await loadManifest(context)
@@ -97,7 +98,11 @@ export function readSaveStateData(
   context: common.UIAbilityContext,
   fileName: string
 ): ArrayBuffer {
-  const targetPath = buildSaveFilePath(context.filesDir, sanitizeFileName(fileName))
+  const safeName = sanitizeFileName(fileName)
+  if (safeName.length === 0) {
+    throw new Error('invalid_save_state_file_name')
+  }
+  const targetPath = buildSaveFilePath(context.filesDir, safeName)
   let stat: fs.Stat
   try {
     stat = fs.statSync(targetPath)
@@ -135,6 +140,9 @@ export async function deleteSaveStateItem(
   fileName: string
 ): Promise<void> {
   const safeName = sanitizeFileName(fileName)
+  if (safeName.length === 0) {
+    throw new Error('invalid_save_state_file_name')
+  }
   const document = await loadManifest(context)
   const targetItem = document.items.find((item: SaveStateManifestItem) => item.fileName === safeName)
   try {
@@ -195,11 +203,11 @@ export async function pruneManifestForFileNames(
 async function loadManifest(context: common.UIAbilityContext): Promise<SaveStateManifestDocument> {
   await ensureDirExists(buildSaveDirPath(context.filesDir))
   const manifestPath = buildManifestPath(context.filesDir)
+  const text = await readOptionalText(manifestPath)
+  if (!text || text.length === 0) {
+    return await buildManifestFromDirectory(context)
+  }
   try {
-    const text = await fs.readText(manifestPath)
-    if (!text || text.length === 0) {
-      return createEmptyManifest()
-    }
     const parsed = JSON.parse(text) as Partial<SaveStateManifestDocument> | null
     const items: SaveStateManifestItem[] = []
     if (parsed?.items) {
@@ -215,6 +223,8 @@ async function loadManifest(context: common.UIAbilityContext): Promise<SaveState
       items: reconciled
     }
   } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.warn('SaveStateRepository', 'Load', `存档索引损坏，已按目录重建: ${message}`)
     return await buildManifestFromDirectory(context)
   }
 }
@@ -241,7 +251,11 @@ async function reconcileManifestItems(
       validItems.push(item)
     } catch (err) {
       const message = (err as Error).message || String(err)
-      LogHelper.warn('SaveStateRepository', 'Reconcile', `裁剪不存在的存档条目 ${item.fileName}: ${message}`)
+      LogHelper.warn(
+        'SaveStateRepository',
+        'Reconcile',
+        `裁剪不存在的存档条目 ${LogHelper.describePathForLog(item.fileName)}: ${message}`
+      )
     }
   }
   // (b) 扫描目录：磁盘上有但 manifest 无的 .state 文件补充为孤儿条目
@@ -262,7 +276,11 @@ async function reconcileManifestItems(
         createdAt: readTimestampFromFileName(fileName),
         byteLength: Number(stat.size)
       })
-      LogHelper.warn('SaveStateRepository', 'Reconcile', `补充孤儿存档文件到清单: ${fileName}`)
+      LogHelper.warn(
+        'SaveStateRepository',
+        'Reconcile',
+        `补充孤儿存档文件到清单: ${LogHelper.describePathForLog(fileName)}`
+      )
     }
   } catch (err) {
     // 目录扫描失败不阻塞主流程，仅丢失孤儿补充能力
@@ -502,7 +520,18 @@ function normalizeNumber(value: number): number {
 }
 
 function sanitizeFileName(fileName: string): string {
-  return fileName.replace(/[\\\/]/g, '').trim()
+  const decoded = fileName.trim()
+  let normalized = ''
+  for (let index = 0; index < decoded.length; index += 1) {
+    const char = decoded.charAt(index)
+    const code = decoded.charCodeAt(index)
+    if (code < 32 || code === 127 || char === '/' || char === '\\') {
+      continue
+    }
+    normalized += ':*?"<>|'.includes(char) ? '_' : char
+  }
+  normalized = normalized.replace(/\.\.+/g, '.').replace(/^\.+/, '').trim()
+  return truncateSaveFileName(normalized)
 }
 
 function sanitizeOptionalFileName(fileName?: string): string {
@@ -521,6 +550,20 @@ function clearThumbnailMetadata(item: SaveStateManifestItem): SaveStateManifestI
     byteLength: item.byteLength
   }
   return nextItem
+}
+
+function truncateSaveFileName(fileName: string): string {
+  if (fileName.length <= MAX_SAVE_FILE_NAME_LENGTH) {
+    return fileName
+  }
+  const dotIndex = fileName.lastIndexOf('.')
+  if (dotIndex > 0 && dotIndex < fileName.length - 1) {
+    const extension = fileName.substring(dotIndex)
+    if (extension.length < MAX_SAVE_FILE_NAME_LENGTH - 1) {
+      return `${fileName.substring(0, MAX_SAVE_FILE_NAME_LENGTH - extension.length)}${extension}`
+    }
+  }
+  return fileName.substring(0, MAX_SAVE_FILE_NAME_LENGTH)
 }
 
 function buildThumbnailFileName(stateFileName: string): string {
@@ -549,5 +592,25 @@ async function ensureDirExists(path: string): Promise<void> {
     await fs.mkdir(path, true)
   } catch (err) {
     return
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (_err) {
+    return ''
   }
 }

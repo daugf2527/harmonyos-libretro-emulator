@@ -439,9 +439,12 @@ static void ExecuteTestCoreLoader(napi_env /*env*/, void *data) {
   bool success = true;
   std::string &resultMessage = ctx->resultMessage;
 
-  LOGF(LOG_INFO, "Step 1: Loading core...");
+  const std::string corePathForLog = security::DescribePathForLog(corePath);
+
+  LOGF(LOG_INFO, "Step 1: Loading core: %{public}s",
+       corePathForLog.c_str());
   if (!loader.LoadCore(corePath)) {
-    resultMessage = "Failed: Could not load core from path: " + corePath;
+    resultMessage = "Failed: Could not load core (" + corePathForLog + ")";
     if (!loader.GetLastErrorStep().empty() || !loader.GetLastErrorMessage().empty()) {
       resultMessage += " (step=" + loader.GetLastErrorStep() + ", message=" +
                        loader.GetLastErrorMessage() + ")";
@@ -642,11 +645,12 @@ static napi_value TestCoreLoader(napi_env env, napi_callback_info info) {
     return MakeResolvedStringPromise(env, "Error: Invalid corePath parameter");
   }
 
-  LOGF(LOG_INFO, "Received corePath from ArkTS: %{public}s", corePath.c_str());
+  LOGF(LOG_INFO, "Received corePath from ArkTS: %{public}s",
+       security::DescribePathForLog(corePath).c_str());
 
   if (!security::ValidateCorePath(corePath)) {
     LOGF(LOG_ERROR, "Security: Core path validation failed in TestCoreLoader: %{public}s",
-         corePath.c_str());
+         security::DescribePathForLog(corePath).c_str());
     return MakeResolvedStringPromise(env,
                                      "Error: Core path not in allowed directories");
   }

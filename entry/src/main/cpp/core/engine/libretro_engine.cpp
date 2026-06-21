@@ -221,6 +221,15 @@ bool IsCoreLoadedState(EngineState state) {
   return state == EngineState::CORE_LOADED || IsGameLoadedState(state);
 }
 
+bool IsExpectedLateWindowQueueDrop(bool running, EngineState state,
+                                   const ThreadSafeQueue<EngineMessage> &queue) {
+  if (!queue.IsClosed()) {
+    return false;
+  }
+  return !running || state == EngineState::STOPPING ||
+         state == EngineState::STOPPED;
+}
+
 bool IsValidTransition(EngineState from, EngineState to) {
   if (from == to) {
     return true;
@@ -765,6 +774,12 @@ void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
     if (!messageQueue_.Push(EngineMessage::MakeWindowMessage(
             window ? MessageType::WindowCreated : MessageType::WindowDestroyed,
             window, false, generation))) {
+      const EngineState stateSnapshot = state_.load(std::memory_order_acquire);
+      const bool runningSnapshot = running_.load(std::memory_order_acquire);
+      if (IsExpectedLateWindowQueueDrop(runningSnapshot, stateSnapshot,
+                                        messageQueue_)) {
+        return;
+      }
       windowMessageDropLogCount_++;
       if (windowMessageDropLogCount_ <= 5 ||
           (windowMessageDropLogCount_ % 60) == 0) {
@@ -839,6 +854,13 @@ void LibretroEngine::OnNativeWindowResized(const std::string &xcomponentId,
                 EngineMessage::MakeWindowMessage(MessageType::WindowCreated,
                                                  windowSnapshot, false,
                                                  generation))) {
+          const EngineState stateSnapshot =
+              state_.load(std::memory_order_acquire);
+          const bool runningSnapshot = running_.load(std::memory_order_acquire);
+          if (IsExpectedLateWindowQueueDrop(runningSnapshot, stateSnapshot,
+                                            messageQueue_)) {
+            return;
+          }
           windowResizeDropLogCount_++;
           if (windowResizeDropLogCount_ <= 5 ||
               (windowResizeDropLogCount_ % 60) == 0) {
@@ -864,6 +886,12 @@ void LibretroEngine::OnNativeWindowResized(const std::string &xcomponentId,
     if (!messageQueue_.PushCoalesce(
             EngineMessage::MakeWindowResizeMessage(width, height),
             coalesceFunc)) {
+      const EngineState stateSnapshot = state_.load(std::memory_order_acquire);
+      const bool runningSnapshot = running_.load(std::memory_order_acquire);
+      if (IsExpectedLateWindowQueueDrop(runningSnapshot, stateSnapshot,
+                                        messageQueue_)) {
+        return;
+      }
       windowResizeDropLogCount_++;
       if (windowResizeDropLogCount_ <= 5 ||
           (windowResizeDropLogCount_ % 60) == 0) {
@@ -936,7 +964,7 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
   if (IsCoreLoadedState(st) || st == EngineState::LOADING ||
       st == EngineState::STOPPING) {
     LOGF(LOG_WARN, "[NEW] SetFilesDir ignored after core loaded: %{public}s",
-         filesDir.c_str());
+         security::DescribePathForLog(filesDir).c_str());
     SetLastErrorInfo("files_dir_set_ignored_state", "SetFilesDir",
                      "SetFilesDir ignored due current engine state");
     return false;
@@ -979,7 +1007,7 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
     pendingFilesDir_.clear();
   }
   LOGF(LOG_INFO, "[NEW] EnvState BaseDir set from ArkTS: %{public}s",
-       filesDir.c_str());
+       security::DescribePathForLog(filesDir).c_str());
   return true;
 }
 
@@ -1476,7 +1504,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     TransitionTo(EngineState::LOADING);
     currentCorePath_ = msg.payload.loadPath.path;
     LOGF(LOG_INFO, "[NEW] Message: LoadCore path=%{public}s",
-         currentCorePath_.c_str());
+         security::DescribePathForLog(currentCorePath_).c_str());
     // 先卸载旧核心（如果已加载）
     if (coreLoader_.IsLoaded()) {
       LOGF(LOG_INFO, "[NEW] Unloading previous core before loading new one");
@@ -1508,7 +1536,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
             envState_.SetBaseDir(appDir + "/files");
             LOGF(LOG_WARN,
                  "[NEW] EnvState BaseDir (fallback): %{public}s/files",
-                 appDir.c_str());
+                 security::DescribePathForLog(appDir).c_str());
           }
         }
       }
@@ -1533,7 +1561,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       TransitionTo(EngineState::CORE_LOADED);
     } else {
       LOGF(LOG_ERROR, " [NEW] LoadCore Failed: %{public}s",
-           currentCorePath_.c_str());
+           security::DescribePathForLog(currentCorePath_).c_str());
 
       // 构建转义后的错误信息，避免 payload JSON 被特殊字符破坏。
 
@@ -1568,11 +1596,12 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     currentGamePath_ = msg.payload.loadPath.path;
     currentGameData_ = msg.payload.loadPath.data;
     LOGF(LOG_INFO, "[NEW] Message: LoadRom path=%{public}s, data=%{public}s",
-         currentGamePath_.c_str(), currentGameData_ ? "YES" : "NO");
+         security::DescribePathForLog(currentGamePath_).c_str(),
+         currentGameData_ ? "YES" : "NO");
     if (!currentGamePath_.empty() &&
         !security::ValidateRomPath(currentGamePath_)) {
       LOGF(LOG_ERROR, " [NEW] LoadRom blocked: invalid ROM path %{public}s",
-           currentGamePath_.c_str());
+           security::DescribePathForLog(currentGamePath_).c_str());
       currentGamePath_.clear();
       currentGameData_.reset();
       eventBridge_.Emit("core_crash", "{\"reason\": \"rom_path_invalid\"}",
@@ -1804,7 +1833,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     if (IsCoreLoadedState(st) || st == EngineState::LOADING ||
         st == EngineState::STOPPING) {
       LOGF(LOG_WARN, "[NEW] SetFilesDir ignored after core loaded: %{public}s",
-           msg.payload.loadPath.path);
+           security::DescribePathForLog(msg.payload.loadPath.path).c_str());
       clearPendingIfMatched();
       break;
     }
@@ -1812,7 +1841,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set from Engine thread failed");
     } else {
       LOGF(LOG_INFO, "[NEW] EnvState BaseDir set from Engine thread: %{public}s",
-           msg.payload.loadPath.path);
+           security::DescribePathForLog(msg.payload.loadPath.path).c_str());
     }
     clearPendingIfMatched();
     break;

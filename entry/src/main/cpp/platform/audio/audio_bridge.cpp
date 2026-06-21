@@ -34,6 +34,20 @@ namespace {
 constexpr const char *kAudioChainPrefix = "[AUD][CHAIN]";
 constexpr const char *kAudioDiagPrefix = "[AUDIO_DIAG]";
 constexpr int kAudioProducerMaxBlockMs = 8;
+
+size_t ResolveMinBufferFrames(unsigned latency_ms, size_t default_frames,
+                              int32_t sample_rate) {
+  if (latency_ms == 0 || sample_rate <= 0) {
+    return default_frames;
+  }
+
+  size_t target_frames =
+      (static_cast<size_t>(sample_rate) * latency_ms) / 1000;
+  if (target_frames < default_frames) {
+    target_frames = default_frames;
+  }
+  return target_frames;
+}
 }
 
 const char *AudioBridge::AudioRunStateToString(AudioRunState state) {
@@ -51,6 +65,64 @@ const char *AudioBridge::AudioRunStateToString(AudioRunState state) {
   default:
     return "unknown";
   }
+}
+
+void AudioBridge::ApplyAudioProfileLocked() {
+  const bool rt_sched =
+      rt_scheduling_available_.load(std::memory_order_relaxed);
+  const int min_buffer_ms =
+      rt_sched ? kMinBufferMsDevice : kMinBufferMsEmulator;
+  drc_low_threshold_ =
+      rt_sched ? kDrcLowThresholdDevice : kDrcLowThresholdEmulator;
+  drc_high_threshold_ =
+      rt_sched ? kDrcHighThresholdDevice : kDrcHighThresholdEmulator;
+  default_min_buffer_frames_.store(
+      static_cast<size_t>(output_sample_rate_) * min_buffer_ms / 1000,
+      std::memory_order_relaxed);
+  const unsigned requested_latency_ms =
+      minimum_latency_ms_.load(std::memory_order_relaxed) +
+      adaptive_buffer_boost_ms_.load(std::memory_order_relaxed);
+  min_buffer_frames_.store(
+      ResolveMinBufferFrames(requested_latency_ms,
+                             default_min_buffer_frames_.load(std::memory_order_relaxed),
+                             sample_rate_),
+      std::memory_order_relaxed);
+  LOGF(LOG_INFO,
+       "%{public}s Audio profile: %{public}s (rt_sched=%{public}d, min_buffer=%{public}d ms, "
+       "boost=%{public}u ms, drc_band=%{public}d%%-%{public}d%%, min_frames=%{public}zu)",
+       kAudioChainPrefix,
+       rt_sched ? "device/low-latency" : "emulator/deep-buffer",
+       rt_sched ? 1 : 0, min_buffer_ms,
+       adaptive_buffer_boost_ms_.load(std::memory_order_relaxed),
+       static_cast<int>(drc_low_threshold_ * 100.0f + 0.5f),
+       static_cast<int>(drc_high_threshold_ * 100.0f + 0.5f),
+       min_buffer_frames_.load(std::memory_order_relaxed));
+}
+
+void AudioBridge::IncreaseAdaptiveBufferBoostLocked() {
+  if (rt_scheduling_available_.load(std::memory_order_relaxed)) {
+    return;
+  }
+  const unsigned current =
+      adaptive_buffer_boost_ms_.load(std::memory_order_relaxed);
+  if (current >= kAdaptiveBoostMsMax) {
+    return;
+  }
+  const unsigned next =
+      std::min<unsigned>(current + kAdaptiveBoostMsStep, kAdaptiveBoostMsMax);
+  adaptive_buffer_boost_ms_.store(next, std::memory_order_relaxed);
+  ApplyAudioProfileLocked();
+  LOGF(LOG_WARN, "%{public}s Adaptive buffer boost increased: %{public}u ms",
+       kAudioChainPrefix, next);
+}
+
+void AudioBridge::ResetAdaptiveBufferBoostLocked() {
+  if (adaptive_buffer_boost_ms_.load(std::memory_order_relaxed) == 0) {
+    return;
+  }
+  adaptive_buffer_boost_ms_.store(0, std::memory_order_relaxed);
+  ApplyAudioProfileLocked();
+  LOGF(LOG_INFO, "%{public}s Adaptive buffer boost reset", kAudioChainPrefix);
 }
 
 void AudioBridge::SetRunState(AudioRunState state, const char *reason) {
@@ -74,33 +146,31 @@ AudioBridge::AudioBridge() {
   LOGF(LOG_INFO, "%{public}s AudioBridge created", kAudioChainPrefix);
 }
 
+void AudioBridge::SetRtSchedulingAvailable(bool available) {
+  const bool previous =
+      rt_scheduling_available_.exchange(available, std::memory_order_relaxed);
+  if (previous == available) {
+    return;
+  }
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (output_sample_rate_ <= 0) {
+    return;
+  }
+  sample_rate_ = output_sample_rate_;
+  ApplyAudioProfileLocked();
+}
+
 void AudioBridge::SetMinimumLatencyMs(unsigned latency_ms) {
+  minimum_latency_ms_.store(latency_ms);
+
   if (!initialized_ || sample_rate_ <= 0) {
     return;
   }
 
-  minimum_latency_ms_.store(latency_ms);
-
-  const size_t current_frames = min_buffer_frames_.load();
-
-  size_t target_frames = 0;
-  if (latency_ms == 0) {
-    target_frames = default_min_buffer_frames_.load();
-  } else {
-    target_frames = (static_cast<size_t>(sample_rate_) * latency_ms) / 1000;
-    const size_t default_frames = default_min_buffer_frames_.load();
-    if (target_frames < default_frames) {
-      target_frames = default_frames;
-    }
-  }
-
-  if (latency_ms == 0) {
-    min_buffer_frames_.store(target_frames);
-  } else {
-    if (target_frames > current_frames) {
-      min_buffer_frames_.store(target_frames);
-    }
-  }
+  const size_t target_frames = ResolveMinBufferFrames(
+      latency_ms, default_min_buffer_frames_.load(), sample_rate_);
+  min_buffer_frames_.store(target_frames);
 
   LOGF(LOG_INFO,
        "%{public}s SetMinimumLatencyMs: req=%{public}u ms, "
@@ -463,6 +533,10 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
   }
   if (!success) {
     recover_streak_ = std::min<uint32_t>(recover_streak_ + 1, 100);
+    if (recover_streak_ >= 3) {
+      std::lock_guard<std::mutex> guard(mutex_);
+      IncreaseAdaptiveBufferBoostLocked();
+    }
     SetRunState(AudioRunState::RECOVERING, "producer_write_failed");
     LOGF(LOG_WARN,
          "%{public}s %{public}s producer drop: write failed (blocking=%{public}d)",
@@ -491,22 +565,31 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
     // 死循环(实测)。故仅真机重缓冲;模拟器 ride-through(消费回调补静音)+ 深缓冲 + DRC
     // 维持,绝不在引擎线程上做昂贵的 HAL 状态切换。详见 memory
     // project-audio-underrun-api22-emulator-not-code。
-    if (rt_scheduling_available_.load(std::memory_order_relaxed) &&
-        underruns > last_rebuffer_underruns && available_frames < min_frames) {
+    if (underruns > last_rebuffer_underruns && available_frames < min_frames) {
       std::lock_guard<std::mutex> guard(mutex_);
-      if (audio_player_ && !buffering_ && audio_player_->IsPlaying()) {
-        const bool paused = audio_player_->Pause();
-        last_rebuffer_underruns_.store(underruns, std::memory_order_relaxed);
-        if (paused) {
-          buffering_ = true;
-          SetRunState(AudioRunState::BUFFERING, "runtime_underrun_rebuffer");
+      if (rt_scheduling_available_.load(std::memory_order_relaxed)) {
+        if (audio_player_ && !buffering_ && audio_player_->IsPlaying()) {
+          const bool paused = audio_player_->Pause();
+          last_rebuffer_underruns_.store(underruns, std::memory_order_relaxed);
+          if (paused) {
+            buffering_ = true;
+            IncreaseAdaptiveBufferBoostLocked();
+            SetRunState(AudioRunState::BUFFERING, "runtime_underrun_rebuffer");
+          }
+          LOGF(LOG_WARN,
+               "%{public}s Runtime rebuffer after underrun: paused=%{public}d, "
+               "available=%{public}zu frames, min=%{public}zu frames, "
+               "underruns=%{public}zu, overruns=%{public}zu",
+               kAudioChainPrefix, paused ? 1 : 0, available_frames, min_frames,
+               underruns, overruns);
         }
+      } else {
+        last_rebuffer_underruns_.store(underruns, std::memory_order_relaxed);
+        IncreaseAdaptiveBufferBoostLocked();
         LOGF(LOG_WARN,
-             "%{public}s Runtime rebuffer after underrun: paused=%{public}d, "
-             "available=%{public}zu frames, min=%{public}zu frames, "
-             "underruns=%{public}zu, overruns=%{public}zu",
-             kAudioChainPrefix, paused ? 1 : 0, available_frames, min_frames,
-             underruns, overruns);
+             "%{public}s Adaptive buffer boost after underrun: available=%{public}zu "
+             "frames, min=%{public}zu frames, underruns=%{public}zu, overruns=%{public}zu",
+             kAudioChainPrefix, available_frames, min_frames, underruns, overruns);
       }
     }
   }
@@ -610,6 +693,7 @@ size_t AudioBridge::ProcessAudio(const int16_t *data, size_t frames) {
           if (audio_player_->Start()) {
             buffering_ = false;
             recover_streak_ = 0;
+            ResetAdaptiveBufferBoostLocked();
             SetRunState(AudioRunState::RUNNING, "buffering_complete");
           }
         }
@@ -631,6 +715,7 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
     buffering_ = false;
     is_started_ = false;
     recover_streak_ = 0;
+    adaptive_buffer_boost_ms_.store(0, std::memory_order_relaxed);
     SetRunState(AudioRunState::INIT, "initialize_reuse");
     if (ring_buffer_) {
       ring_buffer_->Clear();
@@ -644,6 +729,8 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
       resampler_.Init(core_sample_rate_, output_sample_rate_);
       drc_skew_.store(1.0);
     }
+    sample_rate_ = output_sample_rate_;
+    ApplyAudioProfileLocked();
     LOGF(LOG_INFO,
          "%{public}s AudioBridge reuse: running reset, "
          "core_rate=%{public}d, out_rate=%{public}d",
@@ -656,6 +743,7 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   // 输出采样率固定 48k（OHAudio 建议）
   output_sample_rate_ = 48000;
   sample_rate_ = output_sample_rate_; // 兼容旧字段命名
+  adaptive_buffer_boost_ms_.store(0, std::memory_order_relaxed);
 
   // 1. 创建环形缓冲区
   // 缓冲 1 秒音频数据 (立体声: 采样率 * 2)
@@ -667,21 +755,7 @@ bool AudioBridge::Initialize(int32_t sample_rate) {
   // + DRC 带。真机有 RT(回调规整 ~20ms)→ 浅缓冲低延迟;模拟器无 RT(回调抖 ~150ms,
   // workgroup/QoS 被系统拒)→ 深缓冲扛抖动 + DRC 带抬高不抽干。详见 memory
   // project-audio-underrun-api22-emulator-not-code。
-  const bool rt_sched = rt_scheduling_available_.load(std::memory_order_relaxed);
-  const int min_buffer_ms = rt_sched ? kMinBufferMsDevice : kMinBufferMsEmulator;
-  drc_low_threshold_ = rt_sched ? kDrcLowThresholdDevice : kDrcLowThresholdEmulator;
-  drc_high_threshold_ = rt_sched ? kDrcHighThresholdDevice : kDrcHighThresholdEmulator;
-  default_min_buffer_frames_.store(
-      static_cast<size_t>(output_sample_rate_) * min_buffer_ms / 1000);
-  LOGF(LOG_INFO,
-       "%{public}s Audio profile: %{public}s (rt_sched=%{public}d, min_buffer=%{public}d ms, "
-       "drc_band=%{public}d%%-%{public}d%%)",
-       kAudioChainPrefix, rt_sched ? "device/low-latency" : "emulator/deep-buffer",
-       rt_sched ? 1 : 0, min_buffer_ms,
-       static_cast<int>(drc_low_threshold_ * 100.0f + 0.5f),
-       static_cast<int>(drc_high_threshold_ * 100.0f + 0.5f));
-  min_buffer_frames_.store(default_min_buffer_frames_.load());
-  minimum_latency_ms_.store(0);
+  ApplyAudioProfileLocked();
 
   // 2. 创建音频播放器
   audio_player_ = std::make_unique<AudioPlayer>();
@@ -731,12 +805,15 @@ bool AudioBridge::Reset(int32_t sample_rate) {
       buffering_ = false;
       is_started_ = false;
       recover_streak_ = 0;
+      adaptive_buffer_boost_ms_.store(0, std::memory_order_relaxed);
       if (ring_buffer_) {
         ring_buffer_->ResetStats();
         last_rebuffer_underruns_.store(0, std::memory_order_relaxed);
         // 清空旧数据，重新缓冲
         ring_buffer_->Clear();
       }
+      sample_rate_ = output_sample_rate_;
+      ApplyAudioProfileLocked();
       // 重新初始化重采样器与 DRC 状态，以避免沿用上一次的动态比率
       resampler_.Init(core_sample_rate_, output_sample_rate_);
       drc_skew_.store(1.0);
@@ -762,6 +839,7 @@ bool AudioBridge::Reset(int32_t sample_rate) {
       ring_buffer_.reset();
       initialized_.store(false);
       recover_streak_ = 0;
+      adaptive_buffer_boost_ms_.store(0, std::memory_order_relaxed);
       // Audit T3-F2: clear DRC throttle timestamp on full reinit path too
       drc_last_update_ = std::chrono::steady_clock::time_point{};
       SetRunState(AudioRunState::INIT, "reset_reinit");
@@ -809,6 +887,7 @@ bool AudioBridge::Pause() {
 
   bool success = audio_player_->Pause();
   if (success) {
+    ResetAdaptiveBufferBoostLocked();
     SetRunState(AudioRunState::PAUSED, "pause_success");
     LOGF(LOG_INFO, "%{public}s AudioBridge paused", kAudioChainPrefix);
   } else {
@@ -835,6 +914,7 @@ bool AudioBridge::Stop() {
 
   bool success = audio_player_->Stop();
   if (success) {
+    ResetAdaptiveBufferBoostLocked();
     SetRunState(AudioRunState::PAUSED, "stop_success");
     LOGF(LOG_INFO, "%{public}s AudioBridge stopped", kAudioChainPrefix);
 

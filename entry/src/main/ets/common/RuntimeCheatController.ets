@@ -8,6 +8,7 @@ interface RuntimeCheatNapi {
 }
 
 const nativeApi = testNapi as RuntimeCheatNapi
+const MAX_RUNTIME_CHEAT_CODE_LENGTH = 240
 
 export class RuntimeCheatController {
   resetAll(): boolean {
@@ -25,7 +26,7 @@ export class RuntimeCheatController {
   }
 
   setCheat(index: number, enabled: boolean, code: string): boolean {
-    const safeCode = typeof code === 'string' ? code.trim() : ''
+    const safeCode = this.normalizeCheatCode(code)
     if (safeCode.length === 0) {
       LogHelper.warn('RuntimeCheat', 'Engine', '金手指代码为空，跳过写入')
       return false
@@ -59,7 +60,7 @@ export class RuntimeCheatController {
         LogHelper.warn(
           'RuntimeCheat',
           'Engine',
-          `金手指同步中断: index=${index} label=${item.label}`
+          `金手指同步中断: index=${index} enabled=${item.enabled ? 1 : 0} code_len=${item.code.length}`
         )
         return false
       }
@@ -74,6 +75,21 @@ export class RuntimeCheatController {
       return 0
     }
     return Math.floor(index)
+  }
+
+  private normalizeCheatCode(code: string): string {
+    if (typeof code !== 'string') {
+      return ''
+    }
+    let normalized = ''
+    const trimmed = code.trim()
+    for (let index = 0; index < trimmed.length && normalized.length < MAX_RUNTIME_CHEAT_CODE_LENGTH; index++) {
+      const charCode = trimmed.charCodeAt(index)
+      if (charCode >= 0x20 && charCode <= 0x7E) {
+        normalized += trimmed.charAt(index)
+      }
+    }
+    return normalized
   }
 }
 

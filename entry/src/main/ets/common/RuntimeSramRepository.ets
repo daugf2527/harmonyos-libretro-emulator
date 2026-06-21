@@ -18,6 +18,8 @@ const RUNTIME_SRAM_FILE_PREFIX = 'sram_'
 const RUNTIME_SRAM_FILE_SUFFIX = '.srm'
 const ERR_CODE_ENOENT = '13900002'
 const ERR_CODE_ENOENT_NUM: string | number = 13900002
+const MAX_SRAM_FILE_NAME_LENGTH = 120
+const MAX_SRAM_ROM_STEM_LENGTH = 48
 
 export async function listRuntimeSramBackupsForRom(
   context: common.UIAbilityContext,
@@ -143,11 +145,13 @@ function extractRomBaseName(romFile: string): string {
   const fileName = slashIndex >= 0 ? normalizedPath.substring(slashIndex + 1) : normalizedPath
   const dotIndex = fileName.lastIndexOf('.')
   const stem = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName
-  const sanitized = stem.replace(/[\\/:*?"<>|]+/g, '_').trim()
+  const sanitized = sanitizeFileName(stem)
   if (sanitized.length === 0) {
     return 'rom'
   }
-  return sanitized.length > 48 ? sanitized.substring(0, 48) : sanitized
+  return sanitized.length > MAX_SRAM_ROM_STEM_LENGTH
+    ? sanitized.substring(0, MAX_SRAM_ROM_STEM_LENGTH)
+    : sanitized
 }
 
 function computeStableHash(value: string): string {
@@ -161,8 +165,18 @@ function computeStableHash(value: string): string {
 }
 
 function sanitizeFileName(fileName: string | undefined): string {
-  const safeName = typeof fileName === 'string' ? fileName.trim() : ''
-  return safeName.replace(/[\\/:*?"<>|]+/g, '_').replace(/\.\.+/g, '.')
+  const decoded = typeof fileName === 'string' ? fileName.trim() : ''
+  let normalized = ''
+  for (let index = 0; index < decoded.length; index += 1) {
+    const char = decoded.charAt(index)
+    const code = decoded.charCodeAt(index)
+    if (code < 32 || code === 127 || char === '/' || char === '\\') {
+      continue
+    }
+    normalized += ':*?"<>|'.includes(char) ? '_' : char
+  }
+  normalized = normalized.replace(/\.\.+/g, '.').replace(/^\.+/, '').trim()
+  return truncateSramFileName(normalized)
 }
 
 function readTimestampFromFileName(fileName: string): number {
@@ -172,6 +186,20 @@ function readTimestampFromFileName(fileName: string): number {
   }
   const timestamp = Math.floor(Number(matched[1]) || 0)
   return timestamp > 0 ? timestamp : 0
+}
+
+function truncateSramFileName(fileName: string): string {
+  if (fileName.length <= MAX_SRAM_FILE_NAME_LENGTH) {
+    return fileName
+  }
+  const dotIndex = fileName.lastIndexOf('.')
+  if (dotIndex > 0 && dotIndex < fileName.length - 1) {
+    const extension = fileName.substring(dotIndex)
+    if (extension.length < MAX_SRAM_FILE_NAME_LENGTH - 1) {
+      return `${fileName.substring(0, MAX_SRAM_FILE_NAME_LENGTH - extension.length)}${extension}`
+    }
+  }
+  return fileName.substring(0, MAX_SRAM_FILE_NAME_LENGTH)
 }
 
 async function readArrayBufferFromFile(path: string): Promise<ArrayBuffer> {

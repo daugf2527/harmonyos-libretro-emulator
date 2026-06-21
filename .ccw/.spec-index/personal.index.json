@@ -1,0 +1,35 @@
+{
+  "dimension": "personal",
+  "entries": [
+    {
+      "title": "Personal Coding Style",
+      "file": "C:/Users/newwo/.ccw/personal/coding-style.md",
+      "dimension": "personal",
+      "category": "general",
+      "keywords": [
+        "style",
+        "preference"
+      ],
+      "readMode": "optional",
+      "priority": "medium",
+      "scope": "global",
+      "contentLength": 402
+    },
+    {
+      "title": "Tool Preferences",
+      "file": "C:/Users/newwo/.ccw/personal/tool-preferences.md",
+      "dimension": "personal",
+      "category": "general",
+      "keywords": [
+        "tool",
+        "cli",
+        "editor"
+      ],
+      "readMode": "optional",
+      "priority": "low",
+      "scope": "global",
+      "contentLength": 197
+    }
+  ],
+  "built_at": "2026-06-10T09:11:13.543Z"
+}
