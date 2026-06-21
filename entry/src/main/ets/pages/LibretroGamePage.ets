@@ -2705,29 +2705,30 @@ struct LibretroGamePage {
     this.closeRuntimePortControl();
     const token = this.switchToken + 1;
     this.switchToken = token;
-    await this.finalizeActiveLibrarySession();
-    if (!this.isCurrentSwitchTask(token)) {
-      return;
-    }
-
-    await this.refreshRuntimeLaunchState();
-    if (!this.isCurrentSwitchTask(token)) {
-      return;
-    }
-    const renderConfigApplied = this.applyRuntimeRenderSettingsToNative('prelaunch');
-    if (!renderConfigApplied) {
-      this.runtimeSaveStatusText = '运行时画面配置写入失败，已继续按当前引擎状态启动';
-    }
-
-    LogHelper.info(
-      'LibretroGame',
-      'Engine',
-      `[NewArch] 开始游戏: ${core.name} - ${rom.name}`
-    );
     this.switchError = '';
     let success = false;
 
     try {
+      await this.finalizeActiveLibrarySession();
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
+
+      await this.refreshRuntimeLaunchState();
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
+      const renderConfigApplied = this.applyRuntimeRenderSettingsToNative('prelaunch');
+      if (!renderConfigApplied) {
+        this.runtimeSaveStatusText = '运行时画面配置写入失败，已继续按当前引擎状态启动';
+      }
+
+      LogHelper.info(
+        'LibretroGame',
+        'Engine',
+        `[NewArch] 开始游戏: ${core.name} - ${rom.name}`
+      );
+
       // 1. 获取上下文
       const context = this.getUIContext().getHostContext() as
         common.UIAbilityContext;
