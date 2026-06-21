@@ -1062,8 +1062,13 @@ interfaces::IRenderer *LibretroEngine::GetRendererInterface() const {
 }
 
 bool LibretroEngine::ExecuteSyncTask(const std::function<void()> &task,
-                                     uint32_t timeoutMs) {
+                                     uint32_t timeoutMs,
+                                     const char *operation) {
+  const std::string opName =
+      (operation && operation[0] != '\0') ? operation : "ExecuteSyncTask";
   if (!task) {
+    SetLastErrorInfo("sync_task_missing", opName,
+                     "sync task callback is null");
     return false;
   }
   if (g_engineThreadInstance == this || !running_.load()) {
@@ -1072,16 +1077,22 @@ bool LibretroEngine::ExecuteSyncTask(const std::function<void()> &task,
   }
   if (messageQueue_.IsClosed()) {
     LOGF(LOG_WARN, "[NEW] SyncTask dropped: message queue closed");
+    SetLastErrorInfo("sync_task_queue_closed", opName,
+                     "message queue closed before sync task dispatch");
     return false;
   }
 
   auto syncTask = std::make_shared<EngineSyncTask>(task);
   if (!messageQueue_.Push(EngineMessage::MakeSyncTaskMessage(syncTask))) {
     LOGF(LOG_WARN, "[NEW] SyncTask push failed: message queue closed");
+    SetLastErrorInfo("sync_task_dispatch_failed", opName,
+                     "message queue rejected sync task");
     return false;
   }
   if (!syncTask->Wait(timeoutMs)) {
     LOGF(LOG_ERROR, "[NEW] SyncTask timeout after %{public}u ms", timeoutMs);
+    SetLastErrorInfo("sync_task_timeout", opName,
+                     "sync task timed out waiting for engine thread");
     return false;
   }
   return true;
@@ -2929,6 +2940,8 @@ size_t LibretroEngine::GetSaveStateSize() {
   // T8-A-F1: 拒绝在 !IsGameLoadedState() 时调用——core 未加载游戏时
   // serialize_size 行为未定义,且无 game state 时返回 0 已是死路。
   if (!IsGameLoadedState(state_.load())) {
+    SetLastErrorInfo("save_state_size_game_not_loaded", "GetSaveStateSize",
+                     "GetSaveStateSize requires a loaded game");
     return 0;
   }
   size_t size = 0;
@@ -2938,7 +2951,7 @@ size_t LibretroEngine::GetSaveStateSize() {
           size = stateManager_->GetSaveStateSize();
         }
       },
-      kSyncTaskTimeoutMs);
+      kSyncTaskTimeoutMs, "GetSaveStateSize");
   return size;
 }
 
@@ -2948,6 +2961,8 @@ bool LibretroEngine::SaveState(std::vector<uint8_t> &outData) {
   if (!IsGameLoadedState(state_.load())) {
     LOGF(LOG_WARN, "[NEW] SaveState rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("save_state_game_not_loaded", "SaveState",
+                     "SaveState requires a loaded game");
     return false;
   }
   bool ok = false;
@@ -2958,10 +2973,12 @@ bool LibretroEngine::SaveState(std::vector<uint8_t> &outData) {
               ok = stateManager_->SaveState(snapshot);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "SaveState")) {
     return false;
   }
   if (!ok) {
+    SetLastErrorInfo("save_state_failed", "SaveState",
+                     "Core state serialization returned false");
     return false;
   }
   outData = std::move(snapshot);
@@ -2973,6 +2990,9 @@ bool LibretroEngine::CaptureSaveStateBundle(SaveStateCaptureBundle &outBundle) {
     LOGF(LOG_WARN,
          "[NEW] CaptureSaveStateBundle rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("save_state_bundle_game_not_loaded",
+                     "CaptureSaveStateBundle",
+                     "CaptureSaveStateBundle requires a loaded game");
     return false;
   }
 
@@ -2984,10 +3004,12 @@ bool LibretroEngine::CaptureSaveStateBundle(SaveStateCaptureBundle &outBundle) {
               ok = stateManager_->SaveState(bundle.stateData);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "CaptureSaveStateBundle")) {
     return false;
   }
   if (!ok || bundle.stateData.empty()) {
+    SetLastErrorInfo("save_state_bundle_failed", "CaptureSaveStateBundle",
+                     "SaveState bundle capture returned empty snapshot");
     return false;
   }
 
@@ -3003,6 +3025,8 @@ bool LibretroEngine::LoadState(const std::vector<uint8_t> &data) {
   if (!IsGameLoadedState(state_.load())) {
     LOGF(LOG_WARN, "[NEW] LoadState rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("load_state_game_not_loaded", "LoadState",
+                     "LoadState requires a loaded game");
     return false;
   }
   bool ok = false;
@@ -3012,8 +3036,12 @@ bool LibretroEngine::LoadState(const std::vector<uint8_t> &data) {
               ok = stateManager_->LoadState(data);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "LoadState")) {
     return false;
+  }
+  if (!ok) {
+    SetLastErrorInfo("load_state_failed", "LoadState",
+                     "Core state deserialization returned false");
   }
   return ok;
 }
@@ -3025,6 +3053,8 @@ bool LibretroEngine::GetSRAM(std::vector<uint8_t> &outData) {
   if (!IsGameLoadedState(state_.load())) {
     LOGF(LOG_WARN, "[NEW] GetSRAM rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("get_sram_game_not_loaded", "GetSRAM",
+                     "GetSRAM requires a loaded game");
     return false;
   }
   bool ok = false;
@@ -3035,10 +3065,12 @@ bool LibretroEngine::GetSRAM(std::vector<uint8_t> &outData) {
               ok = stateManager_->GetSRAM(snapshot);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "GetSRAM")) {
     return false;
   }
   if (!ok) {
+    SetLastErrorInfo("get_sram_failed", "GetSRAM",
+                     "Failed to read SRAM from core");
     return false;
   }
   outData = std::move(snapshot);
@@ -3050,6 +3082,8 @@ bool LibretroEngine::SetSRAM(const std::vector<uint8_t> &data) {
   if (!IsGameLoadedState(state_.load())) {
     LOGF(LOG_WARN, "[NEW] SetSRAM rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("set_sram_game_not_loaded", "SetSRAM",
+                     "SetSRAM requires a loaded game");
     return false;
   }
   bool ok = false;
@@ -3059,8 +3093,12 @@ bool LibretroEngine::SetSRAM(const std::vector<uint8_t> &data) {
               ok = stateManager_->SetSRAM(data);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "SetSRAM")) {
     return false;
+  }
+  if (!ok) {
+    SetLastErrorInfo("set_sram_failed", "SetSRAM",
+                     "Failed to write SRAM into core");
   }
   return ok;
 }

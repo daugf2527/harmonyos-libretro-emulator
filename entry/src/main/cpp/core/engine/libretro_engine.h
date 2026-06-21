@@ -303,7 +303,8 @@ private:
   void UnloadGameIfNeeded(const char *reason);
   void DetectCoreQuirks();
   bool ApplyFilesDir(const std::string &filesDir);
-  bool ExecuteSyncTask(const std::function<void()> &task, uint32_t timeoutMs);
+  bool ExecuteSyncTask(const std::function<void()> &task, uint32_t timeoutMs,
+                       const char *operation = "ExecuteSyncTask");
 
   // --- 成员变量 ---
   std::atomic<EngineState> state_{EngineState::INIT};
