@@ -34,8 +34,12 @@ export default class EntryAbility extends UIAbility {
     try {
       const ok = LibretroEventHub.getInstance().start();
       LogHelper.info('EntryAbility', 'EventHub', `EventHub start: ok=${ok}`);
+      if (!ok) {
+        LogHelper.warn('EntryAbility', 'EventHub', 'EventHub 未完成初始化，运行时事件可能缺失');
+      }
     } catch (e) {
-      LogHelper.warn('EntryAbility', 'EventHub', 'EventHub start failed');
+      const message = (e as Error)?.message || String(e);
+      LogHelper.warn('EntryAbility', 'EventHub', `EventHub start failed: ${message}`);
     }
 
     // Initialize Input Mapping Service (does not trigger libentry.so load)
@@ -43,7 +47,8 @@ export default class EntryAbility extends UIAbility {
       void getInputMappingService().initialize(this.context);
       LogHelper.info('EntryAbility', 'InputMapping', 'Input Mapping Service initialized');
     } catch (e) {
-      LogHelper.warn('EntryAbility', 'InputMapping', 'Input Mapping Service init failed');
+      const message = (e as Error)?.message || String(e);
+      LogHelper.warn('EntryAbility', 'InputMapping', `Input Mapping Service init failed: ${message}`);
     }
   }
 
