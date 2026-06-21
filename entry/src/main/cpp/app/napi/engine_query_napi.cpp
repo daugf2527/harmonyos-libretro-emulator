@@ -3,6 +3,18 @@
 #include "app/framework/plugin_manager.h"
 #include "common/file_security.h"
 
+namespace {
+
+void SetQueryError(const char *reason, const char *step, const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
+} // namespace
+
 static napi_value GetEngineState(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   libretro::EngineState state = GetEngine()->GetState();
@@ -37,6 +49,10 @@ static napi_value WaitForEngineState(napi_env env, napi_callback_info info) {
   const bool ok = GetEngine()->WaitForState(
       static_cast<libretro::EngineState>(stateValue),
       static_cast<uint32_t>(timeoutMs));
+  if (!ok) {
+    SetQueryError("wait_for_state_failed", "WaitForEngineState",
+                  "Engine did not reach the requested state before timeout");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -64,20 +80,39 @@ static void CompleteWaitForState(napi_env env, napi_status status, void *data) {
     return;
   }
 
-  // Audit T1-F1: guard napi_cancelled — calling napi_get_boolean/napi_resolve_deferred on cancelled env is UB
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] WaitForEngineStateAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
   if (status != napi_ok) {
+    SetQueryError("wait_for_state_async_work_failed", "WaitForEngineStateAsync",
+                  "Async wait completion callback status was not napi_ok");
     napi_value reason = MakeUndefined(env);
     if (reason) {
       (void)RejectDeferredChecked(env, ctx->deferred, reason);
     }
   } else {
+    if (!ctx->result) {
+      SetQueryError("wait_for_state_failed", "WaitForEngineStateAsync",
+                    "Engine did not reach the requested state before timeout");
+    }
     napi_value result = MakeBool(env, ctx->result);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
     }
   }
 
-  napi_delete_async_work(env, ctx->work);
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
   delete ctx;
 }
 
@@ -121,6 +156,9 @@ static napi_value WaitForEngineStateAsync(napi_env env,
 
   napi_value resourceName = MakeString(env, "WaitForEngineStateAsync");
   if (!resourceName) {
+    SetQueryError("wait_for_state_async_create_failed",
+                  "WaitForEngineStateAsync",
+                  "Failed to create async resource name");
     napi_value falseVal = MakeBool(env, false);
     if (falseVal) {
       (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
@@ -131,6 +169,9 @@ static napi_value WaitForEngineStateAsync(napi_env env,
 
   if (napi_create_async_work(env, nullptr, resourceName, ExecuteWaitForState,
                              CompleteWaitForState, ctx, &ctx->work) != napi_ok) {
+    SetQueryError("wait_for_state_async_create_failed",
+                  "WaitForEngineStateAsync",
+                  "Failed to create async wait work item");
     napi_value falseVal = MakeBool(env, false);
     if (falseVal) {
       (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
@@ -140,6 +181,10 @@ static napi_value WaitForEngineStateAsync(napi_env env,
   }
   if (napi_queue_async_work(env, ctx->work) != napi_ok) {
     napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetQueryError("wait_for_state_async_queue_failed",
+                  "WaitForEngineStateAsync",
+                  "Failed to queue async wait work item");
     napi_value falseVal = MakeBool(env, false);
     if (falseVal) {
       (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
