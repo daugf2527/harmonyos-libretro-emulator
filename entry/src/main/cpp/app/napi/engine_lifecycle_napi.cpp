@@ -1266,6 +1266,10 @@ static napi_value StopEngine(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] StopEngine called");
   const bool stopped = GetEngine()->Stop();
+  if (!stopped) {
+    EnsureLastErrorIfEmpty("stop_failed", "StopEngine",
+                           "Stop() returned false");
+  }
 
   return MakeBool(env, stopped);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -1321,6 +1325,8 @@ static void CompleteStopEngineAsync(napi_env env, napi_status status,
     if (!ctx->stopped) {
       LOGF(LOG_WARN,
            "[NEW] StopEngineAsync completed with stop timeout/failure");
+      EnsureLastErrorIfEmpty("stop_failed", "StopEngineAsync",
+                             "Stop() returned false");
     }
     napi_value result = MakeBool(env, ctx->stopped);
     if (result) {
@@ -1411,6 +1417,8 @@ static napi_value ResetEngine(napi_env env, napi_callback_info info) {
   const bool resetOk = GetEngine()->GetState() == EngineState::INIT;
   if (!resetOk) {
     LOGF(LOG_WARN, "[NEW] ResetEngine did not converge to INIT");
+    EnsureLastErrorIfEmpty("reset_failed", "ResetEngine",
+                           "ResetEngine did not converge to INIT");
   }
   return MakeBool(env, resetOk);
   NAPI_TRY_CATCH_END(env, nullptr)
