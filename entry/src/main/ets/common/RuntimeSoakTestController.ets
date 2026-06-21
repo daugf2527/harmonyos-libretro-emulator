@@ -1,4 +1,5 @@
 import testNapi from 'libentry.so'
+import LogHelper from './LogHelper'
 
 export interface RuntimeStatsPayload {
   videoNullFrames: number | string
@@ -56,15 +57,22 @@ export class RuntimeSoakTestController {
       return
     }
 
-    if (!this.reader.refactoredResetStats()) {
-      this.summaryText = 'resetStats 失败'
+    if (!testNapi) {
+      this.summaryText = '运行时未就绪'
       onChange(this.createState())
       return
     }
 
     try {
+      if (!this.reader.refactoredResetStats()) {
+        this.summaryText = 'resetStats 失败'
+        onChange(this.createState())
+        return
+      }
       this.startStats = readStartStats(this.reader.refactoredGetStats())
     } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeSoakTest', 'Stats', `启动 soak test 失败: ${message}`)
       this.running = false
       this.secondsLeft = 0
       this.summaryText = '获取初始 Stats 失败'
@@ -107,7 +115,10 @@ export class RuntimeSoakTestController {
         this.minAudioUsage = Math.min(this.minAudioUsage, usage)
         this.maxAudioUsage = Math.max(this.maxAudioUsage, usage)
       }
-    } catch (_) {}
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeSoakTest', 'Stats', `轮询运行统计失败: ${message}`)
+    }
 
     if (this.secondsLeft <= 0) {
       this.finish(onChange)
@@ -136,6 +147,8 @@ export class RuntimeSoakTestController {
         `Null:${dNull} Dupe:${dDupe} U:${dUnder} O:${dOver} ` +
         `Buf:[${this.minAudioUsage.toFixed(2)}-${this.maxAudioUsage.toFixed(2)}]`
     } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeSoakTest', 'Stats', `生成 soak test 摘要失败: ${message}`)
       this.summaryText = '统计失败'
     }
     onChange(this.createState())
