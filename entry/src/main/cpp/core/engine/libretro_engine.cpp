@@ -393,6 +393,17 @@ bool LibretroEngine::Start() {
       }
     }
   } startGuard(startInProgress_);
+  struct RunningGuard {
+    std::atomic<bool> &flag;
+    bool released = false;
+    explicit RunningGuard(std::atomic<bool> &f) : flag(f) {}
+    void release() { released = true; }
+    ~RunningGuard() {
+      if (!released) {
+        flag.store(false, std::memory_order_release);
+      }
+    }
+  };
 
   if (stopInProgress_.load()) {
     LOGF(LOG_WARN, "[NEW] Start ignored: stop in progress");
@@ -418,16 +429,43 @@ bool LibretroEngine::Start() {
   TransitionTo(EngineState::STARTING);
 
   running_.store(true);
+  RunningGuard runningGuard(running_);
   // std::thread constructor may throw std::system_error if thread creation
   // fails. The StartGuard above ensures startInProgress_ is reset in that case.
-  gameThread_ = std::thread(&LibretroEngine::GameLoop, this);
+  try {
+    gameThread_ = std::thread(&LibretroEngine::GameLoop, this);
+  } catch (const std::exception &e) {
+    const std::string message = std::string("game thread start failed: ") + e.what();
+    LOGF(LOG_ERROR, "[NEW] %{public}s", message.c_str());
+    SetLastErrorInfo("game_thread_start_failed", "Start", message);
+    TransitionTo(EngineState::ERROR);
+    return false;
+  } catch (...) {
+    const std::string message = "game thread start failed: unknown exception";
+    LOGF(LOG_ERROR, "[NEW] %{public}s", message.c_str());
+    SetLastErrorInfo("game_thread_start_failed", "Start", message);
+    TransitionTo(EngineState::ERROR);
+    return false;
+  }
   if (renderThread_ && render_thread_enabled_.load(std::memory_order_relaxed)) {
     renderThread_->SetEnabled(true);
     renderThread_->SetNativeVSyncEnabled(
         native_vsync_enabled_.load(std::memory_order_relaxed));
-    renderThread_->Start();
+    if (!renderThread_->Start()) {
+      const std::string message = "render thread start returned false";
+      LOGF(LOG_ERROR, "[NEW] %{public}s", message.c_str());
+      SetLastErrorInfo("render_thread_start_failed", "Start", message);
+      stopRequested_.store(true, std::memory_order_release);
+      messageQueue_.Close();
+      if (gameThread_.joinable()) {
+        gameThread_.join();
+      }
+      TransitionTo(EngineState::ERROR);
+      return false;
+    }
   }
   LOGF(LOG_INFO, " [NEW] Engine Thread Started");
+  runningGuard.release();
   startGuard.release();
   startInProgress_.store(false);
 
@@ -681,7 +719,14 @@ bool LibretroEngine::LoadCore(const std::string &corePath) {
   // 自动启动引擎（如果未运行）
   if (!running_) {
     LOGF(LOG_INFO, "[NEW] LoadCore: Engine not running, auto-starting...");
-    Start();
+    if (!Start()) {
+      LOGF(LOG_ERROR, "[NEW] LoadCore aborted: auto-start failed");
+      if (GetLastErrorInfo().reason.empty()) {
+        SetLastErrorInfo("core_start_failed", "LoadCore",
+                         "LoadCore auto-start failed");
+      }
+      return false;
+    }
   }
   if (!messageQueue_.Push(
           EngineMessage::MakeLoadMessage(MessageType::LoadCore, corePath))) {
