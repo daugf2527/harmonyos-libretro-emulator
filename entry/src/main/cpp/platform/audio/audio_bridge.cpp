@@ -308,6 +308,12 @@ bool AudioBridge::Start() {
   }
 
   SetRunState(AudioRunState::RECOVERING, "start_failed");
+  buffering_ = false;
+  is_started_ = false;
+  running_.store(false, std::memory_order_release);
+  LOGF(LOG_ERROR,
+       "%{public}s AudioBridge start failed: logical state rolled back",
+       kAudioChainPrefix);
   return false;
 }
 
