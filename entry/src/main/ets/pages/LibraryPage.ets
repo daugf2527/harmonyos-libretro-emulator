@@ -245,13 +245,22 @@ struct LibraryPage {
       return
     }
 
-    let sourceRecords: LibraryRecord[] = []
+    let readyRecords: LibraryRecord[] | undefined = undefined
     try {
       const sources = await scanLibraryRomSources(context, () => this.isCurrentLibraryRefresh(refreshToken))
       if (!sources) {
         return
       }
-      sourceRecords = buildLibraryRecordsFromSources(sources)
+      const sourceRecords = buildLibraryRecordsFromSources(sources)
+      if (!this.isCurrentLibraryRefresh(refreshToken)) {
+        return
+      }
+
+      const syncedRecords = await syncLibraryIndex(context, sourceRecords)
+      if (!this.isCurrentLibraryRefresh(refreshToken)) {
+        return
+      }
+      readyRecords = getReadyLibraryRecords(syncedRecords)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryPage', 'ROM', `刷新库列表失败: ${message}`)
@@ -266,15 +275,10 @@ struct LibraryPage {
       return
     }
 
-    if (!this.isCurrentLibraryRefresh(refreshToken)) {
+    if (!this.isCurrentLibraryRefresh(refreshToken) || !readyRecords) {
       return
     }
-
-    const syncedRecords = await syncLibraryIndex(context, sourceRecords)
-    if (!this.isCurrentLibraryRefresh(refreshToken)) {
-      return
-    }
-    this.applyLibraryGames(getReadyLibraryRecords(syncedRecords))
+    this.applyLibraryGames(readyRecords)
     if (showToast) {
       this.showToastMessage('已刷新库 SYNCED')
     }
