@@ -165,11 +165,22 @@ struct InputLayoutPage {
       this.layoutStatusText = 'CONTEXT_MISSING'
       return
     }
-    const profile = await loadInputLayoutProfile(context)
-    if (!this.isCurrentPageTask(token)) {
-      return
+    try {
+      const profile = await loadInputLayoutProfile(context)
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      this.applyLayoutProfile(profile, 'LOCAL_LAYOUT_READY')
+    } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('InputLayoutPage', 'Layout', `读取输入布局失败: ${message}`)
+      this.layoutButtons = createDefaultInputLayoutProfile().buttons
+      this.layoutStatusText = 'LOCAL_LAYOUT_LOAD_FAILED'
+      this.layoutUpdatedAtText = 'NOT_SAVED'
     }
-    this.applyLayoutProfile(profile, 'LOCAL_LAYOUT_READY')
   }
 
   private applyLayoutProfile(profile: InputLayoutProfile, statusText: string): void {

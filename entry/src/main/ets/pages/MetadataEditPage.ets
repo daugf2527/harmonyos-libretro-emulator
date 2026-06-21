@@ -75,12 +75,22 @@ struct MetadataEditPage {
       this.statusText = 'ROM_CONTEXT_MISSING'
       return
     }
-    const record = await getLibraryRecordByRomFile(context, targetRomFile)
-    if (!this.isCurrentPageTask(token)) {
-      return
+    try {
+      const record = await getLibraryRecordByRomFile(context, targetRomFile)
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      this.applyInitialFields(record)
+      this.statusText = record ? 'LOCAL_METADATA_LOADED' : 'LOCAL_METADATA_EMPTY'
+    } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('MetadataEditPage', 'Load', `读取本地 metadata 失败: ${message}`)
+      this.applyInitialFields(undefined)
+      this.statusText = 'LOCAL_METADATA_LOAD_FAILED'
     }
-    this.applyInitialFields(record)
-    this.statusText = record ? 'LOCAL_METADATA_LOADED' : 'LOCAL_METADATA_EMPTY'
   }
 
   private applyInitialFields(record: LibraryRecord | undefined): void {

@@ -305,65 +305,75 @@ struct RomManagerPage {
       return
     }
 
-    const uris = await pickRomUris(context)
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
-    }
-    if (uris.length === 0) {
-      return
-    }
-
-    this.importCancelRequested = false
-    this.showImportProgress = true
-    this.importProgress = 0
-    this.importProgressText = '准备导入...'
-    this.importStage = 'PREPARING'
-
-    const result: RomImportResult = await importRomUris(
-      context,
-      uris,
-      (progress: RomImportProgress) => {
-        if (!this.isCurrentPageAction(actionToken)) {
-          return
-        }
-        const percent = progress.totalBytes > 0
-          ? (progress.completedBytes / progress.totalBytes)
-          : (progress.completedCount / progress.totalCount)
-        this.importProgress = percent
-        this.importProgressText = `${progress.currentFileName} (${progress.completedCount}/${progress.totalCount})`
-        this.importStage = progress.stage
-      },
-      {
-        overwriteExisting: false,
-        shouldCancel: () => this.importCancelRequested
+    try {
+      const uris = await pickRomUris(context)
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
       }
-    )
+      if (uris.length === 0) {
+        return
+      }
 
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
+      this.importCancelRequested = false
+      this.showImportProgress = true
+      this.importProgress = 0
+      this.importProgressText = '准备导入...'
+      this.importStage = 'PREPARING'
+
+      const result: RomImportResult = await importRomUris(
+        context,
+        uris,
+        (progress: RomImportProgress) => {
+          if (!this.isCurrentPageAction(actionToken)) {
+            return
+          }
+          const percent = progress.totalBytes > 0
+            ? (progress.completedBytes / progress.totalBytes)
+            : (progress.completedCount / progress.totalCount)
+          this.importProgress = percent
+          this.importProgressText = `${progress.currentFileName} (${progress.completedCount}/${progress.totalCount})`
+          this.importStage = progress.stage
+        },
+        {
+          overwriteExisting: false,
+          shouldCancel: () => this.importCancelRequested
+        }
+      )
+
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+
+      this.showImportProgress = false
+
+      if (result.canceled) {
+        this.showToastMessage('导入已取消 IMPORT_CANCELED')
+      } else if (result.failedCount > 0) {
+        this.showToastMessage(`导入完成，${result.failedCount} 个失败 IMPORT_PARTIAL`)
+      } else {
+        this.showToastMessage(`成功导入 ${result.importedCount} 个 ROM IMPORT_SUCCESS`)
+      }
+
+      const sources = await scanLibraryRomSources(context, () => this.isCurrentPageAction(actionToken))
+      if (!sources || !this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      const sourceRecords = buildLibraryRecordsFromSources(sources)
+      await syncLibraryIndex(context, sourceRecords)
+
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      await this.loadRomList()
+    } catch (err) {
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('RomManagerPage', 'Import', `导入 ROM 失败: ${message}`)
+      this.showImportProgress = false
+      this.showToastMessage('导入失败 IMPORT_ERROR')
     }
-
-    this.showImportProgress = false
-
-    if (result.canceled) {
-      this.showToastMessage('导入已取消 IMPORT_CANCELED')
-    } else if (result.failedCount > 0) {
-      this.showToastMessage(`导入完成，${result.failedCount} 个失败 IMPORT_PARTIAL`)
-    } else {
-      this.showToastMessage(`成功导入 ${result.importedCount} 个 ROM IMPORT_SUCCESS`)
-    }
-
-    const sources = await scanLibraryRomSources(context, () => this.isCurrentPageAction(actionToken))
-    if (!sources || !this.isCurrentPageAction(actionToken)) {
-      return
-    }
-    const sourceRecords = buildLibraryRecordsFromSources(sources)
-    await syncLibraryIndex(context, sourceRecords)
-
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
-    }
-    await this.loadRomList()
   }
 
   private onDeleteClick(item: RomListItem): void {
@@ -412,17 +422,25 @@ struct RomManagerPage {
       return
     }
 
-    await removeLibraryRecord(context, item.filePath)
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
-    }
+    try {
+      await removeLibraryRecord(context, item.filePath)
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
 
-    await this.loadRomList()
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
-    }
+      await this.loadRomList()
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
 
-    this.showToastMessage('已删除 ROM DELETE_SUCCESS')
+      this.showToastMessage('已删除 ROM DELETE_SUCCESS')
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.error('RomManagerPage', 'Delete', `删除索引刷新失败: ${message}`)
+      if (this.isCurrentPageAction(actionToken)) {
+        this.showToastMessage('删除失败 DELETE_ERROR')
+      }
+    }
   }
 
   private onBackClick(): void {
