@@ -1966,8 +1966,13 @@ struct LibretroGamePage {
   }
 
   private async finalizeActiveLibrarySession(): Promise<void> {
-    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    await this.librarySessionTracker.finalize(context);
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      await this.librarySessionTracker.finalize(context);
+    } catch (err) {
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Library', `结束运行会话失败: ${message}`);
+    }
   }
 
   handleCoreCrash(payload: CoreCrashPayload) {
