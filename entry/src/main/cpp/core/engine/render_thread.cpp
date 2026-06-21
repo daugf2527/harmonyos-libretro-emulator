@@ -65,6 +65,18 @@ bool RenderThread::Start() {
     return true;
   }
 
+  struct RunningGuard {
+    std::atomic<bool> &flag;
+    bool released = false;
+    explicit RunningGuard(std::atomic<bool> &f) : flag(f) {}
+    void release() { released = true; }
+    ~RunningGuard() {
+      if (!released) {
+        flag.store(false, std::memory_order_release);
+      }
+    }
+  } runningGuard(running_);
+
   stopRequested_.store(false, std::memory_order_release);
   {
     std::lock_guard<std::mutex> lock(controlMutex_);
@@ -72,7 +84,9 @@ bool RenderThread::Start() {
   }
   frameQueue_.Clear();
 
+  // std::thread 构造失败时必须回滚 running_，否则后续 Start/Stop 会误判线程已运行。
   renderThread_ = std::thread(&RenderThread::ThreadMain, this);
+  runningGuard.release();
   return true;
 }
 
