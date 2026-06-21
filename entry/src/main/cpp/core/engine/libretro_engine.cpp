@@ -512,6 +512,9 @@ bool LibretroEngine::Stop() {
   }
 
   LOGF(LOG_INFO, " [NEW] Stopping Engine...");
+  // Stop() 作为一次新的生命周期收敛操作，先清掉旧错误；
+  // 后续停机阶段产生的新错误必须保留下来，不能在末尾再无条件清空。
+  ClearLastErrorInfo();
   const EnginePhase phase = phase_.load(std::memory_order_acquire);
   const int64_t phaseMs = GetPhaseDurationMs();
   LOGF(LOG_INFO,
@@ -567,7 +570,6 @@ bool LibretroEngine::Stop() {
   stopRequested_.store(false);
   stopTimedOut_.store(false);
   stopInProgress_.store(false);
-  ClearLastErrorInfo();
   LOGF(LOG_INFO, " [NEW] Engine Stopped");
   return true;
 }
