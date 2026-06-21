@@ -3112,37 +3112,53 @@ uintptr_t LibretroEngine::GetHwRenderFramebuffer() const {
 
 // --- 核心控制实现 ---
 
-void LibretroEngine::ResetCore() {
+bool LibretroEngine::ResetCore() {
+  bool ok = false;
   const bool dispatched = ExecuteSyncTask(
-      [this]() {
+      [this, &ok]() {
         if (!coreLoader_.IsLoaded()) {
           return;
         }
         auto fn = coreLoader_.GetReset();
         if (fn) {
           fn();
+          ok = true;
           LOGF(LOG_INFO, "Core reset");
         }
       },
-      kSyncTaskTimeoutMs);
+      kSyncTaskTimeoutMs, "ResetCore");
   if (!dispatched) {
     LOGF(LOG_WARN, "[NEW] ResetCore skipped: sync dispatch failed");
+    return false;
   }
+  if (!ok) {
+    SetLastErrorInfo("reset_core_unavailable", "ResetCore",
+                     "Core reset callback is unavailable");
+  }
+  return ok;
 }
 
 // --- 金手指实现 ---
 
-void LibretroEngine::CheatReset() {
+bool LibretroEngine::CheatReset() {
+  bool ok = false;
   const bool dispatched = ExecuteSyncTask(
-      [this]() {
+      [this, &ok]() {
         if (stateManager_) {
           stateManager_->CheatReset();
+          ok = true;
         }
       },
-      kSyncTaskTimeoutMs);
+      kSyncTaskTimeoutMs, "CheatReset");
   if (!dispatched) {
     LOGF(LOG_WARN, "[NEW] CheatReset skipped: sync dispatch failed");
+    return false;
   }
+  if (!ok) {
+    SetLastErrorInfo("cheat_reset_unavailable", "CheatReset",
+                     "Cheat reset is unavailable in current core state");
+  }
+  return ok;
 }
 
 bool LibretroEngine::CheatSet(unsigned index, bool enabled,
@@ -3154,8 +3170,12 @@ bool LibretroEngine::CheatSet(unsigned index, bool enabled,
               ok = stateManager_->CheatSet(index, enabled, code);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "CheatSet")) {
     return false;
+  }
+  if (!ok) {
+    SetLastErrorInfo("cheat_set_failed", "CheatSet",
+                     "Core rejected cheat update");
   }
   return ok;
 }
@@ -3197,8 +3217,12 @@ unsigned LibretroEngine::GetRegion() {
               ok = true;
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "GetRegion")) {
     return 0;
+  }
+  if (!ok) {
+    SetLastErrorInfo("region_unavailable", "GetRegion",
+                     "Region query callback is unavailable");
   }
   return ok ? region : 0;
 }

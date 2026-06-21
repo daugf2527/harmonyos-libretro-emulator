@@ -197,10 +197,10 @@ public:
   bool SetSRAM(const std::vector<uint8_t> &data);
 
   // --- 核心控制 ---
-  void ResetCore();
+  bool ResetCore();
 
   // --- 金手指接口 ---
-  void CheatReset();
+  bool CheatReset();
   bool CheatSet(unsigned index, bool enabled, const std::string &code);
 
   // --- 控制器/区域接口 ---

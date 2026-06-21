@@ -223,15 +223,15 @@ static napi_value SetSRAM(napi_env env, napi_callback_info info) {
 static napi_value ResetCore(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] ResetCore called");
-  GetEngine()->ResetCore();
-  return MakeBool(env, true);
+  const bool ok = GetEngine()->ResetCore();
+  return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
 static napi_value CheatReset(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
-  GetEngine()->CheatReset();
-  return MakeBool(env, true);
+  const bool ok = GetEngine()->CheatReset();
+  return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -253,10 +253,14 @@ static napi_value CheatSet(napi_env env, napi_callback_info info) {
   }
   if (index < 0 || index > kMaxCheatIndex) {
     LOGF(LOG_ERROR, "[NEW] CheatSet invalid index: %{public}d", index);
+    GetEngine()->SetLastErrorInfo("cheat_index_invalid", "CheatSet",
+                                  "Cheat index is outside supported range");
     return MakeBool(env, false);
   }
   if (!IsValidCheatCode(code)) {
     LOGF(LOG_ERROR, "[NEW] CheatSet invalid code format");
+    GetEngine()->SetLastErrorInfo("cheat_code_invalid", "CheatSet",
+                                  "Cheat code format is invalid");
     return MakeBool(env, false);
   }
 
