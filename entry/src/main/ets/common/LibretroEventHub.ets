@@ -387,7 +387,8 @@ export class LibretroEventHub {
       try {
         listener.callback(payload);
       } catch (err) {
-        this.removeListener(event, listener.id);
+        // 与 replayLatest 路径保持一致：页面或组件一次性处理异常不应导致
+        // 监听器被永久移除，否则后续状态事件会静默丢失。
         const errMsg = (err as Error)?.message || String(err);
         this.logCallbackError(event, errMsg);
       }
