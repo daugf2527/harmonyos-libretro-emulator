@@ -286,7 +286,6 @@ LibretroEngine::LibretroEngine() {
       });
   rendererInterface_ = std::make_unique<EngineRendererAdapter>(this);
   renderThread_ = std::make_unique<RenderThread>(videoPipeline_, envState_);
-  renderThread_->SetEnabled(render_thread_enabled_.load(std::memory_order_relaxed));
   renderThread_->SetNativeVSyncEnabled(
       native_vsync_enabled_.load(std::memory_order_relaxed));
   videoPipeline_.SetGlesDiagnosticsEnabled(
