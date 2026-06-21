@@ -4,6 +4,18 @@
 
 using libretro::InputManager;
 
+namespace {
+
+void SetInputError(const char *reason, const char *step, const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
+} // namespace
+
 static InputManager *GetInput() { return InputManager::GetInstance(); }
 
 static napi_value SendInput(napi_env env, napi_callback_info info) {
@@ -25,10 +37,21 @@ static napi_value SendInput(napi_env env, napi_callback_info info) {
   }
 
   auto *input = GetInput();
-  if (!input || !input->CanSendVirtual(port)) {
+  if (!input) {
+    SetInputError("input_manager_unavailable", "SendInput",
+                  "InputManager instance is unavailable");
+    return MakeBool(env, false);
+  }
+  if (!input->CanSendVirtual(port)) {
+    SetInputError("virtual_input_unavailable", "SendInput",
+                  "Virtual input is not assigned to the requested port");
     return MakeBool(env, false);
   }
   const bool ok = input->SendInput(port, id, pressed);
+  if (!ok) {
+    SetInputError("input_button_invalid", "SendInput",
+                  "Button input parameters are outside supported range");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -61,11 +84,22 @@ static napi_value SendAnalog(napi_env env, napi_callback_info info) {
   }
 
   auto *input = GetInput();
-  if (!input || !input->CanSendVirtual(port)) {
+  if (!input) {
+    SetInputError("input_manager_unavailable", "SendAnalog",
+                  "InputManager instance is unavailable");
+    return MakeBool(env, false);
+  }
+  if (!input->CanSendVirtual(port)) {
+    SetInputError("virtual_input_unavailable", "SendAnalog",
+                  "Virtual input is not assigned to the requested port");
     return MakeBool(env, false);
   }
   const bool ok =
       input->SendAnalog(port, index, id, static_cast<int>(value));
+  if (!ok) {
+    SetInputError("analog_input_invalid", "SendAnalog",
+                  "Analog input parameters are outside supported range");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -99,9 +133,15 @@ static napi_value AssignPortSource(napi_env env, napi_callback_info info) {
 
   auto *input = GetInput();
   if (!input) {
+    SetInputError("input_manager_unavailable", "AssignPortSource",
+                  "InputManager instance is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = input->AssignPortSource(port, sourceType, deviceId);
+  if (!ok) {
+    SetInputError("assign_port_source_failed", "AssignPortSource",
+                  "Port source assignment failed for the requested route");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -121,9 +161,15 @@ static napi_value UnassignPort(napi_env env, napi_callback_info info) {
 
   auto *input = GetInput();
   if (!input) {
+    SetInputError("input_manager_unavailable", "UnassignPort",
+                  "InputManager instance is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = input->UnassignPort(port);
+  if (!ok) {
+    SetInputError("unassign_port_failed", "UnassignPort",
+                  "Port unassignment failed for the requested route");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -181,9 +227,15 @@ static napi_value SendSensor(napi_env env, napi_callback_info info) {
 
   auto *input = GetInput();
   if (!input) {
+    SetInputError("input_manager_unavailable", "SendSensor",
+                  "InputManager instance is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = input->SendSensor(port, id, static_cast<float>(value));
+  if (!ok) {
+    SetInputError("sensor_input_invalid", "SendSensor",
+                  "Sensor input parameters are outside supported range");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -207,14 +259,23 @@ static napi_value SetControllerPortDevice(napi_env env, napi_callback_info info)
     LOGF(LOG_ERROR,
          "[NEW] SetControllerPortDevice invalid: port=%{public}d device=%{public}d",
          port, device);
+    SetInputError("controller_port_device_invalid", "SetControllerPortDevice",
+                  "Controller port and device must be non-negative");
     return MakeBool(env, false);
   }
 
   auto *input = GetInput();
   if (!input) {
+    SetInputError("input_manager_unavailable", "SetControllerPortDevice",
+                  "InputManager instance is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = input->SetControllerPortDevice(port, device);
+  if (!ok) {
+    SetInputError("controller_port_device_unavailable",
+                  "SetControllerPortDevice",
+                  "Controller port device callback is unavailable");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
