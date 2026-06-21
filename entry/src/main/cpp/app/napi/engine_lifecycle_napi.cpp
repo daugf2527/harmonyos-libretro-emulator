@@ -25,6 +25,19 @@ static std::string last_switch_rom_path;
 static uint64_t last_switch_request_ms = 0;
 static constexpr uint64_t kSwitchDedupeWindowMs = 800;
 
+namespace {
+
+void SetLifecycleError(const char *reason, const char *step,
+                       const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
+} // namespace
+
 static uint64_t GetSteadyNowMs() {
   const auto now = std::chrono::steady_clock::now().time_since_epoch();
   return static_cast<uint64_t>(
@@ -231,6 +244,8 @@ static void CompleteGetRawFileListAsync(napi_env env, napi_status status,
     LOGF(LOG_ERROR,
          "[NEW] GetRawFileListAsync work failed: status=%{public}d",
          static_cast<int>(status));
+    SetLifecycleError("rawfile_list_async_work_failed", "GetRawFileListAsync",
+                      "GetRawFileListAsync complete callback status was not napi_ok");
     napi_value errMsg = MakeString(env, "async_work_failed");
     if (errMsg) {
       (void)RejectDeferredChecked(env, ctx->deferred, errMsg);
@@ -283,6 +298,9 @@ static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
       OH_ResourceManager_InitNativeResourceManager(env, args[0]);
   if (!mgr) {
     LOGF(LOG_ERROR, "[NEW] GetRawFileListAsync: init resource manager failed");
+    SetLifecycleError("rawfile_list_resource_manager_init_failed",
+                      "GetRawFileListAsync",
+                      "OH_ResourceManager_InitNativeResourceManager failed");
     return MakeResolvedStringArrayPromise(env, {});
   }
 
@@ -301,6 +319,9 @@ static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
 
   napi_value resourceName = MakeString(env, "GetRawFileListAsync");
   if (!resourceName) {
+    SetLifecycleError("rawfile_list_async_resource_name_failed",
+                      "GetRawFileListAsync",
+                      "Failed to create async resource name");
     napi_value empty = BuildStringArray(env, {});
     if (empty) {
       (void)ResolveDeferredChecked(env, ctx->deferred, empty);
@@ -318,6 +339,9 @@ static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
                              CompleteGetRawFileListAsync, ctx, &ctx->work);
   if (createStatus != napi_ok || !ctx->work) {
     LOGF(LOG_ERROR, "[NEW] GetRawFileListAsync create work failed");
+    SetLifecycleError("rawfile_list_async_create_failed",
+                      "GetRawFileListAsync",
+                      "napi_create_async_work failed");
     napi_value empty = BuildStringArray(env, {});
     if (empty) {
       (void)ResolveDeferredChecked(env, ctx->deferred, empty);
@@ -335,6 +359,9 @@ static napi_value GetRawFileListAsync(napi_env env, napi_callback_info info) {
     LOGF(LOG_ERROR, "[NEW] GetRawFileListAsync queue work failed");
     napi_delete_async_work(env, ctx->work);
     ctx->work = nullptr;
+    SetLifecycleError("rawfile_list_async_queue_failed",
+                      "GetRawFileListAsync",
+                      "napi_queue_async_work failed");
     napi_value empty = BuildStringArray(env, {});
     if (empty) {
       (void)ResolveDeferredChecked(env, ctx->deferred, empty);
@@ -1219,11 +1246,17 @@ static napi_value InitEventBridge(napi_env env, napi_callback_info info) {
   if (napi_typeof(env, args[0], &cbType) != napi_ok || cbType != napi_function) {
     LOGF(LOG_ERROR,
                  "[NEW] InitEventBridge requires a function callback");
+    SetLifecycleError("event_bridge_callback_invalid", "InitEventBridge",
+                      "InitEventBridge requires a function callback");
     return MakeBool(env, false);
   }
 
   LOGF(LOG_INFO, "[NEW] InitEventBridge called");
   bool success = GetEngine()->InitializeEventBridge(env, args[0]);
+  if (!success) {
+    SetLifecycleError("event_bridge_init_failed", "InitEventBridge",
+                      "InitializeEventBridge returned false");
+  }
 
   return MakeBool(env, success);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -1324,6 +1357,8 @@ static napi_value StopEngineAsync(napi_env env, napi_callback_info info) {
   napi_value resourceName = MakeString(env, "StopEngineAsyncWork");
   if (!resourceName) {
     stop_in_progress.store(false);
+    SetLifecycleError("stop_async_resource_name_failed", "StopEngineAsync",
+                      "Failed to create async resource name");
     napi_value falseVal = MakeBool(env, false);
     if (falseVal) {
       (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
