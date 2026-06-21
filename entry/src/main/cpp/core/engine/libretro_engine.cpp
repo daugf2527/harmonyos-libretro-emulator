@@ -640,6 +640,7 @@ void LibretroEngine::Reset() {
   currentCorePath_.clear();
   currentGamePath_.clear();
   currentGameData_.reset();
+  gameLoaded_.store(false, std::memory_order_release);
   videoWidth_ = 0;
   videoHeight_ = 0;
   videoMaxWidth_ = 0;
@@ -676,14 +677,15 @@ void LibretroEngine::UnloadGameIfNeeded(const char *reason) {
   if (!unload) {
     return;
   }
-  EngineState st = state_.load();
-  if (!IsGameLoadedState(st)) {
+  if (!gameLoaded_.load(std::memory_order_acquire)) {
     return;
   }
   LOGF(LOG_INFO, "[NEW] Unloading game (%{public}s)",
        reason ? reason : "unknown");
   unload();
+  gameLoaded_.store(false, std::memory_order_release);
   TransitionTo(EngineState::CORE_LOADED);
+  currentGamePath_.clear();
   currentGameData_.reset();
   envState_.ClearInputDescriptorMask();
 }
@@ -1634,6 +1636,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       currentCorePath_.clear();
       currentGamePath_.clear();
       currentGameData_.reset();
+      gameLoaded_.store(false, std::memory_order_release);
       envState_.ClearCoreOptions();
       TransitionTo(EngineState::ERROR);
     }
@@ -1684,6 +1687,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
                          "retro_load_game(NULL)");
 
           if (coreLoader_.GetLoadGame()(nullptr)) {
+            gameLoaded_.store(true, std::memory_order_release);
             struct retro_system_av_info avInfo = {0};
             coreLoader_.GetSystemAvInfo()(&avInfo);
 
@@ -1796,6 +1800,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
 
       if (coreLoader_.GetLoadGame()(&gameInfo)) {
         LOGF(LOG_INFO, " [NEW] LoadRom Success");
+        gameLoaded_.store(true, std::memory_order_release);
         if (needFullpath) {
           currentGameData_.reset();
         }

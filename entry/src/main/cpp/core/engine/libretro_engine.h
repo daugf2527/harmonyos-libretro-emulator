@@ -251,16 +251,9 @@ public:
   // --- 状态查询 ---
   EngineState GetState() const { return state_.load(); }
   bool IsRunning() const { return state_.load() == EngineState::RUNNING; }
-  bool HasCoreLoaded() const {
-    EngineState st = state_.load();
-    return st == EngineState::CORE_LOADED || st == EngineState::GAME_LOADED ||
-           st == EngineState::RUNNING || st == EngineState::PAUSED ||
-           st == EngineState::STOPPING;
-  }
+  bool HasCoreLoaded() const { return coreLoader_.IsLoaded(); }
   bool HasGameLoaded() const {
-    EngineState st = state_.load();
-    return st == EngineState::GAME_LOADED || st == EngineState::RUNNING ||
-           st == EngineState::PAUSED || st == EngineState::STOPPING;
+    return gameLoaded_.load(std::memory_order_acquire);
   }
   bool WaitForState(EngineState target, uint32_t timeoutMs);
   EngineErrorInfo GetLastErrorInfo() const;
@@ -336,6 +329,7 @@ private:
   EnvState envState_; // Libretro 环境状态
   std::atomic<EnginePhase> phase_{EnginePhase::IDLE};
   std::atomic<int64_t> phaseStartUs_{0};
+  std::atomic<bool> gameLoaded_{false};
 
   // 消息队列与输入快照
   ThreadSafeQueue<EngineMessage> messageQueue_;
