@@ -151,6 +151,8 @@ export const refactoredDiskControlAddImageIndex: () => boolean;
 // Cheat
 export const refactoredCheatReset: () => boolean;
 export const refactoredCheatSet: (index: number, enabled: boolean, code: string) => boolean;
+export const refactoredCheatResetAsync: () => Promise<boolean>;
+export const refactoredCheatSetAsync: (index: number, enabled: boolean, code: string) => Promise<boolean>;
 
 // Stats
 export interface EngineStats {

@@ -5,19 +5,21 @@ import { RuntimeCheatItem } from './RuntimeCheatRepository'
 interface RuntimeCheatNapi {
   refactoredCheatReset(): boolean
   refactoredCheatSet(index: number, enabled: boolean, code: string): boolean
+  refactoredCheatResetAsync(): Promise<boolean>
+  refactoredCheatSetAsync(index: number, enabled: boolean, code: string): Promise<boolean>
 }
 
 const nativeApi = testNapi as RuntimeCheatNapi
 const MAX_RUNTIME_CHEAT_CODE_LENGTH = 240
 
 export class RuntimeCheatController {
-  resetAll(): boolean {
+  async resetAllAsync(): Promise<boolean> {
     try {
       if (!testNapi) {
         LogHelper.warn('RuntimeCheat', 'Engine', '金手指重置跳过: engine not ready')
         return false
       }
-      return nativeApi.refactoredCheatReset() === true
+      return await nativeApi.refactoredCheatResetAsync()
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCheat', 'Engine', `金手指重置失败: ${message}`)
@@ -25,7 +27,7 @@ export class RuntimeCheatController {
     }
   }
 
-  setCheat(index: number, enabled: boolean, code: string): boolean {
+  async setCheatAsync(index: number, enabled: boolean, code: string): Promise<boolean> {
     const safeCode = this.normalizeCheatCode(code)
     if (safeCode.length === 0) {
       LogHelper.warn('RuntimeCheat', 'Engine', '金手指代码为空，跳过写入')
@@ -37,11 +39,11 @@ export class RuntimeCheatController {
         LogHelper.warn('RuntimeCheat', 'Engine', '金手指写入跳过: engine not ready')
         return false
       }
-      return nativeApi.refactoredCheatSet(
+      return await nativeApi.refactoredCheatSetAsync(
         this.normalizeIndex(index),
         enabled,
         safeCode
-      ) === true
+      )
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCheat', 'Engine', `金手指写入失败: ${message}`)
@@ -49,14 +51,14 @@ export class RuntimeCheatController {
     }
   }
 
-  applyCheatEntries(items: RuntimeCheatItem[]): boolean {
-    if (!this.resetAll()) {
+  async applyCheatEntries(items: RuntimeCheatItem[]): Promise<boolean> {
+    if (!await this.resetAllAsync()) {
       return false
     }
 
     for (let index = 0; index < items.length; index++) {
       const item = items[index]
-      if (!this.setCheat(index, item.enabled, item.code)) {
+      if (!await this.setCheatAsync(index, item.enabled, item.code)) {
         LogHelper.warn(
           'RuntimeCheat',
           'Engine',

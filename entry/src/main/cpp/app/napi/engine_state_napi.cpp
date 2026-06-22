@@ -569,6 +569,257 @@ static napi_value CheatSet(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+struct CheatResetAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  bool ok = false;
+};
+
+static void ExecuteCheatResetAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<CheatResetAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->ok = GetEngine()->CheatReset();
+}
+
+static void CompleteCheatResetAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<CheatResetAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] CheatResetAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetStateError("cheat_reset_async_work_failed", "CheatResetAsync",
+                  "Async cheat-reset completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    if (!ctx->ok) {
+      EnsureStateErrorIfEmpty("cheat_reset_failed", "CheatResetAsync",
+                              "CheatReset returned false");
+    }
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value CheatResetAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new CheatResetAsyncContext();
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "CheatResetAsync");
+  if (!resourceName) {
+    SetStateError("cheat_reset_async_create_failed", "CheatResetAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteCheatResetAsync,
+      CompleteCheatResetAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetStateError("cheat_reset_async_create_failed", "CheatResetAsync",
+                  "Failed to create async cheat-reset work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetStateError("cheat_reset_async_queue_failed", "CheatResetAsync",
+                  "Failed to queue async cheat-reset work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+struct CheatSetAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  unsigned index = 0;
+  bool enabled = false;
+  std::string code;
+  bool ok = false;
+};
+
+static void ExecuteCheatSetAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<CheatSetAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->ok = GetEngine()->CheatSet(ctx->index, ctx->enabled, ctx->code);
+}
+
+static void CompleteCheatSetAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<CheatSetAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] CheatSetAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetStateError("cheat_set_async_work_failed", "CheatSetAsync",
+                  "Async cheat-set completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    if (!ctx->ok) {
+      EnsureStateErrorIfEmpty("cheat_set_failed", "CheatSetAsync",
+                              "CheatSet returned false");
+    }
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value CheatSetAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[3];
+  if (!GetArgs(env, info, 3, 3, args, &argc, "CheatSetAsync")) {
+    return MakeResolvedPromise(env, false);
+  }
+
+  int32_t index = 0;
+  bool enabled = false;
+  char code[256];
+  if (!GetInt32Arg(env, args[0], index, "CheatSetAsync", "index") ||
+      !GetBoolArg(env, args[1], enabled, "CheatSetAsync", "enabled") ||
+      !GetStringArg(env, args[2], code, sizeof(code), "CheatSetAsync", "code")) {
+    return MakeResolvedPromise(env, false);
+  }
+  if (index < 0 || index > kMaxCheatIndex) {
+    LOGF(LOG_ERROR, "[NEW] CheatSetAsync invalid index: %{public}d", index);
+    GetEngine()->SetLastErrorInfo("cheat_index_invalid", "CheatSetAsync",
+                                  "Cheat index is outside supported range");
+    return MakeResolvedPromise(env, false);
+  }
+  if (!IsValidCheatCode(code)) {
+    LOGF(LOG_ERROR, "[NEW] CheatSetAsync invalid code format");
+    GetEngine()->SetLastErrorInfo("cheat_code_invalid", "CheatSetAsync",
+                                  "Cheat code format is invalid");
+    return MakeResolvedPromise(env, false);
+  }
+
+  auto *ctx = new CheatSetAsyncContext();
+  ctx->index = static_cast<unsigned>(index);
+  ctx->enabled = enabled;
+  ctx->code = code;
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "CheatSetAsync");
+  if (!resourceName) {
+    SetStateError("cheat_set_async_create_failed", "CheatSetAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteCheatSetAsync,
+      CompleteCheatSetAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetStateError("cheat_set_async_create_failed", "CheatSetAsync",
+                  "Failed to create async cheat-set work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetStateError("cheat_set_async_queue_failed", "CheatSetAsync",
+                  "Failed to queue async cheat-set work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value GetCoreOptions(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   std::string j = GetEngine()->GetCoreOptionsJson();
@@ -1037,6 +1288,8 @@ void RegisterStateNapi(napi_env env, napi_value exports) {
       {"refactoredResetCore", nullptr, ResetCore, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredCheatReset", nullptr, CheatReset, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredCheatSet", nullptr, CheatSet, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredCheatResetAsync", nullptr, CheatResetAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredCheatSetAsync", nullptr, CheatSetAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetCoreOptions", nullptr, GetCoreOptions, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetCoreOption", nullptr, SetCoreOption, nullptr, nullptr, nullptr, napi_default, nullptr},
   };

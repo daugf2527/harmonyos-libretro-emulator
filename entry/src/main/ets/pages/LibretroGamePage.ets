@@ -1050,7 +1050,7 @@ struct LibretroGamePage {
       }
 
       if (this.runtimeCheatManagerSupported && this.gameRunning) {
-        const applied = runtimeCheatController.applyCheatEntries(savedItems);
+        const applied = await runtimeCheatController.applyCheatEntries(savedItems);
         this.runtimeSaveStatusText = applied
           ? successText
           : `${successText}，但当前核心同步失败`;
@@ -1156,7 +1156,7 @@ struct LibretroGamePage {
         return;
       }
 
-      const applied = runtimeCheatController.applyCheatEntries(items);
+      const applied = await runtimeCheatController.applyCheatEntries(items);
       if (!this.isCurrentRuntimeCheatManagerTask(token)) {
         return;
       }
