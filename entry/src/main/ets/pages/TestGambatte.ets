@@ -30,10 +30,10 @@ interface LibretroNapi {
     resMgr?: resourceManager.ResourceManager
   ): NapiErrorResult;
   refactoredSetFilesDir(path: string): boolean;
-  refactoredGetRawFileList(
+  refactoredGetRawFileListAsync(
     resMgr: resourceManager.ResourceManager,
     dir: string
-  ): string[];
+  ): Promise<string[]>;
   refactoredWaitForStateAsync(
     state: number,
     timeoutMs?: number
@@ -379,7 +379,7 @@ struct TestGambatte {
     this.currentCoreDescription = this.cores[0].description;
     
     // 动态扫描 ROM 并初始化选项
-    this.refreshRomList();
+    void this.refreshRomList();
 
     this.eventScope = LibretroEventHub.getInstance().createScope();
     this.eventScope.onFpsUpdate((payload: FpsUpdatePayload) => {
@@ -1397,7 +1397,7 @@ struct TestGambatte {
     }
   }
 
-  private refreshRomList() {
+  private async refreshRomList(): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) {
       this.roms = this.buildRomConfigs([]);
@@ -1407,7 +1407,10 @@ struct TestGambatte {
 
     let files: string[] = [];
     try {
-      const rawList: string[] = nativeApi.refactoredGetRawFileList(context.resourceManager, 'roms');
+      const rawList: string[] = await nativeApi.refactoredGetRawFileListAsync(
+        context.resourceManager,
+        'roms'
+      );
       files = rawList.filter(item => typeof item === 'string') as string[];
     } catch (err) {
       const msg = (err as Error).message || String(err);
