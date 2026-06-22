@@ -235,7 +235,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredDiskControlAddImageIndex` | `() => boolean` | sync | 新增磁盘映像槽位 |
 | `refactoredDiskControlAddImageIndexAsync` | `() => Promise<boolean>` | async | 异步新增磁盘映像槽位，避免 UI 线程同步等待 |
 
-### 查询/统计/诊断 (13) — engine_query_napi.cpp
+### 查询/统计/诊断 (14) — engine_query_napi.cpp
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
@@ -249,6 +249,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredResetStats` | `() => boolean` | sync | 重置运行时统计 |
 | `refactoredGetInputDebugStats` | `() => InputDebugStats` | sync | 输入调试统计（结构化对象） |
 | `refactoredGetRegion` | `() => number` | sync | 区域枚举（**number 非 string**，NTSC/PAL） |
+| `refactoredGetRegionAsync` | `() => Promise<number>` | async | 异步读取区域枚举，避免 UI 线程同步等待 |
 | `refactoredGetAVInfo` | `() => AVInfo` | sync | 音视频信息 {videoWidth,videoHeight,fps,audioSampleRate} |
 | `refactoredHasCoreLoaded` | `() => boolean` | sync | 是否已加载核心 |
 | `refactoredHasGameLoaded` | `() => boolean` | sync | 是否已加载游戏 |

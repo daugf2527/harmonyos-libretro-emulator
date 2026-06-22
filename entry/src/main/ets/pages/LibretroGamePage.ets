@@ -1514,7 +1514,7 @@ struct LibretroGamePage {
         this.runtimeRegionText = '';
       }
       if (this.gamePaused) {
-        this.refreshRuntimeRegionSnapshot();
+        void this.refreshRuntimeRegionSnapshot();
       }
       if (this.runtimeCheatManagerSupported && this.gameRunning) {
         void this.restoreRuntimeCheatsForCurrentRom();
@@ -1540,12 +1540,12 @@ struct LibretroGamePage {
     });
   }
 
-  private refreshRuntimeRegionSnapshot(): void {
+  private async refreshRuntimeRegionSnapshot(): Promise<void> {
     if (!this.coreSupportsRegionQuery || !this.gameRunning) {
       this.runtimeRegionText = '';
       return;
     }
-    const regionCode = runtimeCoreControlController.getRegionCode();
+    const regionCode = await runtimeCoreControlController.getRegionCodeAsync();
     this.runtimeRegionText = this.formatRuntimeRegionText(regionCode);
   }
 
@@ -2969,7 +2969,7 @@ struct LibretroGamePage {
       this.syncRuntimePerformanceSnapshot();
       runtimeSessionController.pause();
       this.gamePaused = true;
-      this.refreshRuntimeRegionSnapshot();
+      void this.refreshRuntimeRegionSnapshot();
       this.refreshRuntimePortControlSummaryText();
       this.refreshRuntimeStatusSnapshot();
       if (this.diskControlSupported) {

@@ -285,6 +285,111 @@ static napi_value GetRegion(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+struct GetRegionAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  unsigned region = std::numeric_limits<unsigned>::max();
+};
+
+static void ExecuteGetRegionAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<GetRegionAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->region = GetEngine()->GetRegion();
+}
+
+static void CompleteGetRegionAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<GetRegionAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] GetRegionAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetQueryError("get_region_async_work_failed", "GetRegionAsync",
+                  "Async region query completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    napi_value result = MakeUint32(env, ctx->region);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value GetRegionAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new GetRegionAsyncContext();
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "GetRegionAsync");
+  if (!resourceName) {
+    SetQueryError("get_region_async_create_failed", "GetRegionAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteGetRegionAsync,
+      CompleteGetRegionAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetQueryError("get_region_async_create_failed", "GetRegionAsync",
+                  "Failed to create async region query work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetQueryError("get_region_async_queue_failed", "GetRegionAsync",
+                  "Failed to queue async region query work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value GetAVInfo(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   auto *engine = GetEngine();
@@ -438,6 +543,7 @@ void RegisterQueryNapi(napi_env env, napi_value exports) {
       {"refactoredResetStats", nullptr, ResetStats, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetInputDebugStats", nullptr, GetInputDebugStats, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetRegion", nullptr, GetRegion, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredGetRegionAsync", nullptr, GetRegionAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetAVInfo", nullptr, GetAVInfo, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredHasCoreLoaded", nullptr, HasCoreLoaded, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredHasGameLoaded", nullptr, HasGameLoaded, nullptr, nullptr, nullptr, napi_default, nullptr},

@@ -219,6 +219,7 @@ export const setInputKeyMapping: (mappingMap: Record<string, number>) => boolean
 // Controller/Region
 export const refactoredSetControllerPortDevice: (port: number, device: number) => boolean;
 export const refactoredGetRegion: () => number;
+export const refactoredGetRegionAsync: () => Promise<number>;
 
 // AV Info
 export interface AVInfo {

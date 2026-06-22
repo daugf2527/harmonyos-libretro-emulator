@@ -5,6 +5,7 @@ interface RuntimeCoreControlNapi {
   refactoredResetCore(): boolean
   refactoredResetCoreAsync(): Promise<boolean>
   refactoredGetRegion(): number
+  refactoredGetRegionAsync(): Promise<number>
 }
 
 const nativeApi = testNapi as RuntimeCoreControlNapi
@@ -44,6 +45,27 @@ export class RuntimeCoreControlController {
         return undefined
       }
       const region = nativeApi.refactoredGetRegion()
+      if (!Number.isFinite(region) || region < 0) {
+        return undefined
+      }
+      const normalized = Math.floor(region)
+      if (normalized !== 0 && normalized !== 1) {
+        return undefined
+      }
+      return normalized
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeCoreControl', 'Engine', `读取运行时区域失败: ${message}`)
+      return undefined
+    }
+  }
+
+  async getRegionCodeAsync(): Promise<number | undefined> {
+    try {
+      if (!testNapi) {
+        return undefined
+      }
+      const region = await nativeApi.refactoredGetRegionAsync()
       if (!Number.isFinite(region) || region < 0) {
         return undefined
       }
