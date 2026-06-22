@@ -11,6 +11,19 @@ void SetDiskError(const char *reason, const char *step, const char *message) {
   engine->SetLastErrorInfo(reason, step, message);
 }
 
+void EnsureDiskErrorIfEmpty(const char *reason, const char *step,
+                            const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  auto err = engine->GetLastErrorInfo();
+  if (!err.reason.empty()) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
 } // namespace
 
 static napi_value DiskControlSetEjectState(napi_env env, napi_callback_info info) {
@@ -26,8 +39,8 @@ static napi_value DiskControlSetEjectState(napi_env env, napi_callback_info info
   }
   bool ok = GetEngine()->DiskControlSetEjectState(ejected);
   if (!ok) {
-    SetDiskError("disk_set_eject_failed", "DiskControlSetEjectState",
-                 "Core rejected the requested eject state");
+    EnsureDiskErrorIfEmpty("disk_set_eject_failed", "DiskControlSetEjectState",
+                           "Core rejected the requested eject state");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -65,8 +78,8 @@ static napi_value DiskControlSetImageIndex(napi_env env, napi_callback_info info
   }
   bool ok = GetEngine()->DiskControlSetImageIndex(static_cast<unsigned>(index));
   if (!ok) {
-    SetDiskError("disk_set_image_failed", "DiskControlSetImageIndex",
-                 "Core rejected the requested disk image index");
+    EnsureDiskErrorIfEmpty("disk_set_image_failed", "DiskControlSetImageIndex",
+                           "Core rejected the requested disk image index");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -105,8 +118,9 @@ static napi_value DiskControlReplaceImageIndex(napi_env env, napi_callback_info 
   }
   bool ok = GetEngine()->DiskControlReplaceImageIndex(static_cast<unsigned>(index), path);
   if (!ok) {
-    SetDiskError("disk_replace_image_failed", "DiskControlReplaceImageIndex",
-                 "Core rejected the requested disk image replacement");
+    EnsureDiskErrorIfEmpty("disk_replace_image_failed",
+                           "DiskControlReplaceImageIndex",
+                           "Core rejected the requested disk image replacement");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -116,8 +130,8 @@ static napi_value DiskControlAddImageIndex(napi_env env, napi_callback_info info
   NAPI_TRY_CATCH_BEGIN
   bool ok = GetEngine()->DiskControlAddImageIndex();
   if (!ok) {
-    SetDiskError("disk_add_image_failed", "DiskControlAddImageIndex",
-                 "Core rejected the request to add a disk image slot");
+    EnsureDiskErrorIfEmpty("disk_add_image_failed", "DiskControlAddImageIndex",
+                           "Core rejected the request to add a disk image slot");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)

@@ -2722,14 +2722,17 @@ std::string LibretroEngine::GetCoreOptionsJson() const {
 // 违反 libretro core 的 game-loop context 要求,可能损坏 core 内部状态。
 
 bool LibretroEngine::DiskControlSetEjectState(bool ejected) {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlSetEjectState",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, ejected, &ok]() {
             ok = ejected ? diskController_->Eject() : diskController_->Insert();
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlSetEjectState")) {
     return false;
   }
   return ok;
@@ -2766,12 +2769,15 @@ unsigned LibretroEngine::DiskControlGetImageIndex() {
 }
 
 bool LibretroEngine::DiskControlSetImageIndex(unsigned index) {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlSetImageIndex",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, index, &ok]() { ok = diskController_->SetImageIndex(index); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlSetImageIndex")) {
     return false;
   }
   return ok;
@@ -2794,26 +2800,33 @@ unsigned LibretroEngine::DiskControlGetNumImages() {
 
 bool LibretroEngine::DiskControlReplaceImageIndex(unsigned index,
                                                   const std::string &path) {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable",
+                     "DiskControlReplaceImageIndex",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, index, &path, &ok]() {
             ok = diskController_->ReplaceImageIndex(index, path);
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlReplaceImageIndex")) {
     return false;
   }
   return ok;
 }
 
 bool LibretroEngine::DiskControlAddImageIndex() {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlAddImageIndex",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, &ok]() { ok = diskController_->AddImageIndex(); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlAddImageIndex")) {
     return false;
   }
   return ok;
