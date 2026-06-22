@@ -3,9 +3,11 @@ import LogHelper from './LogHelper'
 
 interface RuntimeDiskControlNapi {
   refactoredDiskControlSetEjectState(ejected: boolean): boolean
+  refactoredDiskControlSetEjectStateAsync(ejected: boolean): Promise<boolean>
   refactoredDiskControlGetEjectState(): boolean
   refactoredDiskControlGetImageIndex(): number
   refactoredDiskControlSetImageIndex(index: number): boolean
+  refactoredDiskControlSetImageIndexAsync(index: number): Promise<boolean>
   refactoredDiskControlGetNumImages(): number
   refactoredDiskControlGetSnapshotAsync(): Promise<RuntimeDiskControlSnapshot>
   refactoredDiskControlReplaceImageIndex(index: number, path: string): boolean
@@ -56,6 +58,20 @@ export class RuntimeDiskControlController {
     }
   }
 
+  async setEjectStateAsync(ejected: boolean): Promise<boolean> {
+    try {
+      if (!testNapi) {
+        LogHelper.warn('RuntimeDiskControl', 'Engine', '换盘弹仓跳过: engine not ready')
+        return false
+      }
+      return await nativeApi.refactoredDiskControlSetEjectStateAsync(ejected)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeDiskControl', 'Engine', `换盘弹仓失败: ${message}`)
+      return false
+    }
+  }
+
   setImageIndex(index: number): boolean {
     try {
       if (!testNapi) {
@@ -63,6 +79,22 @@ export class RuntimeDiskControlController {
         return false
       }
       return nativeApi.refactoredDiskControlSetImageIndex(
+        this.normalizeNonNegativeInt(index)
+      )
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeDiskControl', 'Engine', `切换磁盘失败: ${message}`)
+      return false
+    }
+  }
+
+  async setImageIndexAsync(index: number): Promise<boolean> {
+    try {
+      if (!testNapi) {
+        LogHelper.warn('RuntimeDiskControl', 'Engine', '切换磁盘跳过: engine not ready')
+        return false
+      }
+      return await nativeApi.refactoredDiskControlSetImageIndexAsync(
         this.normalizeNonNegativeInt(index)
       )
     } catch (err) {

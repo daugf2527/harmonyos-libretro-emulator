@@ -136,9 +136,11 @@ export const refactoredResetCoreAsync: () => Promise<boolean>;
 
 // Disk Control
 export const refactoredDiskControlSetEjectState: (ejected: boolean) => boolean;
+export const refactoredDiskControlSetEjectStateAsync: (ejected: boolean) => Promise<boolean>;
 export const refactoredDiskControlGetEjectState: () => boolean;
 export const refactoredDiskControlGetImageIndex: () => number;
 export const refactoredDiskControlSetImageIndex: (index: number) => boolean;
+export const refactoredDiskControlSetImageIndexAsync: (index: number) => Promise<boolean>;
 export const refactoredDiskControlGetNumImages: () => number;
 export interface DiskControlSnapshot {
   ejected: boolean;

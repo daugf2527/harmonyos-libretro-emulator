@@ -1705,12 +1705,12 @@ struct LibretroGamePage {
     });
   }
 
-  private handleRuntimeDiskToggleEject(): void {
+  private async handleRuntimeDiskToggleEject(): Promise<void> {
     if (!this.diskControlSupported || this.diskControlBusy) {
       return;
     }
     const nextEjected = !this.diskControlEjected;
-    const ok = runtimeDiskControlController.setEjectState(nextEjected);
+    const ok = await runtimeDiskControlController.setEjectStateAsync(nextEjected);
     if (!ok) {
       this.refreshRuntimeDiskControlSnapshot(
         nextEjected ? '弹出当前磁盘失败' : '插回当前磁盘失败'
@@ -1722,7 +1722,7 @@ struct LibretroGamePage {
     );
   }
 
-  private switchRuntimeDisk(step: number): void {
+  private async switchRuntimeDisk(step: number): Promise<void> {
     if (!this.diskControlSupported || this.diskControlBusy) {
       return;
     }
@@ -1741,20 +1741,20 @@ struct LibretroGamePage {
     }
 
     const restoreInserted = !this.diskControlEjected;
-    if (restoreInserted && !runtimeDiskControlController.setEjectState(true)) {
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(true)) {
       this.refreshRuntimeDiskControlSnapshot('换盘失败：当前磁盘无法弹出');
       return;
     }
 
-    if (!runtimeDiskControlController.setImageIndex(targetIndex)) {
+    if (!await runtimeDiskControlController.setImageIndexAsync(targetIndex)) {
       if (restoreInserted) {
-        runtimeDiskControlController.setEjectState(false);
+        await runtimeDiskControlController.setEjectStateAsync(false);
       }
       this.refreshRuntimeDiskControlSnapshot(`切换到第 ${targetIndex + 1} 张盘失败`);
       return;
     }
 
-    if (restoreInserted && !runtimeDiskControlController.setEjectState(false)) {
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(false)) {
       this.refreshRuntimeDiskControlSnapshot(
         `已切到第 ${targetIndex + 1} 张盘，但插回失败`
       );
@@ -1795,7 +1795,7 @@ struct LibretroGamePage {
         this.refreshRuntimeDiskControlSnapshot(result.detail.length > 0 ? result.detail : '已取消选择磁盘镜像');
         return;
       }
-      const statusText = this.replaceRuntimeDiskImageAtIndex(
+      const statusText = await this.replaceRuntimeDiskImageAtIndex(
         this.diskControlImageIndex,
         result.importedEntryPath,
         result.importedEntryName
@@ -1843,7 +1843,7 @@ struct LibretroGamePage {
         this.refreshRuntimeDiskControlSnapshot(result.detail.length > 0 ? result.detail : '已取消选择磁盘镜像');
         return;
       }
-      const statusText = this.appendRuntimeDiskImage(
+      const statusText = await this.appendRuntimeDiskImage(
         result.importedEntryPath,
         result.importedEntryName
       );
@@ -1863,51 +1863,51 @@ struct LibretroGamePage {
     }
   }
 
-  private replaceRuntimeDiskImageAtIndex(
+  private async replaceRuntimeDiskImageAtIndex(
     index: number,
     imagePath: string,
     imageName: string
-  ): string {
+  ): Promise<string> {
     const restoreInserted = !this.diskControlEjected;
-    if (restoreInserted && !runtimeDiskControlController.setEjectState(true)) {
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(true)) {
       return '替换磁盘失败：当前磁盘无法弹出';
     }
     if (!runtimeDiskControlController.replaceImageIndex(index, imagePath)) {
       if (restoreInserted) {
-        runtimeDiskControlController.setEjectState(false);
+        await runtimeDiskControlController.setEjectStateAsync(false);
       }
       return `替换第 ${index + 1} 张盘失败`;
     }
-    if (restoreInserted && !runtimeDiskControlController.setEjectState(false)) {
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(false)) {
       return `已替换第 ${index + 1} 张盘 (${imageName})，但插回失败`;
     }
     return `已替换第 ${index + 1} 张盘 (${imageName})`;
   }
 
-  private appendRuntimeDiskImage(
+  private async appendRuntimeDiskImage(
     imagePath: string,
     imageName: string
-  ): string {
+  ): Promise<string> {
     const restoreInserted = !this.diskControlEjected;
-    if (restoreInserted && !runtimeDiskControlController.setEjectState(true)) {
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(true)) {
       return '新增磁盘失败：当前磁盘无法弹出';
     }
     if (!runtimeDiskControlController.addImageIndex()) {
       if (restoreInserted) {
-        runtimeDiskControlController.setEjectState(false);
+        await runtimeDiskControlController.setEjectStateAsync(false);
       }
       return '新增磁盘槽位失败';
     }
 
-    const snapshot = runtimeDiskControlController.getSnapshot();
+    const snapshot = await runtimeDiskControlController.getSnapshotAsync();
     const targetIndex = snapshot.imageCount > 0 ? snapshot.imageCount - 1 : this.diskControlImageCount;
     if (!runtimeDiskControlController.replaceImageIndex(targetIndex, imagePath)) {
       if (restoreInserted) {
-        runtimeDiskControlController.setEjectState(false);
+        await runtimeDiskControlController.setEjectStateAsync(false);
       }
       return `已新增槽位，但写入第 ${targetIndex + 1} 张盘失败`;
     }
-    if (restoreInserted && !runtimeDiskControlController.setEjectState(false)) {
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(false)) {
       return `已新增第 ${targetIndex + 1} 张盘 (${imageName})，但插回失败`;
     }
     return `已新增第 ${targetIndex + 1} 张盘 (${imageName})`;
@@ -2458,13 +2458,13 @@ struct LibretroGamePage {
             this.handlePauseTileAction(actionCode);
           },
           onDiskToggleEject: () => {
-            this.handleRuntimeDiskToggleEject();
+            void this.handleRuntimeDiskToggleEject();
           },
           onDiskSelectPrevious: () => {
-            this.switchRuntimeDisk(-1);
+            void this.switchRuntimeDisk(-1);
           },
           onDiskSelectNext: () => {
-            this.switchRuntimeDisk(1);
+            void this.switchRuntimeDisk(1);
           },
           onDiskRefresh: () => {
             this.refreshRuntimeDiskControlSnapshot();
