@@ -13,6 +13,19 @@ void SetQueryError(const char *reason, const char *step, const char *message) {
   engine->SetLastErrorInfo(reason, step, message);
 }
 
+void EnsureQueryErrorIfEmpty(const char *reason, const char *step,
+                             const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  auto err = engine->GetLastErrorInfo();
+  if (!err.reason.empty()) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
 } // namespace
 
 static napi_value GetEngineState(napi_env env, napi_callback_info info) {
@@ -242,6 +255,10 @@ static napi_value SetFilesDir(napi_env env, napi_callback_info info) {
     return MakeBool(env, false);
   }
   const bool ok = GetEngine()->SetFilesDir(path);
+  if (!ok) {
+    EnsureQueryErrorIfEmpty("files_dir_set_failed", "SetFilesDir",
+                            "SetFilesDir returned false");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
