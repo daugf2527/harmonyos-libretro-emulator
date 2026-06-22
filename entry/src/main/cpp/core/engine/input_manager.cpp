@@ -174,9 +174,8 @@ bool InputManager::SetControllerPortDevice(int port, int device) {
   if (!controller_port_device_callback_) {
     return false;
   }
-  controller_port_device_callback_(static_cast<unsigned>(port),
-                                   static_cast<unsigned>(device));
-  return true;
+  return controller_port_device_callback_(static_cast<unsigned>(port),
+                                          static_cast<unsigned>(device));
 }
 
 interfaces::InputDebugStats InputManager::GetDebugStats() const {
@@ -188,7 +187,7 @@ void InputManager::SetPortRouter(InputPortRouter *router) {
 }
 
 void InputManager::SetControllerPortDeviceCallback(
-    std::function<void(unsigned, unsigned)> callback) {
+    std::function<bool(unsigned, unsigned)> callback) {
   controller_port_device_callback_ = std::move(callback);
 }
 

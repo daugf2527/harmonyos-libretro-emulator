@@ -282,7 +282,7 @@ LibretroEngine::LibretroEngine() {
   inputManager_->SetPortRouter(inputPortRouter_.get());
   inputManager_->SetControllerPortDeviceCallback(
       [this](unsigned port, unsigned device) {
-        (void)SetControllerPortDevice(port, device);
+        return SetControllerPortDevice(port, device);
       });
   rendererInterface_ = std::make_unique<EngineRendererAdapter>(this);
   renderThread_ = std::make_unique<RenderThread>(videoPipeline_, envState_);
