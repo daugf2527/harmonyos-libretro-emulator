@@ -14,6 +14,19 @@ void SetInputError(const char *reason, const char *step, const char *message) {
   engine->SetLastErrorInfo(reason, step, message);
 }
 
+void EnsureInputErrorIfEmpty(const char *reason, const char *step,
+                             const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  auto err = engine->GetLastErrorInfo();
+  if (!err.reason.empty()) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
 } // namespace
 
 static InputManager *GetInput() { return InputManager::GetInstance(); }
@@ -272,9 +285,9 @@ static napi_value SetControllerPortDevice(napi_env env, napi_callback_info info)
   }
   const bool ok = input->SetControllerPortDevice(port, device);
   if (!ok) {
-    SetInputError("controller_port_device_unavailable",
-                  "SetControllerPortDevice",
-                  "Controller port device callback is unavailable");
+    EnsureInputErrorIfEmpty("controller_port_device_unavailable",
+                            "SetControllerPortDevice",
+                            "Controller port device callback is unavailable");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
