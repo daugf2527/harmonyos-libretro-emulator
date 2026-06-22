@@ -1229,9 +1229,13 @@ static napi_value CancelSwitch(napi_env env, napi_callback_info info) {
   }
 
   // 向 Engine 发送 Cancel 消息
-  GetEngine()->Cancel();
+  const bool ok = GetEngine()->Cancel();
+  if (!ok) {
+    EnsureLastErrorIfEmpty("cancel_failed", "CancelSwitch",
+                           "Cancel() returned false");
+  }
 
-  return MakeBool(env, true);
+  return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 

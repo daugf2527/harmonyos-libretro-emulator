@@ -710,11 +710,15 @@ bool LibretroEngine::Resume() {
   return true;
 }
 
-void LibretroEngine::Cancel() {
+bool LibretroEngine::Cancel() {
   LOGF(LOG_INFO, "[NEW] Cancel called");
   if (!messageQueue_.Push({MessageType::Cancel, {}})) {
     LOGF(LOG_WARN, "[NEW] Cancel dropped: message queue closed");
+    SetLastErrorInfo("cancel_dispatch_failed", "Cancel",
+                     "message queue closed before cancel dispatch");
+    return false;
   }
+  return true;
 }
 
 bool LibretroEngine::LoadCore(const std::string &corePath) {

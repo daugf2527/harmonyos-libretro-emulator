@@ -155,7 +155,7 @@ public:
   bool Stop();
   bool Pause();
   bool Resume();
-  void Cancel();
+  bool Cancel();
 
   /**
    * @brief 统一重置引擎状态（解决重入问题）
