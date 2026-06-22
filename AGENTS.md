@@ -141,11 +141,11 @@ ArkTS 虚拟手柄 / 键盘 / 触控
 
 ## NAPI Export Inventory
 
-`libentry.so` 通过 `napi_define_properties` 暴露给 ArkTS 的全部 65 个 export。
+`libentry.so` 通过 `napi_define_properties` 暴露给 ArkTS 的全部 79 个 export。
 ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名以此为准，本表与之同步）。
 注册入口：`libretro_engine_napi.cpp` 转发 6 个子注册函数 + `module_init.cpp` 注册 core_loader / input_mapping 两个独立模块。
 
-命名约定：63 个以 `refactored` 前缀标识新架构；2 个例外（`setInputKeyMapping`、`testCoreLoader`）为遗留/专用接口。
+命名约定：77 个以 `refactored` 前缀标识新架构；2 个例外（`setInputKeyMapping`、`testCoreLoader`）为遗留/专用接口。
 改 `app/napi/**` 任何 export（增删/改签名）须同步本表 + `index.d.ts`（`scan_code_drift.sh` Pattern 5 守）。
 
 ### 生命周期 (13) — engine_lifecycle_napi.cpp
@@ -166,7 +166,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredGetRawFileListAsync` | `(resMgr: ResourceManager, dir?: string) => Promise<string[]>` | async | 异步列出 rawfile 目录 |
 | `refactoredInitEventBridge` | `(callback: (data: RefactoredEvent) => void) => boolean` | sync | 初始化 EventBridge 事件通道 |
 
-### 状态/存档/SRAM/作弊/选项 (19) — engine_state_napi.cpp
+### 状态/存档/SRAM/作弊/选项 (21) — engine_state_napi.cpp
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
