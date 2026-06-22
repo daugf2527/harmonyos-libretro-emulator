@@ -31,6 +31,23 @@ bool IsValidInputPort(int32_t port) {
   return port >= 0 && port < libretro::InputSnapshot::kMaxPorts;
 }
 
+bool IsValidInputButton(int32_t id) {
+  return id >= 0 && id < libretro::InputSnapshot::kMaxButtons;
+}
+
+bool IsValidInputAnalog(int32_t index, int32_t id) {
+  if (index < 0 || id < 0) {
+    return false;
+  }
+  const int32_t axisIndex = (index * 2) + id;
+  return axisIndex >= 0 &&
+         axisIndex < libretro::InputSnapshot::kMaxAnalogAxes;
+}
+
+bool IsValidInputSensor(int32_t id) {
+  return id >= 0 && id < libretro::InputSnapshot::kMaxSensors;
+}
+
 bool IsValidInputSourceType(int32_t sourceType) {
   switch (sourceType) {
   case 0:
@@ -65,6 +82,16 @@ static napi_value SendInput(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], port, "SendInput", "port") ||
       !GetInt32Arg(env, args[1], id, "SendInput", "id") ||
       !GetBoolArg(env, args[2], pressed, "SendInput", "pressed")) {
+    return MakeBool(env, false);
+  }
+  if (!IsValidInputPort(port)) {
+    SetInputError("input_port_invalid", "SendInput",
+                  "Requested input port is outside supported range");
+    return MakeBool(env, false);
+  }
+  if (!IsValidInputButton(id)) {
+    SetInputError("input_button_invalid", "SendInput",
+                  "Requested button id is outside supported range");
     return MakeBool(env, false);
   }
 
@@ -113,6 +140,16 @@ static napi_value SendAnalog(napi_env env, napi_callback_info info) {
     value = 32767.0;
   } else if (value < -32768.0) {
     value = -32768.0;
+  }
+  if (!IsValidInputPort(port)) {
+    SetInputError("analog_port_invalid", "SendAnalog",
+                  "Requested analog input port is outside supported range");
+    return MakeBool(env, false);
+  }
+  if (!IsValidInputAnalog(index, id)) {
+    SetInputError("analog_axis_invalid", "SendAnalog",
+                  "Requested analog index/id is outside supported range");
+    return MakeBool(env, false);
   }
 
   auto *input = GetInput();
@@ -271,6 +308,16 @@ static napi_value SendSensor(napi_env env, napi_callback_info info) {
       !GetDoubleArg(env, args[2], value, "SendSensor", "value")) {
     return MakeBool(env, false);
   }
+  if (!IsValidInputPort(port)) {
+    SetInputError("sensor_port_invalid", "SendSensor",
+                  "Requested sensor input port is outside supported range");
+    return MakeBool(env, false);
+  }
+  if (!IsValidInputSensor(id)) {
+    SetInputError("sensor_id_invalid", "SendSensor",
+                  "Requested sensor id is outside supported range");
+    return MakeBool(env, false);
+  }
 
   auto *input = GetInput();
   if (!input) {
@@ -302,12 +349,12 @@ static napi_value SetControllerPortDevice(napi_env env, napi_callback_info info)
       !GetInt32Arg(env, args[1], device, "SetControllerPortDevice", "device")) {
     return MakeBool(env, false);
   }
-  if (port < 0 || device < 0) {
+  if (!IsValidInputPort(port) || device < 0) {
     LOGF(LOG_ERROR,
          "[NEW] SetControllerPortDevice invalid: port=%{public}d device=%{public}d",
          port, device);
     SetInputError("controller_port_device_invalid", "SetControllerPortDevice",
-                  "Controller port and device must be non-negative");
+                  "Controller port or device is outside supported range");
     return MakeBool(env, false);
   }
 
