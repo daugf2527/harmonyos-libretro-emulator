@@ -70,7 +70,9 @@ interface LibretroNapi {
   refactoredResetStats(): boolean;
   refactoredSetSoftwareMaxResolution(w: number, h: number): boolean;
   refactoredGetCoreOptions(): string;
+  refactoredGetCoreOptionsAsync(): Promise<string>;
   refactoredSetCoreOption(key: string, value: string): boolean;
+  refactoredSetCoreOptionAsync(key: string, value: string): Promise<boolean>;
   refactoredSetMinimumAudioLatency(ms: number): boolean;
   refactoredSetAIUpscale(enabled: boolean): boolean;
   refactoredPauseEngine(): boolean;
@@ -284,7 +286,7 @@ struct LibretroNewArchTestPage {
     }
     this.status = loaded ? '核心已加载' : '核心加载超时';
   };
-  private onInitOptions = (): void => { this.refreshCoreOptions(); };
+  private onInitOptions = (): void => { void this.refreshCoreOptions(); };
   private onLoadRom = async (): Promise<void> => {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) { this.log('获取上下文失败'); return; }
@@ -303,7 +305,7 @@ struct LibretroNewArchTestPage {
       this.log(`LoadRom 超时: ${detail}`);
     }
     this.status = running ? 'ROM已加载，运行中' : 'ROM加载超时';
-    if (romResult.success) { this.refreshCoreOptions(); }
+    if (romResult.success) { void this.refreshCoreOptions(); }
   };
   private onPauseEngine = (): void => {
     this.log('调用 refactoredPauseEngine');
@@ -490,7 +492,7 @@ struct LibretroNewArchTestPage {
     }
     this.eventScope = LibretroEventHub.getInstance().createScope();
     this.eventScope.onOptionsUpdate((_payload) => {
-      this.refreshCoreOptions();
+      void this.refreshCoreOptions();
     });
     this.eventScope.onAudioStatus((payload) => {
       this.audioStatus = {
@@ -684,8 +686,8 @@ struct LibretroNewArchTestPage {
     return Math.round(v * 32768);
   }
 
-  refreshCoreOptions() {
-    this.coreOptions = this.getCoreOptions();
+  async refreshCoreOptions(): Promise<void> {
+    this.coreOptions = await this.getCoreOptions();
     this.log('刷新选项完成');
   }
 
@@ -891,9 +893,9 @@ struct LibretroNewArchTestPage {
     return [];
   }
 }
-  getCoreOptions(): CoreOptionItem[] {
+  async getCoreOptions(): Promise<CoreOptionItem[]> {
     try {
-      const s: string = nativeApi.refactoredGetCoreOptions();
+      const s: string = await nativeApi.refactoredGetCoreOptionsAsync();
       return this.parseOptionsJson(s);
     } catch (_) {
       return [];
@@ -1032,14 +1034,14 @@ struct LibretroNewArchTestPage {
           Blank()
           Button('切换')
             .fontSize(EmuTypography.sm)
-            .onClick(() => {
+            .onClick(async () => {
               const values: CoreOptionValue[] = Array.isArray(opt.values) ? opt.values : [];
               const idx = Math.max(0, values.findIndex((v: CoreOptionValue) => v.value === opt.value));
               const next = values.length > 0 ? values[(idx + 1) % values.length] : undefined;
               if (next && next.value) {
-                const ok = nativeApi.refactoredSetCoreOption(opt.key, next.value);
+                const ok = await nativeApi.refactoredSetCoreOptionAsync(opt.key, next.value);
                 if (ok) {
-                  this.refreshCoreOptions();
+                  void this.refreshCoreOptions();
                 }
               }
             })

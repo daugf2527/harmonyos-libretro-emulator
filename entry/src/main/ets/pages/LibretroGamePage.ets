@@ -1207,13 +1207,13 @@ struct LibretroGamePage {
     this.closeRuntimeCheatManager();
     this.closeRuntimeSramManager();
     this.runtimeCoreOptionsVisible = true;
-    this.refreshRuntimeCoreOptionsPanel();
+    void this.refreshRuntimeCoreOptionsPanel();
   }
 
-  private refreshRuntimeCoreOptionsPanel(statusPrefix: string = ''): void {
+  private async refreshRuntimeCoreOptionsPanel(statusPrefix: string = ''): Promise<void> {
     this.runtimeCoreOptionsBusy = true;
     try {
-      const items = runtimeCoreOptionsController.getOptions();
+      const items = await runtimeCoreOptionsController.getOptionsAsync();
       this.runtimeCoreOptionsItems = items;
       const summaryText = this.buildRuntimeCoreOptionsSummaryText(items.length);
       this.runtimeCoreOptionsSummaryText = statusPrefix.length > 0
@@ -1230,7 +1230,7 @@ struct LibretroGamePage {
     }
   }
 
-  private advanceRuntimeCoreOption(key: string, value: string): void {
+  private async advanceRuntimeCoreOption(key: string, value: string): Promise<void> {
     if (this.runtimeCoreOptionsBusy) {
       return;
     }
@@ -1243,14 +1243,14 @@ struct LibretroGamePage {
 
     this.runtimeCoreOptionsBusy = true;
     try {
-      const ok = runtimeCoreOptionsController.setOption(safeKey, safeValue);
+      const ok = await runtimeCoreOptionsController.setOptionAsync(safeKey, safeValue);
       if (!ok) {
         this.runtimeCoreOptionsSummaryText = `写入核心选项失败 (${safeKey})`;
         this.runtimeSaveStatusText = `核心选项写入失败: ${safeKey}`;
         return;
       }
       this.runtimeSaveStatusText = `核心选项已更新: ${safeKey} -> ${safeValue}`;
-      this.refreshRuntimeCoreOptionsPanel(`已更新 ${safeKey}`);
+      void this.refreshRuntimeCoreOptionsPanel(`已更新 ${safeKey}`);
     } catch (err) {
       const message = (err as Error).message || String(err);
       LogHelper.error('LibretroGame', 'CoreOptions', `写入运行时核心选项失败: ${message}`);
@@ -2536,10 +2536,10 @@ struct LibretroGamePage {
             this.toggleRuntimeCoreOptions();
           },
           onCoreOptionsRefresh: () => {
-            this.refreshRuntimeCoreOptionsPanel();
+            void this.refreshRuntimeCoreOptionsPanel();
           },
           onCoreOptionAdvance: (key: string, value: string) => {
-            this.advanceRuntimeCoreOption(key, value);
+            void this.advanceRuntimeCoreOption(key, value);
           },
           onPortControlToggle: () => {
             this.toggleRuntimePortControl();

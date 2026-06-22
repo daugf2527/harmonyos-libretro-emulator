@@ -188,7 +188,9 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredCheatResetAsync` | `() => Promise<boolean>` | async | 异步重置所有金手指（避免 UI 线程同步等待） |
 | `refactoredCheatSetAsync` | `(index: number, enabled: boolean, code: string) => Promise<boolean>` | async | 异步设置单条金手指（避免 UI 线程同步等待） |
 | `refactoredGetCoreOptions` | `() => string` | sync | 核心选项（JSON 字符串，需 parse） |
+| `refactoredGetCoreOptionsAsync` | `() => Promise<string>` | async | 异步读取核心选项 JSON，避免 UI 线程同步等待 |
 | `refactoredSetCoreOption` | `(key: string, value: string) => boolean` | sync | 设置单条核心选项 |
+| `refactoredSetCoreOptionAsync` | `(key: string, value: string) => Promise<boolean>` | async | 异步设置单条核心选项，避免 UI 线程同步等待 |
 
 ### 输入 (10) — engine_input_napi.cpp (9) + input_mapping_napi.cpp (1)
 

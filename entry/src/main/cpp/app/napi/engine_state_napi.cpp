@@ -958,6 +958,236 @@ static napi_value SetCoreOption(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+struct GetCoreOptionsAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  std::string json;
+};
+
+static void ExecuteGetCoreOptionsAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<GetCoreOptionsAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->json = GetEngine()->GetCoreOptionsJson();
+}
+
+static void CompleteGetCoreOptionsAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<GetCoreOptionsAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] GetCoreOptionsAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetStateError("core_options_async_work_failed", "GetCoreOptionsAsync",
+                  "Async core-options completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    napi_value result = MakeString(env, ctx->json);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value GetCoreOptionsAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new GetCoreOptionsAsyncContext();
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "GetCoreOptionsAsync");
+  if (!resourceName) {
+    SetStateError("core_options_async_create_failed", "GetCoreOptionsAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteGetCoreOptionsAsync,
+      CompleteGetCoreOptionsAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetStateError("core_options_async_create_failed", "GetCoreOptionsAsync",
+                  "Failed to create async core-options work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetStateError("core_options_async_queue_failed", "GetCoreOptionsAsync",
+                  "Failed to queue async core-options work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+struct SetCoreOptionAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  std::string key;
+  std::string value;
+  bool ok = false;
+};
+
+static void ExecuteSetCoreOptionAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<SetCoreOptionAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->ok = GetEngine()->SetCoreOption(ctx->key, ctx->value);
+}
+
+static void CompleteSetCoreOptionAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<SetCoreOptionAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] SetCoreOptionAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetStateError("core_option_set_async_work_failed", "SetCoreOptionAsync",
+                  "Async core-option completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    if (!ctx->ok) {
+      EnsureStateErrorIfEmpty("core_option_set_failed", "SetCoreOptionAsync",
+                              "Core rejected the requested option update");
+    }
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value SetCoreOptionAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[2];
+  if (!GetArgs(env, info, 2, 2, args, &argc, "SetCoreOptionAsync")) {
+    return MakeResolvedPromise(env, false);
+  }
+  char key[256];
+  char val[256];
+  if (!GetStringArg(env, args[0], key, sizeof(key), "SetCoreOptionAsync", "key") ||
+      !GetStringArg(env, args[1], val, sizeof(val), "SetCoreOptionAsync", "value")) {
+    return MakeResolvedPromise(env, false);
+  }
+
+  auto *ctx = new SetCoreOptionAsyncContext();
+  ctx->key = key;
+  ctx->value = val;
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "SetCoreOptionAsync");
+  if (!resourceName) {
+    SetStateError("core_option_set_async_create_failed", "SetCoreOptionAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteSetCoreOptionAsync,
+      CompleteSetCoreOptionAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetStateError("core_option_set_async_create_failed", "SetCoreOptionAsync",
+                  "Failed to create async core-option work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetStateError("core_option_set_async_queue_failed", "SetCoreOptionAsync",
+                  "Failed to queue async core-option work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 // --- SaveStateAsync (napi_async_work) ---
 struct SaveStateAsyncContext {
   // Audit T1-F3: removed unused napi_env env field
@@ -1401,7 +1631,9 @@ void RegisterStateNapi(napi_env env, napi_value exports) {
       {"refactoredCheatResetAsync", nullptr, CheatResetAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredCheatSetAsync", nullptr, CheatSetAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetCoreOptions", nullptr, GetCoreOptions, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredGetCoreOptionsAsync", nullptr, GetCoreOptionsAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetCoreOption", nullptr, SetCoreOption, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredSetCoreOptionAsync", nullptr, SetCoreOptionAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   if (regStatus != napi_ok) {

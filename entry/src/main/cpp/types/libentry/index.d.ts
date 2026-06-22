@@ -232,7 +232,9 @@ export const refactoredGetAVInfo: () => AVInfo;
 
 // Options
 export const refactoredGetCoreOptions: () => string;
+export const refactoredGetCoreOptionsAsync: () => Promise<string>;
 export const refactoredSetCoreOption: (key: string, value: string) => boolean;
+export const refactoredSetCoreOptionAsync: (key: string, value: string) => Promise<boolean>;
 
 // State Query
 export const refactoredHasCoreLoaded: () => boolean;
