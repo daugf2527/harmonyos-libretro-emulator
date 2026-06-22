@@ -408,8 +408,9 @@ struct LibraryPage {
   }
 
   private async finishPullRefresh(): Promise<void> {
+    const refreshToken = this.libraryRefreshToken + 1
     await this.refreshLibraryGames(true)
-    if (!this.pageActive) {
+    if (!this.isCurrentLibraryRefresh(refreshToken)) {
       return
     }
     this.refreshing = false
@@ -591,6 +592,9 @@ struct LibraryPage {
     try {
       await deleteImportedRomFile(context, item.romFile)
     } catch (err) {
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryPage', 'Delete', `删除文件失败: ${message}`)
       // 使用错误码提供具体错误信息
@@ -763,6 +767,9 @@ struct LibraryPage {
         target.fileName,
         () => this.isCurrentPageAction(actionToken)
       )
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
       if (result.cancelled) {
         return
       }
