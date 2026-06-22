@@ -7,6 +7,7 @@ interface RuntimeDiskControlNapi {
   refactoredDiskControlGetImageIndex(): number
   refactoredDiskControlSetImageIndex(index: number): boolean
   refactoredDiskControlGetNumImages(): number
+  refactoredDiskControlGetSnapshotAsync(): Promise<RuntimeDiskControlSnapshot>
   refactoredDiskControlReplaceImageIndex(index: number, path: string): boolean
   refactoredDiskControlAddImageIndex(): boolean
 }
@@ -20,22 +21,17 @@ export interface RuntimeDiskControlSnapshot {
 const nativeApi = testNapi as RuntimeDiskControlNapi
 
 export class RuntimeDiskControlController {
-  getSnapshot(): RuntimeDiskControlSnapshot {
+  async getSnapshotAsync(): Promise<RuntimeDiskControlSnapshot> {
+    if (!testNapi) {
+      return this.emptySnapshot()
+    }
     try {
-      if (!testNapi) {
-        return this.emptySnapshot()
-      }
-
-      const imageCount = this.normalizeNonNegativeInt(
-        nativeApi.refactoredDiskControlGetNumImages()
-      )
-      const imageIndex = this.normalizeIndex(
-        nativeApi.refactoredDiskControlGetImageIndex(),
-        imageCount
-      )
+      const snapshot = await nativeApi.refactoredDiskControlGetSnapshotAsync()
+      const imageCount = this.normalizeNonNegativeInt(snapshot.imageCount)
+      const imageIndex = this.normalizeIndex(snapshot.imageIndex, imageCount)
 
       return {
-        ejected: nativeApi.refactoredDiskControlGetEjectState() === true,
+        ejected: snapshot.ejected === true,
         imageIndex,
         imageCount
       }

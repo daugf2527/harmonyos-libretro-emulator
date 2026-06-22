@@ -251,6 +251,7 @@ struct LibretroGamePage {
   private runtimeSramManagerTaskToken: number = 0;
   private runtimeCheatManagerTaskToken: number = 0;
   private runtimeDiskControlTaskToken: number = 0;
+  private runtimeDiskControlSnapshotToken: number = 0;
   private runtimeStatusSnapshotTaskToken: number = 0;
   private lastStartOrSwitchAtMs: number = 0;
   private readonly librarySessionTracker: RuntimeLibrarySessionTracker = new RuntimeLibrarySessionTracker();
@@ -1659,6 +1660,7 @@ struct LibretroGamePage {
 
   private resetRuntimeDiskControlState(): void {
     this.runtimeDiskControlTaskToken += 1;
+    this.runtimeDiskControlSnapshotToken += 1;
     this.diskControlSupported = false;
     this.diskControlType = '';
     this.diskControlImageCount = 0;
@@ -1673,22 +1675,34 @@ struct LibretroGamePage {
       return;
     }
 
-    const snapshot = runtimeDiskControlController.getSnapshot();
-    this.diskControlImageCount = snapshot.imageCount;
-    this.diskControlImageIndex = snapshot.imageIndex;
-    this.diskControlEjected = snapshot.ejected;
+    const token = this.runtimeDiskControlSnapshotToken + 1;
+    this.runtimeDiskControlSnapshotToken = token;
+    void runtimeDiskControlController.getSnapshotAsync().then((snapshot) => {
+      if (!this.pageActive || token !== this.runtimeDiskControlSnapshotToken) {
+        return;
+      }
+      this.diskControlImageCount = snapshot.imageCount;
+      this.diskControlImageIndex = snapshot.imageIndex;
+      this.diskControlEjected = snapshot.ejected;
 
-    const modeText = this.diskControlType === 'ext'
-      ? '扩展接口'
-      : (this.diskControlType === 'basic' ? '基础接口' : '已接入');
-    const imageText = snapshot.imageCount > 0
-      ? `当前 ${snapshot.imageIndex + 1}/${snapshot.imageCount} 张`
-      : '当前未报告磁盘映像';
-    const ejectText = snapshot.ejected ? '磁盘已弹出' : '磁盘已插入';
-    const statusText = `换盘接口 ${modeText} | ${imageText} | ${ejectText}`;
-    this.diskControlStatusText = statusPrefix.length > 0
-      ? `${statusPrefix} · ${statusText}`
-      : statusText;
+      const modeText = this.diskControlType === 'ext'
+        ? '扩展接口'
+        : (this.diskControlType === 'basic' ? '基础接口' : '已接入');
+      const imageText = snapshot.imageCount > 0
+        ? `当前 ${snapshot.imageIndex + 1}/${snapshot.imageCount} 张`
+        : '当前未报告磁盘映像';
+      const ejectText = snapshot.ejected ? '磁盘已弹出' : '磁盘已插入';
+      const statusText = `换盘接口 ${modeText} | ${imageText} | ${ejectText}`;
+      this.diskControlStatusText = statusPrefix.length > 0
+        ? `${statusPrefix} · ${statusText}`
+        : statusText;
+    }).catch((err: Error) => {
+      if (!this.pageActive || token !== this.runtimeDiskControlSnapshotToken) {
+        return;
+      }
+      this.diskControlStatusText = statusPrefix.length > 0 ? statusPrefix : '读取换盘状态失败';
+      LogHelper.warn('LibretroGame', 'Disk', `读取运行态换盘快照失败: ${err.message || String(err)}`);
+    });
   }
 
   private handleRuntimeDiskToggleEject(): void {

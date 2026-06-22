@@ -26,6 +26,14 @@ void EnsureDiskErrorIfEmpty(const char *reason, const char *step,
 
 } // namespace
 
+struct DiskControlSnapshotAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  bool ejected = false;
+  unsigned imageIndex = 0;
+  unsigned imageCount = 0;
+};
+
 static napi_value DiskControlSetEjectState(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
@@ -92,6 +100,132 @@ static napi_value DiskControlGetNumImages(napi_env env, napi_callback_info info)
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+static void ExecuteDiskControlGetSnapshotAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<DiskControlSnapshotAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  ctx->imageCount = engine->DiskControlGetNumImages();
+  ctx->imageIndex = engine->DiskControlGetImageIndex();
+  ctx->ejected = engine->DiskControlGetEjectState();
+}
+
+static void CompleteDiskControlGetSnapshotAsync(napi_env env, napi_status status,
+                                                void *data) {
+  auto *ctx = static_cast<DiskControlSnapshotAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] DiskControlGetSnapshotAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetDiskError("disk_snapshot_async_work_failed", "DiskControlGetSnapshotAsync",
+                 "Async disk snapshot completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    napi_value result = MakeObject(env);
+    if (result &&
+        SetNamedPropertyChecked(env, result, "ejected", MakeBool(env, ctx->ejected)) &&
+        SetNamedPropertyChecked(env, result, "imageIndex",
+                                MakeUint32(env, ctx->imageIndex)) &&
+        SetNamedPropertyChecked(env, result, "imageCount",
+                                MakeUint32(env, ctx->imageCount))) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value DiskControlGetSnapshotAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  napi_deferred deferred = nullptr;
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &deferred, &promise) != napi_ok || !deferred) {
+    SetDiskError("disk_snapshot_async_create_failed", "DiskControlGetSnapshotAsync",
+                 "Failed to create promise for async disk snapshot");
+    return nullptr;
+  }
+
+  auto *ctx = new (std::nothrow) DiskControlSnapshotAsyncContext();
+  if (!ctx) {
+    SetDiskError("disk_snapshot_async_alloc_failed", "DiskControlGetSnapshotAsync",
+                 "Failed to allocate async disk snapshot context");
+    napi_value reason = MakeString(env, "DiskControlGetSnapshotAsync alloc failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, deferred, reason);
+    }
+    return promise;
+  }
+  ctx->deferred = deferred;
+
+  napi_value resourceName = MakeString(env, "DiskControlGetSnapshotAsync");
+  if (!resourceName) {
+    SetDiskError("disk_snapshot_async_resource_name_failed",
+                 "DiskControlGetSnapshotAsync",
+                 "Failed to create async resource name");
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_status createStatus =
+      napi_create_async_work(env, nullptr, resourceName,
+                             ExecuteDiskControlGetSnapshotAsync,
+                             CompleteDiskControlGetSnapshotAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetDiskError("disk_snapshot_async_create_failed", "DiskControlGetSnapshotAsync",
+                 "Failed to create async work for disk snapshot");
+    napi_value reason = MakeString(env, "DiskControlGetSnapshotAsync create failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, deferred, reason);
+    }
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    SetDiskError("disk_snapshot_async_queue_failed", "DiskControlGetSnapshotAsync",
+                 "Failed to queue async work for disk snapshot");
+    napi_value reason = MakeString(env, "DiskControlGetSnapshotAsync queue failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, deferred, reason);
+    }
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value DiskControlReplaceImageIndex(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
@@ -144,6 +278,7 @@ void RegisterDiskNapi(napi_env env, napi_value exports) {
       {"refactoredDiskControlGetImageIndex", nullptr, DiskControlGetImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredDiskControlSetImageIndex", nullptr, DiskControlSetImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredDiskControlGetNumImages", nullptr, DiskControlGetNumImages, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlGetSnapshotAsync", nullptr, DiskControlGetSnapshotAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredDiskControlReplaceImageIndex", nullptr, DiskControlReplaceImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredDiskControlAddImageIndex", nullptr, DiskControlAddImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
