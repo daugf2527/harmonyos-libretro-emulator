@@ -130,6 +130,7 @@ struct RomManagerPage {
 
   aboutToDisappear(): void {
     this.pageActive = false
+    this.importCancelRequested = true
     this.pageActionToken += 1
     if (this.toastTimer !== -1) {
       clearTimeout(this.toastTimer)
@@ -336,7 +337,7 @@ struct RomManagerPage {
         },
         {
           overwriteExisting: false,
-          shouldCancel: () => this.importCancelRequested
+          shouldCancel: () => this.importCancelRequested || !this.isCurrentPageAction(actionToken)
         }
       )
 
