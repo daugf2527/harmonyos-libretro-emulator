@@ -200,6 +200,7 @@ struct LibretroNewArchTestPage {
   private inputDebugTimer: number = -1;
   private pageActive: boolean = false;
   private engineActionToken: number = 0;
+  private coreOptionsRefreshToken: number = 0;
   private uiTouchCount: number = 0;
   private uiMouseCount: number = 0;
   private uiKeyCount: number = 0;
@@ -529,6 +530,7 @@ struct LibretroNewArchTestPage {
   aboutToDisappear() {
     this.pageActive = false;
     this.engineActionToken += 1;
+    this.coreOptionsRefreshToken += 1;
     if (this.eventScope) {
       this.eventScope.dispose();
       this.eventScope = undefined;
@@ -552,6 +554,15 @@ struct LibretroNewArchTestPage {
 
   private isCurrentEngineAction(token: number): boolean {
     return this.pageActive && token === this.engineActionToken;
+  }
+
+  private beginCoreOptionsRefresh(): number {
+    this.coreOptionsRefreshToken += 1;
+    return this.coreOptionsRefreshToken;
+  }
+
+  private isCurrentCoreOptionsRefresh(token: number): boolean {
+    return this.pageActive && token === this.coreOptionsRefreshToken;
   }
 
   private refreshInputDevices() {
@@ -702,8 +713,9 @@ struct LibretroNewArchTestPage {
   }
 
   async refreshCoreOptions(): Promise<void> {
+    const refreshToken = this.beginCoreOptionsRefresh();
     const nextOptions = await this.getCoreOptions();
-    if (!this.pageActive) {
+    if (!this.isCurrentCoreOptionsRefresh(refreshToken)) {
       return;
     }
     this.coreOptions = nextOptions;
