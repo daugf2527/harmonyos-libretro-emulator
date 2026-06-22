@@ -219,8 +219,8 @@ static napi_value GetSRAM(napi_env env, napi_callback_info info) {
   std::vector<uint8_t> data;
   bool ok = GetEngine()->GetSRAM(data);
   if (!ok || data.empty()) {
-    SetStateError("get_sram_failed", "GetSRAM",
-                  "SRAM snapshot is unavailable in current core state");
+    EnsureStateErrorIfEmpty("get_sram_failed", "GetSRAM",
+                            "SRAM snapshot is unavailable in current core state");
     return MakeNull(env);
   }
   napi_value arrayBuffer =
@@ -253,8 +253,8 @@ static napi_value SetSRAM(napi_env env, napi_callback_info info) {
                                  static_cast<uint8_t *>(data) + length);
   bool ok = GetEngine()->SetSRAM(sramData);
   if (!ok) {
-    SetStateError("set_sram_failed", "SetSRAM",
-                  "Core rejected the provided SRAM data");
+    EnsureStateErrorIfEmpty("set_sram_failed", "SetSRAM",
+                            "Core rejected the provided SRAM data");
   }
 
   return MakeBool(env, ok);
@@ -396,8 +396,8 @@ static void CompleteSaveStateAsync(napi_env env, napi_status status, void *data)
       (void)RejectDeferredChecked(env, ctx->deferred, reason);
     }
   } else if (!ctx->ok || ctx->data.empty()) {
-    SetStateError("save_state_failed", "SaveStateAsync",
-                  "Save-state serialization returned no data");
+    EnsureStateErrorIfEmpty("save_state_failed", "SaveStateAsync",
+                            "Save-state serialization returned no data");
     napi_value reason = MakeString(env, "SaveState failed");
     if (reason) {
       (void)RejectDeferredChecked(env, ctx->deferred, reason);
@@ -555,8 +555,9 @@ static void CompleteSaveStateBundleAsync(napi_env env, napi_status status,
       (void)RejectDeferredChecked(env, ctx->deferred, reason);
     }
   } else if (!ctx->ok || ctx->bundle.stateData.empty()) {
-    SetStateError("save_state_bundle_failed", "SaveStateBundleAsync",
-                  "Save-state bundle capture returned no state data");
+    EnsureStateErrorIfEmpty("save_state_bundle_failed",
+                            "SaveStateBundleAsync",
+                            "Save-state bundle capture returned no state data");
     napi_value reason = MakeString(env, "SaveStateBundle failed");
     if (reason) {
       (void)RejectDeferredChecked(env, ctx->deferred, reason);
