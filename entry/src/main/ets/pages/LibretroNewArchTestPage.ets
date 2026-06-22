@@ -687,7 +687,11 @@ struct LibretroNewArchTestPage {
   }
 
   async refreshCoreOptions(): Promise<void> {
-    this.coreOptions = await this.getCoreOptions();
+    const nextOptions = await this.getCoreOptions();
+    if (!this.pageActive) {
+      return;
+    }
+    this.coreOptions = nextOptions;
     this.log('刷新选项完成');
   }
 

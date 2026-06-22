@@ -1400,6 +1400,9 @@ struct TestGambatte {
   private async refreshRomList(): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) {
+      if (!this.pageActive) {
+        return;
+      }
       this.roms = this.buildRomConfigs([]);
       this.updateRomOptions();
       return;
@@ -1417,6 +1420,9 @@ struct TestGambatte {
       LogHelper.error('TestGambatte', 'ROM', `扫描 ROM 列表失败: ${msg}`);
     }
 
+    if (!this.pageActive) {
+      return;
+    }
     this.roms = this.buildRomConfigs(files);
     this.updateRomOptions();
     
