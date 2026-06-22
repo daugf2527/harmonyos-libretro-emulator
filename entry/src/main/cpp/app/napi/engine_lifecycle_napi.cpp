@@ -1427,18 +1427,24 @@ static napi_value ResetEngine(napi_env env, napi_callback_info info) {
 static napi_value PauseEngine(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] PauseEngine called");
-  GetEngine()->Pause();
-
-  return MakeBool(env, true);
+  const bool ok = GetEngine()->Pause();
+  if (!ok) {
+    EnsureLastErrorIfEmpty("pause_failed", "PauseEngine",
+                           "Pause() returned false");
+  }
+  return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
 static napi_value ResumeEngine(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] ResumeEngine called");
-  GetEngine()->Resume();
-
-  return MakeBool(env, true);
+  const bool ok = GetEngine()->Resume();
+  if (!ok) {
+    EnsureLastErrorIfEmpty("resume_failed", "ResumeEngine",
+                           "Resume() returned false");
+  }
+  return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 

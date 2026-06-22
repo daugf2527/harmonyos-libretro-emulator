@@ -153,8 +153,8 @@ public:
   // --- 控制接口 (由 UI/JS 线程调用) ---
   bool Start();
   bool Stop();
-  void Pause();
-  void Resume();
+  bool Pause();
+  bool Resume();
   void Cancel();
 
   /**

@@ -690,16 +690,24 @@ void LibretroEngine::UnloadGameIfNeeded(const char *reason) {
   envState_.ClearInputDescriptorMask();
 }
 
-void LibretroEngine::Pause() {
+bool LibretroEngine::Pause() {
   if (!messageQueue_.Push({MessageType::Pause, {}})) {
     LOGF(LOG_WARN, "[NEW] Pause dropped: message queue closed");
+    SetLastErrorInfo("pause_dispatch_failed", "Pause",
+                     "message queue closed before pause dispatch");
+    return false;
   }
+  return true;
 }
 
-void LibretroEngine::Resume() {
+bool LibretroEngine::Resume() {
   if (!messageQueue_.Push({MessageType::Resume, {}})) {
     LOGF(LOG_WARN, "[NEW] Resume dropped: message queue closed");
+    SetLastErrorInfo("resume_dispatch_failed", "Resume",
+                     "message queue closed before resume dispatch");
+    return false;
   }
+  return true;
 }
 
 void LibretroEngine::Cancel() {
