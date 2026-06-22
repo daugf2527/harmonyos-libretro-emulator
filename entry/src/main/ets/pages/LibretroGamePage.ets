@@ -1872,7 +1872,7 @@ struct LibretroGamePage {
     if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(true)) {
       return '替换磁盘失败：当前磁盘无法弹出';
     }
-    if (!runtimeDiskControlController.replaceImageIndex(index, imagePath)) {
+    if (!await runtimeDiskControlController.replaceImageIndexAsync(index, imagePath)) {
       if (restoreInserted) {
         await runtimeDiskControlController.setEjectStateAsync(false);
       }
@@ -1892,7 +1892,7 @@ struct LibretroGamePage {
     if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(true)) {
       return '新增磁盘失败：当前磁盘无法弹出';
     }
-    if (!runtimeDiskControlController.addImageIndex()) {
+    if (!await runtimeDiskControlController.addImageIndexAsync()) {
       if (restoreInserted) {
         await runtimeDiskControlController.setEjectStateAsync(false);
       }
@@ -1901,7 +1901,7 @@ struct LibretroGamePage {
 
     const snapshot = await runtimeDiskControlController.getSnapshotAsync();
     const targetIndex = snapshot.imageCount > 0 ? snapshot.imageCount - 1 : this.diskControlImageCount;
-    if (!runtimeDiskControlController.replaceImageIndex(targetIndex, imagePath)) {
+    if (!await runtimeDiskControlController.replaceImageIndexAsync(targetIndex, imagePath)) {
       if (restoreInserted) {
         await runtimeDiskControlController.setEjectStateAsync(false);
       }

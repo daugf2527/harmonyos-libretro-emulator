@@ -11,7 +11,9 @@ interface RuntimeDiskControlNapi {
   refactoredDiskControlGetNumImages(): number
   refactoredDiskControlGetSnapshotAsync(): Promise<RuntimeDiskControlSnapshot>
   refactoredDiskControlReplaceImageIndex(index: number, path: string): boolean
+  refactoredDiskControlReplaceImageIndexAsync(index: number, path: string): Promise<boolean>
   refactoredDiskControlAddImageIndex(): boolean
+  refactoredDiskControlAddImageIndexAsync(): Promise<boolean>
 }
 
 export interface RuntimeDiskControlSnapshot {
@@ -126,6 +128,28 @@ export class RuntimeDiskControlController {
     }
   }
 
+  async replaceImageIndexAsync(index: number, path: string): Promise<boolean> {
+    const safePath = typeof path === 'string' ? path.trim() : ''
+    if (safePath.length === 0) {
+      LogHelper.warn('RuntimeDiskControl', 'Engine', '替换磁盘失败: path 为空')
+      return false
+    }
+    try {
+      if (!testNapi) {
+        LogHelper.warn('RuntimeDiskControl', 'Engine', '替换磁盘跳过: engine not ready')
+        return false
+      }
+      return await nativeApi.refactoredDiskControlReplaceImageIndexAsync(
+        this.normalizeNonNegativeInt(index),
+        safePath
+      )
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeDiskControl', 'Engine', `替换磁盘失败: ${message}`)
+      return false
+    }
+  }
+
   addImageIndex(): boolean {
     try {
       if (!testNapi) {
@@ -133,6 +157,20 @@ export class RuntimeDiskControlController {
         return false
       }
       return nativeApi.refactoredDiskControlAddImageIndex()
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeDiskControl', 'Engine', `新增磁盘失败: ${message}`)
+      return false
+    }
+  }
+
+  async addImageIndexAsync(): Promise<boolean> {
+    try {
+      if (!testNapi) {
+        LogHelper.warn('RuntimeDiskControl', 'Engine', '新增磁盘跳过: engine not ready')
+        return false
+      }
+      return await nativeApi.refactoredDiskControlAddImageIndexAsync()
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeDiskControl', 'Engine', `新增磁盘失败: ${message}`)

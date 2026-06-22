@@ -149,7 +149,9 @@ export interface DiskControlSnapshot {
 }
 export const refactoredDiskControlGetSnapshotAsync: () => Promise<DiskControlSnapshot>;
 export const refactoredDiskControlReplaceImageIndex: (index: number, path: string) => boolean;
+export const refactoredDiskControlReplaceImageIndexAsync: (index: number, path: string) => Promise<boolean>;
 export const refactoredDiskControlAddImageIndex: () => boolean;
+export const refactoredDiskControlAddImageIndexAsync: () => Promise<boolean>;
 
 // Cheat
 export const refactoredCheatReset: () => boolean;

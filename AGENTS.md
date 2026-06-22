@@ -217,7 +217,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredSetAudioSyncMode` | `(mode: number) => boolean` | sync | 音频同步模式 0=NonBlocking/1=Blocking |
 | `refactoredSetAudioVolume` | `(percent: number) => boolean` | sync | 设置主音量百分比 0-100 |
 
-### 磁盘控制 (10) — engine_disk_napi.cpp
+### 磁盘控制 (12) — engine_disk_napi.cpp
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
@@ -230,7 +230,9 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredDiskControlGetNumImages` | `() => number` | sync | 磁盘映像总数 |
 | `refactoredDiskControlGetSnapshotAsync` | `() => Promise<{ejected:boolean,imageIndex:number,imageCount:number}>` | async | 异步读取换盘状态快照，避免 UI 线程串行同步查询 |
 | `refactoredDiskControlReplaceImageIndex` | `(index: number, path: string) => boolean` | sync | 替换指定索引映像 |
+| `refactoredDiskControlReplaceImageIndexAsync` | `(index: number, path: string) => Promise<boolean>` | async | 异步替换指定索引映像，避免 UI 线程同步等待 |
 | `refactoredDiskControlAddImageIndex` | `() => boolean` | sync | 新增磁盘映像槽位 |
+| `refactoredDiskControlAddImageIndexAsync` | `() => Promise<boolean>` | async | 异步新增磁盘映像槽位，避免 UI 线程同步等待 |
 
 ### 查询/统计/诊断 (13) — engine_query_napi.cpp
 

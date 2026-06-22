@@ -48,6 +48,20 @@ struct DiskControlSetImageIndexAsyncContext {
   bool ok = false;
 };
 
+struct DiskControlReplaceImageIndexAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  unsigned index = 0;
+  std::string path;
+  bool ok = false;
+};
+
+struct DiskControlAddImageIndexAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  bool ok = false;
+};
+
 static napi_value DiskControlSetEjectState(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
@@ -487,6 +501,140 @@ static napi_value DiskControlGetSnapshotAsync(napi_env env, napi_callback_info i
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+static void ExecuteDiskControlReplaceImageIndexAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<DiskControlReplaceImageIndexAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  ctx->ok = engine->DiskControlReplaceImageIndex(ctx->index, ctx->path);
+}
+
+static void CompleteDiskControlReplaceImageIndexAsync(napi_env env, napi_status status,
+                                                      void *data) {
+  auto *ctx = static_cast<DiskControlReplaceImageIndexAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] DiskControlReplaceImageIndexAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetDiskError("disk_replace_image_async_work_failed", "DiskControlReplaceImageIndexAsync",
+                 "Async disk replace-image completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    if (!ctx->ok) {
+      EnsureDiskErrorIfEmpty("disk_replace_image_failed", "DiskControlReplaceImageIndexAsync",
+                             "Core rejected the requested disk image replacement");
+    }
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value DiskControlReplaceImageIndexAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[2];
+  if (!GetArgs(env, info, 2, 2, args, &argc, "DiskControlReplaceImageIndexAsync")) {
+    return MakeResolvedPromise(env, false);
+  }
+  int32_t index = 0;
+  char path[1024];
+  if (!GetInt32Arg(env, args[0], index, "DiskControlReplaceImageIndexAsync", "index") ||
+      !GetStringArg(env, args[1], path, sizeof(path), "DiskControlReplaceImageIndexAsync", "path")) {
+    return MakeResolvedPromise(env, false);
+  }
+  if (index < 0) {
+    SetDiskError("disk_image_index_invalid", "DiskControlReplaceImageIndexAsync",
+                 "Disk image index must be non-negative");
+    return MakeResolvedPromise(env, false);
+  }
+  if (!security::ValidateDiskImagePath(path)) {
+    GetEngine()->SetLastErrorInfo("disk_image_path_rejected",
+                                  "DiskControlReplaceImageIndexAsync",
+                                  "Disk image path is outside allowed directories");
+    return MakeResolvedPromise(env, false);
+  }
+
+  auto *ctx = new DiskControlReplaceImageIndexAsyncContext();
+  ctx->index = static_cast<unsigned>(index);
+  ctx->path = path;
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "DiskControlReplaceImageIndexAsync");
+  if (!resourceName) {
+    SetDiskError("disk_replace_image_async_create_failed", "DiskControlReplaceImageIndexAsync",
+                 "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteDiskControlReplaceImageIndexAsync,
+      CompleteDiskControlReplaceImageIndexAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetDiskError("disk_replace_image_async_create_failed", "DiskControlReplaceImageIndexAsync",
+                 "Failed to create async disk replace-image work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetDiskError("disk_replace_image_async_queue_failed", "DiskControlReplaceImageIndexAsync",
+                 "Failed to queue async disk replace-image work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value DiskControlReplaceImageIndex(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
@@ -521,6 +669,115 @@ static napi_value DiskControlReplaceImageIndex(napi_env env, napi_callback_info 
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+static void ExecuteDiskControlAddImageIndexAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<DiskControlAddImageIndexAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  ctx->ok = engine->DiskControlAddImageIndex();
+}
+
+static void CompleteDiskControlAddImageIndexAsync(napi_env env, napi_status status,
+                                                  void *data) {
+  auto *ctx = static_cast<DiskControlAddImageIndexAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] DiskControlAddImageIndexAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetDiskError("disk_add_image_async_work_failed", "DiskControlAddImageIndexAsync",
+                 "Async disk add-image completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    if (!ctx->ok) {
+      EnsureDiskErrorIfEmpty("disk_add_image_failed", "DiskControlAddImageIndexAsync",
+                             "Core rejected the request to add a disk image slot");
+    }
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value DiskControlAddImageIndexAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new DiskControlAddImageIndexAsyncContext();
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "DiskControlAddImageIndexAsync");
+  if (!resourceName) {
+    SetDiskError("disk_add_image_async_create_failed", "DiskControlAddImageIndexAsync",
+                 "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteDiskControlAddImageIndexAsync,
+      CompleteDiskControlAddImageIndexAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetDiskError("disk_add_image_async_create_failed", "DiskControlAddImageIndexAsync",
+                 "Failed to create async disk add-image work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetDiskError("disk_add_image_async_queue_failed", "DiskControlAddImageIndexAsync",
+                 "Failed to queue async disk add-image work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value DiskControlAddImageIndex(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   bool ok = GetEngine()->DiskControlAddImageIndex();
@@ -543,7 +800,9 @@ void RegisterDiskNapi(napi_env env, napi_value exports) {
       {"refactoredDiskControlGetNumImages", nullptr, DiskControlGetNumImages, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredDiskControlGetSnapshotAsync", nullptr, DiskControlGetSnapshotAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredDiskControlReplaceImageIndex", nullptr, DiskControlReplaceImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlReplaceImageIndexAsync", nullptr, DiskControlReplaceImageIndexAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredDiskControlAddImageIndex", nullptr, DiskControlAddImageIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredDiskControlAddImageIndexAsync", nullptr, DiskControlAddImageIndexAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   if (regStatus != napi_ok) {
