@@ -2736,24 +2736,30 @@ bool LibretroEngine::DiskControlSetEjectState(bool ejected) {
 }
 
 bool LibretroEngine::DiskControlGetEjectState() {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlGetEjectState",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, &ok]() { ok = diskController_->IsEjected(); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlGetEjectState")) {
     return false;
   }
   return ok;
 }
 
 unsigned LibretroEngine::DiskControlGetImageIndex() {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlGetImageIndex",
+                     "Disk controller is unavailable");
     return 0;
+  }
   unsigned result = 0;
   if (!ExecuteSyncTask(
           [this, &result]() { result = diskController_->GetImageIndex(); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlGetImageIndex")) {
     return 0;
   }
   return result;
@@ -2772,12 +2778,15 @@ bool LibretroEngine::DiskControlSetImageIndex(unsigned index) {
 }
 
 unsigned LibretroEngine::DiskControlGetNumImages() {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlGetNumImages",
+                     "Disk controller is unavailable");
     return 0;
+  }
   unsigned result = 0;
   if (!ExecuteSyncTask(
           [this, &result]() { result = diskController_->GetNumImages(); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlGetNumImages")) {
     return 0;
   }
   return result;
