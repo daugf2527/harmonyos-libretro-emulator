@@ -93,6 +93,7 @@ struct ImportEntryPage {
   @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private scanTimer: number = -1
   private pageActive: boolean = false
+  private importTaskToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('library')
   private foldDisplayModeListener: (mode: display.FoldDisplayMode) => void = (mode: display.FoldDisplayMode) => {
     this.foldDisplayMode = mode
@@ -129,6 +130,7 @@ struct ImportEntryPage {
 
   aboutToDisappear(): void {
     this.pageActive = false
+    this.importTaskToken += 1
     this.stopScan()
     try {
       display.off('foldDisplayModeChange', this.foldDisplayModeListener)
@@ -144,6 +146,15 @@ struct ImportEntryPage {
     }
   }
 
+  private beginImportTask(): number {
+    this.importTaskToken += 1
+    return this.importTaskToken
+  }
+
+  private isCurrentImportTask(token: number): boolean {
+    return this.pageActive && token === this.importTaskToken
+  }
+
   private startImport(): void {
     if (this.isScanning) {
       return
@@ -153,11 +164,12 @@ struct ImportEntryPage {
     this.scanStatusText = '等待选择文件...'
     this.particleBoosted = true
     this.stopScan()
-    void this.finishImportFlow()
+    const token = this.beginImportTask()
+    void this.finishImportFlow(token)
   }
 
-  private async finishImportFlow(): Promise<void> {
-    if (!this.pageActive) {
+  private async finishImportFlow(token: number): Promise<void> {
+    if (!this.isCurrentImportTask(token)) {
       return
     }
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
@@ -168,7 +180,7 @@ struct ImportEntryPage {
 
     try {
       const uris = await pickRomUris(context)
-      if (!this.pageActive) {
+      if (!this.isCurrentImportTask(token)) {
         return
       }
       this.isScanning = false
@@ -184,7 +196,7 @@ struct ImportEntryPage {
         LogHelper.error('ImportEntryPage', 'Route', `pushUrl failed: ${err.message}`)
       })
     } catch (err) {
-      if (!this.pageActive) {
+      if (!this.isCurrentImportTask(token)) {
         return
       }
       const message = (err as Error).message || String(err)
