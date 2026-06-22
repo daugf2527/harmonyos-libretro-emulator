@@ -576,6 +576,7 @@ struct SettingsPage {
   }
 
   private async toggleHideVirtualController(): Promise<void> {
+    const token = this.beginRefresh()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
       this.setRuntimeApplyStatus('虚拟手柄显示', false)
@@ -589,20 +590,21 @@ struct SettingsPage {
     }
     try {
       const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
-      // D017: await 后页面可能已销毁(用户点 toggle 后立即退出),写 @State
-      // inputPreferences 前检查 pageActive,与同页 refreshPageData/persistRenderProfile
-      // 的 token 守卫范式一致(此处用 pageActive)。
-      if (!this.pageActive) {
+      if (!this.isCurrentRefresh(token)) {
         return
       }
       this.inputPreferences = saved
       this.setRuntimeApplyStatus('虚拟手柄显示', true)
     } catch (_err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
       this.setRuntimeApplyStatus('虚拟手柄显示', false)
     }
   }
 
   private async toggleHideUndeclaredKeys(): Promise<void> {
+    const token = this.beginRefresh()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
       this.setRuntimeApplyStatus('按 core 隐藏未声明键', false)
@@ -616,13 +618,15 @@ struct SettingsPage {
     }
     try {
       const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
-      // D017: 同 toggleHideVirtualController,await 后写 @Local 前检查 pageActive。
-      if (!this.pageActive) {
+      if (!this.isCurrentRefresh(token)) {
         return
       }
       this.inputPreferences = saved
       this.setRuntimeApplyStatus('按 core 隐藏未声明键', true)
     } catch (_err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
       this.setRuntimeApplyStatus('按 core 隐藏未声明键', false)
     }
   }
