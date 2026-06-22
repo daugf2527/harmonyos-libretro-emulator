@@ -2683,7 +2683,28 @@ void LibretroEngine::SetSoftwareMaxResolution(unsigned maxWidth,
 
 bool LibretroEngine::SetCoreOption(const std::string &key,
                                    const std::string &value) {
-  return envState_.SetCoreOptionValue(key.c_str(), value.c_str());
+  const auto defs = envState_.GetCoreOptionDefinitions();
+  const auto it = std::find_if(defs.begin(), defs.end(),
+                               [&key](const auto &def) { return def.key == key; });
+  if (it == defs.end()) {
+    SetLastErrorInfo("core_option_key_unknown", "SetCoreOption",
+                     "Requested core option key is not registered");
+    return false;
+  }
+  const auto valueIt = std::find_if(
+      it->values.begin(), it->values.end(),
+      [&value](const auto &candidate) { return candidate.value == value; });
+  if (valueIt == it->values.end()) {
+    SetLastErrorInfo("core_option_value_invalid", "SetCoreOption",
+                     "Requested core option value is not allowed");
+    return false;
+  }
+  const bool ok = envState_.SetCoreOptionValue(key.c_str(), value.c_str());
+  if (!ok) {
+    SetLastErrorInfo("core_option_apply_failed", "SetCoreOption",
+                     "Core option update could not be applied");
+  }
+  return ok;
 }
 
 std::string LibretroEngine::GetCoreOptionsJson() const {

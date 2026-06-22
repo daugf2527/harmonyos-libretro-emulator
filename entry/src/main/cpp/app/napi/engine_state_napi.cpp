@@ -345,8 +345,8 @@ static napi_value SetCoreOption(napi_env env, napi_callback_info info) {
   }
   bool ok = GetEngine()->SetCoreOption(key, val);
   if (!ok) {
-    SetStateError("core_option_set_failed", "SetCoreOption",
-                  "Core rejected the requested option update");
+    EnsureStateErrorIfEmpty("core_option_set_failed", "SetCoreOption",
+                            "Core rejected the requested option update");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)

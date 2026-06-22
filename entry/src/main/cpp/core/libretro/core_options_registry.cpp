@@ -3,11 +3,20 @@
 #include "env_dispatcher.h"
 #include "common/config/file_configuration.h"
 
+#include <hilog/log.h>
 #include <cctype>
 #include <map>
 #include <mutex>
 #include <string>
 #include <utility>
+
+#undef LOG_DOMAIN
+#define LOG_DOMAIN 0xD003
+#undef LOG_TAG
+#define LOG_TAG "CoreOptions"
+#undef LOG_FLOW
+#define LOG_FLOW "Options"
+#include "common/log_prefix.h"
 
 namespace libretro {
 namespace core_options {
@@ -214,13 +223,21 @@ bool SetCoreOptionValue(EnvState &state, const char *key, const char *value) {
   const auto defsSnapshot = state.GetCoreOptionDefinitions();
   const CoreOptionDefinition *def = FindDefinitionByKey(defsSnapshot, key);
   if (!def) {
+    LOGF(LOG_WARN, "[NEW] SetCoreOptionValue rejected: unknown key=%{public}s",
+         key);
     return false;
   }
   if (!HasValue(def->values, value)) {
+    LOGF(LOG_WARN,
+         "[NEW] SetCoreOptionValue rejected: invalid value key=%{public}s value=%{public}s",
+         key, value);
     return false;
   }
 
   if (!state.SetVariable(key, value)) {
+    LOGF(LOG_WARN,
+         "[NEW] SetCoreOptionValue rejected: SetVariable failed for key=%{public}s",
+         key);
     return false;
   }
 
