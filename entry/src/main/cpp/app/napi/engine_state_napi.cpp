@@ -688,8 +688,8 @@ static void CompleteLoadStateAsync(napi_env env, napi_status status, void *data)
   } else {
     if (!ctx->ok) {
       LOGF(LOG_WARN, "[NEW] LoadStateAsync completed with failure: ok=false");
-      SetStateError("load_state_failed", "LoadStateAsync",
-                    "Core rejected the provided save-state data");
+      EnsureStateErrorIfEmpty("load_state_failed", "LoadStateAsync",
+                              "Core rejected the provided save-state data");
     }
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {

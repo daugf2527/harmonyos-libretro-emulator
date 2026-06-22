@@ -63,8 +63,8 @@ static napi_value WaitForEngineState(napi_env env, napi_callback_info info) {
       static_cast<libretro::EngineState>(stateValue),
       static_cast<uint32_t>(timeoutMs));
   if (!ok) {
-    SetQueryError("wait_for_state_failed", "WaitForEngineState",
-                  "Engine did not reach the requested state before timeout");
+    EnsureQueryErrorIfEmpty("wait_for_state_failed", "WaitForEngineState",
+                            "Engine did not reach the requested state before timeout");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -113,8 +113,9 @@ static void CompleteWaitForState(napi_env env, napi_status status, void *data) {
     }
   } else {
     if (!ctx->result) {
-      SetQueryError("wait_for_state_failed", "WaitForEngineStateAsync",
-                    "Engine did not reach the requested state before timeout");
+      EnsureQueryErrorIfEmpty("wait_for_state_failed",
+                              "WaitForEngineStateAsync",
+                              "Engine did not reach the requested state before timeout");
     }
     napi_value result = MakeBool(env, ctx->result);
     if (result) {
