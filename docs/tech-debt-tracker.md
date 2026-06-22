@@ -95,9 +95,9 @@
 | 引入 | 2026-05-28 / `docs/gc-code-drift-20260528-155349.md` Pattern 5 |
 | 位置 | `entry/src/main/cpp/app/napi/**`（`engine_lifecycle_napi.cpp` / `engine_state_napi.cpp` / `engine_input_napi.cpp` / `engine_audio_napi.cpp` / `core_loader_napi.cpp` 等;55 个 export 完整清单见 `docs/gc-code-drift-20260528-155349.md` "Pattern 5" 节) |
 | 影响 | P1 — ArkTS 端调用 `globalThis.refactoredXxx` 时 agent 找不到该 API 在哪个 .cpp 文件实现 / 参数契约怎么定;ArkTS 侧改动易踩 NAPI 边界坑(memory `feedback_napi_reviewer_no_skip`) |
-| 拟修 | 在 `AGENTS.md` 加一节 "NAPI Export Inventory",分组列出(生命周期/状态/输入/视频音频/磁盘/查询/其他)63 个 export 名 + 实现文件路径 + 签名一句话;每加新 export 必须同时更新此节(用 `scan_code_drift.sh` Pattern 5 守) |
+| 拟修 | 在 `AGENTS.md` 加一节 "NAPI Export Inventory",分组列出(生命周期/状态/输入/视频音频/磁盘/查询/其他)导出清单 + 实现文件路径 + 签名一句话；导出数量按源码实物增量维护（当前为 79 个 export，其中 77 个 `refactored*` + 2 个例外），每加新 export 必须同时更新此节(用 `scan_code_drift.sh` Pattern 5 守) |
 | 状态 | fixed |
-| 备注 | **2026-06-05 修复**（commit 0bb1aee）：实物 grep 实证为 **63 个**（非标题的 55；旧 gc 计数漏 input_mapping/core_loader 两独立模块 + 后续新增）。AGENTS.md 运行链路图节后加 NAPI Export Inventory，7 域表格，签名全部取自真值源 `index.d.ts`，修正 5 处此前二手描述偏差（testCoreLoader 同步 string / sendSensor 3 参 / getRegion·getStats·getAVInfo 返回 number·结构化对象）。`/gc` 2026-05-28 首次发现；后续靠 Pattern 5 增量守。 |
+| 备注 | **2026-06-05 修复**（commit 0bb1aee）：首次补齐 `AGENTS.md` 的 NAPI Export Inventory。**2026-06-22 更新**（commit `6b36de2`）：随多轮异步化扩展后，实物 grep 已更新为 **79 个 export**（其中 **77 个 `refactored*` + 2 个例外**）；同步修正 inventory 总数与 `engine_state_napi.cpp` 分组数，避免继续沿用 63 个的旧口径。签名真值源仍为 `entry/src/main/cpp/types/libentry/index.d.ts`，后续继续靠 Pattern 5 增量守。 |
 
 ### D007 — 30 处 @State 装饰复杂类型（V1 模式整体替换，V2 迁移时需改为 @ObservedV2+@Trace）
 
