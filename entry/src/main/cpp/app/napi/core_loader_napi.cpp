@@ -593,10 +593,26 @@ static void CompleteTestCoreLoader(napi_env env, napi_status status, void *data)
     return;
   }
 
-  // Audit T1-F6: guard napi_cancelled — reject deferred to prevent hung ArkTS Promise
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] TestCoreLoader cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
   if (status != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] TestCoreLoader work failed: status=%{public}d",
+         static_cast<int>(status));
     napi_value reason = nullptr;
     if (napi_get_undefined(env, &reason) != napi_ok) {
+      if (ctx->work) {
+        napi_delete_async_work(env, ctx->work);
+        ctx->work = nullptr;
+      }
       delete ctx;
       return;
     }
@@ -604,6 +620,10 @@ static void CompleteTestCoreLoader(napi_env env, napi_status status, void *data)
   } else {
     napi_value result = MakeString(env, ctx->resultMessage);
     if (!result) {
+      if (ctx->work) {
+        napi_delete_async_work(env, ctx->work);
+        ctx->work = nullptr;
+      }
       delete ctx;
       return;
     }
