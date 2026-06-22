@@ -27,6 +27,25 @@ void EnsureInputErrorIfEmpty(const char *reason, const char *step,
   engine->SetLastErrorInfo(reason, step, message);
 }
 
+bool IsValidInputPort(int32_t port) {
+  return port >= 0 && port < libretro::InputSnapshot::kMaxPorts;
+}
+
+bool IsValidInputSourceType(int32_t sourceType) {
+  switch (sourceType) {
+  case 0:
+  case 1:
+  case 2:
+  case 3:
+  case 4:
+  case 5:
+  case 6:
+    return true;
+  default:
+    return false;
+  }
+}
+
 } // namespace
 
 static InputManager *GetInput() { return InputManager::GetInstance(); }
@@ -143,6 +162,16 @@ static napi_value AssignPortSource(napi_env env, napi_callback_info info) {
     }
     deviceId = idBuf;
   }
+  if (!IsValidInputPort(port)) {
+    SetInputError("assign_port_invalid", "AssignPortSource",
+                  "Requested input port is outside supported range");
+    return MakeBool(env, false);
+  }
+  if (!IsValidInputSourceType(sourceType)) {
+    SetInputError("assign_port_source_type_invalid", "AssignPortSource",
+                  "Requested input source type is unsupported");
+    return MakeBool(env, false);
+  }
 
   auto *input = GetInput();
   if (!input) {
@@ -152,8 +181,8 @@ static napi_value AssignPortSource(napi_env env, napi_callback_info info) {
   }
   const bool ok = input->AssignPortSource(port, sourceType, deviceId);
   if (!ok) {
-    SetInputError("assign_port_source_failed", "AssignPortSource",
-                  "Port source assignment failed for the requested route");
+    EnsureInputErrorIfEmpty("assign_port_source_failed", "AssignPortSource",
+                            "Port source assignment failed for the requested route");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -171,6 +200,11 @@ static napi_value UnassignPort(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], port, "UnassignPort", "port")) {
     return MakeBool(env, false);
   }
+  if (!IsValidInputPort(port)) {
+    SetInputError("unassign_port_invalid", "UnassignPort",
+                  "Requested input port is outside supported range");
+    return MakeBool(env, false);
+  }
 
   auto *input = GetInput();
   if (!input) {
@@ -180,8 +214,8 @@ static napi_value UnassignPort(napi_env env, napi_callback_info info) {
   }
   const bool ok = input->UnassignPort(port);
   if (!ok) {
-    SetInputError("unassign_port_failed", "UnassignPort",
-                  "Port unassignment failed for the requested route");
+    EnsureInputErrorIfEmpty("unassign_port_failed", "UnassignPort",
+                            "Port unassignment failed for the requested route");
   }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
