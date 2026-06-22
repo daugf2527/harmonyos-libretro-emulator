@@ -10,6 +10,7 @@ interface RuntimeInputPortNapi {
   refactoredUnassignPort(port: number): boolean
   refactoredListInputDevices(): InputDeviceInfo[]
   refactoredSetControllerPortDevice(port: number, device: number): boolean
+  refactoredSetControllerPortDeviceAsync(port: number, device: number): Promise<boolean>
 }
 
 export const RETRO_DEVICE_NONE: number = 0
@@ -74,6 +75,21 @@ export class RuntimeInputPortController {
       }
       const normalizedDevice = normalizeRuntimeControllerPortDevice(device)
       return nativeApi.refactoredSetControllerPortDevice(portId, normalizedDevice)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeInputPort', 'Input', `手柄类型切换调用异常: ${message}`)
+      return false
+    }
+  }
+
+  async setControllerPortDeviceAsync(portId: number, device: number): Promise<boolean> {
+    try {
+      if (!testNapi) {
+        LogHelper.warn('RuntimeInputPort', 'Input', '手柄类型切换跳过: engine not ready')
+        return false
+      }
+      const normalizedDevice = normalizeRuntimeControllerPortDevice(device)
+      return await nativeApi.refactoredSetControllerPortDeviceAsync(portId, normalizedDevice)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeInputPort', 'Input', `手柄类型切换调用异常: ${message}`)

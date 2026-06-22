@@ -374,6 +374,159 @@ static napi_value SetControllerPortDevice(napi_env env, napi_callback_info info)
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+struct SetControllerPortDeviceAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  int32_t port = 0;
+  int32_t device = 0;
+  bool ok = false;
+};
+
+static void ExecuteSetControllerPortDeviceAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<SetControllerPortDeviceAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  auto *input = GetInput();
+  if (!input) {
+    return;
+  }
+  ctx->ok = input->SetControllerPortDevice(ctx->port, ctx->device);
+}
+
+static void CompleteSetControllerPortDeviceAsync(napi_env env, napi_status status,
+                                                 void *data) {
+  auto *ctx = static_cast<SetControllerPortDeviceAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] SetControllerPortDeviceAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetInputError("controller_port_device_async_work_failed",
+                  "SetControllerPortDeviceAsync",
+                  "Async controller-port-device completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    if (!ctx->ok) {
+      EnsureInputErrorIfEmpty("controller_port_device_unavailable",
+                              "SetControllerPortDeviceAsync",
+                              "Controller port device callback is unavailable");
+    }
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value SetControllerPortDeviceAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[2];
+  if (!GetArgs(env, info, 2, 2, args, &argc, "SetControllerPortDeviceAsync")) {
+    return MakeResolvedPromise(env, false);
+  }
+
+  int32_t port = 0;
+  int32_t device = 0;
+  if (!GetInt32Arg(env, args[0], port, "SetControllerPortDeviceAsync", "port") ||
+      !GetInt32Arg(env, args[1], device, "SetControllerPortDeviceAsync", "device")) {
+    return MakeResolvedPromise(env, false);
+  }
+  if (!IsValidInputPort(port) || device < 0) {
+    LOGF(LOG_ERROR,
+         "[NEW] SetControllerPortDeviceAsync invalid: port=%{public}d device=%{public}d",
+         port, device);
+    SetInputError("controller_port_device_invalid", "SetControllerPortDeviceAsync",
+                  "Controller port or device is outside supported range");
+    return MakeResolvedPromise(env, false);
+  }
+
+  auto *input = GetInput();
+  if (!input) {
+    SetInputError("input_manager_unavailable", "SetControllerPortDeviceAsync",
+                  "InputManager instance is unavailable");
+    return MakeResolvedPromise(env, false);
+  }
+
+  auto *ctx = new SetControllerPortDeviceAsyncContext();
+  ctx->port = port;
+  ctx->device = device;
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "SetControllerPortDeviceAsync");
+  if (!resourceName) {
+    SetInputError("controller_port_device_async_create_failed",
+                  "SetControllerPortDeviceAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteSetControllerPortDeviceAsync,
+      CompleteSetControllerPortDeviceAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetInputError("controller_port_device_async_create_failed",
+                  "SetControllerPortDeviceAsync",
+                  "Failed to create async controller-port-device work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetInputError("controller_port_device_async_queue_failed",
+                  "SetControllerPortDeviceAsync",
+                  "Failed to queue async controller-port-device work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value GetInputDescriptorMask(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   auto *engine = GetEngine();
@@ -391,6 +544,7 @@ void RegisterInputNapi(napi_env env, napi_value exports) {
       {"refactoredListInputDevices", nullptr, ListInputDevices, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSendSensor", nullptr, SendSensor, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetControllerPortDevice", nullptr, SetControllerPortDevice, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredSetControllerPortDeviceAsync", nullptr, SetControllerPortDeviceAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetInputDescriptorMask", nullptr, GetInputDescriptorMask, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);

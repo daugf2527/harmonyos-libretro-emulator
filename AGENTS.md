@@ -190,7 +190,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredGetCoreOptions` | `() => string` | sync | 核心选项（JSON 字符串，需 parse） |
 | `refactoredSetCoreOption` | `(key: string, value: string) => boolean` | sync | 设置单条核心选项 |
 
-### 输入 (9) — engine_input_napi.cpp (8) + input_mapping_napi.cpp (1)
+### 输入 (10) — engine_input_napi.cpp (9) + input_mapping_napi.cpp (1)
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
@@ -201,6 +201,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredListInputDevices` | `() => InputDeviceInfo[]` | sync | 列出已注册输入设备 |
 | `refactoredSendSensor` | `(port: number, id: number, value: number) => boolean` | sync | 发送传感器事件（**注意 3 参非 5 参**） |
 | `refactoredSetControllerPortDevice` | `(port: number, device: number) => boolean` | sync | 设置端口手柄类型 |
+| `refactoredSetControllerPortDeviceAsync` | `(port: number, device: number) => Promise<boolean>` | async | 异步设置端口手柄类型，避免 UI 线程同步等待 |
 | `refactoredGetInputDescriptorMask` | `() => number` | sync | 16-bit 输入描述符掩码，0=核心未声明 |
 | `setInputKeyMapping` *(无 refactored 前缀)* | `(mappingMap: Record<string, number>) => boolean` | sync | 设置键盘→libretro 映射表 |
 

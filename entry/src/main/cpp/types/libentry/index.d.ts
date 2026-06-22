@@ -159,6 +159,9 @@ export const refactoredCheatSet: (index: number, enabled: boolean, code: string)
 export const refactoredCheatResetAsync: () => Promise<boolean>;
 export const refactoredCheatSetAsync: (index: number, enabled: boolean, code: string) => Promise<boolean>;
 
+// Input Port Control
+export const refactoredSetControllerPortDeviceAsync: (port: number, device: number) => Promise<boolean>;
+
 // Stats
 export interface EngineStats {
   videoRefreshCalls: number;

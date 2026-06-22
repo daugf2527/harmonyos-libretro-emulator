@@ -1316,16 +1316,19 @@ struct LibretroGamePage {
     this.refreshRuntimePortControlSummaryText();
   }
 
-  private requestRuntimeControllerPortDevice(
+  private async requestRuntimeControllerPortDevice(
     portId: number,
     device: number,
     announce: boolean,
     statusPrefix: string = ''
-  ): boolean {
+  ): Promise<boolean> {
     const safePortId = portId >= 0 && portId < 4 ? portId : 0;
     const normalizedDevice = normalizeRuntimeControllerPortDevice(device);
     const deviceLabel = describeRuntimeControllerPortDevice(normalizedDevice);
-    const ok = runtimeInputPortController.setControllerPortDevice(safePortId, normalizedDevice);
+    const ok = await runtimeInputPortController.setControllerPortDeviceAsync(
+      safePortId,
+      normalizedDevice
+    );
     if (!ok) {
       const failureText = `请求 P${safePortId + 1} 使用 ${deviceLabel} 失败`;
       this.runtimePortControlSummaryText = failureText;
@@ -1349,7 +1352,7 @@ struct LibretroGamePage {
     return true;
   }
 
-  private selectRuntimeVirtualPort(portId: number): void {
+  private async selectRuntimeVirtualPort(portId: number): Promise<void> {
     if (portId < 0 || portId >= this.portAssignments.length) {
       return;
     }
@@ -1361,7 +1364,7 @@ struct LibretroGamePage {
       return;
     }
     this.selectedPortIndex = portId;
-    this.requestRuntimeControllerPortDevice(
+    await this.requestRuntimeControllerPortDevice(
       portId,
       this.getRuntimeControllerDeviceForPort(portId),
       true,
@@ -1369,10 +1372,10 @@ struct LibretroGamePage {
     );
   }
 
-  private applyRuntimeControllerPortDevice(device: number): void {
+  private async applyRuntimeControllerPortDevice(device: number): Promise<void> {
     const portId = this.selectedPortIndex;
     const deviceLabel = describeRuntimeControllerPortDevice(device);
-    this.requestRuntimeControllerPortDevice(
+    await this.requestRuntimeControllerPortDevice(
       portId,
       device,
       true,
@@ -1380,10 +1383,10 @@ struct LibretroGamePage {
     );
   }
 
-  private reapplyRuntimeControllerPortDevice(): void {
+  private async reapplyRuntimeControllerPortDevice(): Promise<void> {
     const portId = this.selectedPortIndex;
     const device = this.getRuntimeControllerDeviceForPort(portId);
-    this.requestRuntimeControllerPortDevice(
+    await this.requestRuntimeControllerPortDevice(
       portId,
       device,
       false,
@@ -2542,10 +2545,10 @@ struct LibretroGamePage {
             this.toggleRuntimePortControl();
           },
           onVirtualPortSelect: (portId: number) => {
-            this.selectRuntimeVirtualPort(portId);
+            void this.selectRuntimeVirtualPort(portId);
           },
           onControllerDeviceSelect: (device: number) => {
-            this.applyRuntimeControllerPortDevice(device);
+            void this.applyRuntimeControllerPortDevice(device);
           }
         })
       }
@@ -2848,7 +2851,7 @@ struct LibretroGamePage {
       // 生产路径此前从不调用,沿用默认 latency=0(浅缓冲),故模拟器抖动即 underrun。
       runtimeAudioSettingsController.setMinimumAudioLatency(this.audioSettingsProfile.latencyMs);
       runtimeAudioSettingsController.setVolumePercent(this.audioSettingsProfile.volumePercent);
-      this.reapplyRuntimeControllerPortDevice();
+      void this.reapplyRuntimeControllerPortDevice();
       // core 在 retro_load_game / retro_run 早期 frame 通过 SET_INPUT_DESCRIPTORS
       // 声明使用的按键,这里在 switchGame 成功后立刻拉一次。
       this.runtimeInputDescriptorMask = getRuntimeInputDescriptorMask();
