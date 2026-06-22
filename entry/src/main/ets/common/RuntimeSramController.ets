@@ -21,6 +21,8 @@ export interface RuntimeSramBackupListItem {
 interface RuntimeSramNapi {
   refactoredGetSRAM(): ArrayBuffer | null
   refactoredSetSRAM(data: ArrayBuffer): boolean
+  refactoredGetSRAMAsync(): Promise<ArrayBuffer | null>
+  refactoredSetSRAMAsync(data: ArrayBuffer): Promise<boolean>
 }
 
 const nativeApi = testNapi as RuntimeSramNapi
@@ -42,7 +44,7 @@ export class RuntimeSramController {
     }
 
     try {
-      const data = this.getCurrentSram()
+      const data = await this.getCurrentSramAsync()
       if (!data || data.byteLength <= 0) {
         return '当前核心未暴露 SRAM'
       }
@@ -96,7 +98,7 @@ export class RuntimeSramController {
 
     try {
       const data = await readRuntimeSramBackup(context, romFile, fileName)
-      const applied = this.setCurrentSram(data)
+      const applied = await this.setCurrentSramAsync(data)
       LogHelper.info('RuntimeSram', 'SRAM', `运行态 SRAM 载入: file=${LogHelper.describePathForLog(fileName)} ok=${applied}`)
       return applied ? '电池存档已载入' : '当前核心未接受 SRAM 写入'
     } catch (err) {
@@ -132,12 +134,12 @@ export class RuntimeSramController {
     }
   }
 
-  private getCurrentSram(): ArrayBuffer | undefined {
+  private async getCurrentSramAsync(): Promise<ArrayBuffer | undefined> {
     try {
       if (!testNapi) {
         return undefined
       }
-      const data = nativeApi.refactoredGetSRAM()
+      const data = await nativeApi.refactoredGetSRAMAsync()
       if (!data || data.byteLength <= 0) {
         return undefined
       }
@@ -149,7 +151,7 @@ export class RuntimeSramController {
     }
   }
 
-  private setCurrentSram(data: ArrayBuffer): boolean {
+  private async setCurrentSramAsync(data: ArrayBuffer): Promise<boolean> {
     if (!data || data.byteLength <= 0) {
       return false
     }
@@ -157,7 +159,7 @@ export class RuntimeSramController {
       if (!testNapi) {
         return false
       }
-      return nativeApi.refactoredSetSRAM(data) === true
+      return await nativeApi.refactoredSetSRAMAsync(data)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeSram', 'SRAM', `写入运行态 SRAM 失败: ${message}`)

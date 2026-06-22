@@ -261,6 +261,252 @@ static napi_value SetSRAM(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+struct GetSRAMAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  std::vector<uint8_t> data;
+  bool ok = false;
+};
+
+static void ExecuteGetSRAMAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<GetSRAMAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->ok = GetEngine()->GetSRAM(ctx->data);
+}
+
+static void CompleteGetSRAMAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<GetSRAMAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] GetSRAMAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetStateError("get_sram_async_work_failed", "GetSRAMAsync",
+                  "Async get-sram completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else if (!ctx->ok || ctx->data.empty()) {
+    EnsureStateErrorIfEmpty("get_sram_failed", "GetSRAMAsync",
+                            "SRAM snapshot is unavailable in current core state");
+    napi_value reason = MakeString(env, "GetSRAM failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    napi_value arrayBuffer =
+        MakeArrayBufferFromBytes(env, ctx->data.data(), ctx->data.size());
+    if (arrayBuffer) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, arrayBuffer);
+    } else {
+      LOGF(LOG_ERROR, "[NEW] GetSRAMAsync failed to allocate ArrayBuffer");
+      SetStateError("get_sram_alloc_failed", "GetSRAMAsync",
+                    "Failed to allocate ArrayBuffer for SRAM snapshot");
+      napi_value reason = MakeString(env, "GetSRAM ArrayBuffer alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value GetSRAMAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new GetSRAMAsyncContext();
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "GetSRAMAsync");
+  if (!resourceName) {
+    SetStateError("get_sram_async_create_failed", "GetSRAMAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteGetSRAMAsync,
+      CompleteGetSRAMAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetStateError("get_sram_async_create_failed", "GetSRAMAsync",
+                  "Failed to create async get-sram work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetStateError("get_sram_async_queue_failed", "GetSRAMAsync",
+                  "Failed to queue async get-sram work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+struct SetSRAMAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  std::vector<uint8_t> data;
+  bool ok = false;
+};
+
+static void ExecuteSetSRAMAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<SetSRAMAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->ok = GetEngine()->SetSRAM(ctx->data);
+}
+
+static void CompleteSetSRAMAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<SetSRAMAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] SetSRAMAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetStateError("set_sram_async_work_failed", "SetSRAMAsync",
+                  "Async set-sram completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    if (!ctx->ok) {
+      EnsureStateErrorIfEmpty("set_sram_failed", "SetSRAMAsync",
+                              "Core rejected the provided SRAM data");
+    }
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value SetSRAMAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[1];
+  if (!GetArgs(env, info, 1, 1, args, &argc, "SetSRAMAsync")) {
+    return MakeResolvedPromise(env, false);
+  }
+
+  void *data = nullptr;
+  size_t length = 0;
+  if (!GetArrayBufferArg(env, args[0], &data, &length, "SetSRAMAsync", "sram")) {
+    return MakeResolvedPromise(env, false);
+  }
+
+  auto *ctx = new SetSRAMAsyncContext();
+  ctx->data.assign(static_cast<uint8_t *>(data),
+                   static_cast<uint8_t *>(data) + length);
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "SetSRAMAsync");
+  if (!resourceName) {
+    SetStateError("set_sram_async_create_failed", "SetSRAMAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteSetSRAMAsync,
+      CompleteSetSRAMAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetStateError("set_sram_async_create_failed", "SetSRAMAsync",
+                  "Failed to create async set-sram work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetStateError("set_sram_async_queue_failed", "SetSRAMAsync",
+                  "Failed to queue async set-sram work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value ResetCore(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   LOGF(LOG_INFO, " [NEW] ResetCore called");
@@ -786,6 +1032,8 @@ void RegisterStateNapi(napi_env env, napi_value exports) {
       {"refactoredLoadStateAsync", nullptr, LoadStateAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetSRAM", nullptr, GetSRAM, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetSRAM", nullptr, SetSRAM, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredGetSRAMAsync", nullptr, GetSRAMAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredSetSRAMAsync", nullptr, SetSRAMAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredResetCore", nullptr, ResetCore, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredCheatReset", nullptr, CheatReset, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredCheatSet", nullptr, CheatSet, nullptr, nullptr, nullptr, napi_default, nullptr},

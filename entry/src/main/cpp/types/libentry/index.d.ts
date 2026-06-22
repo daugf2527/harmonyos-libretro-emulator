@@ -127,6 +127,8 @@ export const refactoredLoadStateAsync: (data: ArrayBuffer) => Promise<boolean>;
 // SRAM
 export const refactoredGetSRAM: () => ArrayBuffer | null;
 export const refactoredSetSRAM: (data: ArrayBuffer) => boolean;
+export const refactoredGetSRAMAsync: () => Promise<ArrayBuffer | null>;
+export const refactoredSetSRAMAsync: (data: ArrayBuffer) => Promise<boolean>;
 
 // Core Control
 export const refactoredResetCore: () => boolean;
