@@ -132,6 +132,7 @@ export const refactoredSetSRAMAsync: (data: ArrayBuffer) => Promise<boolean>;
 
 // Core Control
 export const refactoredResetCore: () => boolean;
+export const refactoredResetCoreAsync: () => Promise<boolean>;
 
 // Disk Control
 export const refactoredDiskControlSetEjectState: (ejected: boolean) => boolean;

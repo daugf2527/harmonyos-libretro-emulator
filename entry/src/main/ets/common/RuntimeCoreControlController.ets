@@ -3,6 +3,7 @@ import LogHelper from './LogHelper'
 
 interface RuntimeCoreControlNapi {
   refactoredResetCore(): boolean
+  refactoredResetCoreAsync(): Promise<boolean>
   refactoredGetRegion(): number
 }
 
@@ -16,6 +17,20 @@ export class RuntimeCoreControlController {
         return false
       }
       return nativeApi.refactoredResetCore() === true
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeCoreControl', 'Engine', `核心重置失败: ${message}`)
+      return false
+    }
+  }
+
+  async resetCoreAsync(): Promise<boolean> {
+    try {
+      if (!testNapi) {
+        LogHelper.warn('RuntimeCoreControl', 'Engine', '核心重置跳过: engine not ready')
+        return false
+      }
+      return await nativeApi.refactoredResetCoreAsync()
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreControl', 'Engine', `核心重置失败: ${message}`)

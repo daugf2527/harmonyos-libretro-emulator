@@ -166,7 +166,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredGetRawFileListAsync` | `(resMgr: ResourceManager, dir?: string) => Promise<string[]>` | async | 异步列出 rawfile 目录 |
 | `refactoredInitEventBridge` | `(callback: (data: RefactoredEvent) => void) => boolean` | sync | 初始化 EventBridge 事件通道 |
 
-### 状态/存档/SRAM/作弊/选项 (18) — engine_state_napi.cpp
+### 状态/存档/SRAM/作弊/选项 (19) — engine_state_napi.cpp
 
 | Export | 签名 | 类型 | 功能 |
 |--------|------|------|------|
@@ -182,6 +182,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredGetSRAMAsync` | `() => Promise<ArrayBuffer \| null>` | async | 异步获取电池备份 SRAM（避免 UI 线程同步等待） |
 | `refactoredSetSRAMAsync` | `(data: ArrayBuffer) => Promise<boolean>` | async | 异步写入电池备份 SRAM（避免 UI 线程同步等待） |
 | `refactoredResetCore` | `() => boolean` | sync | retro_reset 重置核心 |
+| `refactoredResetCoreAsync` | `() => Promise<boolean>` | async | 异步执行 core soft reset（避免 UI 线程同步等待） |
 | `refactoredCheatReset` | `() => boolean` | sync | 重置所有金手指 |
 | `refactoredCheatSet` | `(index: number, enabled: boolean, code: string) => boolean` | sync | 设置单条金手指 |
 | `refactoredCheatResetAsync` | `() => Promise<boolean>` | async | 异步重置所有金手指（避免 UI 线程同步等待） |

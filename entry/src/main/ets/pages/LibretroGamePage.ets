@@ -1422,7 +1422,7 @@ struct LibretroGamePage {
     }
     if (actionCode === 'restart_game') {
       if (this.coreSupportsReset) {
-        const ok = runtimeCoreControlController.resetCore();
+        const ok = await runtimeCoreControlController.resetCoreAsync();
         this.runtimeSaveStatusText = ok
           ? '已发送核心软重置，恢复运行后将从头开始本局'
           : '核心软重置失败，改为重新载入当前游戏';

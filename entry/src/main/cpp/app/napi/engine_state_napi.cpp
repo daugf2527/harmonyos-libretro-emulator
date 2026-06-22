@@ -519,6 +519,115 @@ static napi_value ResetCore(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
+struct ResetCoreAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  bool ok = false;
+};
+
+static void ExecuteResetCoreAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<ResetCoreAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->ok = GetEngine()->ResetCore();
+}
+
+static void CompleteResetCoreAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<ResetCoreAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] ResetCoreAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetStateError("reset_core_async_work_failed", "ResetCoreAsync",
+                  "Async reset-core completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    if (!ctx->ok) {
+      EnsureStateErrorIfEmpty("reset_core_failed", "ResetCoreAsync",
+                              "ResetCore returned false");
+    }
+    napi_value result = MakeBool(env, ctx->ok);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value ResetCoreAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new ResetCoreAsyncContext();
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "ResetCoreAsync");
+  if (!resourceName) {
+    SetStateError("reset_core_async_create_failed", "ResetCoreAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteResetCoreAsync,
+      CompleteResetCoreAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetStateError("reset_core_async_create_failed", "ResetCoreAsync",
+                  "Failed to create async reset-core work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetStateError("reset_core_async_queue_failed", "ResetCoreAsync",
+                  "Failed to queue async reset-core work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
 static napi_value CheatReset(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   const bool ok = GetEngine()->CheatReset();
@@ -1286,6 +1395,7 @@ void RegisterStateNapi(napi_env env, napi_value exports) {
       {"refactoredGetSRAMAsync", nullptr, GetSRAMAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetSRAMAsync", nullptr, SetSRAMAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredResetCore", nullptr, ResetCore, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredResetCoreAsync", nullptr, ResetCoreAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredCheatReset", nullptr, CheatReset, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredCheatSet", nullptr, CheatSet, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredCheatResetAsync", nullptr, CheatResetAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
