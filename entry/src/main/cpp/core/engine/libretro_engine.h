@@ -204,7 +204,7 @@ public:
   bool CheatSet(unsigned index, bool enabled, const std::string &code);
 
   // --- 控制器/区域接口 ---
-  void SetControllerPortDevice(unsigned port, unsigned device);
+  bool SetControllerPortDevice(unsigned port, unsigned device);
   unsigned GetRegion();
 
   // --- AV 信息查询 ---

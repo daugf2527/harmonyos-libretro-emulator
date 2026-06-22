@@ -282,7 +282,7 @@ LibretroEngine::LibretroEngine() {
   inputManager_->SetPortRouter(inputPortRouter_.get());
   inputManager_->SetControllerPortDeviceCallback(
       [this](unsigned port, unsigned device) {
-        SetControllerPortDevice(port, device);
+        (void)SetControllerPortDevice(port, device);
       });
   rendererInterface_ = std::make_unique<EngineRendererAdapter>(this);
   renderThread_ = std::make_unique<RenderThread>(videoPipeline_, envState_);
@@ -3194,9 +3194,10 @@ bool LibretroEngine::CheatSet(unsigned index, bool enabled,
 
 // --- 控制器/区域实现 ---
 
-void LibretroEngine::SetControllerPortDevice(unsigned port, unsigned device) {
+bool LibretroEngine::SetControllerPortDevice(unsigned port, unsigned device) {
+  bool applied = false;
   const bool dispatched = ExecuteSyncTask(
-      [this, port, device]() {
+      [this, port, device, &applied]() {
         if (!coreLoader_.IsLoaded()) {
           return;
         }
@@ -3205,14 +3206,22 @@ void LibretroEngine::SetControllerPortDevice(unsigned port, unsigned device) {
           fn(port, device);
           LOGF(LOG_INFO, "Set controller port %{public}u to device %{public}u",
                port, device);
+          applied = true;
         }
       },
-      kSyncTaskTimeoutMs);
+      kSyncTaskTimeoutMs, "SetControllerPortDevice");
   if (!dispatched) {
     LOGF(LOG_WARN,
          "[NEW] SetControllerPortDevice skipped: sync dispatch failed (port=%{public}u, device=%{public}u)",
          port, device);
+    return false;
   }
+  if (!applied) {
+    SetLastErrorInfo("controller_port_device_unavailable",
+                     "SetControllerPortDevice",
+                     "Core controller port device callback is unavailable");
+  }
+  return applied;
 }
 
 unsigned LibretroEngine::GetRegion() {
