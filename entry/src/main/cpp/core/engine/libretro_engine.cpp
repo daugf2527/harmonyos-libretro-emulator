@@ -2979,13 +2979,21 @@ size_t LibretroEngine::GetSaveStateSize() {
     return 0;
   }
   size_t size = 0;
-  (void)ExecuteSyncTask(
-      [this, &size]() {
+  bool queried = false;
+  if (!ExecuteSyncTask(
+      [this, &size, &queried]() {
         if (stateManager_) {
           size = stateManager_->GetSaveStateSize();
+          queried = true;
         }
       },
-      kSyncTaskTimeoutMs, "GetSaveStateSize");
+      kSyncTaskTimeoutMs, "GetSaveStateSize")) {
+    return 0;
+  }
+  if (!queried) {
+    SetLastErrorInfo("save_state_size_unavailable", "GetSaveStateSize",
+                     "Save-state size query callback is unavailable");
+  }
   return size;
 }
 
