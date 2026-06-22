@@ -3290,13 +3290,13 @@ unsigned LibretroEngine::GetRegion() {
             }
           },
           kSyncTaskTimeoutMs, "GetRegion")) {
-    return 0;
+    return std::numeric_limits<unsigned>::max();
   }
   if (!ok) {
     SetLastErrorInfo("region_unavailable", "GetRegion",
                      "Region query callback is unavailable");
   }
-  return ok ? region : 0;
+  return ok ? region : std::numeric_limits<unsigned>::max();
 }
 
 } // namespace libretro

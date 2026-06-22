@@ -32,7 +32,11 @@ export class RuntimeCoreControlController {
       if (!Number.isFinite(region) || region < 0) {
         return undefined
       }
-      return Math.floor(region)
+      const normalized = Math.floor(region)
+      if (normalized !== 0 && normalized !== 1) {
+        return undefined
+      }
+      return normalized
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreControl', 'Engine', `读取运行时区域失败: ${message}`)
