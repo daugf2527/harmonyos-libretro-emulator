@@ -199,6 +199,7 @@ struct LibretroNewArchTestPage {
   private eventScope: EventHubScope | undefined = undefined;
   private inputDebugTimer: number = -1;
   private pageActive: boolean = false;
+  private engineActionToken: number = 0;
   private uiTouchCount: number = 0;
   private uiMouseCount: number = 0;
   private uiKeyCount: number = 0;
@@ -247,13 +248,14 @@ struct LibretroNewArchTestPage {
     this.applyPortAssignment(this.selectedPortIndex, sourceType, true, this.currentPortAssignment.deviceId);
   };
   private onStartEngine = async (): Promise<void> => {
+    const actionToken = this.beginEngineAction();
     this.log('调用 refactoredStartEngine');
     nativeApi.refactoredClearLastErrorInfo();
     const startResult = nativeApi.refactoredStartEngine();
     this.log(`refactoredStartEngine 返回: ${startResult.success}`);
     if (!startResult.success) { this.status = '启动失败'; return; }
     const started = await nativeApi.refactoredWaitForStateAsync(EngineState.STARTING, 5000);
-    if (!this.pageActive) {
+    if (!this.isCurrentEngineAction(actionToken)) {
       return;
     }
     this.status = started ? '引擎已启动' : '启动超时';
@@ -267,6 +269,7 @@ struct LibretroNewArchTestPage {
     this.log(`refactoredSetFilesDir 返回: ${ok}`);
   };
   private onLoadCore = async (): Promise<void> => {
+    const actionToken = this.beginEngineAction();
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) { this.log('获取上下文失败'); return; }
     const abiPath = this.resolveAbiPath();
@@ -276,7 +279,7 @@ struct LibretroNewArchTestPage {
     this.log(`refactoredLoadCore 返回: ${coreResult.success}`);
     if (!coreResult.success) { this.status = '核心加载失败'; return; }
     const loaded = await nativeApi.refactoredWaitForStateAsync(EngineState.CORE_LOADED, 5000);
-    if (!this.pageActive) {
+    if (!this.isCurrentEngineAction(actionToken)) {
       return;
     }
     if (!loaded) {
@@ -288,6 +291,7 @@ struct LibretroNewArchTestPage {
   };
   private onInitOptions = (): void => { void this.refreshCoreOptions(); };
   private onLoadRom = async (): Promise<void> => {
+    const actionToken = this.beginEngineAction();
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) { this.log('获取上下文失败'); return; }
     const resMgr = context.resourceManager;
@@ -296,7 +300,7 @@ struct LibretroNewArchTestPage {
     this.log(`refactoredLoadRom 返回: ${romResult.success}`);
     if (!romResult.success) { this.status = 'ROM加载失败'; return; }
     const running = await nativeApi.refactoredWaitForStateAsync(EngineState.RUNNING, 5000);
-    if (!this.pageActive) {
+    if (!this.isCurrentEngineAction(actionToken)) {
       return;
     }
     if (!running) {
@@ -320,15 +324,16 @@ struct LibretroNewArchTestPage {
     this.status = '运行中';
   };
   private onStopEngine = async (): Promise<void> => {
+    const actionToken = this.beginEngineAction();
     this.log('调用 refactoredStopEngine');
     const ok: boolean = await nativeApi.refactoredStopEngineAsync();
-    if (!this.pageActive) {
+    if (!this.isCurrentEngineAction(actionToken)) {
       return;
     }
     this.log(`refactoredStopEngine 返回: ${ok}`);
     if (!ok) { this.status = '停止失败'; return; }
     const stopped = await nativeApi.refactoredWaitForStateAsync(EngineState.STOPPED, 5000);
-    if (!this.pageActive) {
+    if (!this.isCurrentEngineAction(actionToken)) {
       return;
     }
     this.status = stopped ? '已停止' : '停止超时';
@@ -523,6 +528,7 @@ struct LibretroNewArchTestPage {
 
   aboutToDisappear() {
     this.pageActive = false;
+    this.engineActionToken += 1;
     if (this.eventScope) {
       this.eventScope.dispose();
       this.eventScope = undefined;
@@ -537,6 +543,15 @@ struct LibretroNewArchTestPage {
     const time = this.logDate.toLocaleTimeString();
     this.logs = [`[${time}] ${msg}`, ...this.logs.slice(0, 19)];
     LogHelper.info('NewArchTest', 'Test', msg);
+  }
+
+  private beginEngineAction(): number {
+    this.engineActionToken += 1;
+    return this.engineActionToken;
+  }
+
+  private isCurrentEngineAction(token: number): boolean {
+    return this.pageActive && token === this.engineActionToken;
   }
 
   private refreshInputDevices() {
