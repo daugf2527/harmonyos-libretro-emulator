@@ -51,7 +51,7 @@ export struct PlatformChipBar {
               .onClick(() => {
                 this.onChange?.(item)
               })
-          }, (item: string) => item)
+          }, (item: string, index: number) => `${index}:${item}`)
         }
         .padding({ top: 2, bottom: 2, left: 4, right: 4 })
       }

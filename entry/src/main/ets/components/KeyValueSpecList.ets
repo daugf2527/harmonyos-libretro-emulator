@@ -46,7 +46,7 @@ export struct KeyValueSpecList {
       Column() {
         ForEach(this.items, (item: KeyValueSpecItem) => {
           this.SpecRow(item)
-        }, (item: KeyValueSpecItem) => item.label)
+        }, (item: KeyValueSpecItem, index: number) => `${index}:${item.label}:${item.value}`)
       }
       .width('100%')
     }

@@ -91,7 +91,7 @@ export struct LibraryDetailInfoPanel {
       Row({ space: 1 }) {
         ForEach(this.primaryCells, (cell: LibraryDetailSummaryCellData) => {
           this.SummaryCell(cell)
-        }, (cell: LibraryDetailSummaryCellData) => cell.title)
+        }, (cell: LibraryDetailSummaryCellData, index: number) => `primary:${index}:${cell.title}:${cell.value}`)
       }
       .width('100%')
 
@@ -102,14 +102,14 @@ export struct LibraryDetailInfoPanel {
           Row({ space: 1 }) {
             ForEach(this.extendedCells.slice(0, 2), (cell: LibraryDetailSummaryCellData) => {
               this.SummaryCell(cell, true)
-            }, (cell: LibraryDetailSummaryCellData) => cell.title)
+            }, (cell: LibraryDetailSummaryCellData, index: number) => `extended-a:${index}:${cell.title}:${cell.value}`)
           }
           .width('100%')
 
           Row({ space: 1 }) {
             ForEach(this.extendedCells.slice(2, 4), (cell: LibraryDetailSummaryCellData) => {
               this.SummaryCell(cell, true)
-            }, (cell: LibraryDetailSummaryCellData) => cell.title)
+            }, (cell: LibraryDetailSummaryCellData, index: number) => `extended-b:${index}:${cell.title}:${cell.value}`)
           }
           .width('100%')
         }
