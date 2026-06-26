@@ -10,6 +10,10 @@ interface RuntimeCoreControlNapi {
 
 const nativeApi = testNapi as RuntimeCoreControlNapi
 
+export interface RuntimeCoreControlTaskOptions {
+  shouldCancel?: () => boolean
+}
+
 export class RuntimeCoreControlController {
   resetCore(): boolean {
     try {
@@ -25,17 +29,24 @@ export class RuntimeCoreControlController {
     }
   }
 
-  async resetCoreAsync(): Promise<boolean> {
+  async resetCoreAsync(options?: RuntimeCoreControlTaskOptions): Promise<boolean> {
     try {
+      if (options?.shouldCancel?.()) {
+        return false
+      }
       if (!testNapi) {
         LogHelper.warn('RuntimeCoreControl', 'Engine', '核心重置跳过: engine not ready')
         return false
       }
-      return await nativeApi.refactoredResetCoreAsync()
+      const ok = await nativeApi.refactoredResetCoreAsync()
+      if (options?.shouldCancel?.()) {
+        return false
+      }
+      return ok
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreControl', 'Engine', `核心重置失败: ${message}`)
-      return false
+      throw err as Error
     }
   }
 
@@ -60,12 +71,18 @@ export class RuntimeCoreControlController {
     }
   }
 
-  async getRegionCodeAsync(): Promise<number | undefined> {
+  async getRegionCodeAsync(options?: RuntimeCoreControlTaskOptions): Promise<number | undefined> {
     try {
+      if (options?.shouldCancel?.()) {
+        return undefined
+      }
       if (!testNapi) {
         return undefined
       }
       const region = await nativeApi.refactoredGetRegionAsync()
+      if (options?.shouldCancel?.()) {
+        return undefined
+      }
       if (!Number.isFinite(region) || region < 0) {
         return undefined
       }
@@ -77,7 +94,7 @@ export class RuntimeCoreControlController {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreControl', 'Engine', `读取运行时区域失败: ${message}`)
-      return undefined
+      throw err as Error
     }
   }
 }

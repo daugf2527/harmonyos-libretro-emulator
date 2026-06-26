@@ -18,6 +18,10 @@ export interface RuntimeSramBackupListItem {
   isLatest: boolean
 }
 
+export interface RuntimeSramTaskOptions {
+  shouldCancel?: () => boolean
+}
+
 interface RuntimeSramNapi {
   refactoredGetSRAM(): ArrayBuffer | null
   refactoredSetSRAM(data: ArrayBuffer): boolean
@@ -31,7 +35,8 @@ export class RuntimeSramController {
   async exportCurrentSramBackup(
     context: common.UIAbilityContext | undefined,
     gameRunning: boolean,
-    romFile: string
+    romFile: string,
+    options?: RuntimeSramTaskOptions
   ): Promise<string> {
     if (!gameRunning) {
       return '需在运行中导出电池存档'
@@ -48,7 +53,12 @@ export class RuntimeSramController {
       if (!data || data.byteLength <= 0) {
         return '当前核心未暴露 SRAM'
       }
-      const saved = await saveRuntimeSramBackup(context, romFile, data)
+      if (options?.shouldCancel?.()) {
+        return '电池存档操作已取消'
+      }
+      const saved = await saveRuntimeSramBackup(context, romFile, data, {
+        shouldCancel: options?.shouldCancel
+      })
       LogHelper.info(
         'RuntimeSram',
         'SRAM',
@@ -81,7 +91,8 @@ export class RuntimeSramController {
     context: common.UIAbilityContext | undefined,
     gameRunning: boolean,
     romFile: string,
-    fileName: string
+    fileName: string,
+    options?: RuntimeSramTaskOptions
   ): Promise<string> {
     if (!gameRunning) {
       return '需在运行中载入电池存档'
@@ -97,7 +108,13 @@ export class RuntimeSramController {
     }
 
     try {
+      if (options?.shouldCancel?.()) {
+        return '电池存档操作已取消'
+      }
       const data = await readRuntimeSramBackup(context, romFile, fileName)
+      if (options?.shouldCancel?.()) {
+        return '电池存档操作已取消'
+      }
       const applied = await this.setCurrentSramAsync(data)
       LogHelper.info('RuntimeSram', 'SRAM', `运行态 SRAM 载入: file=${LogHelper.describePathForLog(fileName)} ok=${applied}`)
       return applied ? '电池存档已载入' : '当前核心未接受 SRAM 写入'
@@ -111,7 +128,8 @@ export class RuntimeSramController {
   async deleteBackupByFileName(
     context: common.UIAbilityContext | undefined,
     romFile: string,
-    fileName: string
+    fileName: string,
+    options?: RuntimeSramTaskOptions
   ): Promise<string> {
     if (!context) {
       return '上下文缺失'
@@ -124,6 +142,9 @@ export class RuntimeSramController {
     }
 
     try {
+      if (options?.shouldCancel?.()) {
+        return '电池存档操作已取消'
+      }
       await deleteRuntimeSramBackup(context, romFile, fileName)
       LogHelper.info('RuntimeSram', 'SRAM', `运行态 SRAM 备份已删除: file=${LogHelper.describePathForLog(fileName)}`)
       return '电池存档已删除'
@@ -147,7 +168,7 @@ export class RuntimeSramController {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeSram', 'SRAM', `读取运行态 SRAM 失败: ${message}`)
-      return undefined
+      throw err as Error
     }
   }
 
@@ -163,7 +184,7 @@ export class RuntimeSramController {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeSram', 'SRAM', `写入运行态 SRAM 失败: ${message}`)
-      return false
+      throw err as Error
     }
   }
 }

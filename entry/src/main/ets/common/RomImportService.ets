@@ -397,8 +397,11 @@ export async function importRomUris(
               hasAccurateByteProgress: hasAccurateByteProgress
             })
           }, options?.shouldCancel)
-          await copyFileFromUri(tempOverwritePath, destPath)
-          await deletePathIfExists(tempOverwritePath)
+          if (options?.shouldCancel?.()) {
+            throw new ImportCanceledError(copiedBytesForFile)
+          }
+          await deletePathIfExists(destPath)
+          await fs.rename(tempOverwritePath, destPath)
           result.overwrittenCount += 1
           result.overwrittenNames.push(fileName)
           completedNameSet.add(normalizeFileNameKey(fileName))
@@ -496,8 +499,10 @@ export async function importRomUris(
           hasAccurateByteProgress: hasAccurateByteProgress
         })
       }, options?.shouldCancel)
-      await copyFileFromUri(tempImportPath, destPath)
-      await deletePathIfExists(tempImportPath)
+      if (options?.shouldCancel?.()) {
+        throw new ImportCanceledError(copiedBytesForFile)
+      }
+      await fs.rename(tempImportPath, destPath)
       result.importedCount += 1
       result.importedNames.push(fileName)
       completedNameSet.add(normalizeFileNameKey(fileName))
@@ -814,7 +819,6 @@ async function copyFileFromUri(
       }
       const chunk = new ArrayBuffer(bufSize)
       const readOptions: ReadOptions = {
-        offset: 0,
         length: bufSize
       }
       const readLen = await fs.read(srcFile.fd, chunk, readOptions)

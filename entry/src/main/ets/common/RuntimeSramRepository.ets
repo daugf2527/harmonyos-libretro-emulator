@@ -9,8 +9,18 @@ export interface RuntimeSramBackupItem {
   byteLength: number
 }
 
+export interface RuntimeSramWriteOptions {
+  shouldCancel?: () => boolean
+}
+
 interface RuntimeSramErrorWithCode {
   code?: string | number
+}
+
+class RuntimeSramCanceledError extends Error {
+  constructor() {
+    super('RUNTIME_SRAM_CANCELED')
+  }
 }
 
 const RUNTIME_SRAM_DIR_NAME = 'runtime/sram'
@@ -59,7 +69,8 @@ export async function listRuntimeSramBackupsForRom(
 export async function saveRuntimeSramBackup(
   context: common.UIAbilityContext,
   romFile: string,
-  data: ArrayBuffer
+  data: ArrayBuffer,
+  options?: RuntimeSramWriteOptions
 ): Promise<RuntimeSramBackupItem> {
   const normalizedRomFile = normalizeRomFile(romFile)
   if (normalizedRomFile.length === 0) {
@@ -71,10 +82,15 @@ export async function saveRuntimeSramBackup(
 
   const romDirPath = buildRuntimeSramRomDirPath(context.filesDir, normalizedRomFile)
   await ensureDirExists(romDirPath)
+  throwIfRuntimeSramCanceled(options)
 
   const createdAt = Date.now()
   const fileName = `${RUNTIME_SRAM_FILE_PREFIX}${createdAt}${RUNTIME_SRAM_FILE_SUFFIX}`
-  await writeArrayBufferToFile(buildRuntimeSramBackupPath(context.filesDir, normalizedRomFile, fileName), data)
+  await writeArrayBufferToFile(
+    buildRuntimeSramBackupPath(context.filesDir, normalizedRomFile, fileName),
+    data,
+    options?.shouldCancel
+  )
   return {
     id: fileName,
     fileName,
@@ -230,10 +246,13 @@ async function readArrayBufferFromFile(path: string): Promise<ArrayBuffer> {
   }
 }
 
-async function writeArrayBufferToFile(path: string, data: ArrayBuffer): Promise<void> {
+async function writeArrayBufferToFile(path: string, data: ArrayBuffer, shouldCancel?: () => boolean): Promise<void> {
   const tmpPath = `${path}.tmp`
   let file: fs.File | undefined = undefined
   try {
+    if (shouldCancel?.()) {
+      throw new RuntimeSramCanceledError()
+    }
     file = await fs.open(tmpPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     const writeOptions: WriteOptions = {
       length: data.byteLength
@@ -241,6 +260,9 @@ async function writeArrayBufferToFile(path: string, data: ArrayBuffer): Promise<
     await fs.write(file.fd, data, writeOptions)
     await fs.close(file.fd)
     file = undefined
+    if (shouldCancel?.()) {
+      throw new RuntimeSramCanceledError()
+    }
     await fs.rename(tmpPath, path)
   } catch (err) {
     if (file) {
@@ -254,6 +276,12 @@ async function writeArrayBufferToFile(path: string, data: ArrayBuffer): Promise<
     } catch (_unlinkErr) {
     }
     throw err as Error
+  }
+}
+
+function throwIfRuntimeSramCanceled(options?: RuntimeSramWriteOptions): void {
+  if (options?.shouldCancel?.()) {
+    throw new RuntimeSramCanceledError()
   }
 }
 

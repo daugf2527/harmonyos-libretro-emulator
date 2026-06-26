@@ -66,7 +66,7 @@ interface RuntimeSessionNapi {
   refactoredResumeEngine(): boolean
   refactoredSaveState(): ArrayBuffer | null
   refactoredLoadState(data: ArrayBuffer): boolean
-  refactoredSaveStateAsync(): Promise<ArrayBuffer | null>
+  refactoredSaveStateAsync(): Promise<ArrayBuffer>
   refactoredSaveStateBundleAsync(): Promise<RuntimeSaveStateBundle>
   refactoredLoadStateAsync(data: ArrayBuffer): Promise<boolean>
   refactoredGetLastErrorInfo(): EngineErrorInfo
@@ -176,7 +176,7 @@ export class RuntimeSessionController {
 
   // Async versions — offload heavy serialization/deserialization to
   // napi_async_work so the main thread is never blocked >500ms.
-  async saveStateAsync(): Promise<ArrayBuffer | null> {
+  async saveStateAsync(): Promise<ArrayBuffer> {
     if (!testNapi) {
       LogHelper.warn('RuntimeSession', 'Save', '异步存档跳过: engine not ready')
       throw new Error('engine not ready')

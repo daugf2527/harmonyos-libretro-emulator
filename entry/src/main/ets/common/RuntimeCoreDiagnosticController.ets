@@ -39,15 +39,26 @@ export interface RuntimeStatusSnapshot {
 
 const nativeApi = testNapi as RuntimeCoreDiagnosticNapi
 
+export interface RuntimeCoreDiagnosticTaskOptions {
+  shouldCancel?: () => boolean
+}
+
 export class RuntimeCoreDiagnosticController {
   private capabilityCache: Map<string, RuntimeCoreCapabilities> = new Map()
 
-  async testCoreLoader(path: string): Promise<string> {
+  async testCoreLoader(path: string, options?: RuntimeCoreDiagnosticTaskOptions): Promise<string> {
+    if (options?.shouldCancel?.()) {
+      return 'Error: operation canceled'
+    }
     if (!testNapi) {
       return 'Error: engine not ready'
     }
     try {
-      return await nativeApi.testCoreLoader(path)
+      const report = await nativeApi.testCoreLoader(path)
+      if (options?.shouldCancel?.()) {
+        return 'Error: operation canceled'
+      }
+      return report
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreDiagnostic', 'Core', `核心符号探测失败: ${message}`)
@@ -57,40 +68,75 @@ export class RuntimeCoreDiagnosticController {
 
   async inspectCoreCapabilities(
     path: string,
-    forceRefresh: boolean = false
+    forceRefresh: boolean = false,
+    options?: RuntimeCoreDiagnosticTaskOptions
   ): Promise<RuntimeCoreCapabilities> {
+    if (options?.shouldCancel?.()) {
+      return buildCanceledRuntimeCoreCapabilities()
+    }
     const cached = this.capabilityCache.get(path)
     if (!forceRefresh && cached) {
       return cached
     }
 
-    const report = await this.testCoreLoader(path)
+    const report = await this.testCoreLoader(path, options)
+    if (options?.shouldCancel?.()) {
+      return buildCanceledRuntimeCoreCapabilities()
+    }
     const capabilities = this.parseCapabilities(report)
     this.capabilityCache.set(path, capabilities)
     return capabilities
   }
 
-  async readRuntimeStatusSnapshot(): Promise<RuntimeStatusSnapshot> {
+  async readRuntimeStatusSnapshot(
+    options?: RuntimeCoreDiagnosticTaskOptions
+  ): Promise<RuntimeStatusSnapshot> {
+    if (options?.shouldCancel?.()) {
+      return buildDefaultRuntimeStatusSnapshot()
+    }
     if (!testNapi) {
       return buildDefaultRuntimeStatusSnapshot()
     }
+    const snapshot = buildDefaultRuntimeStatusSnapshot()
     try {
       const stateValue = Number(nativeApi.refactoredGetState())
-      const saveStateSizeValue = Number(await nativeApi.refactoredGetSaveStateSizeAsync())
-      return {
-        state: Number.isFinite(stateValue) ? stateValue : 0,
-        coreLoaded: Boolean(nativeApi.refactoredHasCoreLoaded()),
-        gameLoaded: Boolean(nativeApi.refactoredHasGameLoaded()),
-        saveStateSizeBytes: Number.isFinite(saveStateSizeValue) && saveStateSizeValue > 0
-          ? Math.round(saveStateSizeValue)
-          : 0,
-        inputDebugStats: normalizeRuntimeInputDebugStats(nativeApi.refactoredGetInputDebugStats())
-      }
+      snapshot.state = Number.isFinite(stateValue) ? stateValue : 0
+      snapshot.coreLoaded = Boolean(nativeApi.refactoredHasCoreLoaded())
+      snapshot.gameLoaded = Boolean(nativeApi.refactoredHasGameLoaded())
     } catch (err) {
       const message = (err as Error).message || String(err)
-      LogHelper.warn('RuntimeCoreDiagnostic', 'Runtime', `读取运行态快照失败: ${message}`)
+      LogHelper.warn('RuntimeCoreDiagnostic', 'Runtime', `读取运行态基础快照失败: ${message}`)
+    }
+
+    if (options?.shouldCancel?.()) {
       return buildDefaultRuntimeStatusSnapshot()
     }
+
+    try {
+      const saveStateSizeValue = Number(await nativeApi.refactoredGetSaveStateSizeAsync())
+      if (options?.shouldCancel?.()) {
+        return buildDefaultRuntimeStatusSnapshot()
+      }
+      snapshot.saveStateSizeBytes = Number.isFinite(saveStateSizeValue) && saveStateSizeValue > 0
+        ? Math.round(saveStateSizeValue)
+        : 0
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeCoreDiagnostic', 'Runtime', `读取运行态存档大小失败: ${message}`)
+    }
+
+    if (options?.shouldCancel?.()) {
+      return buildDefaultRuntimeStatusSnapshot()
+    }
+
+    try {
+      snapshot.inputDebugStats = normalizeRuntimeInputDebugStats(nativeApi.refactoredGetInputDebugStats())
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RuntimeCoreDiagnostic', 'Runtime', `读取运行态输入统计失败: ${message}`)
+    }
+
+    return snapshot
   }
 
   private parseCapabilities(report: string): RuntimeCoreCapabilities {
@@ -104,6 +150,16 @@ export class RuntimeCoreDiagnosticController {
       supportsCheatSet: !failed && normalized.indexOf('retro_cheat_set not provided') < 0,
       report
     }
+  }
+}
+
+function buildCanceledRuntimeCoreCapabilities(): RuntimeCoreCapabilities {
+  return {
+    supportsReset: false,
+    supportsRegion: false,
+    supportsCheatReset: false,
+    supportsCheatSet: false,
+    report: 'Error: operation canceled'
   }
 }
 

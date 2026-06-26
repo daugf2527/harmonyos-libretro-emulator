@@ -11,6 +11,10 @@ export interface RuntimeDiskImageImportResult {
   detail: string
 }
 
+export interface RuntimeDiskImageImportOptions {
+  shouldCancel?: () => boolean
+}
+
 interface RuntimeDiskImagePlan {
   uri: string
   fileName: string
@@ -28,15 +32,22 @@ interface PickerSelectOptionsCompat {
   maxSelectNumber: number
 }
 
+class RuntimeDiskImportCanceledError extends Error {
+  constructor() {
+    super('RUNTIME_DISK_IMPORT_CANCELED')
+  }
+}
+
 const MULTIFILE_ENTRY_EXTENSIONS: string[] = ['cue', 'm3u']
 const RUNTIME_DISK_IMAGE_IMPORT_DIR = 'runtime/disks/imported'
 const MAX_IMPORT_FILE_NAME_LENGTH = 120
 
 export async function importPickedRuntimeDiskImages(
-  context: common.UIAbilityContext
+  context: common.UIAbilityContext,
+  options?: RuntimeDiskImageImportOptions
 ): Promise<RuntimeDiskImageImportResult> {
   const uris = await pickRuntimeDiskImageUris(context)
-  return importRuntimeDiskImageUris(context, uris)
+  return importRuntimeDiskImageUris(context, uris, options)
 }
 
 async function pickRuntimeDiskImageUris(
@@ -61,7 +72,8 @@ async function pickRuntimeDiskImageUris(
 
 async function importRuntimeDiskImageUris(
   context: common.UIAbilityContext,
-  uris: string[]
+  uris: string[],
+  options?: RuntimeDiskImageImportOptions
 ): Promise<RuntimeDiskImageImportResult> {
   const result = createEmptyRuntimeDiskImageImportResult()
   if (!uris || uris.length === 0) {
@@ -72,6 +84,11 @@ async function importRuntimeDiskImageUris(
 
   const diskDir = `${context.filesDir}/${RUNTIME_DISK_IMAGE_IMPORT_DIR}`
   await ensureDirExists(diskDir)
+  if (options?.shouldCancel?.()) {
+    result.canceled = true
+    result.detail = '磁盘镜像导入已取消'
+    return result
+  }
   const plans = await buildRuntimeDiskImagePlans(uris)
   const primaryResult = resolvePrimaryRuntimeDiskPlan(plans)
   if (!primaryResult.plan) {
@@ -91,9 +108,23 @@ async function importRuntimeDiskImageUris(
 
   const orderedPlans = sortRuntimeDiskImagePlans(plans)
   for (let index = 0; index < orderedPlans.length; index += 1) {
+    if (options?.shouldCancel?.()) {
+      result.canceled = true
+      result.detail = '磁盘镜像导入已取消'
+      return result
+    }
     const plan = orderedPlans[index]
     const destPath = `${diskDir}/${plan.fileName}`
-    await writeRuntimeDiskImageFile(plan.uri, destPath)
+    try {
+      await writeRuntimeDiskImageFile(plan.uri, destPath, options?.shouldCancel)
+    } catch (err) {
+      if (err instanceof RuntimeDiskImportCanceledError) {
+        result.canceled = true
+        result.detail = '磁盘镜像导入已取消'
+        return result
+      }
+      throw err as Error
+    }
   }
 
   result.canceled = false
@@ -342,12 +373,16 @@ function normalizeFileNameKey(fileName: string): string {
 
 async function writeRuntimeDiskImageFile(
   sourceUri: string,
-  destPath: string
+  destPath: string,
+  shouldCancel?: () => boolean
 ): Promise<void> {
   const tmpPath = `${destPath}.importing`
   await deletePathIfExists(tmpPath)
   try {
-    await copyFileFromUri(sourceUri, tmpPath)
+    await copyFileFromUri(sourceUri, tmpPath, shouldCancel)
+    if (shouldCancel?.()) {
+      throw new RuntimeDiskImportCanceledError()
+    }
     await deletePathIfExists(destPath)
     await fs.rename(tmpPath, destPath)
   } catch (err) {
@@ -358,7 +393,8 @@ async function writeRuntimeDiskImageFile(
 
 async function copyFileFromUri(
   sourceUri: string,
-  destPath: string
+  destPath: string,
+  shouldCancel?: () => boolean
 ): Promise<void> {
   let srcFile: fs.File | undefined = undefined
   let destFile: fs.File | undefined = undefined
@@ -367,9 +403,11 @@ async function copyFileFromUri(
     destFile = await fs.open(destPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     const bufSize = 64 * 1024
     while (true) {
+      if (shouldCancel?.()) {
+        throw new RuntimeDiskImportCanceledError()
+      }
       const chunk = new ArrayBuffer(bufSize)
       const readOptions: ReadOptions = {
-        offset: 0,
         length: bufSize
       }
       const readLen = await fs.read(srcFile.fd, chunk, readOptions)
@@ -378,6 +416,9 @@ async function copyFileFromUri(
       }
       const chunkToWrite = readLen >= chunk.byteLength ? chunk : chunk.slice(0, readLen)
       await fs.write(destFile.fd, chunkToWrite)
+      if (shouldCancel?.()) {
+        throw new RuntimeDiskImportCanceledError()
+      }
     }
   } catch (err) {
     throw err as Error

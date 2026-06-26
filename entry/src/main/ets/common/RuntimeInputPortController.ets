@@ -23,6 +23,10 @@ export interface RuntimeControllerPortDeviceOption {
   detail: string
 }
 
+export interface RuntimeInputPortTaskOptions {
+  shouldCancel?: () => boolean
+}
+
 export const RUNTIME_CONTROLLER_PORT_DEVICE_OPTIONS: RuntimeControllerPortDeviceOption[] = [
   {
     device: RETRO_DEVICE_JOYPAD,
@@ -68,13 +72,17 @@ export class RuntimeInputPortController {
   }
 
   setControllerPortDevice(portId: number, device: number): boolean {
+    const safeDevice = validateRuntimeControllerPortDevice(device)
+    if (safeDevice === undefined) {
+      LogHelper.warn('RuntimeInputPort', 'Input', '手柄类型切换失败: device 非法')
+      return false
+    }
     try {
       if (!testNapi) {
         LogHelper.warn('RuntimeInputPort', 'Input', '手柄类型切换跳过: engine not ready')
         return false
       }
-      const normalizedDevice = normalizeRuntimeControllerPortDevice(device)
-      return nativeApi.refactoredSetControllerPortDevice(portId, normalizedDevice)
+      return nativeApi.refactoredSetControllerPortDevice(portId, safeDevice)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeInputPort', 'Input', `手柄类型切换调用异常: ${message}`)
@@ -82,32 +90,65 @@ export class RuntimeInputPortController {
     }
   }
 
-  async setControllerPortDeviceAsync(portId: number, device: number): Promise<boolean> {
+  async setControllerPortDeviceAsync(
+    portId: number,
+    device: number,
+    options?: RuntimeInputPortTaskOptions
+  ): Promise<boolean> {
+    const safeDevice = validateRuntimeControllerPortDevice(device)
+    if (safeDevice === undefined) {
+      LogHelper.warn('RuntimeInputPort', 'Input', '手柄类型切换失败: device 非法')
+      return false
+    }
     try {
+      if (options?.shouldCancel?.()) {
+        return false
+      }
       if (!testNapi) {
         LogHelper.warn('RuntimeInputPort', 'Input', '手柄类型切换跳过: engine not ready')
         return false
       }
-      const normalizedDevice = normalizeRuntimeControllerPortDevice(device)
-      return await nativeApi.refactoredSetControllerPortDeviceAsync(portId, normalizedDevice)
+      const ok = await nativeApi.refactoredSetControllerPortDeviceAsync(portId, safeDevice)
+      if (options?.shouldCancel?.()) {
+        return false
+      }
+      return ok
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeInputPort', 'Input', `手柄类型切换调用异常: ${message}`)
-      return false
+      throw err as Error
     }
   }
+}
+
+export function getRuntimeControllerPortDeviceForDisplay(device: number): number {
+  if (!Number.isFinite(device) || device < 0) {
+    return RETRO_DEVICE_JOYPAD
+  }
+  return Math.floor(device)
 }
 
 export function normalizeRuntimeControllerPortDevice(device: number): number {
-  return device === RETRO_DEVICE_ANALOG ? RETRO_DEVICE_ANALOG : RETRO_DEVICE_JOYPAD
+  const safeDevice = validateRuntimeControllerPortDevice(device)
+  return safeDevice === undefined ? RETRO_DEVICE_JOYPAD : safeDevice
 }
 
 export function describeRuntimeControllerPortDevice(device: number): string {
-  const normalizedDevice = normalizeRuntimeControllerPortDevice(device)
+  const safeDevice = validateRuntimeControllerPortDevice(device)
+  if (safeDevice === undefined) {
+    return 'Unknown'
+  }
   const found = RUNTIME_CONTROLLER_PORT_DEVICE_OPTIONS.find((item: RuntimeControllerPortDeviceOption) => {
-    return item.device === normalizedDevice
+    return item.device === safeDevice
   })
-  return found ? found.label : 'Joypad'
+  return found ? found.label : `Device ${safeDevice}`
+}
+
+function validateRuntimeControllerPortDevice(device: number): number | undefined {
+  if (!Number.isFinite(device) || device < 0) {
+    return undefined
+  }
+  return Math.floor(device)
 }
 
 export function createDefaultRuntimeControllerPortDevices(): number[] {

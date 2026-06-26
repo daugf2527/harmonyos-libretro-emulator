@@ -27,12 +27,19 @@ interface SaveStateManifestDocument {
 
 export interface SaveStateWriteOptions {
   thumbnail?: SaveStateManifestItemThumbnail
+  shouldCancel?: () => boolean
 }
 
 interface PersistedSaveStateThumbnail {
   fileName: string
   width: number
   height: number
+}
+
+class SaveStateCanceledError extends Error {
+  constructor() {
+    super('SAVE_STATE_CANCELED')
+  }
 }
 
 const SAVE_STATE_VERSION = 2
@@ -59,39 +66,54 @@ export async function saveStateData(
   romFile: string,
   options?: SaveStateWriteOptions
 ): Promise<SaveStateManifestItem> {
+  throwIfSaveStateCanceled(options)
   await ensureDirExists(buildSaveDirPath(context.filesDir))
   const createdAt = Date.now()
   const fileName = `state_${createdAt}.state`
   const targetPath = buildSaveFilePath(context.filesDir, fileName)
-  // T6-F4: .state written before manifest; crash here leaves an orphan .state (no romFile association).
-  // Mitigated by T6-F3 (both writes are atomic), but a process kill between the two steps is still possible.
-  // T8-C-F1: writeArrayBufferToFile 改 async, 避免 PS1/GBA 等大存档 (128KB-1MB) 阻塞主线程。
-  await writeArrayBufferToFile(targetPath, data)
-  const thumbnail = await tryPersistSaveStateThumbnail(context.filesDir, fileName, options?.thumbnail)
-  const item: SaveStateManifestItem = {
-    id: fileName,
-    fileName: fileName,
-    romFile: romFile,
-    createdAt: createdAt,
-    byteLength: data.byteLength
-  }
-  if (thumbnail) {
-    item.thumbnailFileName = thumbnail.fileName
-    item.thumbnailWidth = thumbnail.width
-    item.thumbnailHeight = thumbnail.height
-  }
-  const document = await loadManifest(context)
-  const nextItems: SaveStateManifestItem[] = [item]
-  document.items.forEach((existing: SaveStateManifestItem) => {
-    if (existing.fileName !== fileName) {
-      nextItems.push(normalizeManifestItem(existing))
+  let thumbnail: PersistedSaveStateThumbnail | undefined = undefined
+  try {
+    // T6-F4: .state written before manifest; crash here leaves an orphan .state (no romFile association).
+    // Mitigated by T6-F3 (both writes are atomic), but a process kill between the two steps is still possible.
+    // T8-C-F1: writeArrayBufferToFile 改 async, 避免 PS1/GBA 等大存档 (128KB-1MB) 阻塞主线程。
+    await writeArrayBufferToFile(targetPath, data, options?.shouldCancel)
+    throwIfSaveStateCanceled(options)
+    thumbnail = await tryPersistSaveStateThumbnail(context.filesDir, fileName, options?.thumbnail, options?.shouldCancel)
+    throwIfSaveStateCanceled(options)
+    const item: SaveStateManifestItem = {
+      id: fileName,
+      fileName: fileName,
+      romFile: romFile,
+      createdAt: createdAt,
+      byteLength: data.byteLength
     }
-  })
-  await saveManifest(context, {
-    version: SAVE_STATE_VERSION,
-    items: nextItems
-  })
-  return item
+    if (thumbnail) {
+      item.thumbnailFileName = thumbnail.fileName
+      item.thumbnailWidth = thumbnail.width
+      item.thumbnailHeight = thumbnail.height
+    }
+    const document = await loadManifest(context)
+    throwIfSaveStateCanceled(options)
+    const nextItems: SaveStateManifestItem[] = [item]
+    document.items.forEach((existing: SaveStateManifestItem) => {
+      if (existing.fileName !== fileName) {
+        nextItems.push(normalizeManifestItem(existing))
+      }
+    })
+    await saveManifest(context, {
+      version: SAVE_STATE_VERSION,
+      items: nextItems
+    }, options?.shouldCancel)
+    return item
+  } catch (err) {
+    if (err instanceof SaveStateCanceledError) {
+      await deletePathBestEffort(targetPath)
+      if (thumbnail) {
+        await deletePathBestEffort(buildSaveFilePath(context.filesDir, thumbnail.fileName))
+      }
+    }
+    throw err as Error
+  }
 }
 
 export function readSaveStateData(
@@ -322,7 +344,8 @@ async function buildManifestFromDirectory(context: common.UIAbilityContext): Pro
 
 async function saveManifest(
   context: common.UIAbilityContext,
-  document: SaveStateManifestDocument
+  document: SaveStateManifestDocument,
+  shouldCancel?: () => boolean
 ): Promise<void> {
   await ensureDirExists(buildSaveDirPath(context.filesDir))
   // Audit T6-F3: tmp+rename atomic write — crash during write leaves .tmp, not a corrupt manifest
@@ -330,10 +353,16 @@ async function saveManifest(
   const tmpPath = manifestPath + '.tmp'
   let file: fs.File | undefined = undefined
   try {
+    if (shouldCancel?.()) {
+      throw new SaveStateCanceledError()
+    }
     file = await fs.open(tmpPath, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     await fs.write(file.fd, JSON.stringify(document, null, 2))
     await fs.close(file.fd)
     file = undefined
+    if (shouldCancel?.()) {
+      throw new SaveStateCanceledError()
+    }
     await fs.rename(tmpPath, manifestPath)
   } catch (err) {
     if (file) {
@@ -344,12 +373,15 @@ async function saveManifest(
   }
 }
 
-async function writeArrayBufferToFile(path: string, data: ArrayBuffer): Promise<void> {
+async function writeArrayBufferToFile(path: string, data: ArrayBuffer, shouldCancel?: () => boolean): Promise<void> {
   // Audit T6-F3: tmp+rename atomic write — crash during write leaves .tmp, not a corrupt .state
   // T8-C-F1: async fs.* avoids blocking main thread on 128KB-1MB save serialization.
   const tmpPath = path + '.tmp'
   let file: fs.File | undefined = undefined
   try {
+    if (shouldCancel?.()) {
+      throw new SaveStateCanceledError()
+    }
     file = await fs.open(tmpPath, fs.OpenMode.READ_WRITE | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     const writeOptions: WriteOptions = {
       length: data.byteLength
@@ -357,6 +389,9 @@ async function writeArrayBufferToFile(path: string, data: ArrayBuffer): Promise<
     await fs.write(file.fd, data, writeOptions)
     await fs.close(file.fd)
     file = undefined
+    if (shouldCancel?.()) {
+      throw new SaveStateCanceledError()
+    }
     await fs.rename(tmpPath, path)
   } catch (err) {
     if (file) {
@@ -378,14 +413,18 @@ export function buildSaveStateThumbnailUri(filesDir: string, thumbnailFileName?:
 async function tryPersistSaveStateThumbnail(
   filesDir: string,
   stateFileName: string,
-  thumbnail?: SaveStateManifestItemThumbnail
+  thumbnail?: SaveStateManifestItemThumbnail,
+  shouldCancel?: () => boolean
 ): Promise<PersistedSaveStateThumbnail | undefined> {
   if (!thumbnail || thumbnail.width <= 0 || thumbnail.height <= 0 || thumbnail.rgba.byteLength === 0) {
     return undefined
   }
   try {
-    return await persistSaveStateThumbnail(filesDir, stateFileName, thumbnail)
+    return await persistSaveStateThumbnail(filesDir, stateFileName, thumbnail, shouldCancel)
   } catch (err) {
+    if (err instanceof SaveStateCanceledError) {
+      throw err
+    }
     const message = (err as Error).message || String(err)
     LogHelper.warn('SaveStateRepository', 'Thumbnail', `写入存档缩略图失败: ${message}`)
     return undefined
@@ -395,11 +434,15 @@ async function tryPersistSaveStateThumbnail(
 async function persistSaveStateThumbnail(
   filesDir: string,
   stateFileName: string,
-  thumbnail: SaveStateManifestItemThumbnail
+  thumbnail: SaveStateManifestItemThumbnail,
+  shouldCancel?: () => boolean
 ): Promise<PersistedSaveStateThumbnail> {
   const encoded = await encodeSaveStateThumbnail(thumbnail)
+  if (shouldCancel?.()) {
+    throw new SaveStateCanceledError()
+  }
   const thumbnailFileName = buildThumbnailFileName(stateFileName)
-  await writeArrayBufferToFile(buildSaveFilePath(filesDir, thumbnailFileName), encoded)
+  await writeArrayBufferToFile(buildSaveFilePath(filesDir, thumbnailFileName), encoded, shouldCancel)
   return {
     fileName: thumbnailFileName,
     width: thumbnail.width,
@@ -474,6 +517,19 @@ async function deleteThumbnailFileBestEffort(filesDir: string, thumbnailFileName
       return
     }
     LogHelper.warn('SaveStateRepository', 'Thumbnail', `删除缩略图失败 (保留孤儿图): ${message}`)
+  }
+}
+
+async function deletePathBestEffort(path: string): Promise<void> {
+  try {
+    await fs.unlink(path)
+  } catch (_err) {
+  }
+}
+
+function throwIfSaveStateCanceled(options?: SaveStateWriteOptions): void {
+  if (options?.shouldCancel?.()) {
+    throw new SaveStateCanceledError()
   }
 }
 

@@ -19,11 +19,16 @@ export interface RuntimeSaveStateListItem {
   isLatest: boolean
 }
 
+export interface RuntimeSaveStateTaskOptions {
+  shouldCancel?: () => boolean
+}
+
 export class RuntimeSaveStateController {
   async quickSave(
     context: common.UIAbilityContext | undefined,
     gameRunning: boolean,
-    romFile: string
+    romFile: string,
+    options?: RuntimeSaveStateTaskOptions
   ): Promise<string> {
     if (!gameRunning) {
       return '需在运行中存档'
@@ -37,7 +42,8 @@ export class RuntimeSaveStateController {
         return '存档数据不可用'
       }
       await saveStateData(context, bundle.stateData, romFile, {
-        thumbnail: buildThumbnailPayload(bundle)
+        thumbnail: buildThumbnailPayload(bundle),
+        shouldCancel: options?.shouldCancel
       })
       LogHelper.info(
         'RuntimeSaveState',
@@ -55,7 +61,8 @@ export class RuntimeSaveStateController {
   async quickLoad(
     context: common.UIAbilityContext | undefined,
     gameRunning: boolean,
-    romFile: string
+    romFile: string,
+    options?: RuntimeSaveStateTaskOptions
   ): Promise<string> {
     if (!gameRunning) {
       return '需在运行中读档'
@@ -69,7 +76,13 @@ export class RuntimeSaveStateController {
       if (!item) {
         return '当前 ROM 暂无存档'
       }
+      if (options?.shouldCancel?.()) {
+        return '存档操作已取消'
+      }
       const stateData = readSaveStateData(context, item.fileName)
+      if (options?.shouldCancel?.()) {
+        return '存档操作已取消'
+      }
       // Use async version to avoid blocking main thread on load deserialization
       const loaded = await runtimeSessionController.loadStateAsync(stateData)
       LogHelper.info('RuntimeSaveState', 'Save', `运行态即时读档: file=${LogHelper.describePathForLog(item.fileName)} ok=${loaded}`)
@@ -100,7 +113,8 @@ export class RuntimeSaveStateController {
   async loadSaveByFileName(
     context: common.UIAbilityContext | undefined,
     gameRunning: boolean,
-    fileName: string
+    fileName: string,
+    options?: RuntimeSaveStateTaskOptions
   ): Promise<string> {
     if (!gameRunning) {
       return '需在运行中读档'
@@ -112,7 +126,13 @@ export class RuntimeSaveStateController {
       return '存档文件无效'
     }
     try {
+      if (options?.shouldCancel?.()) {
+        return '存档操作已取消'
+      }
       const stateData = readSaveStateData(context, fileName)
+      if (options?.shouldCancel?.()) {
+        return '存档操作已取消'
+      }
       const loaded = await runtimeSessionController.loadStateAsync(stateData)
       LogHelper.info('RuntimeSaveState', 'Save', `运行态指定读档: file=${LogHelper.describePathForLog(fileName)} ok=${loaded}`)
       return loaded ? '读档已加载' : '读档被拒绝'
@@ -125,7 +145,8 @@ export class RuntimeSaveStateController {
 
   async deleteSaveByFileName(
     context: common.UIAbilityContext | undefined,
-    fileName: string
+    fileName: string,
+    options?: RuntimeSaveStateTaskOptions
   ): Promise<string> {
     if (!context) {
       return '上下文缺失'
@@ -134,6 +155,9 @@ export class RuntimeSaveStateController {
       return '存档文件无效'
     }
     try {
+      if (options?.shouldCancel?.()) {
+        return '存档操作已取消'
+      }
       await deleteSaveStateItem(context, fileName)
       LogHelper.info('RuntimeSaveState', 'Save', `运行态删除存档: file=${LogHelper.describePathForLog(fileName)}`)
       return '存档已删除'

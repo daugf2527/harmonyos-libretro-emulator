@@ -22,6 +22,10 @@ interface RuntimeCoreOptionsNapi {
 
 const nativeApi = testNapi as RuntimeCoreOptionsNapi
 
+export interface RuntimeCoreOptionsTaskOptions {
+  shouldCancel?: () => boolean
+}
+
 export class RuntimeCoreOptionsController {
   getOptions(): RuntimeCoreOptionItem[] {
     try {
@@ -36,16 +40,24 @@ export class RuntimeCoreOptionsController {
     }
   }
 
-  async getOptionsAsync(): Promise<RuntimeCoreOptionItem[]> {
+  async getOptionsAsync(options?: RuntimeCoreOptionsTaskOptions): Promise<RuntimeCoreOptionItem[]> {
+    if (options?.shouldCancel?.()) {
+      return []
+    }
+    if (!testNapi) {
+      LogHelper.warn('RuntimeCoreOptions', 'Engine', '读取核心选项跳过: engine not ready')
+      throw new Error('engine not ready')
+    }
     try {
-      if (!testNapi) {
+      const raw = await nativeApi.refactoredGetCoreOptionsAsync()
+      if (options?.shouldCancel?.()) {
         return []
       }
-      return this.parseOptionsJson(await nativeApi.refactoredGetCoreOptionsAsync())
+      return this.parseOptionsJson(raw)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreOptions', 'Engine', `读取核心选项失败: ${message}`)
-      return []
+      throw err as Error
     }
   }
 
@@ -70,7 +82,11 @@ export class RuntimeCoreOptionsController {
     }
   }
 
-  async setOptionAsync(key: string, value: string): Promise<boolean> {
+  async setOptionAsync(
+    key: string,
+    value: string,
+    options?: RuntimeCoreOptionsTaskOptions
+  ): Promise<boolean> {
     const safeKey = typeof key === 'string' ? key.trim() : ''
     const safeValue = typeof value === 'string' ? value.trim() : ''
     if (safeKey.length === 0 || safeValue.length === 0) {
@@ -78,16 +94,25 @@ export class RuntimeCoreOptionsController {
       return false
     }
 
+    if (options?.shouldCancel?.()) {
+      return false
+    }
+
+    if (!testNapi) {
+      LogHelper.warn('RuntimeCoreOptions', 'Engine', '写入核心选项跳过: engine not ready')
+      throw new Error('engine not ready')
+    }
+
     try {
-      if (!testNapi) {
-        LogHelper.warn('RuntimeCoreOptions', 'Engine', '写入核心选项跳过: engine not ready')
+      const ok = await nativeApi.refactoredSetCoreOptionAsync(safeKey, safeValue)
+      if (options?.shouldCancel?.()) {
         return false
       }
-      return await nativeApi.refactoredSetCoreOptionAsync(safeKey, safeValue)
+      return ok
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreOptions', 'Engine', `写入核心选项失败: ${message}`)
-      return false
+      throw err as Error
     }
   }
 

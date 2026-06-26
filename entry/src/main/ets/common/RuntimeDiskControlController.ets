@@ -27,7 +27,8 @@ const nativeApi = testNapi as RuntimeDiskControlNapi
 export class RuntimeDiskControlController {
   async getSnapshotAsync(): Promise<RuntimeDiskControlSnapshot> {
     if (!testNapi) {
-      return this.emptySnapshot()
+      LogHelper.warn('RuntimeDiskControl', 'Engine', '读取换盘快照跳过: engine not ready')
+      throw new Error('engine not ready')
     }
     try {
       const snapshot = await nativeApi.refactoredDiskControlGetSnapshotAsync()
@@ -42,7 +43,7 @@ export class RuntimeDiskControlController {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeDiskControl', 'Engine', `读取换盘快照失败: ${message}`)
-      return this.emptySnapshot()
+      throw err as Error
     }
   }
 
@@ -70,19 +71,21 @@ export class RuntimeDiskControlController {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeDiskControl', 'Engine', `换盘弹仓失败: ${message}`)
-      return false
+      throw err as Error
     }
   }
 
   setImageIndex(index: number): boolean {
+    const safeIndex = this.validateNonNegativeInt(index, '切换磁盘')
+    if (safeIndex === undefined) {
+      return false
+    }
     try {
       if (!testNapi) {
         LogHelper.warn('RuntimeDiskControl', 'Engine', '切换磁盘跳过: engine not ready')
         return false
       }
-      return nativeApi.refactoredDiskControlSetImageIndex(
-        this.normalizeNonNegativeInt(index)
-      )
+      return nativeApi.refactoredDiskControlSetImageIndex(safeIndex)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeDiskControl', 'Engine', `切换磁盘失败: ${message}`)
@@ -91,22 +94,28 @@ export class RuntimeDiskControlController {
   }
 
   async setImageIndexAsync(index: number): Promise<boolean> {
+    const safeIndex = this.validateNonNegativeInt(index, '切换磁盘')
+    if (safeIndex === undefined) {
+      return false
+    }
     try {
       if (!testNapi) {
         LogHelper.warn('RuntimeDiskControl', 'Engine', '切换磁盘跳过: engine not ready')
         return false
       }
-      return await nativeApi.refactoredDiskControlSetImageIndexAsync(
-        this.normalizeNonNegativeInt(index)
-      )
+      return await nativeApi.refactoredDiskControlSetImageIndexAsync(safeIndex)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeDiskControl', 'Engine', `切换磁盘失败: ${message}`)
-      return false
+      throw err as Error
     }
   }
 
   replaceImageIndex(index: number, path: string): boolean {
+    const safeIndex = this.validateNonNegativeInt(index, '替换磁盘')
+    if (safeIndex === undefined) {
+      return false
+    }
     const safePath = typeof path === 'string' ? path.trim() : ''
     if (safePath.length === 0) {
       LogHelper.warn('RuntimeDiskControl', 'Engine', '替换磁盘失败: path 为空')
@@ -118,7 +127,7 @@ export class RuntimeDiskControlController {
         return false
       }
       return nativeApi.refactoredDiskControlReplaceImageIndex(
-        this.normalizeNonNegativeInt(index),
+        safeIndex,
         safePath
       )
     } catch (err) {
@@ -129,6 +138,10 @@ export class RuntimeDiskControlController {
   }
 
   async replaceImageIndexAsync(index: number, path: string): Promise<boolean> {
+    const safeIndex = this.validateNonNegativeInt(index, '替换磁盘')
+    if (safeIndex === undefined) {
+      return false
+    }
     const safePath = typeof path === 'string' ? path.trim() : ''
     if (safePath.length === 0) {
       LogHelper.warn('RuntimeDiskControl', 'Engine', '替换磁盘失败: path 为空')
@@ -140,13 +153,13 @@ export class RuntimeDiskControlController {
         return false
       }
       return await nativeApi.refactoredDiskControlReplaceImageIndexAsync(
-        this.normalizeNonNegativeInt(index),
+        safeIndex,
         safePath
       )
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeDiskControl', 'Engine', `替换磁盘失败: ${message}`)
-      return false
+      throw err as Error
     }
   }
 
@@ -174,15 +187,7 @@ export class RuntimeDiskControlController {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeDiskControl', 'Engine', `新增磁盘失败: ${message}`)
-      return false
-    }
-  }
-
-  private emptySnapshot(): RuntimeDiskControlSnapshot {
-    return {
-      ejected: false,
-      imageIndex: 0,
-      imageCount: 0
+      throw err as Error
     }
   }
 
@@ -199,6 +204,14 @@ export class RuntimeDiskControlController {
       return 0
     }
     return Math.min(normalized, count - 1)
+  }
+
+  private validateNonNegativeInt(value: number, actionLabel: string): number | undefined {
+    if (!Number.isFinite(value) || value < 0) {
+      LogHelper.warn('RuntimeDiskControl', 'Engine', `${actionLabel}失败: index 非法`)
+      return undefined
+    }
+    return Math.floor(value)
   }
 }
 
