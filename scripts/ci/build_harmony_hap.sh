@@ -81,17 +81,18 @@ run_hvigor_assemble() {
     --no-daemon "$@"
 }
 
+last_hvigor_status=0
+
 run_and_print_hvigor_log() {
   local log_file="$1"
   shift
 
   set +e
   run_hvigor_assemble "$@" >"${log_file}" 2>&1
-  local status=$?
+  last_hvigor_status=$?
   set -e
 
   filter_unsigned_sign_warning <"${log_file}" || true
-  return "${status}"
 }
 
 echo "[INFO] Running hvigor unsigned build..."
@@ -99,9 +100,11 @@ echo "[INFO] Running hvigor unsigned build..."
 first_log="${RUNNER_TEMP:-/tmp}/hvigor-assemble.log"
 stacktrace_log="${RUNNER_TEMP:-/tmp}/hvigor-assemble-stacktrace.log"
 
-if ! run_and_print_hvigor_log "${first_log}"; then
+run_and_print_hvigor_log "${first_log}"
+if (( last_hvigor_status != 0 )); then
   echo "[WARN] hvigor assembleHap failed, rerunning with --stacktrace for diagnostics..."
-  if ! run_and_print_hvigor_log "${stacktrace_log}" --stacktrace; then
+  run_and_print_hvigor_log "${stacktrace_log}" --stacktrace
+  if (( last_hvigor_status != 0 )); then
     echo "[ERROR] hvigor assembleHap failed again with --stacktrace."
   fi
   exit 1
