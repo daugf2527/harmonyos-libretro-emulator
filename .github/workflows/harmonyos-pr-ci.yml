@@ -82,12 +82,30 @@ jobs:
 
       - name: Build HAP
         id: build
+        continue-on-error: true
         shell: bash
         env:
           HARMONY_BUILD_MODE: release
           HARMONY_PRODUCT_NAME: default
           HARMONY_MODULE_TARGET: entry@default
         run: bash scripts/ci/build_harmony_hap.sh
+
+      - name: Build HAP Stacktrace Diagnostics
+        if: steps.build.outcome == 'failure'
+        shell: bash
+        env:
+          HARMONY_BUILD_MODE: release
+          HARMONY_PRODUCT_NAME: default
+          HARMONY_MODULE_TARGET: entry@default
+          HARMONY_FORCE_STACKTRACE_BUILD: "1"
+        run: bash scripts/ci/build_harmony_hap.sh
+
+      - name: Fail If Build HAP Failed
+        if: steps.build.outcome == 'failure'
+        shell: bash
+        run: |
+          echo "[FAIL] Build HAP step failed. See the stacktrace diagnostics step above." >&2
+          exit 1
 
       - name: M3 Core Compatibility Manifest
         shell: bash
