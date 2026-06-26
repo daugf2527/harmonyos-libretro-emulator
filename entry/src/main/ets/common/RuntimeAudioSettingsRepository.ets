@@ -1,3 +1,4 @@
+import { deviceInfo } from '@kit.BasicServicesKit'
 import { common } from '@kit.AbilityKit'
 import { fileIo as fs } from '@kit.CoreFileKit'
 import LogHelper from './LogHelper'
@@ -22,7 +23,7 @@ const RUNTIME_AUDIO_SETTINGS_FILE_NAME = 'audio_settings.json'
 // 手感不变）；标准 128 在真机(100地板)之上加缓冲。MAX→400 给高缓冲留头寸
 // （400ms=19200帧 << RingBuffer 48000帧容量，安全）。改动需 DevEco + 模拟器实测抗 underrun。
 export const AUDIO_LATENCY_PRESETS: number[] = [48, 128, 300]
-const DEFAULT_AUDIO_LATENCY_MS = 48
+const DEFAULT_AUDIO_LATENCY_MS = resolveDefaultAudioLatencyMs()
 const MAX_AUDIO_LATENCY_MS = 400
 const DEFAULT_AUDIO_VOLUME_PERCENT = 100
 
@@ -170,6 +171,11 @@ function buildRuntimeAudioSettingsDirPath(filesDir: string): string {
 
 function buildRuntimeAudioSettingsPath(filesDir: string): string {
   return `${buildRuntimeAudioSettingsDirPath(filesDir)}/${RUNTIME_AUDIO_SETTINGS_FILE_NAME}`
+}
+
+function resolveDefaultAudioLatencyMs(): number {
+  const rawAbiList = String(deviceInfo.abiList ?? '').toLowerCase()
+  return rawAbiList.indexOf('x86_64') >= 0 ? AUDIO_LATENCY_PRESETS[2] : AUDIO_LATENCY_PRESETS[0]
 }
 
 async function ensureDirExists(path: string): Promise<void> {

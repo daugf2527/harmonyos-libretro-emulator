@@ -41,6 +41,9 @@ export const CORE_FIRMWARE_DEPENDENCY_RULES: CoreFirmwareDependencyRule[] = [
 
 export async function loadSystemFirmwareEntries(context: common.UIAbilityContext): Promise<string[]> {
   const systemDir = buildSystemFirmwareDir(context.filesDir)
+  if (!(await pathExists(systemDir))) {
+    return []
+  }
   try {
     return await fs.listFile(systemDir)
   } catch (_err) {
@@ -111,4 +114,13 @@ function buildSystemFirmwareDir(filesDir: string): string {
 
 function normalizeFirmwareName(value: string): string {
   return `${value}`.trim().toLowerCase()
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
 }
