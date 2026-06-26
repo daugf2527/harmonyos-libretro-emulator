@@ -265,6 +265,13 @@ static void CompleteGetRawFileListAsync(napi_env env, napi_status status,
   napi_value result = BuildStringArray(env, ctx->files);
   if (result) {
     (void)ResolveDeferredChecked(env, ctx->deferred, result);
+  } else {
+    SetLifecycleError("rawfile_list_result_alloc_failed", "GetRawFileListAsync",
+                      "Failed to allocate async rawfile list result array");
+    napi_value errMsg = MakeString(env, "rawfile_list_result_alloc_failed");
+    if (errMsg) {
+      (void)RejectDeferredChecked(env, ctx->deferred, errMsg);
+    }
   }
 
   if (ctx->work) {
@@ -948,6 +955,14 @@ static void CompleteSwitchGame(napi_env env, napi_status status, void *data) {
                                       ctx->errorMessage.empty() ? nullptr : ctx->errorMessage.c_str());
   if (result) {
     (void)ResolveDeferredChecked(env, ctx->deferred, result);
+  } else {
+    GetEngine()->SetLastErrorInfo("switch_result_alloc_failed",
+                                  "SwitchGameAsync",
+                                  "Failed to allocate switch result object");
+    napi_value reason = MakeString(env, "SwitchGameAsync result alloc failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
   }
 
   // 清理 TSFN
@@ -1156,6 +1171,11 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
         "SwitchGameAsync: failed to create async resource name");
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      napi_value reason = MakeString(env, "SwitchGameAsync resource result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
     delete ctx;
     return promise;
@@ -1177,6 +1197,11 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
         "SwitchGameAsync: napi_create_async_work failed");
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      napi_value reason = MakeString(env, "SwitchGameAsync create result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
     delete ctx;
     return promise;
@@ -1199,6 +1224,11 @@ static napi_value SwitchGameAsync(napi_env env, napi_callback_info info) {
         "SwitchGameAsync: napi_queue_async_work failed");
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      napi_value reason = MakeString(env, "SwitchGameAsync queue result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
     delete ctx;
     return promise;
@@ -1335,6 +1365,14 @@ static void CompleteStopEngineAsync(napi_env env, napi_status status,
     napi_value result = MakeBool(env, ctx->stopped);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      GetEngine()->SetLastErrorInfo("stop_result_alloc_failed",
+                                    "StopEngineAsync",
+                                    "Failed to allocate async stop result value");
+      napi_value errMsg = MakeString(env, "stop_result_alloc_failed");
+      if (errMsg) {
+        (void)RejectDeferredChecked(env, ctx->deferred, errMsg);
+      }
     }
   }
 

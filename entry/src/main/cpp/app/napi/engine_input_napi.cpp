@@ -430,6 +430,14 @@ static void CompleteSetControllerPortDeviceAsync(napi_env env, napi_status statu
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetInputError("controller_port_device_result_alloc_failed",
+                    "SetControllerPortDeviceAsync",
+                    "Failed to allocate async controller-port-device result value");
+      napi_value reason = MakeString(env, "SetControllerPortDeviceAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 

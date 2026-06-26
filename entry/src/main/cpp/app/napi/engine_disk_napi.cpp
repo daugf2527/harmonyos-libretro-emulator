@@ -173,6 +173,13 @@ static void CompleteDiskControlSetEjectStateAsync(napi_env env, napi_status stat
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetDiskError("disk_set_eject_result_alloc_failed", "DiskControlSetEjectStateAsync",
+                   "Failed to allocate async disk eject-state result value");
+      napi_value reason = MakeString(env, "DiskControlSetEjectStateAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -294,6 +301,13 @@ static void CompleteDiskControlSetImageIndexAsync(napi_env env, napi_status stat
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetDiskError("disk_set_image_result_alloc_failed", "DiskControlSetImageIndexAsync",
+                   "Failed to allocate async disk image-index result value");
+      napi_value reason = MakeString(env, "DiskControlSetImageIndexAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -423,6 +437,13 @@ static void CompleteDiskControlGetSnapshotAsync(napi_env env, napi_status status
         SetNamedPropertyChecked(env, result, "imageCount",
                                 MakeUint32(env, ctx->imageCount))) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetDiskError("disk_snapshot_result_alloc_failed", "DiskControlGetSnapshotAsync",
+                   "Failed to allocate async disk snapshot result object");
+      napi_value reason = MakeString(env, "DiskControlGetSnapshotAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -460,8 +481,12 @@ static napi_value DiskControlGetSnapshotAsync(napi_env env, napi_callback_info i
     SetDiskError("disk_snapshot_async_resource_name_failed",
                  "DiskControlGetSnapshotAsync",
                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "DiskControlGetSnapshotAsync create failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, deferred, reason);
+    }
     delete ctx;
-    return nullptr;
+    return promise;
   }
 
   napi_status createStatus =
@@ -546,6 +571,14 @@ static void CompleteDiskControlReplaceImageIndexAsync(napi_env env, napi_status 
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetDiskError("disk_replace_image_result_alloc_failed",
+                   "DiskControlReplaceImageIndexAsync",
+                   "Failed to allocate async disk replace-image result value");
+      napi_value reason = MakeString(env, "DiskControlReplaceImageIndexAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -714,6 +747,13 @@ static void CompleteDiskControlAddImageIndexAsync(napi_env env, napi_status stat
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetDiskError("disk_add_image_result_alloc_failed", "DiskControlAddImageIndexAsync",
+                   "Failed to allocate async disk add-image result value");
+      napi_value reason = MakeString(env, "DiskControlAddImageIndexAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 

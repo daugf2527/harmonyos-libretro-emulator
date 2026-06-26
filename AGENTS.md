@@ -174,7 +174,7 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredGetSaveStateSizeAsync` | `() => Promise<number>` | async | 异步获取存档大小（推荐） |
 | `refactoredSaveState` | `() => ArrayBuffer \| null` | sync | 同步保存状态（阻塞） |
 | `refactoredLoadState` | `(data: ArrayBuffer) => boolean` | sync | 同步加载状态（阻塞） |
-| `refactoredSaveStateAsync` | `() => Promise<ArrayBuffer \| null>` | async | 异步保存状态（推荐） |
+| `refactoredSaveStateAsync` | `() => Promise<ArrayBuffer>` | async | 异步保存状态（推荐；失败 reject，成功只 resolve ArrayBuffer） |
 | `refactoredSaveStateBundleAsync` | `() => Promise<{stateData:ArrayBuffer,thumbnailRgba:ArrayBuffer \| null,thumbnailWidth:number,thumbnailHeight:number}>` | async | 异步保存状态并返回当前帧缩略图原始 RGBA（CPU/GLES 最小闭环） |
 | `refactoredLoadStateAsync` | `(data: ArrayBuffer) => Promise<boolean>` | async | 异步加载状态（推荐） |
 | `refactoredGetSRAM` | `() => ArrayBuffer \| null` | sync | 获取电池备份 SRAM |
@@ -202,8 +202,8 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredUnassignPort` | `(port: number) => boolean` | sync | 解除端口绑定 |
 | `refactoredListInputDevices` | `() => InputDeviceInfo[]` | sync | 列出已注册输入设备 |
 | `refactoredSendSensor` | `(port: number, id: number, value: number) => boolean` | sync | 发送传感器事件（**注意 3 参非 5 参**） |
-| `refactoredSetControllerPortDevice` | `(port: number, device: number) => boolean` | sync | 设置端口手柄类型 |
-| `refactoredSetControllerPortDeviceAsync` | `(port: number, device: number) => Promise<boolean>` | async | 异步设置端口手柄类型，避免 UI 线程同步等待 |
+| `refactoredSetControllerPortDevice` | `(port: number, device: number) => boolean` | sync | 设置端口手柄类型；port 0-3，device 为非负 libretro device id（含 subclass），非法值返回 false |
+| `refactoredSetControllerPortDeviceAsync` | `(port: number, device: number) => Promise<boolean>` | async | 异步设置端口手柄类型；port 0-3，device 为非负 libretro device id（含 subclass），非法值返回 false |
 | `refactoredGetInputDescriptorMask` | `() => number` | sync | 16-bit 输入描述符掩码，0=核心未声明 |
 | `setInputKeyMapping` *(无 refactored 前缀)* | `(mappingMap: Record<string, number>) => boolean` | sync | 设置键盘→libretro 映射表 |
 
@@ -216,9 +216,9 @@ ArkTS 契约真值源：`entry/src/main/cpp/types/libentry/index.d.ts`（签名�
 | `refactoredSetSoftwareMaxResolution` | `(maxWidth: number, maxHeight: number) => boolean` | sync | 限制软渲染最大分辨率 |
 | `refactoredSetAIUpscale` | `(enabled: boolean) => boolean` | sync | AI 超分开关 |
 | `refactoredSetHwRenderAllowed` | `(enabled: boolean) => boolean` | sync | 允许/禁止硬件渲染 |
-| `refactoredSetMinimumAudioLatency` | `(latencyMs: number) => boolean` | sync | 设置音频最小延迟 (ms) |
+| `refactoredSetMinimumAudioLatency` | `(latencyMs: number) => boolean` | sync | 设置音频最小延迟 (ms)，负数返回 false 并写入 lastErrorInfo |
 | `refactoredSetAudioSyncMode` | `(mode: number) => boolean` | sync | 音频同步模式 0=NonBlocking/1=Blocking |
-| `refactoredSetAudioVolume` | `(percent: number) => boolean` | sync | 设置主音量百分比 0-100 |
+| `refactoredSetAudioVolume` | `(percent: number) => boolean` | sync | 设置主音量百分比 0-100，越界返回 false 并写入 lastErrorInfo |
 
 ### 磁盘控制 (12) — engine_disk_napi.cpp
 

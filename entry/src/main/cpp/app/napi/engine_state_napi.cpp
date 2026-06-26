@@ -99,6 +99,13 @@ static void CompleteGetSaveStateSizeAsync(napi_env env, napi_status status, void
     napi_value result = MakeInt64(env, static_cast<int64_t>(ctx->size));
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("save_state_size_result_alloc_failed", "GetSaveStateSizeAsync",
+                    "Failed to allocate async save-state-size result value");
+      napi_value reason = MakeString(env, "GetSaveStateSizeAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
   if (ctx->work) {
@@ -302,9 +309,16 @@ static void CompleteGetSRAMAsync(napi_env env, napi_status status, void *data) {
   } else if (!ctx->ok || ctx->data.empty()) {
     EnsureStateErrorIfEmpty("get_sram_failed", "GetSRAMAsync",
                             "SRAM snapshot is unavailable in current core state");
-    napi_value reason = MakeString(env, "GetSRAM failed");
-    if (reason) {
-      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    napi_value result = MakeNull(env);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("get_sram_null_result_alloc_failed", "GetSRAMAsync",
+                    "Failed to allocate async get-sram null result value");
+      napi_value reason = MakeString(env, "GetSRAMAsync null result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   } else {
     napi_value arrayBuffer =
@@ -429,6 +443,13 @@ static void CompleteSetSRAMAsync(napi_env env, napi_status status, void *data) {
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("set_sram_result_alloc_failed", "SetSRAMAsync",
+                    "Failed to allocate async set-sram result value");
+      napi_value reason = MakeString(env, "SetSRAMAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -564,6 +585,13 @@ static void CompleteResetCoreAsync(napi_env env, napi_status status, void *data)
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("reset_core_result_alloc_failed", "ResetCoreAsync",
+                    "Failed to allocate async reset-core result value");
+      napi_value reason = MakeString(env, "ResetCoreAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -723,6 +751,13 @@ static void CompleteCheatResetAsync(napi_env env, napi_status status, void *data
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("cheat_reset_result_alloc_failed", "CheatResetAsync",
+                    "Failed to allocate async cheat-reset result value");
+      napi_value reason = MakeString(env, "CheatResetAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -835,6 +870,13 @@ static void CompleteCheatSetAsync(napi_env env, napi_status status, void *data) 
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("cheat_set_result_alloc_failed", "CheatSetAsync",
+                    "Failed to allocate async cheat-set result value");
+      napi_value reason = MakeString(env, "CheatSetAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -999,6 +1041,13 @@ static void CompleteGetCoreOptionsAsync(napi_env env, napi_status status, void *
     napi_value result = MakeString(env, ctx->json);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("core_options_result_alloc_failed", "GetCoreOptionsAsync",
+                    "Failed to allocate async core-options result string");
+      napi_value reason = MakeString(env, "GetCoreOptionsAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -1110,6 +1159,13 @@ static void CompleteSetCoreOptionAsync(napi_env env, napi_status status, void *d
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("core_option_set_result_alloc_failed", "SetCoreOptionAsync",
+                    "Failed to allocate async core-option result value");
+      napi_value reason = MakeString(env, "SetCoreOptionAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -1530,6 +1586,13 @@ static void CompleteLoadStateAsync(napi_env env, napi_status status, void *data)
     napi_value result = MakeBool(env, ctx->ok);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetStateError("load_state_result_alloc_failed", "LoadStateAsync",
+                    "Failed to allocate async load-state result value");
+      napi_value reason = MakeString(env, "LoadStateAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 

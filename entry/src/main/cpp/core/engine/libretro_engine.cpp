@@ -1676,6 +1676,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     LOGF(LOG_INFO, "[NEW] Message: LoadRom path=%{public}s, data=%{public}s",
          security::DescribePathForLog(currentGamePath_).c_str(),
          currentGameData_ ? "YES" : "NO");
+    const bool emptyContent = currentGamePath_.empty() && !currentGameData_;
     if (!currentGamePath_.empty() &&
         !security::ValidateRomPath(currentGamePath_)) {
       LOGF(LOG_ERROR, " [NEW] LoadRom blocked: invalid ROM path %{public}s",
@@ -1689,23 +1690,24 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       break;
     }
     if (coreLoader_.IsLoaded()) {
+      if (emptyContent && envState_.SupportsNoGame() &&
+          (prevState == EngineState::GAME_LOADED ||
+           prevState == EngineState::RUNNING ||
+           prevState == EngineState::PAUSED)) {
+        LOGF(LOG_INFO,
+             "[NEW] LoadRom ignored for no-game core (already loaded)");
+        currentGamePath_.clear();
+        currentGameData_.reset();
+        break;
+      }
       if (prevState == EngineState::GAME_LOADED ||
           prevState == EngineState::RUNNING ||
           prevState == EngineState::PAUSED) {
         UnloadGameIfNeeded("reload_rom");
       }
       TransitionTo(EngineState::LOADING);
-      const bool emptyContent = currentGamePath_.empty() && !currentGameData_;
       if (emptyContent) {
         if (envState_.SupportsNoGame()) {
-          if (prevState == EngineState::GAME_LOADED ||
-              prevState == EngineState::RUNNING ||
-              prevState == EngineState::PAUSED) {
-            LOGF(LOG_INFO,
-                 "[NEW] LoadRom ignored for no-game core (already loaded)");
-            break;
-          }
-
           LOGF(LOG_INFO, "[NEW] Empty ROM path for no-game core: calling "
                          "retro_load_game(NULL)");
 
@@ -1729,7 +1731,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
               if (!reset_ok) {
                 LOGF(LOG_ERROR,
                      " [NEW] LoadRom(no-game) Failed: AudioBridge reset failed");
-                currentGameData_.reset();
+                UnloadGameIfNeeded("audio_reset_failed_no_game");
                 eventBridge_.Emit("core_crash",
                                   "{\"reason\": \"audio_bridge_reset_failed\"}",
                                   true);
@@ -1890,7 +1892,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
           if (!reset_ok) {
             LOGF(LOG_ERROR,
                  " [NEW] LoadRom Failed: AudioBridge reset failed");
-            currentGameData_.reset();
+            UnloadGameIfNeeded("audio_reset_failed");
             eventBridge_.Emit("core_crash",
                               "{\"reason\": \"audio_bridge_reset_failed\"}",
                               true);

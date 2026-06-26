@@ -168,7 +168,7 @@ std::vector<interfaces::InputDeviceInfo> InputManager::ListInputDevices()
 }
 
 bool InputManager::SetControllerPortDevice(int port, int device) {
-  if (port < 0 || device < 0) {
+  if (!IsValidPort(port) || device < 0) {
     return false;
   }
   if (!controller_port_device_callback_) {

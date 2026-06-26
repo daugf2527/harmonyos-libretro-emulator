@@ -183,7 +183,11 @@ static napi_value SetMinimumAudioLatency(napi_env env, napi_callback_info info) 
       return MakeBool(env, false);
     }
   }
-  if (v < 0) v = 0;
+  if (v < 0) {
+    SetVideoAudioError("audio_latency_invalid", "SetMinimumAudioLatency",
+                       "Audio latency must be non-negative");
+    return MakeBool(env, false);
+  }
   LOGF(LOG_INFO, "[NEW] SetMinimumAudioLatency called: %{public}d ms", v);
   GetEngine()->SetMinimumAudioLatency(static_cast<unsigned>(v));
   return MakeBool(env, true);
@@ -238,10 +242,10 @@ static napi_value SetAudioVolume(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], percent, "SetAudioVolume", "percent")) {
     return MakeBool(env, false);
   }
-  if (percent < 0) {
-    percent = 0;
-  } else if (percent > 100) {
-    percent = 100;
+  if (percent < 0 || percent > 100) {
+    SetVideoAudioError("audio_volume_invalid", "SetAudioVolume",
+                       "Audio volume percent must be between 0 and 100");
+    return MakeBool(env, false);
   }
 
   auto *audioBridge = libretro::AudioBridge::GetInstance();

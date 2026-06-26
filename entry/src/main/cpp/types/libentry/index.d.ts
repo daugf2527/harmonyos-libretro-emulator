@@ -97,9 +97,9 @@ export interface EngineErrorInfo {
 export const refactoredGetLastErrorInfo: () => EngineErrorInfo;
 export const refactoredClearLastErrorInfo: () => boolean;
 export const refactoredSetFilesDir: (filesDir: string) => boolean;
-export const refactoredSetMinimumAudioLatency: (latencyMs: number) => boolean;
+export const refactoredSetMinimumAudioLatency: (latencyMs: number) => boolean; // latencyMs >= 0
 export const refactoredSetAudioSyncMode: (mode: number) => boolean; // 0=NonBlocking, 1=Blocking
-export const refactoredSetAudioVolume: (percent: number) => boolean;
+export const refactoredSetAudioVolume: (percent: number) => boolean; // percent 0-100
 
 // Video Config
 export const refactoredSetScalingMode: (mode: number) => boolean; // 0=Hardware, 1=Software, 2=GLES
@@ -120,7 +120,7 @@ export interface SaveStateBundleResult {
 }
 export const refactoredSaveState: () => ArrayBuffer | null;
 export const refactoredLoadState: (data: ArrayBuffer) => boolean;
-export const refactoredSaveStateAsync: () => Promise<ArrayBuffer | null>;
+export const refactoredSaveStateAsync: () => Promise<ArrayBuffer>;
 export const refactoredSaveStateBundleAsync: () => Promise<SaveStateBundleResult>;
 export const refactoredLoadStateAsync: (data: ArrayBuffer) => Promise<boolean>;
 
@@ -160,7 +160,7 @@ export const refactoredCheatResetAsync: () => Promise<boolean>;
 export const refactoredCheatSetAsync: (index: number, enabled: boolean, code: string) => Promise<boolean>;
 
 // Input Port Control
-export const refactoredSetControllerPortDeviceAsync: (port: number, device: number) => Promise<boolean>;
+export const refactoredSetControllerPortDeviceAsync: (port: number, device: number) => Promise<boolean>; // port 0-3, device >= 0
 
 // Stats
 export interface EngineStats {
@@ -217,7 +217,7 @@ export const refactoredGetInputDebugStats: () => InputDebugStats;
 export const setInputKeyMapping: (mappingMap: Record<string, number>) => boolean;
 
 // Controller/Region
-export const refactoredSetControllerPortDevice: (port: number, device: number) => boolean;
+export const refactoredSetControllerPortDevice: (port: number, device: number) => boolean; // port 0-3, device >= 0
 export const refactoredGetRegion: () => number;
 export const refactoredGetRegionAsync: () => Promise<number>;
 

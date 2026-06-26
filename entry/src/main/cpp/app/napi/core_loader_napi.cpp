@@ -104,6 +104,15 @@ static napi_value MakeString(napi_env env, const char *value) {
   return MakeString(env, std::string(value ? value : ""));
 }
 
+static napi_value MakeUndefined(napi_env env) {
+  napi_value result = nullptr;
+  if (napi_get_undefined(env, &result) != napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to create undefined value");
+    return nullptr;
+  }
+  return result;
+}
+
 static bool ResolveDeferredChecked(napi_env env, napi_deferred deferred,
                                    napi_value value) {
   if (!deferred || !value) {
@@ -620,6 +629,11 @@ static void CompleteTestCoreLoader(napi_env env, napi_status status, void *data)
   } else {
     napi_value result = MakeString(env, ctx->resultMessage);
     if (!result) {
+      LOGF(LOG_ERROR, "[NEW] TestCoreLoader failed to allocate result string");
+      napi_value reason = MakeUndefined(env);
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
       if (ctx->work) {
         napi_delete_async_work(env, ctx->work);
         ctx->work = nullptr;

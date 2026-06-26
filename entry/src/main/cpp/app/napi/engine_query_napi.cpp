@@ -26,6 +26,15 @@ void EnsureQueryErrorIfEmpty(const char *reason, const char *step,
   engine->SetLastErrorInfo(reason, step, message);
 }
 
+bool IsValidEngineStateValue(int32_t stateValue) {
+  return stateValue >= static_cast<int32_t>(libretro::EngineState::INIT) &&
+         stateValue <= static_cast<int32_t>(libretro::EngineState::ERROR);
+}
+
+bool IsValidRegionValue(unsigned region) {
+  return region == 0 || region == 1;
+}
+
 } // namespace
 
 static napi_value GetEngineState(napi_env env, napi_callback_info info) {
@@ -46,6 +55,11 @@ static napi_value WaitForEngineState(napi_env env, napi_callback_info info) {
 
   int32_t stateValue = 0;
   if (!GetInt32Arg(env, args[0], stateValue, "WaitForEngineState", "state")) {
+    return MakeBool(env, false);
+  }
+  if (!IsValidEngineStateValue(stateValue)) {
+    SetQueryError("wait_state_invalid", "WaitForEngineState",
+                  "Requested engine state is outside supported range");
     return MakeBool(env, false);
   }
 
@@ -120,6 +134,13 @@ static void CompleteWaitForState(napi_env env, napi_status status, void *data) {
     napi_value result = MakeBool(env, ctx->result);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetQueryError("wait_for_state_result_alloc_failed", "WaitForEngineStateAsync",
+                    "Failed to allocate async wait-for-state result value");
+      napi_value reason = MakeString(env, "WaitForEngineStateAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
@@ -142,6 +163,11 @@ static napi_value WaitForEngineStateAsync(napi_env env,
   int32_t stateValue = 0;
   if (!GetInt32Arg(env, args[0], stateValue, "WaitForEngineStateAsync",
                    "state")) {
+    return MakeResolvedPromise(env, false);
+  }
+  if (!IsValidEngineStateValue(stateValue)) {
+    SetQueryError("wait_state_invalid", "WaitForEngineStateAsync",
+                  "Requested engine state is outside supported range");
     return MakeResolvedPromise(env, false);
   }
 
@@ -281,6 +307,11 @@ static napi_value HasGameLoaded(napi_env env, napi_callback_info info) {
 static napi_value GetRegion(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   unsigned region = GetEngine()->GetRegion();
+  if (!IsValidRegionValue(region)) {
+    EnsureQueryErrorIfEmpty("region_unavailable", "GetRegion",
+                            "Region query callback is unavailable");
+    region = 0;
+  }
   return MakeUint32(env, region);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -323,9 +354,22 @@ static void CompleteGetRegionAsync(napi_env env, napi_status status, void *data)
       (void)RejectDeferredChecked(env, ctx->deferred, reason);
     }
   } else {
-    napi_value result = MakeUint32(env, ctx->region);
+    unsigned region = ctx->region;
+    if (!IsValidRegionValue(region)) {
+      EnsureQueryErrorIfEmpty("region_unavailable", "GetRegionAsync",
+                              "Region query callback is unavailable");
+      region = 0;
+    }
+    napi_value result = MakeUint32(env, region);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetQueryError("get_region_result_alloc_failed", "GetRegionAsync",
+                    "Failed to allocate async region result value");
+      napi_value reason = MakeString(env, "GetRegionAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 

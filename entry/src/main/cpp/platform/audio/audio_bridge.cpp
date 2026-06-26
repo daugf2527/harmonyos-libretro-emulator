@@ -836,10 +836,23 @@ bool AudioBridge::Reset(int32_t sample_rate) {
 
     if (initialized_.load()) {
       if (audio_player_) {
+        const bool was_started = is_started_;
+        const bool was_buffering = buffering_;
+        const uint32_t previous_recover_streak = recover_streak_;
         running_.store(false, std::memory_order_release);
         if (ring_buffer_)
           ring_buffer_->Clear();
-        audio_player_->Stop();
+        if (!audio_player_->Stop()) {
+          running_.store(was_started, std::memory_order_release);
+          buffering_ = was_buffering;
+          recover_streak_ = previous_recover_streak;
+          SetRunState(AudioRunState::RECOVERING, "reset_stop_failed");
+          LOGF(LOG_WARN,
+               "%{public}s AudioBridge reset aborted: stop failed "
+               "(started=%{public}d, buffering=%{public}d)",
+               kAudioChainPrefix, was_started ? 1 : 0, was_buffering ? 1 : 0);
+          return false;
+        }
         audio_player_.reset();
       }
       ring_buffer_.reset();

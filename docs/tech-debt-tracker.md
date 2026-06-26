@@ -185,7 +185,7 @@
 | 影响 | P3 — 声明 `ArrayBuffer\|null`，失败却返回 `{success:false,errorCode,message}` 结构对象（truthy）→ ArkTS `if(!buf)`/`buf===null` 漏判失败（D010/D011/D012 同根类型谎言）。**当前无活跃 caller**：`RuntimeSessionController.saveState():56` 透传但全仓 0 上游调用，生产实走 `refactoredSaveStateAsync`（reject 失败，正确）。休眠路径，爆炸半径≈0，但属潜在地雷 |
 | 拟修 | 已修：两失败路径 `MakeErrorResult` → `MakeNull(env)`，对齐同文件 GetSRAM L161/166（同为 `ArrayBuffer\|null` sync，失败返回 MakeNull）正范式。errorCode 仍可经 `refactoredGetLastErrorInfo` 查。成功路径 return arrayBuffer 不变 |
 | 状态 | fixed |
-| 备注 | **2026-06-06 修复**（本会话 loop）：cxx-build PASS；napi-boundary-reviewer 复核 **PASS**（5/5 OK：MakeNull 对齐 GetSRAM、ArkTS 消费 0 依赖旧 struct、RAII 安全、文件级 MakeErrorResult 仅剩注释）。**全文件闭环结论**：reviewer 交叉核对 engine_state_napi.cpp 全部 13 sync export 返回类型现 100% 对齐 index.d.ts 声明。其余 6 async（GetSaveStateSize/SaveState/LoadState/WaitForState/StopEngine/GetRawFileList）resolve 类型本轮亦逐个核实与声明一致，失败均走 reject。memory `feedback_napi_return_type_lie_hides_bug` |
+| 备注 | **2026-06-06 修复**（本会话 loop）：cxx-build PASS；napi-boundary-reviewer 复核 **PASS**（5/5 OK：MakeNull 对齐 GetSRAM、ArkTS 消费 0 依赖旧 struct、RAII 安全、文件级 MakeErrorResult 仅剩注释）。**全文件闭环结论**：reviewer 交叉核对 engine_state_napi.cpp 全部 13 sync export 返回类型现 100% 对齐 index.d.ts 声明。其余 async 失败均走 reject。**2026-06-23 补契约漂移**：`refactoredSaveStateAsync` native 逻辑失败/分配失败均 reject，成功只 resolve `ArrayBuffer`，不会 resolve `null`；已将 `index.d.ts`、`RuntimeSessionController` 局部接口和 `AGENTS.md` inventory 从 `Promise<ArrayBuffer \| null>` 修为 `Promise<ArrayBuffer>`。memory `feedback_napi_return_type_lie_hides_bug` |
 
 ### D015 — EventBridge core_error 死事件类型 + 枚举版 Emit/GetEventName 死代码（需决策）
 
