@@ -19,6 +19,7 @@ mkdir -p "${HARMONY_CLI_INSTALL_DIR}"
 
 archive_path="${HARMONY_CLI_INSTALL_DIR}/command-line-tools.zip"
 tool_home="${HARMONY_CLI_INSTALL_DIR}/command-line-tools"
+sdk_overlay_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/ci-assets/harmony-sdk-api26"
 
 if [[ ! -d "${tool_home}" ]]; then
   echo "[INFO] Downloading HarmonyOS Command Line Tools..."
@@ -66,6 +67,21 @@ sdk_toolchains="${tool_home}/sdk/default/openharmony/toolchains"
 if [[ ! -d "${sdk_toolchains}" ]]; then
   echo "[FAIL] HarmonyOS toolchains directory not found: ${sdk_toolchains}" >&2
   exit 1
+fi
+
+if [[ -d "${sdk_overlay_dir}" ]]; then
+  echo "[INFO] Applying API26 SDK metadata overlay..."
+  mkdir -p "${tool_home}/sdk/default/openharmony/native"
+  mkdir -p "${tool_home}/sdk/default/openharmony/ets"
+  mkdir -p "${tool_home}/sdk/default/openharmony/js"
+  mkdir -p "${tool_home}/sdk/default/openharmony/toolchains"
+  mkdir -p "${tool_home}/sdk/default/openharmony/previewer"
+  cp "${sdk_overlay_dir}/sdk-pkg.json" "${tool_home}/sdk/default/sdk-pkg.json"
+  cp "${sdk_overlay_dir}/openharmony/native/oh-uni-package.json" "${tool_home}/sdk/default/openharmony/native/oh-uni-package.json"
+  cp "${sdk_overlay_dir}/openharmony/ets/oh-uni-package.json" "${tool_home}/sdk/default/openharmony/ets/oh-uni-package.json"
+  cp "${sdk_overlay_dir}/openharmony/js/oh-uni-package.json" "${tool_home}/sdk/default/openharmony/js/oh-uni-package.json"
+  cp "${sdk_overlay_dir}/openharmony/toolchains/oh-uni-package.json" "${tool_home}/sdk/default/openharmony/toolchains/oh-uni-package.json"
+  cp "${sdk_overlay_dir}/openharmony/previewer/oh-uni-package.json" "${tool_home}/sdk/default/openharmony/previewer/oh-uni-package.json"
 fi
 
 node_home=""
