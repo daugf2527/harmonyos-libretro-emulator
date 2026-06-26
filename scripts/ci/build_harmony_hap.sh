@@ -91,20 +91,16 @@ cleanup_logs() {
 }
 trap cleanup_logs EXIT
 
-set +e
-"${hvigorw_bin}" assembleHap "${hvigor_args[@]}" >"${first_log}" 2>&1
-first_status=$?
-set -e
+first_status=0
+"${hvigorw_bin}" assembleHap "${hvigor_args[@]}" >"${first_log}" 2>&1 || first_status=$?
 
 cat "${first_log}"
 filter_unsigned_sign_warning <"${first_log}" || true
 if (( first_status != 0 )); then
   echo "[WARN] hvigor assembleHap failed, rerunning with --stacktrace for diagnostics..."
   echo "[WARN] first attempt log: ${first_log}"
-  set +e
-  "${hvigorw_bin}" assembleHap "${hvigor_args[@]}" --stacktrace >"${stacktrace_log}" 2>&1
-  stacktrace_status=$?
-  set -e
+  stacktrace_status=0
+  "${hvigorw_bin}" assembleHap "${hvigor_args[@]}" --stacktrace >"${stacktrace_log}" 2>&1 || stacktrace_status=$?
   cat "${stacktrace_log}"
   if (( stacktrace_status != 0 )); then
     echo "[FAIL] hvigor assembleHap failed with --stacktrace."
