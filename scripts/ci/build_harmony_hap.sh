@@ -74,26 +74,12 @@ filter_unsigned_sign_warning() {
 }
 
 hvigor_args=(
-  assembleHap
   --mode module
   -p "module=${module_target}"
   -p "product=${product_name}"
   -p "buildMode=${build_mode}"
   --no-daemon
 )
-
-run_hvigor_to_log() {
-  local log_file="$1"
-  shift
-  set +e
-  "${hvigorw_bin}" "$@" >"${log_file}" 2>&1
-  last_hvigor_status=$?
-  set -e
-  cat "${log_file}"
-  return 0
-}
-
-last_hvigor_status=0
 
 echo "[INFO] Running hvigor unsigned build..."
 "${hvigorw_bin}" clean --no-daemon
@@ -105,16 +91,24 @@ cleanup_logs() {
 }
 trap cleanup_logs EXIT
 
-run_hvigor_to_log "${first_log}" "${hvigor_args[@]}"
+set +e
+"${hvigorw_bin}" assembleHap "${hvigor_args[@]}" >"${first_log}" 2>&1
+first_status=$?
+set -e
+
+cat "${first_log}"
 filter_unsigned_sign_warning <"${first_log}" || true
-if (( last_hvigor_status != 0 )); then
+if (( first_status != 0 )); then
   echo "[WARN] hvigor assembleHap failed, rerunning with --stacktrace for diagnostics..."
   echo "[WARN] first attempt log: ${first_log}"
-  run_hvigor_to_log "${stacktrace_log}" "${hvigor_args[@]}" --stacktrace
-  if (( last_hvigor_status != 0 )); then
-    echo "[FAIL] hvigor assembleHap failed with --stacktrace. Full stacktrace log follows:"
-    cat "${stacktrace_log}"
-    exit 1
+  set +e
+  "${hvigorw_bin}" assembleHap "${hvigor_args[@]}" --stacktrace >"${stacktrace_log}" 2>&1
+  stacktrace_status=$?
+  set -e
+  cat "${stacktrace_log}"
+  if (( stacktrace_status != 0 )); then
+    echo "[FAIL] hvigor assembleHap failed with --stacktrace."
+    exit "${stacktrace_status}"
   fi
 fi
 
