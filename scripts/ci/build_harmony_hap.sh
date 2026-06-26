@@ -73,41 +73,44 @@ filter_unsigned_sign_warning() {
   sed -E "/Will skip sign 'hos_hap'/d;/No signingConfigs profile is configured/d;/configure the signingConfigs/d"
 }
 
-run_hvigor_assemble() {
-  "${hvigorw_bin}" assembleHap --mode module \
-    -p module="${module_target}" \
-    -p product="${product_name}" \
-    -p buildMode="${build_mode}" \
-    --no-daemon "$@"
-}
+hvigor_args=(
+  assembleHap
+  --mode module
+  -p "module=${module_target}"
+  -p "product=${product_name}"
+  -p "buildMode=${build_mode}"
+  --no-daemon
+)
 
-last_hvigor_status=0
-
-run_and_print_hvigor_log() {
+run_hvigor_to_log() {
   local log_file="$1"
   shift
-
   set +e
-  run_hvigor_assemble "$@" >"${log_file}" 2>&1
-  last_hvigor_status=$?
+  "${hvigorw_bin}" "$@" >"${log_file}" 2>&1
+  local status=$?
   set -e
-
-  filter_unsigned_sign_warning <"${log_file}" || true
+  cat "${log_file}"
+  return "${status}"
 }
 
 echo "[INFO] Running hvigor unsigned build..."
 "${hvigorw_bin}" clean --no-daemon
-first_log="${RUNNER_TEMP:-/tmp}/hvigor-assemble.log"
-stacktrace_log="${RUNNER_TEMP:-/tmp}/hvigor-assemble-stacktrace.log"
 
-run_and_print_hvigor_log "${first_log}"
-if (( last_hvigor_status != 0 )); then
+first_log="$(mktemp -t hvigor-assemble.XXXXXX.log)"
+stacktrace_log="$(mktemp -t hvigor-assemble-stacktrace.XXXXXX.log)"
+cleanup_logs() {
+  rm -f "${first_log}" "${stacktrace_log}"
+}
+trap cleanup_logs EXIT
+
+if ! run_hvigor_to_log "${first_log}" "${hvigor_args[@]}" | filter_unsigned_sign_warning; then
   echo "[WARN] hvigor assembleHap failed, rerunning with --stacktrace for diagnostics..."
-  run_and_print_hvigor_log "${stacktrace_log}" --stacktrace
-  if (( last_hvigor_status != 0 )); then
-    echo "[ERROR] hvigor assembleHap failed again with --stacktrace."
+  echo "[WARN] first attempt log: ${first_log}"
+  if ! run_hvigor_to_log "${stacktrace_log}" "${hvigor_args[@]}" --stacktrace; then
+    echo "[FAIL] hvigor assembleHap failed with --stacktrace. Full stacktrace log follows:"
+    cat "${stacktrace_log}"
+    exit 1
   fi
-  exit 1
 fi
 
 mapfile -t hap_files < <(find "${ROOT_DIR}/entry/build" -type f -name "*.hap" | sort)
