@@ -17,6 +17,17 @@ import {
   saveRuntimeRenderSettingsProfile
 } from '../common/RuntimeRenderSettingsRepository'
 import {
+  AUDIO_LATENCY_PRESETS,
+  createDefaultRuntimeAudioSettingsProfile,
+  describeAudioLatency,
+  getAudioLatencyForPreset,
+  getAudioLatencyPresetIndex,
+  loadRuntimeAudioSettingsProfile,
+  RuntimeAudioSettingsProfile,
+  saveRuntimeAudioSettingsProfile
+} from '../common/RuntimeAudioSettingsRepository'
+import { runtimeAudioSettingsController } from '../common/RuntimeAudioSettingsController'
+import {
   createDefaultRuntimeInputPreferencesProfile,
   loadRuntimeInputPreferencesProfile,
   RuntimeInputPreferencesProfile,
@@ -31,6 +42,13 @@ import {
 import { LibraryRecord, loadAllLibraryRecords } from '../common/LibraryRepository'
 import { InputDeviceInfo } from '../common/InputPortRouting'
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
+import {
+  createDefaultRuntimeVisualSettingsProfile,
+  describeRuntimeAspectMode,
+  loadRuntimeVisualSettingsProfile,
+  RuntimeVisualSettingsProfile,
+  saveRuntimeVisualSettingsProfile
+} from '../common/RuntimeVisualSettingsRepository'
 
 interface SettingOptionItem {
   key: string
@@ -43,14 +61,14 @@ interface SoftwareResolutionPreset {
   height: number
 }
 
-@Component
+@ComponentV2
 struct LinearSettingRow {
-  @Prop label: string = ''
-  @Prop code: string = ''
-  @Prop value: number = 0
-  @Prop min: number = 0
-  @Prop max: number = 100
-  onChange?: (value: number) => void
+  @Param label: string = ''
+  @Param code: string = ''
+  @Param value: number = 0
+  @Param min: number = 0
+  @Param max: number = 100
+  @Event onChange?: (value: number) => void
 
   build() {
     Column({ space: 14 }) {
@@ -119,31 +137,35 @@ interface SettingGroup {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct SettingsPage {
-  @State private activeTab: string = 'basic'
-  @State private aspectMode: string = '4:3'
-  @State private scanlineIntensity: number = 64
-  @State private masterVolume: number = 80
-  @State private inputDeviceStatus: string = '正在读取'
-  @State private inputLayoutSummaryText: string = '正在读取布局信息'
-  @State private inputLayoutDetailText: string = '正在读取本地触控布局'
-  @State private telemetryPrimaryLabel: string = '最近一次运行'
-  @State private telemetryPrimaryValue: string = '--'
-  @State private telemetrySecondaryLabel: string = '音频缓冲'
-  @State private telemetrySecondaryValue: string = '--'
-  @State private telemetryFooterLeft: string = '尚无运行记录'
-  @State private telemetryFooterRight: string = '进入游戏后会更新摘要'
-  @State private telemetryBars: BarChartItem[] = this.createEmptyTelemetryBars()
-  @State private renderProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile()
-  @State private inputPreferences: RuntimeInputPreferencesProfile = createDefaultRuntimeInputPreferencesProfile()
-  @State private advancedStatusText: string = '运行时设置尚未读取'
-  @State private runtimeApplyStatusText: string = '尚未执行运行时写入'
-  @State private foldableMode: FoldableMode = FoldableMode.SINGLE
-  @State private activeGroup: string = 'video'  // 当前选中的设置分组
+  @Local private activeTab: string = 'basic'
+  @Local private inputDeviceStatus: string = '正在读取'
+  @Local private inputLayoutSummaryText: string = '正在读取布局信息'
+  @Local private inputLayoutDetailText: string = '正在读取本地触控布局'
+  @Local private telemetryPrimaryLabel: string = '最近一次运行'
+  @Local private telemetryPrimaryValue: string = '--'
+  @Local private telemetrySecondaryLabel: string = '音频缓冲'
+  @Local private telemetrySecondaryValue: string = '--'
+  @Local private telemetryFooterLeft: string = '尚无运行记录'
+  @Local private telemetryFooterRight: string = '进入游戏后会更新摘要'
+  @Local private telemetryBars: BarChartItem[] = this.createEmptyTelemetryBars()
+  @Local private renderProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile()
+  @Local private audioProfile: RuntimeAudioSettingsProfile = createDefaultRuntimeAudioSettingsProfile()
+  @Local private inputPreferences: RuntimeInputPreferencesProfile = createDefaultRuntimeInputPreferencesProfile()
+  @Local private visualProfile: RuntimeVisualSettingsProfile = createDefaultRuntimeVisualSettingsProfile()
+  @Local private advancedStatusText: string = '运行时设置尚未读取'
+  @Local private runtimeApplyStatusText: string = '尚未执行运行时写入'
+  @Local private foldableMode: FoldableMode = FoldableMode.SINGLE
+  @Local private activeGroup: string = 'video'  // 当前选中的设置分组
   private pageActive: boolean = false
   private refreshToken: number = 0
+  private visualPersistTimer: number = -1
+  private audioPersistTimer: number = -1
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.updateFoldableMode(data)
   }
 
@@ -183,7 +205,7 @@ struct SettingsPage {
   }
 
   private isAspectActive(key: string): boolean {
-    return this.aspectMode === key
+    return this.visualProfile.aspectMode === key
   }
 
   private clampPercent(value: number): number {
@@ -191,11 +213,14 @@ struct SettingsPage {
   }
 
   private onScanlineIntensityChange = (value: number): void => {
-    this.scanlineIntensity = this.clampPercent(value)
+    const nextProfile = this.cloneVisualProfile()
+    nextProfile.scanlineIntensity = this.clampPercent(value)
+    this.scheduleVisualProfilePersist(nextProfile, '扫描线强度')
   }
 
   private onMasterVolumeChange = (value: number): void => {
-    this.masterVolume = this.clampPercent(value)
+    const nextPercent = this.clampPercent(value)
+    this.scheduleAudioProfilePersist(nextPercent, '主音量')
   }
 
   private get gpuBackendText(): string {
@@ -214,6 +239,18 @@ struct SettingsPage {
     return describeSoftwareResolutionPreset(this.renderProfile.softwareMaxPresetIndex)
   }
 
+  private get vsyncSummaryText(): string {
+    return this.renderProfile.swapInterval === 0 ?
+      '当前关闭 · 允许非同步提交，可能减少等待但可能出现画面撕裂' :
+      '当前开启 · 跟随显示刷新提交，优先减少画面撕裂'
+  }
+
+  private get aiUpscaleSummaryText(): string {
+    return this.renderProfile.aiUpscaleEnabled ?
+      '当前开启 · 设备支持 XEngine 时启用 AI 超分' :
+      '当前关闭 · 保持原始分辨率输出，不支持设备可继续正常运行'
+  }
+
   private get audioBufferSummaryText(): string {
     const bufferValue = this.telemetrySecondaryValue && this.telemetrySecondaryValue !== '--' ?
       this.telemetrySecondaryValue :
@@ -223,14 +260,16 @@ struct SettingsPage {
   }
 
   private get shaderModeSummaryText(): string {
-    return '仅打开本地滤镜预览，不会写入当前运行时 shader preset'
+    return `${describeRuntimeAspectMode(this.visualProfile.aspectMode)} · 扫描线 ${this.visualProfile.scanlineIntensity}% / 曲率 ${this.visualProfile.curvature}% / 饱和度 ${this.visualProfile.saturation}%`
   }
 
   private cloneRenderProfile(): RuntimeRenderSettingsProfile {
     return {
       version: this.renderProfile.version,
       scalingMode: this.renderProfile.scalingMode,
+      swapInterval: this.renderProfile.swapInterval,
       softwareMaxPresetIndex: this.renderProfile.softwareMaxPresetIndex,
+      aiUpscaleEnabled: this.renderProfile.aiUpscaleEnabled,
       hwRenderAllowed: this.renderProfile.hwRenderAllowed,
       updatedAt: this.renderProfile.updatedAt
     }
@@ -239,14 +278,22 @@ struct SettingsPage {
   aboutToAppear(): void {
     this.pageActive = true
     this.detectFoldableMode()
-    display.on('foldStatusChange', this.foldStatusListener)
+    try {
+      display.on('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('SettingsPage', 'Fold', `foldStatusChange on failed: ${err}`)
+    }
     void this.refreshPageData()
   }
 
   aboutToDisappear(): void {
     this.pageActive = false
     this.refreshToken += 1
-    display.off('foldStatusChange', this.foldStatusListener)
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('SettingsPage', 'Fold', `foldStatusChange off failed: ${err}`)
+    }
   }
 
   private detectFoldableMode(): void {
@@ -294,22 +341,47 @@ struct SettingsPage {
       this.inputLayoutDetailText = '请重新进入页面'
       this.renderProfile = createDefaultRuntimeRenderSettingsProfile()
       this.inputPreferences = createDefaultRuntimeInputPreferencesProfile()
+      this.visualProfile = createDefaultRuntimeVisualSettingsProfile()
+      this.audioProfile = createDefaultRuntimeAudioSettingsProfile()
       this.advancedStatusText = '上下文不可用'
       this.applyEmptyTelemetry()
       return
     }
 
-    const renderProfile = await loadRuntimeRenderSettingsProfile(context)
-    if (!this.isCurrentRefresh(token)) {
-      return
+    try {
+      const renderProfile = await loadRuntimeRenderSettingsProfile(context)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.renderProfile = renderProfile
+      const audioProfile = await loadRuntimeAudioSettingsProfile(context)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.audioProfile = audioProfile
+      const visualProfile = await loadRuntimeVisualSettingsProfile(context)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.visualProfile = visualProfile
+      const inputPreferences = await loadRuntimeInputPreferencesProfile(context)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.inputPreferences = inputPreferences
+      this.refreshAdvancedStatus()
+    } catch (err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('SettingsPage', 'Settings', `读取运行时设置失败: ${message}`)
+      this.renderProfile = createDefaultRuntimeRenderSettingsProfile()
+      this.inputPreferences = createDefaultRuntimeInputPreferencesProfile()
+      this.visualProfile = createDefaultRuntimeVisualSettingsProfile()
+      this.audioProfile = createDefaultRuntimeAudioSettingsProfile()
+      this.advancedStatusText = '运行时设置读取失败，已回退默认值'
     }
-    this.renderProfile = renderProfile
-    const inputPreferences = await loadRuntimeInputPreferencesProfile(context)
-    if (!this.isCurrentRefresh(token)) {
-      return
-    }
-    this.inputPreferences = inputPreferences
-    this.refreshAdvancedStatus()
 
     const inputDevices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
     const externalNames: string[] = []
@@ -362,7 +434,83 @@ struct SettingsPage {
     const softwareText = this.renderProfile.scalingMode === 1 ?
       ` / 软件分辨率上限 ${this.softwareResolutionText}` :
       ''
-    this.advancedStatusText = `${backendText} / ${describeRenderMode(this.renderProfile.scalingMode)}${softwareText}`
+    const vsyncText = this.renderProfile.swapInterval === 0 ? 'VSync OFF' : 'VSync ON'
+    const aiText = this.renderProfile.aiUpscaleEnabled ? 'AI Upscale ON' : 'AI Upscale OFF'
+    this.advancedStatusText = `${backendText} / ${describeRenderMode(this.renderProfile.scalingMode)}${softwareText} / ${vsyncText} / ${aiText}`
+  }
+
+  private cloneVisualProfile(): RuntimeVisualSettingsProfile {
+    return {
+      version: this.visualProfile.version,
+      aspectMode: this.visualProfile.aspectMode,
+      scanlineIntensity: this.visualProfile.scanlineIntensity,
+      curvature: this.visualProfile.curvature,
+      saturation: this.visualProfile.saturation,
+      updatedAt: this.visualProfile.updatedAt
+    }
+  }
+
+  private cloneAudioProfile(): RuntimeAudioSettingsProfile {
+    return {
+      version: this.audioProfile.version,
+      latencyMs: this.audioProfile.latencyMs,
+      volumePercent: this.audioProfile.volumePercent,
+      updatedAt: this.audioProfile.updatedAt
+    }
+  }
+
+  private scheduleVisualProfilePersist(profile: RuntimeVisualSettingsProfile, actionLabel: string): void {
+    this.visualProfile = profile
+    this.runtimeApplyStatusText = `${actionLabel} 已更新，返回运行页后生效`
+    if (this.visualPersistTimer !== -1) {
+      clearTimeout(this.visualPersistTimer)
+    }
+    this.visualPersistTimer = setTimeout(() => {
+      this.visualPersistTimer = -1
+      void this.persistVisualProfile(profile, actionLabel)
+    }, 80)
+  }
+
+  private scheduleAudioProfilePersist(volumePercent: number, actionLabel: string): void {
+    const nextProfile = this.cloneAudioProfile()
+    nextProfile.volumePercent = volumePercent
+    this.audioProfile = nextProfile
+    const ok = runtimeAudioSettingsController.setVolumePercent(volumePercent)
+    this.setRuntimeApplyStatus(actionLabel, ok)
+    if (!ok) {
+      return
+    }
+    if (this.audioPersistTimer !== -1) {
+      clearTimeout(this.audioPersistTimer)
+    }
+    this.audioPersistTimer = setTimeout(() => {
+      this.audioPersistTimer = -1
+      void this.persistAudioProfile(nextProfile)
+    }, 80)
+  }
+
+  private async persistVisualProfile(
+    profile: RuntimeVisualSettingsProfile,
+    actionLabel: string
+  ): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      return
+    }
+    const token = this.beginRefresh()
+    try {
+      const saved = await saveRuntimeVisualSettingsProfile(context, profile)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.visualProfile = saved
+      this.runtimeApplyStatusText = `${actionLabel} 已保存，返回运行页后生效`
+    } catch (_err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.runtimeApplyStatusText = `${actionLabel} 保存失败`
+    }
   }
 
   private async persistRenderProfile(profile: RuntimeRenderSettingsProfile): Promise<void> {
@@ -371,12 +519,21 @@ struct SettingsPage {
     if (!context) {
       return
     }
-    const savedProfile = await saveRuntimeRenderSettingsProfile(context, profile)
-    if (!this.isCurrentRefresh(token)) {
-      return
+    try {
+      const savedProfile = await saveRuntimeRenderSettingsProfile(context, profile)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.renderProfile = savedProfile
+      this.refreshAdvancedStatus()
+    } catch (err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('SettingsPage', 'Render', `保存运行时渲染配置失败: ${message}`)
+      this.runtimeApplyStatusText = '运行时渲染配置保存失败'
     }
-    this.renderProfile = savedProfile
-    this.refreshAdvancedStatus()
   }
 
   private setRuntimeApplyStatus(actionLabel: string, ok: boolean): void {
@@ -397,7 +554,32 @@ struct SettingsPage {
     await this.persistRenderProfile(nextProfile)
   }
 
+  private async toggleSwapInterval(): Promise<void> {
+    const nextValue = this.renderProfile.swapInterval === 0 ? 1 : 0
+    const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
+    nextProfile.swapInterval = nextValue
+    const ok = runtimeRenderSettingsController.setSwapInterval(nextValue)
+    this.setRuntimeApplyStatus('VSync', ok)
+    if (!ok) {
+      return
+    }
+    await this.persistRenderProfile(nextProfile)
+  }
+
+  private async toggleAIUpscale(): Promise<void> {
+    const nextValue = !this.renderProfile.aiUpscaleEnabled
+    const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
+    nextProfile.aiUpscaleEnabled = nextValue
+    const ok = runtimeRenderSettingsController.setAIUpscale(nextValue)
+    this.setRuntimeApplyStatus('AI Upscale', ok)
+    if (!ok) {
+      return
+    }
+    await this.persistRenderProfile(nextProfile)
+  }
+
   private async toggleHideVirtualController(): Promise<void> {
+    const token = this.beginRefresh()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
       this.setRuntimeApplyStatus('虚拟手柄显示', false)
@@ -411,13 +593,21 @@ struct SettingsPage {
     }
     try {
       const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
       this.inputPreferences = saved
       this.setRuntimeApplyStatus('虚拟手柄显示', true)
     } catch (_err) {
-      this.setRuntimeApplyStatus('虚拟手柄显示', false)    }
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.setRuntimeApplyStatus('虚拟手柄显示', false)
+    }
   }
 
   private async toggleHideUndeclaredKeys(): Promise<void> {
+    const token = this.beginRefresh()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
       this.setRuntimeApplyStatus('按 core 隐藏未声明键', false)
@@ -431,9 +621,15 @@ struct SettingsPage {
     }
     try {
       const saved = await saveRuntimeInputPreferencesProfile(context, nextProfile)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
       this.inputPreferences = saved
       this.setRuntimeApplyStatus('按 core 隐藏未声明键', true)
     } catch (_err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
       this.setRuntimeApplyStatus('按 core 隐藏未声明键', false)
     }
   }
@@ -454,6 +650,42 @@ struct SettingsPage {
       return
     }
     await this.persistRenderProfile(nextProfile)
+  }
+
+  private async cycleAudioLatencyPreset(): Promise<void> {
+    const currentIndex = getAudioLatencyPresetIndex(this.audioProfile.latencyMs)
+    const nextIndex = (currentIndex + 1) % AUDIO_LATENCY_PRESETS.length
+    const nextLatency = getAudioLatencyForPreset(nextIndex)
+    const ok = runtimeAudioSettingsController.setMinimumAudioLatency(nextLatency)
+    this.setRuntimeApplyStatus('音频缓冲延迟', ok)
+    if (!ok) {
+      return
+    }
+    const nextProfile = this.cloneAudioProfile()
+    nextProfile.latencyMs = nextLatency
+    await this.persistAudioProfile(nextProfile)
+  }
+
+  private async persistAudioProfile(profile: RuntimeAudioSettingsProfile): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      return
+    }
+    const token = this.beginRefresh()
+    try {
+      const saved = await saveRuntimeAudioSettingsProfile(context, profile)
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      this.audioProfile = saved
+    } catch (err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('SettingsPage', 'Audio', `保存运行时音频配置失败: ${message}`)
+      this.runtimeApplyStatusText = '运行时音频配置保存失败'
+    }
   }
 
   private async cycleSoftwareResolutionPreset(): Promise<void> {
@@ -642,7 +874,9 @@ struct SettingsPage {
         .justifyContent(FlexAlign.Center)
         .backgroundColor(this.isAspectActive(item.key) ? EmuColors.surfaceContainerHighest : EmuColors.surfaceContainerHigh)
         .onClick(() => {
-          this.aspectMode = item.key
+          const nextProfile = this.cloneVisualProfile()
+          nextProfile.aspectMode = item.key === '4:3' || item.key === '16:9' ? item.key : 'native'
+          this.scheduleVisualProfilePersist(nextProfile, '画面比例')
         })
       }, (item: SettingOptionItem) => item.key)
     }
@@ -894,7 +1128,7 @@ struct SettingsPage {
       }
       .width('100%')
 
-      Text('当前页会把 GPU Backend、缩放/呈现模式与软件分辨率上限写入运行时；Audio Buffer 为运行期只读摘要，滤镜预览不会写入 shader preset。')
+      Text('当前页会把 GPU Backend、缩放/呈现模式、VSync、AI Upscale、软件分辨率上限、主音量，以及屏上手柄/视觉配置写入本地运行配置；返回运行页后会按最新配置生效。')
         .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
         .width('100%')
@@ -1014,7 +1248,7 @@ struct SettingsPage {
       this.SectionTitle('画面设置', 'VIDEO_PROCESSING')
 
       Column({ space: 12 }) {
-        Text('画面比例 aspect_ratio')
+        Text('画面比例 display_aspect')
           .fontSize(EmuTypography.sm)
           .fontWeight(FontWeight.Bold)
           .fontColor('#9AABABAB')
@@ -1022,7 +1256,12 @@ struct SettingsPage {
       }
       .width('100%')
 
-      this.LinearSettingBlock('CRT 复古扫描线强度', 'scanline_intensity', this.scanlineIntensity, this.onScanlineIntensityChange)
+      this.LinearSettingBlock(
+        'CRT 复古扫描线强度',
+        'scanline_intensity',
+        this.visualProfile.scanlineIntensity,
+        this.onScanlineIntensityChange
+      )
     }
     .width('100%')
   }
@@ -1040,7 +1279,7 @@ struct SettingsPage {
   private AudioSettings() {
     Column({ space: 18 }) {
       this.SectionTitle('音频音量', 'AUDIO_VOLUME')
-      this.LinearSettingBlock('主音量', 'master_volume', this.masterVolume, this.onMasterVolumeChange)
+      this.LinearSettingBlock('主音量', 'master_volume', this.audioProfile.volumePercent, this.onMasterVolumeChange)
     }
     .width('100%')
   }
@@ -1099,11 +1338,35 @@ struct SettingsPage {
           void this.cycleSoftwareResolutionPreset()
         }
       )
+      this.AdvancedSettingRow(
+        'VSync',
+        this.vsyncSummaryText,
+        this.renderProfile.swapInterval === 0 ? '开启' : '关闭',
+        () => {
+          void this.toggleSwapInterval()
+        }
+      )
+      this.AdvancedSettingRow(
+        'AI Upscale',
+        this.aiUpscaleSummaryText,
+        this.renderProfile.aiUpscaleEnabled ? '关闭' : '开启',
+        () => {
+          void this.toggleAIUpscale()
+        }
+      )
       this.AdvancedSettingRow('Audio Buffer', `最近一次运行摘要 · ${this.audioBufferSummaryText}`)
+      this.AdvancedSettingRow(
+        'Audio Latency',
+        `${describeAudioLatency(this.audioProfile.latencyMs)} · 缓冲越大越抗模拟器/低端机 underrun,代价是按键到出声延迟。注:低/标准档受平台最小缓冲地板(真机~100ms/模拟器~250ms)限制,模拟器上仅"高缓冲"档(300ms)能进一步加深缓冲`,
+        '切换',
+        () => {
+          void this.cycleAudioLatencyPreset()
+        }
+      )
       this.AdvancedSettingRow(
         'Shader Mode',
         this.shaderModeSummaryText,
-        '预览',
+        '配置',
         () => {
           this.openPage('pages/ShaderPreviewPage', '滤镜预览')
         }

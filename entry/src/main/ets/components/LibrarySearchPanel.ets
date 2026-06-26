@@ -7,20 +7,20 @@ import {
 } from './EmuTelemetryPanel'
 import { PlatformChipBar } from './PlatformChipBar'
 
-@Component
+@ComponentV2
 export struct LibrarySearchPanel {
-  @Prop keyword: string = ''
-  @Prop searchBusy: boolean = false
-  @Prop showSearchResults: boolean = false
-  @Prop selectedPlatform: string = 'ALL'
-  @Prop spinnerAngle: number = 0
-  @Prop searchResults: LibraryRecord[] = []
-  @Prop telemetryCells: EmuTelemetryCellItem[] = []
-  @Prop showTelemetry: boolean = true
-  @Prop platforms: string[] = ['ALL']
-  onKeywordChange?: (value: string) => void
-  onSearchResultLaunch?: (item: LibraryRecord) => void
-  onPlatformChange?: (value: string) => void
+  @Param keyword: string = ''
+  @Param searchBusy: boolean = false
+  @Param showSearchResults: boolean = false
+  @Param selectedPlatform: string = 'ALL'
+  @Param spinnerAngle: number = 0
+  @Param searchResults: LibraryRecord[] = []
+  @Param telemetryCells: EmuTelemetryCellItem[] = []
+  @Param showTelemetry: boolean = true
+  @Param platforms: string[] = ['ALL']
+  @Event onKeywordChange?: (value: string) => void
+  @Event onSearchResultLaunch?: (item: LibraryRecord) => void
+  @Event onPlatformChange?: (value: string) => void
 
   build() {
     Column({ space: 16 }) {

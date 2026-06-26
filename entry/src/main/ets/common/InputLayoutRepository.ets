@@ -74,6 +74,11 @@ const INPUT_LAYOUT_VERSION = 1
 const INPUT_LAYOUT_DIR_NAME = 'input'
 const INPUT_LAYOUT_FILE_NAME = 'input_layout.json'
 
+function isMissingFileError(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
+}
+
 export function createDefaultInputLayoutProfile(): InputLayoutProfile {
   return {
     version: INPUT_LAYOUT_VERSION,
@@ -96,16 +101,16 @@ export function createDefaultInputLayoutProfile(): InputLayoutProfile {
 
 export async function loadInputLayoutProfile(context: common.UIAbilityContext): Promise<InputLayoutProfile> {
   const path = buildInputLayoutPath(context.filesDir)
+  const text = await readOptionalText(path)
+  if (!text || text.length === 0) {
+    return createDefaultInputLayoutProfile()
+  }
   try {
-    const text = await fs.readText(path)
-    if (!text || text.length === 0) {
-      return createDefaultInputLayoutProfile()
-    }
     const parsed = JSON.parse(text) as Partial<InputLayoutProfile> | null
     return normalizeProfile(parsed)
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('InputLayoutRepository', 'Load', `读取输入布局失败: ${message}`)
+    LogHelper.warn('InputLayoutRepository', 'Load', `输入布局配置损坏，已回退默认值: ${message}`)
     return createDefaultInputLayoutProfile()
   }
 }
@@ -244,5 +249,29 @@ async function ensureDirExists(path: string): Promise<void> {
     await fs.mkdir(path, true)
   } catch (err) {
     return
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    if (isMissingFileError(message)) {
+      return ''
+    }
+    return ''
   }
 }

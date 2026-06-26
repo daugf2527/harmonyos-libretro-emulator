@@ -32,6 +32,7 @@ fi
 build_mode="${HARMONY_BUILD_MODE:-release}"
 product_name="${HARMONY_PRODUCT_NAME:-default}"
 module_target="${HARMONY_MODULE_TARGET:-entry@default}"
+force_stacktrace_build="${HARMONY_FORCE_STACKTRACE_BUILD:-0}"
 
 echo "[INFO] Configuring npm/ohpm registry..."
 npm config set strict-ssl false
@@ -69,13 +70,68 @@ raw = raw.replace(/['\"]signingConfigs['\"]\s*:\s*\[[\s\S]*?\]\s*,?\s*/g, '');
 fs.writeFileSync(path, raw);
 "
 
-echo "[INFO] Running hvigor build..."
-"${hvigorw_bin}" clean --no-daemon
-"${hvigorw_bin}" assembleHap --mode module \
-  -p module="${module_target}" \
-  -p product="${product_name}" \
-  -p buildMode="${build_mode}" \
+filter_unsigned_sign_warning() {
+  sed -E "/Will skip sign 'hos_hap'/d;/No signingConfigs profile is configured/d;/configure the signingConfigs/d"
+}
+
+print_filtered_log() {
+  local log_file="$1"
+  filter_unsigned_sign_warning < "${log_file}"
+}
+
+hvigor_args=(
+  assembleHap
+  --mode module
+  -p "module=${module_target}"
+  -p "product=${product_name}"
+  -p "buildMode=${build_mode}"
   --no-daemon
+)
+
+run_hvigor_to_log() {
+  local log_file="$1"
+  shift
+  set +e
+  "${hvigorw_bin}" "$@" >"${log_file}" 2>&1
+  local status=$?
+  set -e
+  cat "${log_file}"
+  return "${status}"
+}
+echo "[INFO] Running hvigor unsigned build..."
+"${hvigorw_bin}" clean --no-daemon
+
+first_log="$(mktemp -t hvigor-assemble.XXXXXX.log)"
+stacktrace_log="$(mktemp -t hvigor-assemble-stacktrace.XXXXXX.log)"
+cleanup_logs() {
+  rm -f "${first_log}" "${stacktrace_log}"
+}
+trap cleanup_logs EXIT
+
+first_status=0
+if [[ "${force_stacktrace_build}" == "1" ]]; then
+  echo "[INFO] Running hvigor unsigned build with forced --stacktrace diagnostics..."
+  run_hvigor_to_log "${first_log}" "${hvigor_args[@]}" --stacktrace || first_status=$?
+else
+  run_hvigor_to_log "${first_log}" "${hvigor_args[@]}" || first_status=$?
+fi
+print_filtered_log "${first_log}"
+
+if (( first_status != 0 )) && [[ "${force_stacktrace_build}" != "1" ]]; then
+  echo "[WARN] hvigor assembleHap failed, rerunning with --stacktrace for diagnostics..."
+  echo "[WARN] first attempt log: ${first_log}"
+  stacktrace_status=0
+  run_hvigor_to_log "${stacktrace_log}" "${hvigor_args[@]}" --stacktrace || stacktrace_status=$?
+  if (( stacktrace_status != 0 )); then
+    echo "[FAIL] hvigor assembleHap failed with --stacktrace. Full stacktrace log follows:"
+    exit "${stacktrace_status}"
+  fi
+fi
+
+if (( first_status != 0 )) && [[ "${force_stacktrace_build}" == "1" ]]; then
+  echo "[FAIL] hvigor assembleHap failed in forced --stacktrace mode."
+  exit "${first_status}"
+fi
 
 mapfile -t hap_files < <(find "${ROOT_DIR}/entry/build" -type f -name "*.hap" | sort)
 if (( ${#hap_files[@]} == 0 )); then

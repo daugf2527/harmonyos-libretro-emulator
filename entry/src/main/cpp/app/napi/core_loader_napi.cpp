@@ -104,6 +104,15 @@ static napi_value MakeString(napi_env env, const char *value) {
   return MakeString(env, std::string(value ? value : ""));
 }
 
+static napi_value MakeUndefined(napi_env env) {
+  napi_value result = nullptr;
+  if (napi_get_undefined(env, &result) != napi_ok) {
+    napi_throw_error(env, nullptr, "Failed to create undefined value");
+    return nullptr;
+  }
+  return result;
+}
+
 static bool ResolveDeferredChecked(napi_env env, napi_deferred deferred,
                                    napi_value value) {
   if (!deferred || !value) {
@@ -439,9 +448,12 @@ static void ExecuteTestCoreLoader(napi_env /*env*/, void *data) {
   bool success = true;
   std::string &resultMessage = ctx->resultMessage;
 
-  LOGF(LOG_INFO, "Step 1: Loading core...");
+  const std::string corePathForLog = security::DescribePathForLog(corePath);
+
+  LOGF(LOG_INFO, "Step 1: Loading core: %{public}s",
+       corePathForLog.c_str());
   if (!loader.LoadCore(corePath)) {
-    resultMessage = "Failed: Could not load core from path: " + corePath;
+    resultMessage = "Failed: Could not load core (" + corePathForLog + ")";
     if (!loader.GetLastErrorStep().empty() || !loader.GetLastErrorMessage().empty()) {
       resultMessage += " (step=" + loader.GetLastErrorStep() + ", message=" +
                        loader.GetLastErrorMessage() + ")";
@@ -590,10 +602,26 @@ static void CompleteTestCoreLoader(napi_env env, napi_status status, void *data)
     return;
   }
 
-  // Audit T1-F6: guard napi_cancelled — reject deferred to prevent hung ArkTS Promise
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] TestCoreLoader cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
   if (status != napi_ok) {
+    LOGF(LOG_ERROR, "[NEW] TestCoreLoader work failed: status=%{public}d",
+         static_cast<int>(status));
     napi_value reason = nullptr;
     if (napi_get_undefined(env, &reason) != napi_ok) {
+      if (ctx->work) {
+        napi_delete_async_work(env, ctx->work);
+        ctx->work = nullptr;
+      }
       delete ctx;
       return;
     }
@@ -601,6 +629,15 @@ static void CompleteTestCoreLoader(napi_env env, napi_status status, void *data)
   } else {
     napi_value result = MakeString(env, ctx->resultMessage);
     if (!result) {
+      LOGF(LOG_ERROR, "[NEW] TestCoreLoader failed to allocate result string");
+      napi_value reason = MakeUndefined(env);
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
+      if (ctx->work) {
+        napi_delete_async_work(env, ctx->work);
+        ctx->work = nullptr;
+      }
       delete ctx;
       return;
     }
@@ -642,11 +679,12 @@ static napi_value TestCoreLoader(napi_env env, napi_callback_info info) {
     return MakeResolvedStringPromise(env, "Error: Invalid corePath parameter");
   }
 
-  LOGF(LOG_INFO, "Received corePath from ArkTS: %{public}s", corePath.c_str());
+  LOGF(LOG_INFO, "Received corePath from ArkTS: %{public}s",
+       security::DescribePathForLog(corePath).c_str());
 
   if (!security::ValidateCorePath(corePath)) {
     LOGF(LOG_ERROR, "Security: Core path validation failed in TestCoreLoader: %{public}s",
-         corePath.c_str());
+         security::DescribePathForLog(corePath).c_str());
     return MakeResolvedStringPromise(env,
                                      "Error: Core path not in allowed directories");
   }

@@ -14,6 +14,7 @@
  */
 
 #include "platform_resource_manager.h"
+#include "common/file_security.h"
 #include <dirent.h>
 #include <fstream>
 #include <hilog/log.h>
@@ -80,7 +81,8 @@ bool PlatformResourceManager::LoadRawFileUnlocked(
       if (size <= 0 || static_cast<size_t>(size) > kMaxSize) {
         LOGF(LOG_ERROR,
              "Invalid file size: %{public}lld (%{public}s)",
-             static_cast<long long>(size), path.c_str());
+             static_cast<long long>(size),
+             security::DescribePathForLog(path).c_str());
         return false;
       }
 
@@ -100,12 +102,14 @@ bool PlatformResourceManager::LoadRawFileUnlocked(
   if (native_mgr) {
     RawFile64 *rawFile = OH_ResourceManager_OpenRawFile64(native_mgr, path.c_str());
     if (!rawFile) {
-      LOGF(LOG_WARN, "OpenRawFile64 failed: %{public}s", path.c_str());
+      LOGF(LOG_WARN, "OpenRawFile64 failed: %{public}s",
+           security::DescribePathForLog(path).c_str());
     } else {
       int64_t rawSize = OH_ResourceManager_GetRawFileSize64(rawFile);
       if (rawSize <= 0) {
         LOGF(LOG_ERROR, "Invalid rawfile size: %{public}lld (%{public}s)",
-             static_cast<long long>(rawSize), path.c_str());
+             static_cast<long long>(rawSize),
+             security::DescribePathForLog(path).c_str());
         OH_ResourceManager_CloseRawFile64(rawFile);
         return false;
       }
@@ -113,7 +117,8 @@ bool PlatformResourceManager::LoadRawFileUnlocked(
       constexpr size_t kMaxSize = 512ULL * 1024ULL * 1024ULL;
       size_t size = static_cast<size_t>(rawSize);
       if (size > kMaxSize) {
-        LOGF(LOG_ERROR, "Rawfile too large: %{public}zu (%{public}s)", size, path.c_str());
+        LOGF(LOG_ERROR, "Rawfile too large: %{public}zu (%{public}s)", size,
+             security::DescribePathForLog(path).c_str());
         OH_ResourceManager_CloseRawFile64(rawFile);
         return false;
       }
@@ -125,17 +130,20 @@ bool PlatformResourceManager::LoadRawFileUnlocked(
 
       if (readBytes < 0 || static_cast<size_t>(readBytes) != size) {
         LOGF(LOG_ERROR, "ReadRawFile64 failed: %{public}lld/%{public}zu (%{public}s)",
-             static_cast<long long>(readBytes), size, path.c_str());
+             static_cast<long long>(readBytes), size,
+             security::DescribePathForLog(path).c_str());
         out_data.clear();
         return false;
       }
 
-      LOGF(LOG_INFO, "Loaded rawfile: %{public}zu bytes (%{public}s)", size, path.c_str());
+      LOGF(LOG_INFO, "Loaded rawfile: %{public}zu bytes (%{public}s)", size,
+           security::DescribePathForLog(path).c_str());
       return true;
     }
   }
 
-  LOGF(LOG_ERROR, "Failed to load file: %{public}s", path.c_str());
+  LOGF(LOG_ERROR, "Failed to load file: %{public}s",
+       security::DescribePathForLog(path).c_str());
   return false;
 }
 
@@ -168,7 +176,8 @@ std::vector<std::string> PlatformResourceManager::GetRawFileListUnlocked(
   // 尝试打开 RawDir
   RawDir *rawDir = OH_ResourceManager_OpenRawDir(native_mgr, dir.c_str());
   if (!rawDir) {
-    LOGF(LOG_WARN, "OpenRawDir failed: %{public}s", dir.c_str());
+    LOGF(LOG_WARN, "OpenRawDir failed: %{public}s",
+         security::DescribePathForLog(dir).c_str());
     return fileList;
   }
 

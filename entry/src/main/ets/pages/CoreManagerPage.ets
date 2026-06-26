@@ -30,34 +30,45 @@ interface ManagedCoreItem {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct CoreManagerPage {
-  @State private coreItems: ManagedCoreItem[] = []
-  @State private statusText: string = '正在扫描本地核心'
-  @State private selectedCoreId: string = ''
-  @State private firmwareSummaryText: string = '正在读取本地 system 目录'
-  @State private firmwareFilesText: string = 'system/ 尚未扫描'
-  @State private firmwareDirectoryText: string = 'filesDir/system'
-  @State private remoteUpdateText: string = '当前构建未配置远端 core / firmware 仓库'
-  @State private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+  @Local private coreItems: ManagedCoreItem[] = []
+  @Local private statusText: string = '正在扫描本地核心'
+  @Local private selectedCoreId: string = ''
+  @Local private firmwareSummaryText: string = '正在读取本地 system 目录'
+  @Local private firmwareFilesText: string = 'system/ 尚未扫描'
+  @Local private firmwareDirectoryText: string = 'filesDir/system'
+  @Local private remoteUpdateText: string = '当前构建未配置远端 core / firmware 仓库'
+  @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private pageActive: boolean = false
   private coreRefreshToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.updateFoldDisplayMode()
   }
 
   aboutToAppear(): void {
     this.pageActive = true
     this.updateFoldDisplayMode()
-    display.on('foldStatusChange', this.foldStatusListener)
+    try {
+      display.on('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('CoreManagerPage', 'Fold', `foldStatusChange on failed: ${err}`)
+    }
     void this.refreshCoreStatus()
   }
 
   aboutToDisappear(): void {
     this.pageActive = false
     this.coreRefreshToken += 1
-    display.off('foldStatusChange', this.foldStatusListener)
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('CoreManagerPage', 'Fold', `foldStatusChange off failed: ${err}`)
+    }
   }
 
   private updateFoldDisplayMode(): void {
@@ -89,35 +100,47 @@ struct CoreManagerPage {
     const nextItems: ManagedCoreItem[] = []
     const catalogItems = this.buildCatalogItems()
     this.firmwareDirectoryText = `${context.filesDir}/system`
-    const systemEntries = await loadSystemFirmwareEntries(context)
-    if (!this.isCurrentCoreRefresh(token)) {
-      return
-    }
-    this.firmwareFilesText = formatCoreFirmwarePathList(systemEntries)
-    for (let index = 0; index < catalogItems.length; index += 1) {
-      const item = catalogItems[index]
-      const installed = await this.hasCoreFile(context, item.soFile)
+    try {
+      const systemEntries = await loadSystemFirmwareEntries(context)
       if (!this.isCurrentCoreRefresh(token)) {
         return
       }
-      const firmwareState: CoreFirmwareDependencyState = buildCoreFirmwareDependencyState(item.id, systemEntries)
-      nextItems.push({
-        id: item.id,
-        name: item.name,
-        platform: item.platform,
-        soFile: item.soFile,
-        status: installed ? '已安装' : '未找到',
-        installed: installed,
-        firmwareStatus: firmwareState.statusText,
-        firmwareDetail: firmwareState.detailText,
-        firmwareFoundText: firmwareState.foundFilesText,
-        firmwareMissingText: firmwareState.missingFilesText,
-        hasFirmwareDependencies: firmwareState.hasDependencies
-      })
+      this.firmwareFilesText = formatCoreFirmwarePathList(systemEntries)
+      for (let index = 0; index < catalogItems.length; index += 1) {
+        const item = catalogItems[index]
+        const installed = await this.hasCoreFile(context, item.soFile)
+        if (!this.isCurrentCoreRefresh(token)) {
+          return
+        }
+        const firmwareState: CoreFirmwareDependencyState = buildCoreFirmwareDependencyState(item.id, systemEntries)
+        nextItems.push({
+          id: item.id,
+          name: item.name,
+          platform: item.platform,
+          soFile: item.soFile,
+          status: installed ? '已安装' : '未找到',
+          installed: installed,
+          firmwareStatus: firmwareState.statusText,
+          firmwareDetail: firmwareState.detailText,
+          firmwareFoundText: firmwareState.foundFilesText,
+          firmwareMissingText: firmwareState.missingFilesText,
+          hasFirmwareDependencies: firmwareState.hasDependencies
+        })
+      }
+      this.coreItems = nextItems
+      this.statusText = this.buildStatusText(nextItems)
+      this.firmwareSummaryText = this.buildFirmwareSummaryText(nextItems, systemEntries)
+    } catch (err) {
+      if (!this.isCurrentCoreRefresh(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('CoreManagerPage', 'Core', `扫描本地核心失败: ${message}`)
+      this.coreItems = catalogItems
+      this.statusText = '本地核心扫描失败'
+      this.firmwareSummaryText = 'system/ 目录扫描失败'
+      this.firmwareFilesText = 'system/ 读取失败'
     }
-    this.coreItems = nextItems
-    this.statusText = this.buildStatusText(nextItems)
-    this.firmwareSummaryText = this.buildFirmwareSummaryText(nextItems, systemEntries)
   }
 
   private async hasCoreFile(context: common.UIAbilityContext, soFile: string): Promise<boolean> {

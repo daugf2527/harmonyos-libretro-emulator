@@ -7,9 +7,9 @@ export interface EmuTelemetryCellItem {
   progressColor: string
 }
 
-@Component
+@ComponentV2
 export struct EmuTelemetryPanel {
-  @Prop cells: EmuTelemetryCellItem[] = []
+  @Param cells: EmuTelemetryCellItem[] = []
 
   private clampProgress(value: number): number {
     if (!Number.isFinite(value) || value < 0) {
@@ -78,7 +78,7 @@ export struct EmuTelemetryPanel {
           this.TelemetryDivider()
         }
         this.TelemetryCell(item)
-      }, (item: EmuTelemetryCellItem) => item.label)
+      }, (item: EmuTelemetryCellItem, index: number) => `${index}:${item.label}:${item.value}`)
     }
     .width('100%')
     .padding({ left: 14, right: 14, top: 12, bottom: 12 })

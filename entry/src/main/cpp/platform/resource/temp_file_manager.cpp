@@ -1,4 +1,5 @@
 #include "temp_file_manager.h"
+#include "../../common/file_security.h"
 #include "../../common/file_utils.h"
 #include <hilog/log.h>
 #include <sys/stat.h>
@@ -15,6 +16,18 @@
 #include "../../common/log_prefix.h"
 
 namespace libretro {
+
+namespace {
+
+bool IsSafeRelativePath(const std::string &path) {
+    if (path.empty() || path[0] == '/' || path.find('\\') != std::string::npos ||
+        path.find("..") != std::string::npos) {
+        return false;
+    }
+    return common::GetBaseName(path).size() > 0;
+}
+
+} // namespace
 
 TempFileManager::TempFileManager(const std::string& filesDir) : filesDir_(filesDir) {}
 
@@ -52,7 +65,8 @@ bool TempFileManager::WriteTempRom(const std::string& rawfilePath, const std::ve
 
     // Check if already extracted (use access() to check file existence)
     if (access(builtinPath.c_str(), F_OK) == 0) {
-        LOGF(LOG_INFO, "Built-in ROM already exists: %{public}s", builtinPath.c_str());
+        LOGF(LOG_INFO, "Built-in ROM already exists: %{public}s",
+             security::DescribePathForLog(builtinPath).c_str());
         outTempPath = builtinPath;
         return true;
     }
@@ -60,17 +74,20 @@ bool TempFileManager::WriteTempRom(const std::string& rawfilePath, const std::ve
     // Ensure builtin directory exists
     std::string builtinDir = filesDir_ + "/roms/builtin";
     if (!common::EnsureDirExists(builtinDir)) {
-        LOGF(LOG_ERROR, "Failed to create builtin directory: %{public}s", builtinDir.c_str());
+        LOGF(LOG_ERROR, "Failed to create builtin directory: %{public}s",
+             security::DescribePathForLog(builtinDir).c_str());
         return false;
     }
 
     if (common::WriteFileAll(builtinPath, data.data(), data.size())) {
-        LOGF(LOG_INFO, "Wrote built-in ROM file: %{public}s", builtinPath.c_str());
+        LOGF(LOG_INFO, "Wrote built-in ROM file: %{public}s",
+             security::DescribePathForLog(builtinPath).c_str());
         outTempPath = builtinPath;
         return true;
     }
 
-    LOGF(LOG_ERROR, "Failed to write built-in ROM file: %{public}s", builtinPath.c_str());
+    LOGF(LOG_ERROR, "Failed to write built-in ROM file: %{public}s",
+         security::DescribePathForLog(builtinPath).c_str());
     return false;
 }
 
@@ -79,8 +96,9 @@ bool TempFileManager::WriteDependencyFile(const std::string& relativePath, const
         return false;
     }
 
-    if (relativePath.find("..") != std::string::npos) {
-        LOGF(LOG_ERROR, "Path traversal detected in dependency path: %{public}s", relativePath.c_str());
+    if (!IsSafeRelativePath(relativePath)) {
+        LOGF(LOG_ERROR, "Path traversal detected in dependency path: %{public}s",
+             security::DescribePathForLog(relativePath).c_str());
         return false;
     }
 
@@ -89,21 +107,25 @@ bool TempFileManager::WriteDependencyFile(const std::string& relativePath, const
     // Ensure parent directory of the dependency exists (handling subdirectories in relativePath)
     size_t lastSlash = fullPath.find_last_of('/');
     if (lastSlash == std::string::npos) {
-        LOGF(LOG_ERROR, "No directory separator in path: %{public}s", fullPath.c_str());
+        LOGF(LOG_ERROR, "No directory separator in path: %{public}s",
+             security::DescribePathForLog(fullPath).c_str());
         return false;
     }
     std::string dirName = fullPath.substr(0, lastSlash);
     if (!common::EnsureDirExists(dirName)) {
-        LOGF(LOG_ERROR, "Failed to create dependency directory: %{public}s", dirName.c_str());
+        LOGF(LOG_ERROR, "Failed to create dependency directory: %{public}s",
+             security::DescribePathForLog(dirName).c_str());
         return false;
     }
 
     if (common::WriteFileAll(fullPath, data.data(), data.size())) {
-        LOGF(LOG_INFO, "Wrote dependency file: %{public}s", fullPath.c_str());
+        LOGF(LOG_INFO, "Wrote dependency file: %{public}s",
+             security::DescribePathForLog(fullPath).c_str());
         return true;
     }
 
-    LOGF(LOG_ERROR, "Failed to write dependency file: %{public}s", fullPath.c_str());
+    LOGF(LOG_ERROR, "Failed to write dependency file: %{public}s",
+         security::DescribePathForLog(fullPath).c_str());
     return false;
 }
 

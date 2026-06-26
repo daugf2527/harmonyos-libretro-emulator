@@ -221,6 +221,15 @@ bool IsCoreLoadedState(EngineState state) {
   return state == EngineState::CORE_LOADED || IsGameLoadedState(state);
 }
 
+bool IsExpectedLateWindowQueueDrop(bool running, EngineState state,
+                                   const ThreadSafeQueue<EngineMessage> &queue) {
+  if (!queue.IsClosed()) {
+    return false;
+  }
+  return !running || state == EngineState::STOPPING ||
+         state == EngineState::STOPPED;
+}
+
 bool IsValidTransition(EngineState from, EngineState to) {
   if (from == to) {
     return true;
@@ -273,11 +282,10 @@ LibretroEngine::LibretroEngine() {
   inputManager_->SetPortRouter(inputPortRouter_.get());
   inputManager_->SetControllerPortDeviceCallback(
       [this](unsigned port, unsigned device) {
-        SetControllerPortDevice(port, device);
+        return SetControllerPortDevice(port, device);
       });
   rendererInterface_ = std::make_unique<EngineRendererAdapter>(this);
   renderThread_ = std::make_unique<RenderThread>(videoPipeline_, envState_);
-  renderThread_->SetEnabled(render_thread_enabled_.load(std::memory_order_relaxed));
   renderThread_->SetNativeVSyncEnabled(
       native_vsync_enabled_.load(std::memory_order_relaxed));
   videoPipeline_.SetGlesDiagnosticsEnabled(
@@ -384,6 +392,17 @@ bool LibretroEngine::Start() {
       }
     }
   } startGuard(startInProgress_);
+  struct RunningGuard {
+    std::atomic<bool> &flag;
+    bool released = false;
+    explicit RunningGuard(std::atomic<bool> &f) : flag(f) {}
+    void release() { released = true; }
+    ~RunningGuard() {
+      if (!released) {
+        flag.store(false, std::memory_order_release);
+      }
+    }
+  };
 
   if (stopInProgress_.load()) {
     LOGF(LOG_WARN, "[NEW] Start ignored: stop in progress");
@@ -409,16 +428,43 @@ bool LibretroEngine::Start() {
   TransitionTo(EngineState::STARTING);
 
   running_.store(true);
+  RunningGuard runningGuard(running_);
   // std::thread constructor may throw std::system_error if thread creation
   // fails. The StartGuard above ensures startInProgress_ is reset in that case.
-  gameThread_ = std::thread(&LibretroEngine::GameLoop, this);
+  try {
+    gameThread_ = std::thread(&LibretroEngine::GameLoop, this);
+  } catch (const std::exception &e) {
+    const std::string message = std::string("game thread start failed: ") + e.what();
+    LOGF(LOG_ERROR, "[NEW] %{public}s", message.c_str());
+    SetLastErrorInfo("game_thread_start_failed", "Start", message);
+    TransitionTo(EngineState::ERROR);
+    return false;
+  } catch (...) {
+    const std::string message = "game thread start failed: unknown exception";
+    LOGF(LOG_ERROR, "[NEW] %{public}s", message.c_str());
+    SetLastErrorInfo("game_thread_start_failed", "Start", message);
+    TransitionTo(EngineState::ERROR);
+    return false;
+  }
   if (renderThread_ && render_thread_enabled_.load(std::memory_order_relaxed)) {
     renderThread_->SetEnabled(true);
     renderThread_->SetNativeVSyncEnabled(
         native_vsync_enabled_.load(std::memory_order_relaxed));
-    renderThread_->Start();
+    if (!renderThread_->Start()) {
+      const std::string message = "render thread start returned false";
+      LOGF(LOG_ERROR, "[NEW] %{public}s", message.c_str());
+      SetLastErrorInfo("render_thread_start_failed", "Start", message);
+      stopRequested_.store(true, std::memory_order_release);
+      messageQueue_.Close();
+      if (gameThread_.joinable()) {
+        gameThread_.join();
+      }
+      TransitionTo(EngineState::ERROR);
+      return false;
+    }
   }
   LOGF(LOG_INFO, " [NEW] Engine Thread Started");
+  runningGuard.release();
   startGuard.release();
   startInProgress_.store(false);
 
@@ -465,6 +511,9 @@ bool LibretroEngine::Stop() {
   }
 
   LOGF(LOG_INFO, " [NEW] Stopping Engine...");
+  // Stop() 作为一次新的生命周期收敛操作，先清掉旧错误；
+  // 后续停机阶段产生的新错误必须保留下来，不能在末尾再无条件清空。
+  ClearLastErrorInfo();
   const EnginePhase phase = phase_.load(std::memory_order_acquire);
   const int64_t phaseMs = GetPhaseDurationMs();
   LOGF(LOG_INFO,
@@ -520,7 +569,6 @@ bool LibretroEngine::Stop() {
   stopRequested_.store(false);
   stopTimedOut_.store(false);
   stopInProgress_.store(false);
-  ClearLastErrorInfo();
   LOGF(LOG_INFO, " [NEW] Engine Stopped");
   return true;
 }
@@ -592,6 +640,7 @@ void LibretroEngine::Reset() {
   currentCorePath_.clear();
   currentGamePath_.clear();
   currentGameData_.reset();
+  gameLoaded_.store(false, std::memory_order_release);
   videoWidth_ = 0;
   videoHeight_ = 0;
   videoMaxWidth_ = 0;
@@ -628,35 +677,48 @@ void LibretroEngine::UnloadGameIfNeeded(const char *reason) {
   if (!unload) {
     return;
   }
-  EngineState st = state_.load();
-  if (!IsGameLoadedState(st)) {
+  if (!gameLoaded_.load(std::memory_order_acquire)) {
     return;
   }
   LOGF(LOG_INFO, "[NEW] Unloading game (%{public}s)",
        reason ? reason : "unknown");
   unload();
+  gameLoaded_.store(false, std::memory_order_release);
   TransitionTo(EngineState::CORE_LOADED);
+  currentGamePath_.clear();
   currentGameData_.reset();
   envState_.ClearInputDescriptorMask();
 }
 
-void LibretroEngine::Pause() {
+bool LibretroEngine::Pause() {
   if (!messageQueue_.Push({MessageType::Pause, {}})) {
     LOGF(LOG_WARN, "[NEW] Pause dropped: message queue closed");
+    SetLastErrorInfo("pause_dispatch_failed", "Pause",
+                     "message queue closed before pause dispatch");
+    return false;
   }
+  return true;
 }
 
-void LibretroEngine::Resume() {
+bool LibretroEngine::Resume() {
   if (!messageQueue_.Push({MessageType::Resume, {}})) {
     LOGF(LOG_WARN, "[NEW] Resume dropped: message queue closed");
+    SetLastErrorInfo("resume_dispatch_failed", "Resume",
+                     "message queue closed before resume dispatch");
+    return false;
   }
+  return true;
 }
 
-void LibretroEngine::Cancel() {
+bool LibretroEngine::Cancel() {
   LOGF(LOG_INFO, "[NEW] Cancel called");
   if (!messageQueue_.Push({MessageType::Cancel, {}})) {
     LOGF(LOG_WARN, "[NEW] Cancel dropped: message queue closed");
+    SetLastErrorInfo("cancel_dispatch_failed", "Cancel",
+                     "message queue closed before cancel dispatch");
+    return false;
   }
+  return true;
 }
 
 bool LibretroEngine::LoadCore(const std::string &corePath) {
@@ -672,7 +734,14 @@ bool LibretroEngine::LoadCore(const std::string &corePath) {
   // 自动启动引擎（如果未运行）
   if (!running_) {
     LOGF(LOG_INFO, "[NEW] LoadCore: Engine not running, auto-starting...");
-    Start();
+    if (!Start()) {
+      LOGF(LOG_ERROR, "[NEW] LoadCore aborted: auto-start failed");
+      if (GetLastErrorInfo().reason.empty()) {
+        SetLastErrorInfo("core_start_failed", "LoadCore",
+                         "LoadCore auto-start failed");
+      }
+      return false;
+    }
   }
   if (!messageQueue_.Push(
           EngineMessage::MakeLoadMessage(MessageType::LoadCore, corePath))) {
@@ -765,6 +834,12 @@ void LibretroEngine::SetNativeWindow(const std::string &xcomponentId,
     if (!messageQueue_.Push(EngineMessage::MakeWindowMessage(
             window ? MessageType::WindowCreated : MessageType::WindowDestroyed,
             window, false, generation))) {
+      const EngineState stateSnapshot = state_.load(std::memory_order_acquire);
+      const bool runningSnapshot = running_.load(std::memory_order_acquire);
+      if (IsExpectedLateWindowQueueDrop(runningSnapshot, stateSnapshot,
+                                        messageQueue_)) {
+        return;
+      }
       windowMessageDropLogCount_++;
       if (windowMessageDropLogCount_ <= 5 ||
           (windowMessageDropLogCount_ % 60) == 0) {
@@ -839,6 +914,13 @@ void LibretroEngine::OnNativeWindowResized(const std::string &xcomponentId,
                 EngineMessage::MakeWindowMessage(MessageType::WindowCreated,
                                                  windowSnapshot, false,
                                                  generation))) {
+          const EngineState stateSnapshot =
+              state_.load(std::memory_order_acquire);
+          const bool runningSnapshot = running_.load(std::memory_order_acquire);
+          if (IsExpectedLateWindowQueueDrop(runningSnapshot, stateSnapshot,
+                                            messageQueue_)) {
+            return;
+          }
           windowResizeDropLogCount_++;
           if (windowResizeDropLogCount_ <= 5 ||
               (windowResizeDropLogCount_ % 60) == 0) {
@@ -864,6 +946,12 @@ void LibretroEngine::OnNativeWindowResized(const std::string &xcomponentId,
     if (!messageQueue_.PushCoalesce(
             EngineMessage::MakeWindowResizeMessage(width, height),
             coalesceFunc)) {
+      const EngineState stateSnapshot = state_.load(std::memory_order_acquire);
+      const bool runningSnapshot = running_.load(std::memory_order_acquire);
+      if (IsExpectedLateWindowQueueDrop(runningSnapshot, stateSnapshot,
+                                        messageQueue_)) {
+        return;
+      }
       windowResizeDropLogCount_++;
       if (windowResizeDropLogCount_ <= 5 ||
           (windowResizeDropLogCount_ % 60) == 0) {
@@ -936,7 +1024,7 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
   if (IsCoreLoadedState(st) || st == EngineState::LOADING ||
       st == EngineState::STOPPING) {
     LOGF(LOG_WARN, "[NEW] SetFilesDir ignored after core loaded: %{public}s",
-         filesDir.c_str());
+         security::DescribePathForLog(filesDir).c_str());
     SetLastErrorInfo("files_dir_set_ignored_state", "SetFilesDir",
                      "SetFilesDir ignored due current engine state");
     return false;
@@ -947,40 +1035,27 @@ bool LibretroEngine::SetFilesDir(const std::string &filesDir) {
       std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
       pendingFilesDir_ = filesDir;
     }
-    if (messageQueue_.IsClosed()) {
+    bool applyOk = false;
+    const bool dispatched = ExecuteSyncTask(
+        [this, &filesDir, &applyOk]() { applyOk = ApplyFilesDir(filesDir); },
+        kSyncTaskTimeoutMs);
+    if (!dispatched) {
       std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
       pendingFilesDir_.clear();
-      LOGF(LOG_WARN, "[NEW] SetFilesDir dropped: message queue closed");
-      SetLastErrorInfo("files_dir_queue_closed", "SetFilesDir",
-                       "SetFilesDir queue closed");
+      SetLastErrorInfo("files_dir_sync_dispatch_failed", "SetFilesDir",
+                       "failed to dispatch SetFilesDir sync task");
       return false;
     }
-    if (!messageQueue_.Push(EngineMessage::MakeLoadMessage(
-            MessageType::SetFilesDir, filesDir))) {
+    if (!applyOk) {
       std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
       pendingFilesDir_.clear();
-      LOGF(LOG_WARN, "[NEW] SetFilesDir dropped: message queue closed");
-      SetLastErrorInfo("files_dir_queue_closed", "SetFilesDir",
-                       "SetFilesDir queue closed");
       return false;
     }
     return true;
   }
 
   // 引擎未运行时可直接设置（无并发读写）
-  if (!envState_.SetBaseDir(filesDir)) {
-    LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set from ArkTS failed");
-    SetLastErrorInfo("files_dir_env_set_failed", "SetFilesDir",
-                     "EnvState::SetBaseDir failed");
-    return false;
-  }
-  {
-    std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
-    pendingFilesDir_.clear();
-  }
-  LOGF(LOG_INFO, "[NEW] EnvState BaseDir set from ArkTS: %{public}s",
-       filesDir.c_str());
-  return true;
+  return ApplyFilesDir(filesDir);
 }
 
 std::string LibretroEngine::GetFilesDir() const {
@@ -999,8 +1074,13 @@ interfaces::IRenderer *LibretroEngine::GetRendererInterface() const {
 }
 
 bool LibretroEngine::ExecuteSyncTask(const std::function<void()> &task,
-                                     uint32_t timeoutMs) {
+                                     uint32_t timeoutMs,
+                                     const char *operation) {
+  const std::string opName =
+      (operation && operation[0] != '\0') ? operation : "ExecuteSyncTask";
   if (!task) {
+    SetLastErrorInfo("sync_task_missing", opName,
+                     "sync task callback is null");
     return false;
   }
   if (g_engineThreadInstance == this || !running_.load()) {
@@ -1009,18 +1089,43 @@ bool LibretroEngine::ExecuteSyncTask(const std::function<void()> &task,
   }
   if (messageQueue_.IsClosed()) {
     LOGF(LOG_WARN, "[NEW] SyncTask dropped: message queue closed");
+    SetLastErrorInfo("sync_task_queue_closed", opName,
+                     "message queue closed before sync task dispatch");
     return false;
   }
 
   auto syncTask = std::make_shared<EngineSyncTask>(task);
   if (!messageQueue_.Push(EngineMessage::MakeSyncTaskMessage(syncTask))) {
     LOGF(LOG_WARN, "[NEW] SyncTask push failed: message queue closed");
+    SetLastErrorInfo("sync_task_dispatch_failed", opName,
+                     "message queue rejected sync task");
     return false;
   }
   if (!syncTask->Wait(timeoutMs)) {
     LOGF(LOG_ERROR, "[NEW] SyncTask timeout after %{public}u ms", timeoutMs);
+    SetLastErrorInfo("sync_task_timeout", opName,
+                     "sync task timed out waiting for engine thread");
     return false;
   }
+  return true;
+}
+
+bool LibretroEngine::ApplyFilesDir(const std::string &filesDir) {
+  if (!envState_.SetBaseDir(filesDir)) {
+    LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set failed: %{public}s",
+         security::DescribePathForLog(filesDir).c_str());
+    SetLastErrorInfo("files_dir_env_set_failed", "SetFilesDir",
+                     "EnvState::SetBaseDir failed");
+    return false;
+  }
+  {
+    std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+    if (pendingFilesDir_ == filesDir) {
+      pendingFilesDir_.clear();
+    }
+  }
+  LOGF(LOG_INFO, "[NEW] EnvState BaseDir set: %{public}s",
+       security::DescribePathForLog(filesDir).c_str());
   return true;
 }
 
@@ -1139,6 +1244,10 @@ void LibretroEngine::GameLoop() {
   // 强制大核调度、减少高负载抢占（音频线程已由 OH_AudioWorkgroup 覆盖，此处仅 Game 线程）。
   int qosRet = OH_QoS_SetThreadQoS(QOS_USER_INTERACTIVE);
   LOGF(LOG_INFO, "[QoS] GameLoop thread QoS set ret=%{public}d", qosRet);
+  // 平台能力探测:QoS 成功(ret==0)=平台支持实时调度(真机)→ 音频走低延迟浅缓冲;
+  // 失败(ret==-1,模拟器无 RT 调度)→ 音频走深缓冲扛抖动。须早于游戏加载(AudioBridge
+  // ::Initialize 读此标志选 profile)注入,故置于 GameLoop 入口。
+  AudioBridge::GetInstance()->SetRtSchedulingAvailable(qosRet == 0);
   LOGF(LOG_INFO, " [NEW] GameLoop Thread Entry: ID = %{public}zu",
        std::hash<std::thread::id>{}(std::this_thread::get_id()));
   g_engineThreadInstance = this;
@@ -1183,7 +1292,7 @@ void LibretroEngine::GameLoop() {
         // 节拍器：若 retro_run 内部未走视频管线节拍（如 loading、菜单态、
         // hwrender 早退路径），这里兜底 sleep 到目标帧时间，避免 frameCount
         // 飙升到 1000+ FPS。VideoPipeline 内部仍有自己的节拍，本节拍仅作上限。
-        const double safeTargetFps = (targetFps_ > 0.0) ? targetFps_ : 60.0;
+        const double safeTargetFps = (targetFps_.load() > 0.0) ? targetFps_.load() : 60.0;
         const int64_t targetFrameUs =
             static_cast<int64_t>(1000000.0 / safeTargetFps);
         auto frameEnd = std::chrono::steady_clock::now();
@@ -1472,7 +1581,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     TransitionTo(EngineState::LOADING);
     currentCorePath_ = msg.payload.loadPath.path;
     LOGF(LOG_INFO, "[NEW] Message: LoadCore path=%{public}s",
-         currentCorePath_.c_str());
+         security::DescribePathForLog(currentCorePath_).c_str());
     // 先卸载旧核心（如果已加载）
     if (coreLoader_.IsLoaded()) {
       LOGF(LOG_INFO, "[NEW] Unloading previous core before loading new one");
@@ -1504,7 +1613,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
             envState_.SetBaseDir(appDir + "/files");
             LOGF(LOG_WARN,
                  "[NEW] EnvState BaseDir (fallback): %{public}s/files",
-                 appDir.c_str());
+                 security::DescribePathForLog(appDir).c_str());
           }
         }
       }
@@ -1529,7 +1638,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       TransitionTo(EngineState::CORE_LOADED);
     } else {
       LOGF(LOG_ERROR, " [NEW] LoadCore Failed: %{public}s",
-           currentCorePath_.c_str());
+           security::DescribePathForLog(currentCorePath_).c_str());
 
       // 构建转义后的错误信息，避免 payload JSON 被特殊字符破坏。
 
@@ -1550,6 +1659,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       currentCorePath_.clear();
       currentGamePath_.clear();
       currentGameData_.reset();
+      gameLoaded_.store(false, std::memory_order_release);
       envState_.ClearCoreOptions();
       TransitionTo(EngineState::ERROR);
     }
@@ -1564,11 +1674,13 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
     currentGamePath_ = msg.payload.loadPath.path;
     currentGameData_ = msg.payload.loadPath.data;
     LOGF(LOG_INFO, "[NEW] Message: LoadRom path=%{public}s, data=%{public}s",
-         currentGamePath_.c_str(), currentGameData_ ? "YES" : "NO");
+         security::DescribePathForLog(currentGamePath_).c_str(),
+         currentGameData_ ? "YES" : "NO");
+    const bool emptyContent = currentGamePath_.empty() && !currentGameData_;
     if (!currentGamePath_.empty() &&
         !security::ValidateRomPath(currentGamePath_)) {
       LOGF(LOG_ERROR, " [NEW] LoadRom blocked: invalid ROM path %{public}s",
-           currentGamePath_.c_str());
+           security::DescribePathForLog(currentGamePath_).c_str());
       currentGamePath_.clear();
       currentGameData_.reset();
       eventBridge_.Emit("core_crash", "{\"reason\": \"rom_path_invalid\"}",
@@ -1578,27 +1690,29 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
       break;
     }
     if (coreLoader_.IsLoaded()) {
+      if (emptyContent && envState_.SupportsNoGame() &&
+          (prevState == EngineState::GAME_LOADED ||
+           prevState == EngineState::RUNNING ||
+           prevState == EngineState::PAUSED)) {
+        LOGF(LOG_INFO,
+             "[NEW] LoadRom ignored for no-game core (already loaded)");
+        currentGamePath_.clear();
+        currentGameData_.reset();
+        break;
+      }
       if (prevState == EngineState::GAME_LOADED ||
           prevState == EngineState::RUNNING ||
           prevState == EngineState::PAUSED) {
         UnloadGameIfNeeded("reload_rom");
       }
       TransitionTo(EngineState::LOADING);
-      const bool emptyContent = currentGamePath_.empty() && !currentGameData_;
       if (emptyContent) {
         if (envState_.SupportsNoGame()) {
-          if (prevState == EngineState::GAME_LOADED ||
-              prevState == EngineState::RUNNING ||
-              prevState == EngineState::PAUSED) {
-            LOGF(LOG_INFO,
-                 "[NEW] LoadRom ignored for no-game core (already loaded)");
-            break;
-          }
-
           LOGF(LOG_INFO, "[NEW] Empty ROM path for no-game core: calling "
                          "retro_load_game(NULL)");
 
           if (coreLoader_.GetLoadGame()(nullptr)) {
+            gameLoaded_.store(true, std::memory_order_release);
             struct retro_system_av_info avInfo = {0};
             coreLoader_.GetSystemAvInfo()(&avInfo);
 
@@ -1614,6 +1728,18 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
                    "rate=%{public}.2f",
                    kAudioChainPrefix, reset_ok ? 1 : 0,
                    avInfo.timing.sample_rate);
+              if (!reset_ok) {
+                LOGF(LOG_ERROR,
+                     " [NEW] LoadRom(no-game) Failed: AudioBridge reset failed");
+                UnloadGameIfNeeded("audio_reset_failed_no_game");
+                eventBridge_.Emit("core_crash",
+                                  "{\"reason\": \"audio_bridge_reset_failed\"}",
+                                  true);
+                SetLastErrorInfo("audio_bridge_reset_failed", "LoadRom",
+                                 "AudioBridge reset failed for no-game core");
+                TransitionTo(EngineState::ERROR);
+                break;
+              }
             }
 
             ClearLastErrorInfo();
@@ -1699,6 +1825,7 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
 
       if (coreLoader_.GetLoadGame()(&gameInfo)) {
         LOGF(LOG_INFO, " [NEW] LoadRom Success");
+        gameLoaded_.store(true, std::memory_order_release);
         if (needFullpath) {
           currentGameData_.reset();
         }
@@ -1744,14 +1871,14 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
           LOGF(LOG_WARN,
                " [NEW] Abnormal audio sample rate detected: %{public}.2f "
                "Hz. Clamping to %{public}.2f Hz to match GB standard.",
-               audioSampleRate_, fallbackRate);
+               audioSampleRate_.load(), fallbackRate);
           audioSampleRate_ = fallbackRate;
           avInfo.timing.sample_rate = fallbackRate;
         }
         LOGF(LOG_INFO,
              "%{public}s AV applied: fps=%{public}.2f, audio_rate=%{public}.2f, "
              "video=%{public}ux%{public}u",
-             kAudioChainPrefix, targetFps_, audioSampleRate_, videoWidth_,
+             kAudioChainPrefix, targetFps_.load(), audioSampleRate_.load(), videoWidth_,
              videoHeight_);
         auto *bridge = AudioBridge::GetInstance();
         if (bridge) {
@@ -1762,6 +1889,18 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
                "rate=%{public}.2f",
                kAudioChainPrefix, reset_ok ? 1 : 0,
                avInfo.timing.sample_rate);
+          if (!reset_ok) {
+            LOGF(LOG_ERROR,
+                 " [NEW] LoadRom Failed: AudioBridge reset failed");
+            UnloadGameIfNeeded("audio_reset_failed");
+            eventBridge_.Emit("core_crash",
+                              "{\"reason\": \"audio_bridge_reset_failed\"}",
+                              true);
+            SetLastErrorInfo("audio_bridge_reset_failed", "LoadRom",
+                             "AudioBridge reset failed after retro_load_game");
+            TransitionTo(EngineState::ERROR);
+            break;
+          }
         }
 
         // ...
@@ -1789,28 +1928,22 @@ void LibretroEngine::HandleMessage(const EngineMessage &msg) {
   } break;
   case MessageType::SetFilesDir: {
     const std::string requestPath = msg.payload.loadPath.path;
-    auto clearPendingIfMatched = [this, &requestPath]() {
-      std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
-      if (pendingFilesDir_ == requestPath) {
-        pendingFilesDir_.clear();
-      }
-    };
-
     EngineState st = state_.load();
     if (IsCoreLoadedState(st) || st == EngineState::LOADING ||
         st == EngineState::STOPPING) {
       LOGF(LOG_WARN, "[NEW] SetFilesDir ignored after core loaded: %{public}s",
-           msg.payload.loadPath.path);
-      clearPendingIfMatched();
+           security::DescribePathForLog(msg.payload.loadPath.path).c_str());
+      {
+        std::lock_guard<std::mutex> hintLock(filesDirHintMutex_);
+        if (pendingFilesDir_ == requestPath) {
+          pendingFilesDir_.clear();
+        }
+      }
+      SetLastErrorInfo("files_dir_set_ignored_state", "SetFilesDir",
+                       "SetFilesDir ignored due current engine state");
       break;
     }
-    if (!envState_.SetBaseDir(msg.payload.loadPath.path)) {
-      LOGF(LOG_ERROR, "[NEW] EnvState BaseDir set from Engine thread failed");
-    } else {
-      LOGF(LOG_INFO, "[NEW] EnvState BaseDir set from Engine thread: %{public}s",
-           msg.payload.loadPath.path);
-    }
-    clearPendingIfMatched();
+    (void)ApplyFilesDir(requestPath);
     break;
   }
   case MessageType::WindowCreated:
@@ -2552,7 +2685,28 @@ void LibretroEngine::SetSoftwareMaxResolution(unsigned maxWidth,
 
 bool LibretroEngine::SetCoreOption(const std::string &key,
                                    const std::string &value) {
-  return envState_.SetCoreOptionValue(key.c_str(), value.c_str());
+  const auto defs = envState_.GetCoreOptionDefinitions();
+  const auto it = std::find_if(defs.begin(), defs.end(),
+                               [&key](const auto &def) { return def.key == key; });
+  if (it == defs.end()) {
+    SetLastErrorInfo("core_option_key_unknown", "SetCoreOption",
+                     "Requested core option key is not registered");
+    return false;
+  }
+  const auto valueIt = std::find_if(
+      it->values.begin(), it->values.end(),
+      [&value](const auto &candidate) { return candidate.value == value; });
+  if (valueIt == it->values.end()) {
+    SetLastErrorInfo("core_option_value_invalid", "SetCoreOption",
+                     "Requested core option value is not allowed");
+    return false;
+  }
+  const bool ok = envState_.SetCoreOptionValue(key.c_str(), value.c_str());
+  if (!ok) {
+    SetLastErrorInfo("core_option_apply_failed", "SetCoreOption",
+                     "Core option update could not be applied");
+  }
+  return ok;
 }
 
 std::string LibretroEngine::GetCoreOptionsJson() const {
@@ -2591,62 +2745,77 @@ std::string LibretroEngine::GetCoreOptionsJson() const {
 // 违反 libretro core 的 game-loop context 要求,可能损坏 core 内部状态。
 
 bool LibretroEngine::DiskControlSetEjectState(bool ejected) {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlSetEjectState",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, ejected, &ok]() {
             ok = ejected ? diskController_->Eject() : diskController_->Insert();
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlSetEjectState")) {
     return false;
   }
   return ok;
 }
 
 bool LibretroEngine::DiskControlGetEjectState() {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlGetEjectState",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, &ok]() { ok = diskController_->IsEjected(); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlGetEjectState")) {
     return false;
   }
   return ok;
 }
 
 unsigned LibretroEngine::DiskControlGetImageIndex() {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlGetImageIndex",
+                     "Disk controller is unavailable");
     return 0;
+  }
   unsigned result = 0;
   if (!ExecuteSyncTask(
           [this, &result]() { result = diskController_->GetImageIndex(); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlGetImageIndex")) {
     return 0;
   }
   return result;
 }
 
 bool LibretroEngine::DiskControlSetImageIndex(unsigned index) {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlSetImageIndex",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, index, &ok]() { ok = diskController_->SetImageIndex(index); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlSetImageIndex")) {
     return false;
   }
   return ok;
 }
 
 unsigned LibretroEngine::DiskControlGetNumImages() {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlGetNumImages",
+                     "Disk controller is unavailable");
     return 0;
+  }
   unsigned result = 0;
   if (!ExecuteSyncTask(
           [this, &result]() { result = diskController_->GetNumImages(); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlGetNumImages")) {
     return 0;
   }
   return result;
@@ -2654,26 +2823,33 @@ unsigned LibretroEngine::DiskControlGetNumImages() {
 
 bool LibretroEngine::DiskControlReplaceImageIndex(unsigned index,
                                                   const std::string &path) {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable",
+                     "DiskControlReplaceImageIndex",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, index, &path, &ok]() {
             ok = diskController_->ReplaceImageIndex(index, path);
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlReplaceImageIndex")) {
     return false;
   }
   return ok;
 }
 
 bool LibretroEngine::DiskControlAddImageIndex() {
-  if (!diskController_)
+  if (!diskController_) {
+    SetLastErrorInfo("disk_controller_unavailable", "DiskControlAddImageIndex",
+                     "Disk controller is unavailable");
     return false;
+  }
   bool ok = false;
   if (!ExecuteSyncTask(
           [this, &ok]() { ok = diskController_->AddImageIndex(); },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "DiskControlAddImageIndex")) {
     return false;
   }
   return ok;
@@ -2723,6 +2899,17 @@ void LibretroEngine::TransitionTo(EngineState newState) {
          kAudioChainPrefix, ok ? 1 : 0, bridge->IsRunning() ? 1 : 0,
          bridge->IsPlaying() ? 1 : 0,
          static_cast<int>(bridge->GetSyncMode()));
+    if (!ok) {
+      eventBridge_.Emit("core_crash",
+                        "{\"reason\": \"audio_bridge_start_failed\", "
+                        "\"step\": \"TransitionTo\", "
+                        "\"message\": \"AudioBridge failed to enter running state\"}",
+                        true);
+      SetLastErrorInfo("audio_bridge_start_failed", "TransitionTo",
+                       "AudioBridge failed to enter running state");
+      TransitionTo(EngineState::ERROR);
+      return;
+    }
   } else if (newState == EngineState::PAUSED ||
              newState == EngineState::STOPPING) {
     const bool ok = bridge->Pause();
@@ -2731,6 +2918,19 @@ void LibretroEngine::TransitionTo(EngineState newState) {
          "running=%{public}d, playing=%{public}d",
          kAudioChainPrefix, static_cast<int>(newState), ok ? 1 : 0,
          bridge->IsRunning() ? 1 : 0, bridge->IsPlaying() ? 1 : 0);
+    if (!ok) {
+      eventBridge_.Emit("core_crash",
+                        "{\"reason\": \"audio_bridge_pause_failed\", "
+                        "\"step\": \"TransitionTo\", "
+                        "\"message\": \"AudioBridge failed to pause for engine state change\"}",
+                        true);
+      SetLastErrorInfo("audio_bridge_pause_failed", "TransitionTo",
+                       "AudioBridge failed to pause for engine state change");
+      if (newState == EngineState::PAUSED) {
+        TransitionTo(EngineState::ERROR);
+      }
+      return;
+    }
   } else if (newState == EngineState::STOPPED) {
     const bool ok = bridge->Stop();
     LOGF(LOG_INFO,
@@ -2738,6 +2938,16 @@ void LibretroEngine::TransitionTo(EngineState newState) {
          "running=%{public}d, playing=%{public}d",
          kAudioChainPrefix, ok ? 1 : 0, bridge->IsRunning() ? 1 : 0,
          bridge->IsPlaying() ? 1 : 0);
+    if (!ok) {
+      eventBridge_.Emit("core_crash",
+                        "{\"reason\": \"audio_bridge_stop_failed\", "
+                        "\"step\": \"TransitionTo\", "
+                        "\"message\": \"AudioBridge failed to stop during engine shutdown\"}",
+                        true);
+      SetLastErrorInfo("audio_bridge_stop_failed", "TransitionTo",
+                       "AudioBridge failed to stop during engine shutdown");
+      return;
+    }
   }
 }
 
@@ -2787,16 +2997,26 @@ size_t LibretroEngine::GetSaveStateSize() {
   // T8-A-F1: 拒绝在 !IsGameLoadedState() 时调用——core 未加载游戏时
   // serialize_size 行为未定义,且无 game state 时返回 0 已是死路。
   if (!IsGameLoadedState(state_.load())) {
+    SetLastErrorInfo("save_state_size_game_not_loaded", "GetSaveStateSize",
+                     "GetSaveStateSize requires a loaded game");
     return 0;
   }
   size_t size = 0;
-  (void)ExecuteSyncTask(
-      [this, &size]() {
+  bool queried = false;
+  if (!ExecuteSyncTask(
+      [this, &size, &queried]() {
         if (stateManager_) {
           size = stateManager_->GetSaveStateSize();
+          queried = true;
         }
       },
-      kSyncTaskTimeoutMs);
+      kSyncTaskTimeoutMs, "GetSaveStateSize")) {
+    return 0;
+  }
+  if (!queried) {
+    SetLastErrorInfo("save_state_size_unavailable", "GetSaveStateSize",
+                     "Save-state size query callback is unavailable");
+  }
   return size;
 }
 
@@ -2806,6 +3026,8 @@ bool LibretroEngine::SaveState(std::vector<uint8_t> &outData) {
   if (!IsGameLoadedState(state_.load())) {
     LOGF(LOG_WARN, "[NEW] SaveState rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("save_state_game_not_loaded", "SaveState",
+                     "SaveState requires a loaded game");
     return false;
   }
   bool ok = false;
@@ -2816,13 +3038,50 @@ bool LibretroEngine::SaveState(std::vector<uint8_t> &outData) {
               ok = stateManager_->SaveState(snapshot);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "SaveState")) {
     return false;
   }
   if (!ok) {
+    SetLastErrorInfo("save_state_failed", "SaveState",
+                     "Core state serialization returned false");
     return false;
   }
   outData = std::move(snapshot);
+  return true;
+}
+
+bool LibretroEngine::CaptureSaveStateBundle(SaveStateCaptureBundle &outBundle) {
+  if (!IsGameLoadedState(state_.load())) {
+    LOGF(LOG_WARN,
+         "[NEW] CaptureSaveStateBundle rejected: state=%{public}d (game not loaded)",
+         static_cast<int>(state_.load()));
+    SetLastErrorInfo("save_state_bundle_game_not_loaded",
+                     "CaptureSaveStateBundle",
+                     "CaptureSaveStateBundle requires a loaded game");
+    return false;
+  }
+
+  SaveStateCaptureBundle bundle{};
+  bool ok = false;
+  if (!ExecuteSyncTask(
+          [this, &ok, &bundle]() {
+            if (stateManager_) {
+              ok = stateManager_->SaveState(bundle.stateData);
+            }
+          },
+          kSyncTaskTimeoutMs, "CaptureSaveStateBundle")) {
+    return false;
+  }
+  if (!ok || bundle.stateData.empty()) {
+    SetLastErrorInfo("save_state_bundle_failed", "CaptureSaveStateBundle",
+                     "SaveState bundle capture returned empty snapshot");
+    return false;
+  }
+
+  (void)videoPipeline_.CaptureLastFrameRgba(bundle.thumbnail.rgba,
+                                            bundle.thumbnail.width,
+                                            bundle.thumbnail.height);
+  outBundle = std::move(bundle);
   return true;
 }
 
@@ -2831,6 +3090,8 @@ bool LibretroEngine::LoadState(const std::vector<uint8_t> &data) {
   if (!IsGameLoadedState(state_.load())) {
     LOGF(LOG_WARN, "[NEW] LoadState rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("load_state_game_not_loaded", "LoadState",
+                     "LoadState requires a loaded game");
     return false;
   }
   bool ok = false;
@@ -2840,8 +3101,12 @@ bool LibretroEngine::LoadState(const std::vector<uint8_t> &data) {
               ok = stateManager_->LoadState(data);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "LoadState")) {
     return false;
+  }
+  if (!ok) {
+    SetLastErrorInfo("load_state_failed", "LoadState",
+                     "Core state deserialization returned false");
   }
   return ok;
 }
@@ -2853,6 +3118,8 @@ bool LibretroEngine::GetSRAM(std::vector<uint8_t> &outData) {
   if (!IsGameLoadedState(state_.load())) {
     LOGF(LOG_WARN, "[NEW] GetSRAM rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("get_sram_game_not_loaded", "GetSRAM",
+                     "GetSRAM requires a loaded game");
     return false;
   }
   bool ok = false;
@@ -2863,10 +3130,12 @@ bool LibretroEngine::GetSRAM(std::vector<uint8_t> &outData) {
               ok = stateManager_->GetSRAM(snapshot);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "GetSRAM")) {
     return false;
   }
   if (!ok) {
+    SetLastErrorInfo("get_sram_failed", "GetSRAM",
+                     "Failed to read SRAM from core");
     return false;
   }
   outData = std::move(snapshot);
@@ -2878,6 +3147,8 @@ bool LibretroEngine::SetSRAM(const std::vector<uint8_t> &data) {
   if (!IsGameLoadedState(state_.load())) {
     LOGF(LOG_WARN, "[NEW] SetSRAM rejected: state=%{public}d (game not loaded)",
          static_cast<int>(state_.load()));
+    SetLastErrorInfo("set_sram_game_not_loaded", "SetSRAM",
+                     "SetSRAM requires a loaded game");
     return false;
   }
   bool ok = false;
@@ -2887,8 +3158,12 @@ bool LibretroEngine::SetSRAM(const std::vector<uint8_t> &data) {
               ok = stateManager_->SetSRAM(data);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "SetSRAM")) {
     return false;
+  }
+  if (!ok) {
+    SetLastErrorInfo("set_sram_failed", "SetSRAM",
+                     "Failed to write SRAM into core");
   }
   return ok;
 }
@@ -2902,37 +3177,53 @@ uintptr_t LibretroEngine::GetHwRenderFramebuffer() const {
 
 // --- 核心控制实现 ---
 
-void LibretroEngine::ResetCore() {
+bool LibretroEngine::ResetCore() {
+  bool ok = false;
   const bool dispatched = ExecuteSyncTask(
-      [this]() {
+      [this, &ok]() {
         if (!coreLoader_.IsLoaded()) {
           return;
         }
         auto fn = coreLoader_.GetReset();
         if (fn) {
           fn();
+          ok = true;
           LOGF(LOG_INFO, "Core reset");
         }
       },
-      kSyncTaskTimeoutMs);
+      kSyncTaskTimeoutMs, "ResetCore");
   if (!dispatched) {
     LOGF(LOG_WARN, "[NEW] ResetCore skipped: sync dispatch failed");
+    return false;
   }
+  if (!ok) {
+    SetLastErrorInfo("reset_core_unavailable", "ResetCore",
+                     "Core reset callback is unavailable");
+  }
+  return ok;
 }
 
 // --- 金手指实现 ---
 
-void LibretroEngine::CheatReset() {
+bool LibretroEngine::CheatReset() {
+  bool ok = false;
   const bool dispatched = ExecuteSyncTask(
-      [this]() {
+      [this, &ok]() {
         if (stateManager_) {
           stateManager_->CheatReset();
+          ok = true;
         }
       },
-      kSyncTaskTimeoutMs);
+      kSyncTaskTimeoutMs, "CheatReset");
   if (!dispatched) {
     LOGF(LOG_WARN, "[NEW] CheatReset skipped: sync dispatch failed");
+    return false;
   }
+  if (!ok) {
+    SetLastErrorInfo("cheat_reset_unavailable", "CheatReset",
+                     "Cheat reset is unavailable in current core state");
+  }
+  return ok;
 }
 
 bool LibretroEngine::CheatSet(unsigned index, bool enabled,
@@ -2944,17 +3235,22 @@ bool LibretroEngine::CheatSet(unsigned index, bool enabled,
               ok = stateManager_->CheatSet(index, enabled, code);
             }
           },
-          kSyncTaskTimeoutMs)) {
+          kSyncTaskTimeoutMs, "CheatSet")) {
     return false;
+  }
+  if (!ok) {
+    SetLastErrorInfo("cheat_set_failed", "CheatSet",
+                     "Core rejected cheat update");
   }
   return ok;
 }
 
 // --- 控制器/区域实现 ---
 
-void LibretroEngine::SetControllerPortDevice(unsigned port, unsigned device) {
+bool LibretroEngine::SetControllerPortDevice(unsigned port, unsigned device) {
+  bool applied = false;
   const bool dispatched = ExecuteSyncTask(
-      [this, port, device]() {
+      [this, port, device, &applied]() {
         if (!coreLoader_.IsLoaded()) {
           return;
         }
@@ -2963,14 +3259,22 @@ void LibretroEngine::SetControllerPortDevice(unsigned port, unsigned device) {
           fn(port, device);
           LOGF(LOG_INFO, "Set controller port %{public}u to device %{public}u",
                port, device);
+          applied = true;
         }
       },
-      kSyncTaskTimeoutMs);
+      kSyncTaskTimeoutMs, "SetControllerPortDevice");
   if (!dispatched) {
     LOGF(LOG_WARN,
          "[NEW] SetControllerPortDevice skipped: sync dispatch failed (port=%{public}u, device=%{public}u)",
          port, device);
+    return false;
   }
+  if (!applied) {
+    SetLastErrorInfo("controller_port_device_unavailable",
+                     "SetControllerPortDevice",
+                     "Core controller port device callback is unavailable");
+  }
+  return applied;
 }
 
 unsigned LibretroEngine::GetRegion() {
@@ -2987,10 +3291,14 @@ unsigned LibretroEngine::GetRegion() {
               ok = true;
             }
           },
-          kSyncTaskTimeoutMs)) {
-    return 0;
+          kSyncTaskTimeoutMs, "GetRegion")) {
+    return std::numeric_limits<unsigned>::max();
   }
-  return ok ? region : 0;
+  if (!ok) {
+    SetLastErrorInfo("region_unavailable", "GetRegion",
+                     "Region query callback is unavailable");
+  }
+  return ok ? region : std::numeric_limits<unsigned>::max();
 }
 
 } // namespace libretro

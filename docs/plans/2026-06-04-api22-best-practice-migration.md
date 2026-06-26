@@ -13,6 +13,11 @@
 > 文档建议把 HUD DTO 标 `@ObservedV2 + @Trace`，但实践已证伪：V1 项目里 `@ObservedV2` 类定义本身就触发编译器递归代理 → **heap OOM**（上会话连续 3 次崩溃）。
 > 详见 memory `feedback_arkts_v1v2_no_mixing.md`。perfDisplay 现状（`LibretroGamePage.ets:441/474/490` 纯 V1 整体替换）**已是当前最优**，保持不动。
 >
+> ### ⚠️ 2026-06-07 更正：方案 B 决策已反转 —— 改为「全量迁移 V2」并已完成
+> 上面"方案 B 废弃"的结论**已被 2026-06-07 的实际工作覆盖**（commit `ddb9ad7`）。当时判定"V1 里 `@ObservedV2` 触发 OOM"是**误判**——真因是【同组件内】混用 V1/V2 装饰器，而非 V2 不可用。`compatibleSdkVersion=22` 下 V2 装饰器(API12+)+ 官方兼容工具 `UIUtils.enableV2Compatibility`/`makeV1Observed`(API19+) 均可用，渐进迁移每批可编译。
+> **结果：91 文件 / 64 组件全量迁 V2 已完成并经 DevEco 编译验证**（实测 `@ComponentV2=44 / @Local=251 / @Trace=7`，`@Component/@Prop` 残留 0）。perfDisplay 改 `@ObservedV2 + @Trace` + handler 改字段（非整体替换），根治了虚拟键输入延迟。
+> 完整方法论（装饰器映射 / `@Monitor` 抽方法 / sed 批量 / CRLF 污染坑）见 memory `project_arkts_v2_migration_done` 与 tech-debt-tracker `D007`。
+>
 > **方案 A（路由 Navigation）— ⏸️ 暂缓。**
 > router 在 API22 **未 deprecated**（上会话核查 0 deprecated API），迁移属纯合规/前瞻投入、**无功能收益**。用户 2026-06-04 决定本会话暂缓。
 > 若未来重启，先按下方"实物核查修正"更新数据，**别用下方过时的旧数字**。

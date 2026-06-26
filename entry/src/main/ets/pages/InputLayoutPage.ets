@@ -44,15 +44,15 @@ interface NetplayRoomItem {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct InputLayoutPage {
-  @State private activeMode: string = 'center'
-  @State private savedToastVisible: boolean = false
-  @State private layoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons
-  @State private selectedButtonId: string = 'a'
-  @State private layoutStatusText: string = 'LOCAL_LAYOUT_READY'
-  @State private layoutUpdatedAtText: string = 'NOT_SAVED'
-  @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
+  @Local private activeMode: string = 'center'
+  @Local private savedToastVisible: boolean = false
+  @Local private layoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons
+  @Local private selectedButtonId: string = 'a'
+  @Local private layoutStatusText: string = 'LOCAL_LAYOUT_READY'
+  @Local private layoutUpdatedAtText: string = 'NOT_SAVED'
+  @Local private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
   private savedToastTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0
@@ -62,6 +62,9 @@ struct InputLayoutPage {
   private readonly editorLayoutHeight: number = 340
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('input')
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.detectFoldMode()
   }
   private readonly controllerCards: ControllerCardItem[] = [
@@ -97,7 +100,11 @@ struct InputLayoutPage {
 
   aboutToAppear(): void {
     this.pageActive = true
-    display.on('foldStatusChange', this.foldStatusListener)
+    try {
+      display.on('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('InputLayoutPage', 'Fold', `foldStatusChange on failed: ${err}`)
+    }
     this.detectFoldMode()
     void this.loadSavedLayout()
   }
@@ -105,7 +112,11 @@ struct InputLayoutPage {
   aboutToDisappear(): void {
     this.pageActive = false
     this.pageTaskToken += 1
-    display.off('foldStatusChange', this.foldStatusListener)
+    try {
+      display.off('foldStatusChange', this.foldStatusListener)
+    } catch (err) {
+      LogHelper.error('InputLayoutPage', 'Fold', `foldStatusChange off failed: ${err}`)
+    }
     if (this.savedToastTimer !== -1) {
       clearTimeout(this.savedToastTimer)
       this.savedToastTimer = -1
@@ -157,11 +168,22 @@ struct InputLayoutPage {
       this.layoutStatusText = 'CONTEXT_MISSING'
       return
     }
-    const profile = await loadInputLayoutProfile(context)
-    if (!this.isCurrentPageTask(token)) {
-      return
+    try {
+      const profile = await loadInputLayoutProfile(context)
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      this.applyLayoutProfile(profile, 'LOCAL_LAYOUT_READY')
+    } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('InputLayoutPage', 'Layout', `读取输入布局失败: ${message}`)
+      this.layoutButtons = createDefaultInputLayoutProfile().buttons
+      this.layoutStatusText = 'LOCAL_LAYOUT_LOAD_FAILED'
+      this.layoutUpdatedAtText = 'NOT_SAVED'
     }
-    this.applyLayoutProfile(profile, 'LOCAL_LAYOUT_READY')
   }
 
   private applyLayoutProfile(profile: InputLayoutProfile, statusText: string): void {

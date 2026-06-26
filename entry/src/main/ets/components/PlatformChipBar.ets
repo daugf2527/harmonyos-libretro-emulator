@@ -1,10 +1,10 @@
 import { EmuColors } from '../common/EmuUiTokens'
 
-@Component
+@ComponentV2
 export struct PlatformChipBar {
-  @Prop items: string[] = []
-  @Prop @Watch('onSelectedChange') selected: string = ''
-  onChange?: (value: string) => void
+  @Param items: string[] = []
+  @Param selected: string = ''
+  @Event onChange?: (value: string) => void
   private scroller: Scroller = new Scroller()
   private readonly estimatedChipWidth: number = 64
 
@@ -19,7 +19,8 @@ export struct PlatformChipBar {
     return item
   }
 
-  private onSelectedChange(): void {
+  @Monitor('selected')
+  private onSelectedChange(monitor: IMonitor): void {
     const idx = this.items.findIndex((item: string) => item === this.selected)
     if (idx <= 0) {
       this.scroller.scrollTo({ xOffset: 0, yOffset: 0 })
@@ -50,7 +51,7 @@ export struct PlatformChipBar {
               .onClick(() => {
                 this.onChange?.(item)
               })
-          }, (item: string) => item)
+          }, (item: string, index: number) => `${index}:${item}`)
         }
         .padding({ top: 2, bottom: 2, left: 4, right: 4 })
       }

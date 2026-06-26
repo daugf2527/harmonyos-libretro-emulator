@@ -2,6 +2,19 @@
 #include "interfaces/graphics/i_renderer.h"
 #include "platform/audio/audio_bridge.h"
 
+namespace {
+
+void SetVideoAudioError(const char *reason, const char *step,
+                        const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
+} // namespace
+
 static napi_value SetScalingMode(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   size_t argc = 0;
@@ -14,12 +27,23 @@ static napi_value SetScalingMode(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], mode, "SetScalingMode", "mode")) {
     return MakeBool(env, false);
   }
+  if (mode < 0 || mode > 2) {
+    SetVideoAudioError("scaling_mode_invalid", "SetScalingMode",
+                       "Scaling mode must be 0, 1, or 2");
+    return MakeBool(env, false);
+  }
 
   auto *renderer = GetEngine()->GetRendererInterface();
   if (!renderer) {
+    SetVideoAudioError("renderer_unavailable", "SetScalingMode",
+                       "Renderer interface is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = renderer->SetScalingMode(mode);
+  if (!ok) {
+    SetVideoAudioError("scaling_mode_apply_failed", "SetScalingMode",
+                       "Renderer rejected the requested scaling mode");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -35,6 +59,11 @@ static napi_value SetSwapInterval(napi_env env, napi_callback_info info) {
 
   int32_t interval = 1;
   if (!GetInt32Arg(env, args[0], interval, "SetSwapInterval", "interval")) {
+    return MakeBool(env, false);
+  }
+  if (interval != 0 && interval != 1) {
+    GetEngine()->SetLastErrorInfo("swap_interval_invalid", "SetSwapInterval",
+                                  "Swap interval must be 0 or 1");
     return MakeBool(env, false);
   }
 
@@ -60,14 +89,24 @@ static napi_value SetSoftwareMaxResolution(napi_env env, napi_callback_info info
     LOGF(LOG_ERROR,
          "[NEW] SetSoftwareMaxResolution invalid: %{public}dx%{public}d", w,
          h);
+    SetVideoAudioError("software_resolution_invalid",
+                       "SetSoftwareMaxResolution",
+                       "Software max resolution must be positive");
     return MakeBool(env, false);
   }
 
   auto *renderer = GetEngine()->GetRendererInterface();
   if (!renderer) {
+    SetVideoAudioError("renderer_unavailable", "SetSoftwareMaxResolution",
+                       "Renderer interface is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = renderer->SetSoftwareMaxResolution(w, h);
+  if (!ok) {
+    SetVideoAudioError("software_resolution_apply_failed",
+                       "SetSoftwareMaxResolution",
+                       "Renderer rejected the requested software resolution");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -88,9 +127,15 @@ static napi_value SetAIUpscale(napi_env env, napi_callback_info info) {
 
   auto *renderer = GetEngine()->GetRendererInterface();
   if (!renderer) {
+    SetVideoAudioError("renderer_unavailable", "SetAIUpscale",
+                       "Renderer interface is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = renderer->SetAIUpscale(enabled);
+  if (!ok) {
+    SetVideoAudioError("ai_upscale_apply_failed", "SetAIUpscale",
+                       "Renderer rejected the AI upscale setting");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -111,9 +156,15 @@ static napi_value SetHwRenderAllowed(napi_env env, napi_callback_info info) {
 
   auto *renderer = GetEngine()->GetRendererInterface();
   if (!renderer) {
+    SetVideoAudioError("renderer_unavailable", "SetHwRenderAllowed",
+                       "Renderer interface is unavailable");
     return MakeBool(env, false);
   }
   const bool ok = renderer->SetHwRenderAllowed(enabled);
+  if (!ok) {
+    SetVideoAudioError("hw_render_apply_failed", "SetHwRenderAllowed",
+                       "Renderer rejected the hardware render setting");
+  }
 
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
@@ -132,7 +183,11 @@ static napi_value SetMinimumAudioLatency(napi_env env, napi_callback_info info) 
       return MakeBool(env, false);
     }
   }
-  if (v < 0) v = 0;
+  if (v < 0) {
+    SetVideoAudioError("audio_latency_invalid", "SetMinimumAudioLatency",
+                       "Audio latency must be non-negative");
+    return MakeBool(env, false);
+  }
   LOGF(LOG_INFO, "[NEW] SetMinimumAudioLatency called: %{public}d ms", v);
   GetEngine()->SetMinimumAudioLatency(static_cast<unsigned>(v));
   return MakeBool(env, true);
@@ -151,17 +206,60 @@ static napi_value SetAudioSyncMode(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], mode, "SetAudioSyncMode", "mode")) {
     return MakeBool(env, false);
   }
-
-  auto *audioBridge = libretro::AudioBridge::GetInstance();
-  if (audioBridge) {
-    auto syncMode = (mode == 0) ? libretro::AudioBridge::SyncMode::NON_BLOCKING
-                                : libretro::AudioBridge::SyncMode::AUDIO_BLOCKING;
-    // Audit T1-F4: SetSyncMode is sync_mode_.store() (std::atomic) — safe to call from NAPI thread
-    audioBridge->SetSyncMode(syncMode);
-    LOGF(LOG_INFO, "[NEW] SetAudioSyncMode: %{public}d", mode);
+  if (mode != 0 && mode != 1) {
+    GetEngine()->SetLastErrorInfo("audio_sync_mode_invalid",
+                                  "SetAudioSyncMode",
+                                  "Audio sync mode must be 0 or 1");
+    return MakeBool(env, false);
   }
 
+  auto *audioBridge = libretro::AudioBridge::GetInstance();
+  if (!audioBridge) {
+    GetEngine()->SetLastErrorInfo("audio_bridge_unavailable",
+                                  "SetAudioSyncMode",
+                                  "AudioBridge instance is unavailable");
+    return MakeBool(env, false);
+  }
+  auto syncMode = (mode == 0) ? libretro::AudioBridge::SyncMode::NON_BLOCKING
+                              : libretro::AudioBridge::SyncMode::AUDIO_BLOCKING;
+  // Audit T1-F4: SetSyncMode is sync_mode_.store() (std::atomic) — safe to call from NAPI thread
+  audioBridge->SetSyncMode(syncMode);
+  LOGF(LOG_INFO, "[NEW] SetAudioSyncMode: %{public}d", mode);
+
   return MakeBool(env, true);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+static napi_value SetAudioVolume(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  size_t argc = 0;
+  napi_value args[1];
+  if (!GetArgs(env, info, 1, 1, args, &argc, "SetAudioVolume")) {
+    return MakeBool(env, false);
+  }
+
+  int32_t percent = 100;
+  if (!GetInt32Arg(env, args[0], percent, "SetAudioVolume", "percent")) {
+    return MakeBool(env, false);
+  }
+  if (percent < 0 || percent > 100) {
+    SetVideoAudioError("audio_volume_invalid", "SetAudioVolume",
+                       "Audio volume percent must be between 0 and 100");
+    return MakeBool(env, false);
+  }
+
+  auto *audioBridge = libretro::AudioBridge::GetInstance();
+  if (!audioBridge) {
+    SetVideoAudioError("audio_bridge_unavailable", "SetAudioVolume",
+                       "AudioBridge instance is unavailable");
+    return MakeBool(env, false);
+  }
+  const bool ok = audioBridge->SetVolumePercent(percent);
+  if (!ok) {
+    SetVideoAudioError("audio_volume_apply_failed", "SetAudioVolume",
+                       "AudioBridge rejected the requested volume");
+  }
+  return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -174,6 +272,7 @@ void RegisterVideoAudioNapi(napi_env env, napi_value exports) {
       {"refactoredSetHwRenderAllowed", nullptr, SetHwRenderAllowed, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetMinimumAudioLatency", nullptr, SetMinimumAudioLatency, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredSetAudioSyncMode", nullptr, SetAudioSyncMode, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredSetAudioVolume", nullptr, SetAudioVolume, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
   napi_status regStatus = napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   if (regStatus != napi_ok) {

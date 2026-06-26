@@ -33,9 +33,11 @@ void PreloadGraphicsLibs() {
         LOGF(LOG_INFO, "Preloaded graphics lib: %{public}s", lib);
       } else {
         const char *err = dlerror();
+        const std::string safeErr =
+            security::SanitizeErrorMessageForLog(err ? err : "unknown");
         LOGF(LOG_WARN,
              "Preload graphics lib failed: %{public}s (%{public}s)", lib,
-             err ? err : "unknown");
+             safeErr.c_str());
       }
     }
   });
@@ -60,7 +62,7 @@ void *DlopenLocal(const char *path, std::string &outErr) {
       return handle;
     }
     const char *err = dlerror();
-    outErr = err ? err : "unknown";
+    outErr = security::SanitizeErrorMessageForLog(err ? err : "unknown");
     LOGF(LOG_ERROR, "dlopen (%{public}s) failed: %{public}s", attempt.label,
          outErr.c_str());
   }
@@ -86,13 +88,14 @@ bool CoreLoader::LoadCore(const std::string &corePath) {
   if (!security::ValidateCorePath(corePath)) {
     LOGF(LOG_ERROR,
                  "Security: Core path validation failed: %{public}s",
-                 corePath.c_str());
+                 security::DescribePathForLog(corePath).c_str());
     SetLastError("security_check", "Core path not in allowed directories");
     return false;
   }
 
   LOGF(LOG_INFO,
-               "Loading Libretro core: %{public}s", corePath.c_str());
+               "Loading Libretro core: %{public}s",
+               security::DescribePathForLog(corePath).c_str());
 
   // 预加载图形库以满足部分 HW 核心的符号依赖（如 glGetIntegerv）
   PreloadGraphicsLibs();
@@ -102,7 +105,7 @@ bool CoreLoader::LoadCore(const std::string &corePath) {
   if (stat(corePath.c_str(), &fileStat) != 0) {
     LOGF(LOG_ERROR,
                  "File does not exist or cannot be accessed: %{public}s",
-                 corePath.c_str());
+                 security::DescribePathForLog(corePath).c_str());
     char errBuf[128] = {};
     strerror_r(errno, errBuf, sizeof(errBuf));
     LOGF(LOG_ERROR,
@@ -279,12 +282,13 @@ template <typename T> bool CoreLoader::LoadSymbol(T &func, const char *name) {
   func = reinterpret_cast<T>(dlsym(coreHandle_, name));
   if (!func) {
     const char *error = dlerror();
+    const std::string safeError =
+        security::SanitizeErrorMessageForLog(error ? error : "unknown error");
     LOGF(LOG_ERROR,
                  "Failed to load symbol '%{public}s': %{public}s", name,
-                 error ? error : "unknown error");
+                 safeError.c_str());
     if (recordError_) {
-      SetLastError(std::string("dlsym:") + name,
-                   error ? error : "unknown error");
+      SetLastError(std::string("dlsym:") + name, safeError);
     }
     return false;
   }

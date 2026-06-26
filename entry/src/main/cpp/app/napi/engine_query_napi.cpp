@@ -1,6 +1,41 @@
 #include "engine_napi_common.h"
 #include "platform/audio/audio_bridge.h"
 #include "app/framework/plugin_manager.h"
+#include "common/file_security.h"
+
+namespace {
+
+void SetQueryError(const char *reason, const char *step, const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
+void EnsureQueryErrorIfEmpty(const char *reason, const char *step,
+                             const char *message) {
+  auto *engine = GetEngine();
+  if (!engine) {
+    return;
+  }
+  auto err = engine->GetLastErrorInfo();
+  if (!err.reason.empty()) {
+    return;
+  }
+  engine->SetLastErrorInfo(reason, step, message);
+}
+
+bool IsValidEngineStateValue(int32_t stateValue) {
+  return stateValue >= static_cast<int32_t>(libretro::EngineState::INIT) &&
+         stateValue <= static_cast<int32_t>(libretro::EngineState::ERROR);
+}
+
+bool IsValidRegionValue(unsigned region) {
+  return region == 0 || region == 1;
+}
+
+} // namespace
 
 static napi_value GetEngineState(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
@@ -22,6 +57,11 @@ static napi_value WaitForEngineState(napi_env env, napi_callback_info info) {
   if (!GetInt32Arg(env, args[0], stateValue, "WaitForEngineState", "state")) {
     return MakeBool(env, false);
   }
+  if (!IsValidEngineStateValue(stateValue)) {
+    SetQueryError("wait_state_invalid", "WaitForEngineState",
+                  "Requested engine state is outside supported range");
+    return MakeBool(env, false);
+  }
 
   int32_t timeoutMs = 0;
   if (argc >= 2) {
@@ -36,6 +76,10 @@ static napi_value WaitForEngineState(napi_env env, napi_callback_info info) {
   const bool ok = GetEngine()->WaitForState(
       static_cast<libretro::EngineState>(stateValue),
       static_cast<uint32_t>(timeoutMs));
+  if (!ok) {
+    EnsureQueryErrorIfEmpty("wait_for_state_failed", "WaitForEngineState",
+                            "Engine did not reach the requested state before timeout");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -63,20 +107,47 @@ static void CompleteWaitForState(napi_env env, napi_status status, void *data) {
     return;
   }
 
-  // Audit T1-F1: guard napi_cancelled — calling napi_get_boolean/napi_resolve_deferred on cancelled env is UB
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN,
+         "[NEW] WaitForEngineStateAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
   if (status != napi_ok) {
+    SetQueryError("wait_for_state_async_work_failed", "WaitForEngineStateAsync",
+                  "Async wait completion callback status was not napi_ok");
     napi_value reason = MakeUndefined(env);
     if (reason) {
       (void)RejectDeferredChecked(env, ctx->deferred, reason);
     }
   } else {
+    if (!ctx->result) {
+      EnsureQueryErrorIfEmpty("wait_for_state_failed",
+                              "WaitForEngineStateAsync",
+                              "Engine did not reach the requested state before timeout");
+    }
     napi_value result = MakeBool(env, ctx->result);
     if (result) {
       (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetQueryError("wait_for_state_result_alloc_failed", "WaitForEngineStateAsync",
+                    "Failed to allocate async wait-for-state result value");
+      napi_value reason = MakeString(env, "WaitForEngineStateAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
     }
   }
 
-  napi_delete_async_work(env, ctx->work);
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
   delete ctx;
 }
 
@@ -92,6 +163,11 @@ static napi_value WaitForEngineStateAsync(napi_env env,
   int32_t stateValue = 0;
   if (!GetInt32Arg(env, args[0], stateValue, "WaitForEngineStateAsync",
                    "state")) {
+    return MakeResolvedPromise(env, false);
+  }
+  if (!IsValidEngineStateValue(stateValue)) {
+    SetQueryError("wait_state_invalid", "WaitForEngineStateAsync",
+                  "Requested engine state is outside supported range");
     return MakeResolvedPromise(env, false);
   }
 
@@ -120,6 +196,9 @@ static napi_value WaitForEngineStateAsync(napi_env env,
 
   napi_value resourceName = MakeString(env, "WaitForEngineStateAsync");
   if (!resourceName) {
+    SetQueryError("wait_for_state_async_create_failed",
+                  "WaitForEngineStateAsync",
+                  "Failed to create async resource name");
     napi_value falseVal = MakeBool(env, false);
     if (falseVal) {
       (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
@@ -130,6 +209,9 @@ static napi_value WaitForEngineStateAsync(napi_env env,
 
   if (napi_create_async_work(env, nullptr, resourceName, ExecuteWaitForState,
                              CompleteWaitForState, ctx, &ctx->work) != napi_ok) {
+    SetQueryError("wait_for_state_async_create_failed",
+                  "WaitForEngineStateAsync",
+                  "Failed to create async wait work item");
     napi_value falseVal = MakeBool(env, false);
     if (falseVal) {
       (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
@@ -139,6 +221,10 @@ static napi_value WaitForEngineStateAsync(napi_env env,
   }
   if (napi_queue_async_work(env, ctx->work) != napi_ok) {
     napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetQueryError("wait_for_state_async_queue_failed",
+                  "WaitForEngineStateAsync",
+                  "Failed to queue async wait work item");
     napi_value falseVal = MakeBool(env, false);
     if (falseVal) {
       (void)ResolveDeferredChecked(env, ctx->deferred, falseVal);
@@ -188,8 +274,18 @@ static napi_value SetFilesDir(napi_env env, napi_callback_info info) {
     return MakeBool(env, false);
   }
 
-  LOGF(LOG_INFO, " [NEW] SetFilesDir: %{public}s", path);
+  LOGF(LOG_INFO, " [NEW] SetFilesDir: %{public}s",
+       security::DescribePathForLog(path).c_str());
+  if (!security::ValidateFilesDir(path)) {
+    GetEngine()->SetLastErrorInfo("files_dir_rejected", "SetFilesDir",
+                                  "filesDir is outside allowed directories");
+    return MakeBool(env, false);
+  }
   const bool ok = GetEngine()->SetFilesDir(path);
+  if (!ok) {
+    EnsureQueryErrorIfEmpty("files_dir_set_failed", "SetFilesDir",
+                            "SetFilesDir returned false");
+  }
   return MakeBool(env, ok);
   NAPI_TRY_CATCH_END(env, nullptr)
 }
@@ -211,7 +307,130 @@ static napi_value HasGameLoaded(napi_env env, napi_callback_info info) {
 static napi_value GetRegion(napi_env env, napi_callback_info info) {
   NAPI_TRY_CATCH_BEGIN
   unsigned region = GetEngine()->GetRegion();
+  if (!IsValidRegionValue(region)) {
+    EnsureQueryErrorIfEmpty("region_unavailable", "GetRegion",
+                            "Region query callback is unavailable");
+    region = 0;
+  }
   return MakeUint32(env, region);
+  NAPI_TRY_CATCH_END(env, nullptr)
+}
+
+struct GetRegionAsyncContext {
+  napi_deferred deferred = nullptr;
+  napi_async_work work = nullptr;
+  unsigned region = std::numeric_limits<unsigned>::max();
+};
+
+static void ExecuteGetRegionAsync(napi_env env, void *data) {
+  auto *ctx = static_cast<GetRegionAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+  ctx->region = GetEngine()->GetRegion();
+}
+
+static void CompleteGetRegionAsync(napi_env env, napi_status status, void *data) {
+  auto *ctx = static_cast<GetRegionAsyncContext *>(data);
+  if (!ctx) {
+    return;
+  }
+
+  if (status == napi_cancelled) {
+    LOGF(LOG_WARN, "[NEW] GetRegionAsync cancelled (env teardown); skipping NAPI calls");
+    if (ctx->work) {
+      napi_delete_async_work(env, ctx->work);
+      ctx->work = nullptr;
+    }
+    delete ctx;
+    return;
+  }
+
+  if (status != napi_ok) {
+    SetQueryError("get_region_async_work_failed", "GetRegionAsync",
+                  "Async region query completion callback status was not napi_ok");
+    napi_value reason = MakeUndefined(env);
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+  } else {
+    unsigned region = ctx->region;
+    if (!IsValidRegionValue(region)) {
+      EnsureQueryErrorIfEmpty("region_unavailable", "GetRegionAsync",
+                              "Region query callback is unavailable");
+      region = 0;
+    }
+    napi_value result = MakeUint32(env, region);
+    if (result) {
+      (void)ResolveDeferredChecked(env, ctx->deferred, result);
+    } else {
+      SetQueryError("get_region_result_alloc_failed", "GetRegionAsync",
+                    "Failed to allocate async region result value");
+      napi_value reason = MakeString(env, "GetRegionAsync result alloc failed");
+      if (reason) {
+        (void)RejectDeferredChecked(env, ctx->deferred, reason);
+      }
+    }
+  }
+
+  if (ctx->work) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+  }
+  delete ctx;
+}
+
+static napi_value GetRegionAsync(napi_env env, napi_callback_info info) {
+  NAPI_TRY_CATCH_BEGIN
+  auto *ctx = new GetRegionAsyncContext();
+
+  napi_value promise = nullptr;
+  if (napi_create_promise(env, &ctx->deferred, &promise) != napi_ok) {
+    delete ctx;
+    return nullptr;
+  }
+
+  napi_value resourceName = MakeString(env, "GetRegionAsync");
+  if (!resourceName) {
+    SetQueryError("get_region_async_create_failed", "GetRegionAsync",
+                  "Failed to create async resource name");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status createStatus = napi_create_async_work(
+      env, nullptr, resourceName, ExecuteGetRegionAsync,
+      CompleteGetRegionAsync, ctx, &ctx->work);
+  if (createStatus != napi_ok || !ctx->work) {
+    SetQueryError("get_region_async_create_failed", "GetRegionAsync",
+                  "Failed to create async region query work item");
+    napi_value reason = MakeString(env, "async_work_create_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  napi_status queueStatus = napi_queue_async_work(env, ctx->work);
+  if (queueStatus != napi_ok) {
+    napi_delete_async_work(env, ctx->work);
+    ctx->work = nullptr;
+    SetQueryError("get_region_async_queue_failed", "GetRegionAsync",
+                  "Failed to queue async region query work item");
+    napi_value reason = MakeString(env, "async_work_queue_failed");
+    if (reason) {
+      (void)RejectDeferredChecked(env, ctx->deferred, reason);
+    }
+    delete ctx;
+    return promise;
+  }
+
+  return promise;
   NAPI_TRY_CATCH_END(env, nullptr)
 }
 
@@ -368,6 +587,7 @@ void RegisterQueryNapi(napi_env env, napi_value exports) {
       {"refactoredResetStats", nullptr, ResetStats, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetInputDebugStats", nullptr, GetInputDebugStats, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetRegion", nullptr, GetRegion, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"refactoredGetRegionAsync", nullptr, GetRegionAsync, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredGetAVInfo", nullptr, GetAVInfo, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredHasCoreLoaded", nullptr, HasCoreLoaded, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"refactoredHasGameLoaded", nullptr, HasGameLoaded, nullptr, nullptr, nullptr, napi_default, nullptr},

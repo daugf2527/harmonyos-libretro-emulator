@@ -37,6 +37,33 @@ class LibraryDataSource implements IDataSource {
   }
 }
 
+function buildLibraryRecordKey(item: LibraryRecord): string {
+  return `${item.sourceType}:${item.romFile}:${item.id}`
+}
+
+@ReusableV2
+@ComponentV2
+struct LibraryGameListItem {
+  @Param title: string = ''
+  @Param subtitle: string = ''
+  @Param platform: string = ''
+  @Param coverColor: string = '#2C2C2C'
+  @Param coverKey: string = ''
+  @Param coverUrl: string = ''
+
+  build() {
+    GameCard({
+      title: this.title,
+      subtitle: this.subtitle,
+      platform: this.platform,
+      coverColor: this.coverColor,
+      coverKey: this.coverKey,
+      coverUrl: this.coverUrl,
+      variant: 'list'
+    })
+  }
+}
+
 export interface LibraryGameSectionsState {
   recentGames: LibraryRecord[]
   games: LibraryRecord[]
@@ -45,18 +72,18 @@ export interface LibraryGameSectionsState {
   spinnerAngle: number
 }
 
-@Component
+@ComponentV2
 export struct LibraryGameSections {
-  @Prop recentGames: LibraryRecord[] = []
-  @Prop @Watch('onGamesChanged') games: LibraryRecord[] = []
-  @Prop highlightedRecentGameId: string = ''
-  @Prop bottomLoaderActive: boolean = false
-  @Prop spinnerAngle: number = 0
-  onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
-  onHideSearchResults?: () => void
-  onListScrolled?: (yOffset: number) => void
-  onListReachEnd?: () => void
-  onListTouched?: (event: TouchEvent, yOffset: number) => void
+  @Param recentGames: LibraryRecord[] = []
+  @Param games: LibraryRecord[] = []
+  @Param highlightedRecentGameId: string = ''
+  @Param bottomLoaderActive: boolean = false
+  @Param spinnerAngle: number = 0
+  @Event onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
+  @Event onHideSearchResults?: () => void
+  @Event onListScrolled?: (yOffset: number) => void
+  @Event onListReachEnd?: () => void
+  @Event onListTouched?: (event: TouchEvent, yOffset: number) => void
   private allGamesDataSource: LibraryDataSource = new LibraryDataSource();
   private listScroller: ListScroller = new ListScroller();
 
@@ -87,19 +114,19 @@ export struct LibraryGameSections {
 
       LazyForEach(this.allGamesDataSource, (item: LibraryRecord) => {
         ListItem() {
-          GameCard({
+          LibraryGameListItem({
             title: item.title,
             subtitle: item.subtitle,
             platform: item.platform,
             coverColor: item.coverColor,
             coverKey: item.coverKey,
-            variant: 'list'
+            coverUrl: item.coverUrl ?? ''
           })
             .onTouch((event: TouchEvent) => {
               this.onCardTouch?.(event, item)
             })
         }
-      }, (item: LibraryRecord) => item.id)
+      }, (item: LibraryRecord) => buildLibraryRecordKey(item))
 
       if (this.bottomLoaderActive || (this.games.length === 0 && this.recentGames.length === 0)) {
         ListItem() {
@@ -110,7 +137,8 @@ export struct LibraryGameSections {
     .width('100%')
     .scrollBar(BarState.Off)
     .edgeEffect(EdgeEffect.None)
-    .onScroll((_scrollOffset: number, _scrollState: ScrollState) => {
+    .cachedCount(2)
+    .onDidScroll((_scrollOffset: number, _scrollState: ScrollState) => {
       this.onListScrolled?.(Math.max(0, Number(this.listScroller.currentOffset().yOffset)))
     })
     .onReachEnd(() => {
@@ -143,7 +171,7 @@ export struct LibraryGameSections {
         .onTouch((event: TouchEvent) => {
           this.onCardTouch?.(event, item)
         })
-      }, (item: LibraryRecord) => item.id)
+      }, (item: LibraryRecord) => buildLibraryRecordKey(item))
     }
     .width('100%')
   }
@@ -242,7 +270,8 @@ export struct LibraryGameSections {
     return this.recentGames.length > 0 ? this.recentGames[0].id : ''
   }
 
-  private onGamesChanged(): void {
+  @Monitor('games')
+  private onGamesChanged(monitor: IMonitor): void {
     this.allGamesDataSource.updateGames(this.games);
   }
 }

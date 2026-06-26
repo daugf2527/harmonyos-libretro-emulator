@@ -1,17 +1,31 @@
+import { common } from '@kit.AbilityKit'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
-import { EmuHeaderBar } from '../components/EmuAppShell'
+import { EmuHeaderBar, ScanlineBackground } from '../components/EmuAppShell'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import LogHelper from '../common/LogHelper'
+import {
+  createDefaultRuntimeVisualSettingsProfile,
+  describeRuntimeAspectMode,
+  loadRuntimeVisualSettingsProfile,
+  RuntimeAspectMode,
+  RuntimeVisualSettingsProfile,
+  saveRuntimeVisualSettingsProfile
+} from '../common/RuntimeVisualSettingsRepository'
 
-@Component
+interface ShaderAspectOptionItem {
+  key: RuntimeAspectMode
+  label: string
+}
+
+@ComponentV2
 struct ShaderSliderRow {
-  @Prop label: string = ''
-  @Prop value: number = 0
-  @Prop suffix: string = ''
-  @Prop min: number = 0
-  @Prop max: number = 100
-  onChange?: (value: number) => void
+  @Param label: string = ''
+  @Param value: number = 0
+  @Param suffix: string = ''
+  @Param min: number = 0
+  @Param max: number = 100
+  @Event onChange?: (value: number) => void
 
   build() {
     Column({ space: 8 }) {
@@ -49,30 +63,113 @@ struct ShaderSliderRow {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct ShaderPreviewPage {
-  @State private scanlineIntensity: number = 65
-  @State private curvature: number = 12
-  @State private saturation: number = 115
-  @State private selectedMode: string = 'STATIC_PREVIEW'
-  @State private statusText: string = '滤镜运行时未接入'
-  private readonly scanlineRows: number[] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-  private readonly previewStatBars: number[] = [12, 22, 34, 18, 42, 28]
+  @Local private draftProfile: RuntimeVisualSettingsProfile = createDefaultRuntimeVisualSettingsProfile()
+  @Local private statusText: string = '读取视觉配置中'
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
+  private readonly aspectOptions: ShaderAspectOptionItem[] = [
+    { key: '4:3', label: '4:3' },
+    { key: '16:9', label: '16:9' },
+    { key: 'native', label: 'NATIVE' }
+  ]
+  private pageActive: boolean = false
+  private taskToken: number = 0
+
+  aboutToAppear(): void {
+    this.pageActive = true
+    void this.loadSavedProfile()
+  }
+
+  aboutToDisappear(): void {
+    this.pageActive = false
+    this.taskToken += 1
+  }
+
+  private beginTask(): number {
+    this.taskToken += 1
+    return this.taskToken
+  }
+
+  private isCurrentTask(token: number): boolean {
+    return this.pageActive && token === this.taskToken
+  }
+
+  private cloneProfile(): RuntimeVisualSettingsProfile {
+    return {
+      version: this.draftProfile.version,
+      aspectMode: this.draftProfile.aspectMode,
+      scanlineIntensity: this.draftProfile.scanlineIntensity,
+      curvature: this.draftProfile.curvature,
+      saturation: this.draftProfile.saturation,
+      updatedAt: this.draftProfile.updatedAt
+    }
+  }
+
+  private applyProfile(profile: RuntimeVisualSettingsProfile, statusText: string): void {
+    this.draftProfile = {
+      version: profile.version,
+      aspectMode: profile.aspectMode,
+      scanlineIntensity: profile.scanlineIntensity,
+      curvature: profile.curvature,
+      saturation: profile.saturation,
+      updatedAt: profile.updatedAt
+    }
+    this.statusText = statusText
+  }
+
+  private async loadSavedProfile(): Promise<void> {
+    const token = this.beginTask()
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.statusText = '上下文不可用'
+      return
+    }
+    try {
+      const profile = await loadRuntimeVisualSettingsProfile(context)
+      if (!this.isCurrentTask(token)) {
+        return
+      }
+      this.applyProfile(profile, '视觉配置已载入')
+    } catch (err) {
+      if (!this.isCurrentTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('ShaderPreviewPage', 'Visual', `读取视觉配置失败: ${message}`)
+      this.statusText = '读取视觉配置失败'
+    }
+  }
+
+  private async persistProfile(profile: RuntimeVisualSettingsProfile, successText: string): Promise<void> {
+    const token = this.beginTask()
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.statusText = '上下文不可用'
+      return
+    }
+    try {
+      const saved = await saveRuntimeVisualSettingsProfile(context, profile)
+      if (!this.isCurrentTask(token)) {
+        return
+      }
+      this.applyProfile(saved, successText)
+    } catch (err) {
+      if (!this.isCurrentTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('ShaderPreviewPage', 'Visual', `保存视觉配置失败: ${message}`)
+      this.statusText = '保存视觉配置失败'
+    }
+  }
 
   private resetPreset(): void {
-    this.scanlineIntensity = 65
-    this.curvature = 12
-    this.saturation = 115
-    this.statusText = '已重置本地预设'
+    void this.persistProfile(createDefaultRuntimeVisualSettingsProfile(), '已重置视觉配置')
   }
 
   private savePreviewConfig(): void {
-    this.statusText = '已保存预览预设'
-  }
-
-  private getSliderTrackValue(value: number): number {
-    return Math.max(0, Math.min(100, value))
+    void this.persistProfile(this.cloneProfile(), '已保存视觉配置')
   }
 
   private clampPercent(value: number): number {
@@ -80,15 +177,35 @@ struct ShaderPreviewPage {
   }
 
   private onScanlineIntensityChange = (value: number): void => {
-    this.scanlineIntensity = Math.max(0, Math.min(100, Math.round(value)))
+    const nextProfile = this.cloneProfile()
+    nextProfile.scanlineIntensity = Math.max(0, Math.min(100, Math.round(value)))
+    this.draftProfile = nextProfile
+    this.statusText = '有未保存改动'
   }
 
   private onCurvatureChange = (value: number): void => {
-    this.curvature = Math.max(0, Math.min(100, Math.round(value)))
+    const nextProfile = this.cloneProfile()
+    nextProfile.curvature = Math.max(0, Math.min(100, Math.round(value)))
+    this.draftProfile = nextProfile
+    this.statusText = '有未保存改动'
   }
 
   private onSaturationChange = (value: number): void => {
-    this.saturation = this.clampPercent(value)
+    const nextProfile = this.cloneProfile()
+    nextProfile.saturation = this.clampPercent(value)
+    this.draftProfile = nextProfile
+    this.statusText = '有未保存改动'
+  }
+
+  private isAspectActive(mode: RuntimeAspectMode): boolean {
+    return this.draftProfile.aspectMode === mode
+  }
+
+  private onAspectModeChange(mode: RuntimeAspectMode): void {
+    const nextProfile = this.cloneProfile()
+    nextProfile.aspectMode = mode
+    this.draftProfile = nextProfile
+    this.statusText = '有未保存改动'
   }
 
   private onBottomNavClick(key: string): void {
@@ -107,6 +224,39 @@ struct ShaderPreviewPage {
     })
   }
 
+  private getPreviewBorderRadius(): number {
+    return 6 + Math.round(this.draftProfile.curvature * 0.22)
+  }
+
+  private getPreviewScanlineOpacity(): number {
+    if (this.draftProfile.scanlineIntensity <= 0) {
+      return 0
+    }
+    return Math.min(0.42, 0.08 + this.draftProfile.scanlineIntensity * 0.0034)
+  }
+
+  private getPreviewScanlineSpacing(): number {
+    if (this.draftProfile.scanlineIntensity >= 70) {
+      return 1
+    }
+    if (this.draftProfile.scanlineIntensity >= 35) {
+      return 2
+    }
+    return 3
+  }
+
+  private getPreviewSaturationFactor(): number {
+    return Math.max(0, this.draftProfile.saturation / 100)
+  }
+
+  private getPreviewBars(): number[] {
+    return [
+      10 + Math.round(this.draftProfile.scanlineIntensity * 0.34),
+      10 + Math.round(this.draftProfile.curvature * 0.34),
+      10 + Math.round(this.draftProfile.saturation * 0.17)
+    ]
+  }
+
   @Builder
   private PreviewPane(title: string, mode: string, processed: boolean) {
     Stack() {
@@ -119,19 +269,18 @@ struct ShaderPreviewPage {
             [[0xFF133323, 0.0], [0xFF1B2856, 0.52], [0xFF2E1528, 1.0]] :
             [[0xFF101010, 0.0], [0xFF243044, 0.52], [0xFF171717, 1.0]]
         })
+        .saturate(processed ? this.getPreviewSaturationFactor() : 1)
 
-      if (processed) {
-        Column({ space: 3 }) {
-          ForEach(this.scanlineRows, (item: number) => {
-            Row()
-              .width('100%')
-              .height(1)
-              .backgroundColor('#55000000')
-              .opacity(0.5)
-          }, (item: number) => `scan-${item}`)
-        }
-        .width('100%')
-        .height('100%')
+      if (processed && this.draftProfile.scanlineIntensity > 0) {
+        ScanlineBackground({
+          lineColor: '#2400FF41',
+          lineSpacing: this.getPreviewScanlineSpacing(),
+          alternateColor: '#0F000000'
+        })
+          .width('100%')
+          .height('100%')
+          .opacity(this.getPreviewScanlineOpacity())
+          .hitTestBehavior(HitTestMode.None)
       }
 
       Column({ space: 10 }) {
@@ -142,9 +291,9 @@ struct ShaderPreviewPage {
           .letterSpacing(1.8)
           .padding({ left: 10, right: 10, top: 5, bottom: 5 })
           .backgroundColor(processed ? EmuColors.primary : '#CC000000')
-        Text(processed ? `${mode} / 未应用到游戏` : mode)
+        Text(processed ? `${mode} / 保存后返回运行页生效` : mode)
           .fontSize(EmuTypography.xs)
-                    .fontColor(processed ? EmuColors.primary : EmuColors.onSurface)
+          .fontColor(processed ? EmuColors.primary : EmuColors.onSurface)
       }
       .align(processed ? Alignment.TopEnd : Alignment.TopStart)
       .margin({ left: 18, right: 18, top: 18 })
@@ -168,6 +317,7 @@ struct ShaderPreviewPage {
     .layoutWeight(1)
     .height('100%')
     .backgroundColor(EmuColors.surfaceContainerLow)
+    .borderRadius(processed ? this.getPreviewBorderRadius() : 6)
     .clip(true)
   }
 
@@ -176,7 +326,7 @@ struct ShaderPreviewPage {
     Stack() {
       Row({ space: 1 }) {
         this.PreviewPane('原始画面', '原始输出', false)
-        this.PreviewPane('滤镜预览', this.selectedMode, true)
+        this.PreviewPane('滤镜预览', '运行页效果', true)
       }
       .width('100%')
       .height('100%')
@@ -202,6 +352,31 @@ struct ShaderPreviewPage {
   }
 
   @Builder
+  private AspectModeControl() {
+    Row({ space: 0 }) {
+      ForEach(this.aspectOptions, (item: ShaderAspectOptionItem) => {
+        Row() {
+          Text(item.label)
+            .fontSize(12)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.isAspectActive(item.key) ? EmuColors.onSurface : '#B3ABABAB')
+        }
+        .layoutWeight(1)
+        .height(36)
+        .justifyContent(FlexAlign.Center)
+        .backgroundColor(
+          this.isAspectActive(item.key) ? EmuColors.surfaceContainerHighest : EmuColors.surfaceContainerHigh
+        )
+        .onClick(() => {
+          this.onAspectModeChange(item.key)
+        })
+      }, (item: ShaderAspectOptionItem) => item.key)
+    }
+    .width('100%')
+    .clip(true)
+  }
+
+  @Builder
   private ParameterPanel() {
     Column({ space: 18 }) {
       Row() {
@@ -212,14 +387,28 @@ struct ShaderPreviewPage {
           .letterSpacing(1.4)
         Text(this.statusText)
           .fontSize(9)
-                    .fontColor(EmuColors.primary)
+          .fontColor(EmuColors.primary)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
+      Column({ space: 10 }) {
+        Text('显示比例 display_aspect')
+          .fontSize(9)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurfaceVariant)
+        this.AspectModeControl()
+      }
+      .width('100%')
+
+      Text(`显示比例 ${describeRuntimeAspectMode(this.draftProfile.aspectMode)} · 保存后返回运行页按该配置渲染`)
+        .fontSize(9)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .width('100%')
+
       ShaderSliderRow({
         label: '扫描线强度',
-        value: this.scanlineIntensity,
+        value: this.draftProfile.scanlineIntensity,
         suffix: '%',
         min: 0,
         max: 100,
@@ -227,7 +416,7 @@ struct ShaderPreviewPage {
       })
       ShaderSliderRow({
         label: 'CRT 曲率',
-        value: this.curvature,
+        value: this.draftProfile.curvature,
         suffix: '%',
         min: 0,
         max: 100,
@@ -235,7 +424,7 @@ struct ShaderPreviewPage {
       })
       ShaderSliderRow({
         label: '色彩饱和度',
-        value: this.saturation,
+        value: this.draftProfile.saturation,
         suffix: '%',
         min: 0,
         max: 200,
@@ -275,55 +464,16 @@ struct ShaderPreviewPage {
   }
 
   @Builder
-  private SliderRow(
-    label: string,
-    value: number,
-    suffix: string,
-    min: number,
-    max: number,
-    onChange: (value: number) => void
-  ) {
-    Column({ space: 8 }) {
-      Row() {
-        Text(label)
-          .fontSize(9)
-                    .fontColor(EmuColors.onSurfaceVariant)
-          .letterSpacing(1.2)
-        Text(`${value}${suffix}`)
-          .fontSize(EmuTypography.xs)
-                    .fontColor(EmuColors.onSurface)
-      }
-      .width('100%')
-      .justifyContent(FlexAlign.SpaceBetween)
-
-      Slider({
-        value: value,
-        min: min,
-        max: max,
-        step: 1
-      })
-        .width('100%')
-        .blockColor(EmuColors.onSurface)
-        .trackColor(EmuColors.outlineVariant)
-        .selectedColor(EmuColors.primary)
-        .showSteps(false)
-        .showTips(false)
-        .onChange(onChange)
-    }
-    .width('100%')
-  }
-
-  @Builder
   private PreviewStatsOverlay() {
     Column({ space: 12 }) {
       Row() {
-        Text('GPU 负载')
+        Text('显示比例')
           .fontSize(EmuTypography.xs)
-                    .fontColor(EmuColors.onSurfaceVariant)
+          .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.4)
-        Text('未接入')
+        Text(describeRuntimeAspectMode(this.draftProfile.aspectMode))
           .fontSize(EmuTypography.xs)
-                    .fontColor(EmuColors.primary)
+          .fontColor(EmuColors.primary)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
@@ -334,19 +484,19 @@ struct ShaderPreviewPage {
         .backgroundColor('#3300FF41')
 
       Row() {
-        Text('延迟')
+        Text('运行页应用')
           .fontSize(EmuTypography.xs)
-                    .fontColor(EmuColors.onSurfaceVariant)
+          .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.4)
-        Text('仅预览')
+        Text('扫描线 / 曲率 / 饱和度')
           .fontSize(EmuTypography.xs)
-                    .fontColor(EmuColors.primary)
+          .fontColor(EmuColors.primary)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
       Row({ space: 3 }) {
-        ForEach(this.previewStatBars, (heightValue: number) => {
+        ForEach(this.getPreviewBars(), (heightValue: number) => {
           Row()
             .width(6)
             .height(heightValue)

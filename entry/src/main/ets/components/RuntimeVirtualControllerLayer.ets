@@ -7,18 +7,18 @@ import { InputLayoutButton } from '../common/InputLayoutRepository'
 //
 // State precedence (high → low): disabled > pressed > primary > default.
 // Disabled wins over pressed: cannot show "pressed" feedback while disabled.
-@Component
+@ComponentV2
 struct RuntimeKeyButton {
-  @Prop button: InputLayoutButton
-  @Prop isPrimary: boolean = false
-  @Prop buttonWidth: number = 48
-  @Prop buttonHeight: number = 48
-  @Prop cornerRadius: number = 3
-  @Prop labelFontSize: number = 16
-  @Prop disabled: boolean = false
-  @Prop forcedPressed: boolean = false
-  @State private pressed: boolean = false
-  onPressChange?: (pressed: boolean) => void
+  @Require @Param button: InputLayoutButton
+  @Param isPrimary: boolean = false
+  @Param buttonWidth: number = 48
+  @Param buttonHeight: number = 48
+  @Param cornerRadius: number = 3
+  @Param labelFontSize: number = 16
+  @Param disabled: boolean = false
+  @Param forcedPressed: boolean = false
+  @Local private pressed: boolean = false
+  @Event onPressChange?: (pressed: boolean) => void
 
   private isPressedNow(): boolean {
     return this.pressed || this.forcedPressed
@@ -86,8 +86,8 @@ struct RuntimeKeyButton {
     .scale(this.isPressedNow() && !this.disabled ? { x: 0.92, y: 0.92 } : { x: 1, y: 1 })
     .opacity(this.disabled ? 0.5 : 1)
     .animation({
-      duration: EmuMotion.stateChangeMs,
-      curve: Curve.EaseInOut
+      duration: EmuMotion.instantMs,
+      curve: Curve.EaseOut
     })
     .position({ x: this.button.x, y: this.button.y })
     .enabled(!this.disabled)
@@ -106,27 +106,71 @@ struct RuntimeKeyButton {
   }
 }
 
-@Component
+@ComponentV2
+struct RuntimeFloatingFunctionButton {
+  @Require @Param button: InputLayoutButton
+  @Local private pressed: boolean = false
+  @Event onPressChange?: (pressed: boolean) => void
+
+  build() {
+    Button({ type: ButtonType.Normal }) {
+      Text(this.button.label)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontFamily('monospace')
+        .fontColor(this.pressed ? EmuStateColors.onPrimary : EmuColors.primary)
+        .letterSpacing(0.4)
+    }
+    .height(26)
+    .padding({ left: 14, right: 14, top: 2, bottom: 2 })
+    .backgroundColor(this.pressed ? EmuColors.primary : '#1F00FF41')
+    .border({
+      width: this.pressed ? 1.8 : 1.2,
+      color: EmuColors.primary,
+      style: BorderStyle.Solid
+    })
+    .borderRadius(13)
+    .shadow({
+      radius: this.pressed ? 14 : 8,
+      color: this.pressed ? '#AA00FF41' : '#4400FF41',
+      offsetX: 0,
+      offsetY: this.pressed ? 1 : 2
+    })
+    .scale(this.pressed ? { x: 0.95, y: 0.95 } : { x: 1, y: 1 })
+    .animation({ duration: EmuMotion.instantMs, curve: Curve.EaseOut })
+    .onTouch((event: TouchEvent) => {
+      if (event.type === TouchType.Down) {
+        this.pressed = true
+        this.onPressChange?.(true)
+      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+        this.pressed = false
+        this.onPressChange?.(false)
+      }
+    })
+  }
+}
+
+@ComponentV2
 export struct RuntimeVirtualControllerLayer {
-  @Prop buttons: InputLayoutButton[] = []
-  @Prop layoutWidth: number = 440
-  @Prop layoutHeight: number = 340
+  @Param buttons: InputLayoutButton[] = []
+  @Param layoutWidth: number = 440
+  @Param layoutHeight: number = 340
   // 16-bit mask of RETRO_DEVICE_ID_JOYPAD_* declared by the active core via
   // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS. 0 = core hasn't declared, render
   // the full layout (fallback). Non-zero = hide buttons whose retroButtonId
   // bit is unset.
-  @Prop inputDescriptorMask: number = 0
-  onButtonChange?: (keyId: number, pressed: boolean) => void
-  onAnalogChange?: (index: number, x: number, y: number) => void
+  @Param inputDescriptorMask: number = 0
+  @Event onButtonChange?: (keyId: number, pressed: boolean) => void
+  @Event onAnalogChange?: (index: number, x: number, y: number) => void
 
   // atan2-based D-pad overlay 状态:覆盖在 up/down/left/right 4 按钮 bbox 上,
   // 接管 touch 后由角度判定激活的方向(支持斜方向同时激活相邻两键)。
-  // 4 个独立 @State 而非 Object,确保单字段变更触发 re-render。
-  @State private dpadUpPressed: boolean = false
-  @State private dpadDownPressed: boolean = false
-  @State private dpadLeftPressed: boolean = false
-  @State private dpadRightPressed: boolean = false
-  @State private dpadActive: boolean = false
+  // 4 个独立 @Local 而非 Object,确保单字段变更触发 re-render。
+  @Local private dpadUpPressed: boolean = false
+  @Local private dpadDownPressed: boolean = false
+  @Local private dpadLeftPressed: boolean = false
+  @Local private dpadRightPressed: boolean = false
+  @Local private dpadActive: boolean = false
 
   // diagonal sector 比 cardinal 窄(30° vs 60°),抑制误触斜方向
   // 参考 Lemuroid 1.5 / RetroArch D-Pad Diagonal Sensitivity 默认 80% 范式
@@ -195,7 +239,7 @@ export struct RuntimeVirtualControllerLayer {
         .position({ x: this.getDpadBboxX(), y: this.getDpadBboxY() })
         .backgroundColor(this.dpadActive ? '#1A00FF41' : Color.Transparent)
         .borderRadius(this.getDpadBboxWidth() / 2)
-        .animation({ duration: EmuMotion.stateChangeMs, curve: Curve.EaseInOut })
+        .animation({ duration: EmuMotion.instantMs, curve: Curve.EaseOut })
         .onTouch((event: TouchEvent) => {
           this.handleDpadTouch(event)
         })
@@ -208,29 +252,14 @@ export struct RuntimeVirtualControllerLayer {
       Row({ space: 14 }) {
         ForEach(this.buttons, (button: InputLayoutButton) => {
           if (this.isFloatingFunctionButton(button.id) && this.isButtonDeclaredByCore(button)) {
-            Button({ type: ButtonType.Normal }) {
-              Text(button.label)
-                .fontSize(11)
-                .fontWeight(FontWeight.Bold)
-                .fontFamily('monospace')
-                .fontColor(EmuColors.primary)
-                .letterSpacing(0.4)
-            }
-            .height(26)
-            .padding({ left: 14, right: 14, top: 2, bottom: 2 })
-            .backgroundColor('#1F00FF41')
-            .border({ width: 1.2, color: EmuColors.primary, style: BorderStyle.Solid })
-            .borderRadius(13)
-            .shadow({ radius: 8, color: '#4400FF41', offsetX: 0, offsetY: 2 })
-            .onTouch((event: TouchEvent) => {
-              const keyId = this.getRetroButtonId(button)
-              if (keyId < 0 || !this.onButtonChange) {
-                return
-              }
-              if (event.type === TouchType.Down) {
-                this.onButtonChange(keyId, true)
-              } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-                this.onButtonChange(keyId, false)
+            RuntimeFloatingFunctionButton({
+              button: button,
+              onPressChange: (pressed: boolean) => {
+                const keyId = this.getRetroButtonId(button)
+                if (keyId < 0 || !this.onButtonChange) {
+                  return
+                }
+                this.onButtonChange(keyId, pressed)
               }
             })
           }

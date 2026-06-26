@@ -10,21 +10,21 @@ export interface LibraryDetailSummaryCellData {
   value: string
 }
 
-@Component
+@ComponentV2
 export struct LibraryDetailInfoPanel {
-  @Prop showExtendedDetails: boolean = false
-  @Prop hasRuntimeSnapshot: boolean = false
-  @Prop telemetryFpsText: string = '--.-'
-  @Prop telemetryAudioText: string = '--'
-  @Prop telemetryDropText: string = '--'
-  @Prop telemetryScanOffset: number = -180
-  @Prop telemetryGlowOpacity: number = 0.2
-  @Prop overviewText: string = 'Unknown'
-  @Prop runtimeSummaryText: string = ''
-  @Prop primaryCells: LibraryDetailSummaryCellData[] = []
-  @Prop extendedCells: LibraryDetailSummaryCellData[] = []
-  @Prop telemetryProfile: number[] = []
-  onToggleDetails?: () => void
+  @Param showExtendedDetails: boolean = false
+  @Param hasRuntimeSnapshot: boolean = false
+  @Param telemetryFpsText: string = '--.-'
+  @Param telemetryAudioText: string = '--'
+  @Param telemetryDropText: string = '--'
+  @Param telemetryScanOffset: number = -180
+  @Param telemetryGlowOpacity: number = 0.2
+  @Param overviewText: string = 'Unknown'
+  @Param runtimeSummaryText: string = ''
+  @Param primaryCells: LibraryDetailSummaryCellData[] = []
+  @Param extendedCells: LibraryDetailSummaryCellData[] = []
+  @Param telemetryProfile: number[] = []
+  @Event onToggleDetails?: () => void
   private readonly telemetryVerticalLines: number[] = createIndexRange(13)
   private readonly telemetryHorizontalLines: number[] = createIndexRange(4)
 
@@ -91,7 +91,7 @@ export struct LibraryDetailInfoPanel {
       Row({ space: 1 }) {
         ForEach(this.primaryCells, (cell: LibraryDetailSummaryCellData) => {
           this.SummaryCell(cell)
-        }, (cell: LibraryDetailSummaryCellData) => cell.title)
+        }, (cell: LibraryDetailSummaryCellData, index: number) => `primary:${index}:${cell.title}:${cell.value}`)
       }
       .width('100%')
 
@@ -102,14 +102,14 @@ export struct LibraryDetailInfoPanel {
           Row({ space: 1 }) {
             ForEach(this.extendedCells.slice(0, 2), (cell: LibraryDetailSummaryCellData) => {
               this.SummaryCell(cell, true)
-            }, (cell: LibraryDetailSummaryCellData) => cell.title)
+            }, (cell: LibraryDetailSummaryCellData, index: number) => `extended-a:${index}:${cell.title}:${cell.value}`)
           }
           .width('100%')
 
           Row({ space: 1 }) {
             ForEach(this.extendedCells.slice(2, 4), (cell: LibraryDetailSummaryCellData) => {
               this.SummaryCell(cell, true)
-            }, (cell: LibraryDetailSummaryCellData) => cell.title)
+            }, (cell: LibraryDetailSummaryCellData, index: number) => `extended-b:${index}:${cell.title}:${cell.value}`)
           }
           .width('100%')
         }

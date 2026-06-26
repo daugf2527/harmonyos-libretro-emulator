@@ -12,7 +12,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { AbilityConstant, UIAbility, Want, MemoryLevel } from '@kit.AbilityKit';
+import { AbilityConstant, UIAbility, Want } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import LogHelper from '../common/LogHelper';
 import { LibretroEventHub } from '../common/LibretroEventHub';
@@ -34,17 +34,21 @@ export default class EntryAbility extends UIAbility {
     try {
       const ok = LibretroEventHub.getInstance().start();
       LogHelper.info('EntryAbility', 'EventHub', `EventHub start: ok=${ok}`);
+      if (!ok) {
+        LogHelper.warn('EntryAbility', 'EventHub', 'EventHub 未完成初始化，运行时事件可能缺失');
+      }
     } catch (e) {
-      LogHelper.warn('EntryAbility', 'EventHub', 'EventHub start failed');
+      const message = (e as Error)?.message || String(e);
+      LogHelper.warn('EntryAbility', 'EventHub', `EventHub start failed: ${message}`);
     }
 
     // Initialize Input Mapping Service (does not trigger libentry.so load)
-    try {
-      void getInputMappingService().initialize(this.context);
+    void getInputMappingService().initialize(this.context).then(() => {
       LogHelper.info('EntryAbility', 'InputMapping', 'Input Mapping Service initialized');
-    } catch (e) {
-      LogHelper.warn('EntryAbility', 'InputMapping', 'Input Mapping Service init failed');
-    }
+    }).catch((e: Error) => {
+      const message = e?.message || String(e);
+      LogHelper.warn('EntryAbility', 'InputMapping', `Input Mapping Service init failed: ${message}`);
+    });
   }
 
   onDestroy(): void {
@@ -89,7 +93,7 @@ export default class EntryAbility extends UIAbility {
     // when the user navigates to the game page — see imports note above.
   }
 
-  onMemoryLevel(level: MemoryLevel): void {
+  onMemoryLevel(level: AbilityConstant.MemoryLevel): void {
     // 内存压力回调（诊断用）：系统内存不足时触发。
     // 模拟器内存大头（ROM / core .so）无法在运行时释放，此回调目前仅做日志。
     // 未来可在此处释放 shader 缓存、降低音频缓冲等不关键资源。

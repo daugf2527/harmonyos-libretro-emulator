@@ -55,29 +55,29 @@ interface LibraryLaunchRouteParams {
   autoStart?: boolean
 }
 
-@Component
+@ComponentV2
 struct AnimatedDetailBody {
-  @Prop coverKey: string = ''
-  @Prop displayTitle: string = ''
-  @Prop localizedTitle: string = ''
-  @Prop coreLabel: string = ''
-  @Prop showExtendedDetails: boolean = false
-  @Prop primaryCells: LibraryDetailSummaryCellData[] = []
-  @Prop extendedCells: LibraryDetailSummaryCellData[] = []
-  @Prop hasRuntimeSnapshot: boolean = false
-  @Prop telemetryFpsText: string = ''
-  @Prop telemetryAudioText: string = ''
-  @Prop telemetryDropText: string = ''
-  @Prop telemetryProfile: number[] = []
-  @Prop overviewText: string = ''
-  @Prop runtimeSummaryText: string = ''
-  @Prop coreSpecItems: KeyValueSpecItem[] = []
-  onLaunch?: () => void
-  onQuickAction?: (message: string) => void
-  onToggleDetails?: () => void
-  @State private heroScale: number = 1.04
-  @State private telemetryScanOffset: number = -180
-  @State private telemetryGlowOpacity: number = 0.2
+  @Param coverKey: string = ''
+  @Param displayTitle: string = ''
+  @Param localizedTitle: string = ''
+  @Param coreLabel: string = ''
+  @Param showExtendedDetails: boolean = false
+  @Param primaryCells: LibraryDetailSummaryCellData[] = []
+  @Param extendedCells: LibraryDetailSummaryCellData[] = []
+  @Param hasRuntimeSnapshot: boolean = false
+  @Param telemetryFpsText: string = ''
+  @Param telemetryAudioText: string = ''
+  @Param telemetryDropText: string = ''
+  @Param telemetryProfile: number[] = []
+  @Param overviewText: string = ''
+  @Param runtimeSummaryText: string = ''
+  @Param coreSpecItems: KeyValueSpecItem[] = []
+  @Event onLaunch?: () => void
+  @Event onQuickAction?: (message: string) => void
+  @Event onToggleDetails?: () => void
+  @Local private heroScale: number = 1.04
+  @Local private telemetryScanOffset: number = -180
+  @Local private telemetryGlowOpacity: number = 0.2
   private visualTimer: number = -1
 
   aboutToAppear(): void {
@@ -154,16 +154,16 @@ struct AnimatedDetailBody {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct LibraryDetailPage {
-  @State private libraryRecord: LibraryRecord | undefined = undefined
-  @State private showExtendedDetails: boolean = false
-  @State private showActionMenu: boolean = false
-  @State private showToast: boolean = false
-  @State private toastMessage: string = ''
-  @State private isLaunching: boolean = false
-  @State private launchProgress: number = 0
-  @State private launchStatusText: string = 'READY_TO_HANDOFF'
+  @Local private libraryRecord: LibraryRecord | undefined = undefined
+  @Local private showExtendedDetails: boolean = false
+  @Local private showActionMenu: boolean = false
+  @Local private showToast: boolean = false
+  @Local private toastMessage: string = ''
+  @Local private isLaunching: boolean = false
+  @Local private launchProgress: number = 0
+  @Local private launchStatusText: string = 'READY_TO_HANDOFF'
   private readonly coverCycleKeys: string[] = ['', 'metroid_fusion', 'zelda_triforce']
   private readonly coverPalette: string[] = ['#274530', '#27405E', '#4E2A41', '#5A4331']
   private readonly navItems = createEmuBottomNavItems('library')
@@ -217,17 +217,26 @@ struct LibraryDetailPage {
       this.showToastMessage('上下文不可用 CONTEXT_MISSING')
       return
     }
-    const record = await getLibraryRecordByRomFile(context, romFile)
-    if (!this.isCurrentPageTask(token)) {
-      return
+    try {
+      const record = await getLibraryRecordByRomFile(context, romFile)
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      if (!record) {
+        this.showToastMessage('条目不存在 RECORD_NOT_FOUND')
+        return
+      }
+      this.libraryRecord = record
+      this.invalidateDerivedCaches()
+      this.applyTelemetrySnapshot(record)
+    } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryDetailPage', 'Data', `读取详情条目失败: ${message}`)
+      this.showToastMessage('详情读取失败 DETAIL_LOAD_FAIL')
     }
-    if (!record) {
-      this.showToastMessage('条目不存在 RECORD_NOT_FOUND')
-      return
-    }
-    this.libraryRecord = record
-    this.invalidateDerivedCaches()
-    this.applyTelemetrySnapshot(record)
   }
 
   private resolveRequestedRomFile(): string {
@@ -249,6 +258,9 @@ struct LibraryDetailPage {
       clearTimeout(this.toastTimer)
     }
     this.toastTimer = setTimeout(() => {
+      if (!this.pageActive) {
+        return
+      }
       this.showToast = false
       this.toastTimer = -1
     }, 2600)
@@ -358,19 +370,28 @@ struct LibraryDetailPage {
     }
     const nextCoverKey = this.getNextCoverKey(target)
     const nextCoverColor = this.resolveCoverColorByKey(nextCoverKey)
-    const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
-    if (!this.isCurrentPageTask(token)) {
-      return
-    }
-    if (!updated) {
+    try {
+      const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      if (!updated) {
+        this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+        return
+      }
+      this.libraryRecord = updated
+      this.invalidateDerivedCaches()
+      this.applyTelemetrySnapshot(updated)
+      this.showActionMenu = false
+      this.showToastMessage('已切换内置封面 COVER_UPDATED')
+    } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryDetailPage', 'Cover', `更新封面失败: ${message}`)
       this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
-      return
     }
-    this.libraryRecord = updated
-    this.invalidateDerivedCaches()
-    this.applyTelemetrySnapshot(updated)
-    this.showActionMenu = false
-    this.showToastMessage('已切换内置封面 COVER_UPDATED')
   }
 
   private async deleteSaveFiles(): Promise<void> {
@@ -390,6 +411,9 @@ struct LibraryDetailPage {
         cleanLibraryFileName(target.fileName),
         () => this.isCurrentPageTask(token)
       )
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
       if (result.cancelled) {
         return
       }
@@ -401,6 +425,9 @@ struct LibraryDetailPage {
       this.showActionMenu = false
       this.showToastMessage(`已删除 ${result.deletedCount} 个存档 SAVE_PURGED`)
     } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryDetailPage', 'Save', `删除存档失败: ${message}`)
       this.showToastMessage('存档删除失败 SAVE_PURGE_FAIL')

@@ -155,8 +155,8 @@ bool CoreStateManager::CheatSet(unsigned index, bool enabled,
   }
   fn(index, enabled, code.c_str());
   LOGF(LOG_INFO,
-               "Cheat %{public}u %{public}s: %{public}s", index,
-               enabled ? "enabled" : "disabled", code.c_str());
+               "Cheat %{public}u %{public}s (code_len=%{public}zu)", index,
+               enabled ? "enabled" : "disabled", code.size());
   return true;
 }
 

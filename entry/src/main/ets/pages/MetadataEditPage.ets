@@ -14,16 +14,16 @@ interface MetadataEditRouteParams {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct MetadataEditPage {
-  @State private romFile: string = ''
-  @State private titleText: string = ''
-  @State private publisherText: string = ''
-  @State private overviewText: string = ''
-  @State private releaseYearText: string = ''
-  @State private platformText: string = ''
-  @State private coverKeyText: string = ''
-  @State private statusText: string = 'LOCAL_METADATA_EDITOR'
+  @Local private romFile: string = ''
+  @Local private titleText: string = ''
+  @Local private publisherText: string = ''
+  @Local private overviewText: string = ''
+  @Local private releaseYearText: string = ''
+  @Local private platformText: string = ''
+  @Local private coverKeyText: string = ''
+  @Local private statusText: string = 'LOCAL_METADATA_EDITOR'
   private pageActive: boolean = false
   private pageTaskToken: number = 0
 
@@ -75,12 +75,22 @@ struct MetadataEditPage {
       this.statusText = 'ROM_CONTEXT_MISSING'
       return
     }
-    const record = await getLibraryRecordByRomFile(context, targetRomFile)
-    if (!this.isCurrentPageTask(token)) {
-      return
+    try {
+      const record = await getLibraryRecordByRomFile(context, targetRomFile)
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      this.applyInitialFields(record)
+      this.statusText = record ? 'LOCAL_METADATA_LOADED' : 'LOCAL_METADATA_EMPTY'
+    } catch (err) {
+      if (!this.isCurrentPageTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('MetadataEditPage', 'Load', `读取本地 metadata 失败: ${message}`)
+      this.applyInitialFields(undefined)
+      this.statusText = 'LOCAL_METADATA_LOAD_FAILED'
     }
-    this.applyInitialFields(record)
-    this.statusText = record ? 'LOCAL_METADATA_LOADED' : 'LOCAL_METADATA_EMPTY'
   }
 
   private applyInitialFields(record: LibraryRecord | undefined): void {

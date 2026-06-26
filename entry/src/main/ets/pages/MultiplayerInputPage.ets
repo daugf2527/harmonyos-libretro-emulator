@@ -41,23 +41,31 @@ interface InputLogItem {
 
 
 @Entry
-@Component
+@ComponentV2
 struct MultiplayerInputPage {
-  @State private deviceNamesText: string = ''
-  @State private deviceCountText: string = '0'
-  @State private selectedRoomId: string = 'local'
-  @State private localLatencyText: string = '本地触控'
-  @State private inputLogTitleText: string = '等待输入'
-  @State private inputLogDetailText: string = '刷新设备后可查看当前外接手柄状态'
+  @Local private deviceNamesText: string = ''
+  @Local private deviceCountText: string = '0'
+  @Local private selectedRoomId: string = 'local'
+  @Local private localLatencyText: string = '本地触控'
+  @Local private inputLogTitleText: string = '等待输入'
+  @Local private inputLogDetailText: string = '刷新设备后可查看当前外接手柄状态'
   private readonly navItems = createEmuBottomNavItems('input')
+  private pageActive: boolean = false
+  private refreshToken: number = 0
 
   // 折叠屏状态
-  @State private foldStatus: display.FoldStatus = display.FoldStatus.FOLD_STATUS_UNKNOWN
-  @State private displayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+  @Local private foldStatus: display.FoldStatus = display.FoldStatus.FOLD_STATUS_UNKNOWN
+  @Local private displayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.foldStatus = data
   }
   private displayModeListener: (data: display.FoldDisplayMode) => void = (data: display.FoldDisplayMode) => {
+    if (!this.pageActive) {
+      return
+    }
     this.displayMode = data
   }
 
@@ -90,7 +98,7 @@ struct MultiplayerInputPage {
       color: EmuColors.secondary
     }
   ]
-  @State private controllerSlots: ControllerSlotItem[] = []
+  @Local private controllerSlots: ControllerSlotItem[] = []
 
   private readonly telemetryBars: BarChartItem[] = [
     { height: 24, isPrimary: false }, { height: 30, isPrimary: false },
@@ -107,9 +115,10 @@ struct MultiplayerInputPage {
     { height: 40, isPrimary: false }, { height: 18, isPrimary: true }
   ]
 
-  @State private inputLogs: InputLogItem[] = []
+  @Local private inputLogs: InputLogItem[] = []
 
   aboutToAppear(): void {
+    this.pageActive = true
     void this.refreshDevices()  // Audit C-F5: async fire-and-forget; yields main thread before NAPI call
 
     // 注册折叠态监听
@@ -124,12 +133,23 @@ struct MultiplayerInputPage {
   }
 
   aboutToDisappear(): void {
+    this.pageActive = false
+    this.refreshToken += 1
     try {
       display.off('foldStatusChange', this.foldStatusListener)
       display.off('foldDisplayModeChange', this.displayModeListener)
     } catch (err) {
       LogHelper.error('MultiplayerInputPage', 'FoldableCleanup', `Failed to cleanup foldable: ${err}`)
     }
+  }
+
+  private beginRefresh(): number {
+    this.refreshToken += 1
+    return this.refreshToken
+  }
+
+  private isCurrentRefresh(token: number): boolean {
+    return this.pageActive && token === this.refreshToken
   }
 
   private buildControllerSlots(): ControllerSlotItem[] {
@@ -163,7 +183,11 @@ struct MultiplayerInputPage {
   }
 
   private async refreshDevices(): Promise<void> {
+    const token = this.beginRefresh()
     await Promise.resolve();  // Audit C-F5: yield main thread before NAPI call
+    if (!this.isCurrentRefresh(token)) {
+      return
+    }
     const devices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
     const names: string[] = []
     const logs: InputLogItem[] = [
@@ -188,6 +212,9 @@ struct MultiplayerInputPage {
         isPrimary: true
       })
     })
+    if (!this.isCurrentRefresh(token)) {
+      return
+    }
     this.deviceNamesText = names.join(' / ')
     this.deviceCountText = `${devices.length}`
     this.localLatencyText = devices.length > 0 ? '多源输入' : '本地触控'

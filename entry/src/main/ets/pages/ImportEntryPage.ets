@@ -17,10 +17,10 @@ interface ImportParticle {
   opacity: number
 }
 
-@Component
+@ComponentV2
 struct ParticleLayer {
-  @Prop boosted: boolean = false
-  @State particlePhase: number = 0
+  @Param boosted: boolean = false
+  @Local particlePhase: number = 0
   private timer: number = -1
   private readonly particles: ImportParticle[] = [
     { x: 24, y: 88, size: 2, opacity: 0.12 },
@@ -82,19 +82,23 @@ struct ParticleLayer {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct ImportEntryPage {
-  @State private hasGames: boolean = false
-  @State private isScanning: boolean = false
-  @State private scanProgress: number = 0
-  @State private scanStatusText: string = '正在扫描本地文件...'
-  @State private importButtonPressed: boolean = false
-  @State private particleBoosted: boolean = false
-  @State private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
+  @Local private hasGames: boolean = false
+  @Local private isScanning: boolean = false
+  @Local private scanProgress: number = 0
+  @Local private scanStatusText: string = '正在扫描本地文件...'
+  @Local private importButtonPressed: boolean = false
+  @Local private particleBoosted: boolean = false
+  @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private scanTimer: number = -1
   private pageActive: boolean = false
+  private importTaskToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('library')
   private foldDisplayModeListener: (mode: display.FoldDisplayMode) => void = (mode: display.FoldDisplayMode) => {
+    if (!this.pageActive) {
+      return
+    }
     this.foldDisplayMode = mode
   }
 
@@ -115,7 +119,11 @@ struct ImportEntryPage {
     } catch (err) {
       LogHelper.error('ImportEntryPage', 'FoldDetect', `getFoldDisplayMode failed: ${err}`)
     }
-    display.on('foldDisplayModeChange', this.foldDisplayModeListener)
+    try {
+      display.on('foldDisplayModeChange', this.foldDisplayModeListener)
+    } catch (err) {
+      LogHelper.error('ImportEntryPage', 'FoldDetect', `foldDisplayModeChange on failed: ${err}`)
+    }
     if (this.hasGames) {
       this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
         LogHelper.error('ImportEntryPage', 'Route', `replaceUrl failed: ${err.message}`)
@@ -125,8 +133,13 @@ struct ImportEntryPage {
 
   aboutToDisappear(): void {
     this.pageActive = false
+    this.importTaskToken += 1
     this.stopScan()
-    display.off('foldDisplayModeChange', this.foldDisplayModeListener)
+    try {
+      display.off('foldDisplayModeChange', this.foldDisplayModeListener)
+    } catch (err) {
+      LogHelper.error('ImportEntryPage', 'FoldDetect', `foldDisplayModeChange off failed: ${err}`)
+    }
   }
 
   private stopScan(): void {
@@ -134,6 +147,15 @@ struct ImportEntryPage {
       clearInterval(this.scanTimer)
       this.scanTimer = -1
     }
+  }
+
+  private beginImportTask(): number {
+    this.importTaskToken += 1
+    return this.importTaskToken
+  }
+
+  private isCurrentImportTask(token: number): boolean {
+    return this.pageActive && token === this.importTaskToken
   }
 
   private startImport(): void {
@@ -145,11 +167,12 @@ struct ImportEntryPage {
     this.scanStatusText = '等待选择文件...'
     this.particleBoosted = true
     this.stopScan()
-    void this.finishImportFlow()
+    const token = this.beginImportTask()
+    void this.finishImportFlow(token)
   }
 
-  private async finishImportFlow(): Promise<void> {
-    if (!this.pageActive) {
+  private async finishImportFlow(token: number): Promise<void> {
+    if (!this.isCurrentImportTask(token)) {
       return
     }
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
@@ -158,22 +181,31 @@ struct ImportEntryPage {
       return
     }
 
-    const uris = await pickRomUris(context)
-    if (!this.pageActive) {
-      return
-    }
-    this.isScanning = false
-    this.particleBoosted = false
-    if (!uris || uris.length === 0) {
-      this.scanProgress = 0
-      this.scanStatusText = '未选择文件'
-      return
-    }
+    try {
+      const uris = await pickRomUris(context)
+      if (!this.isCurrentImportTask(token)) {
+        return
+      }
+      this.isScanning = false
+      this.particleBoosted = false
+      if (!uris || uris.length === 0) {
+        this.scanProgress = 0
+        this.scanStatusText = '未选择文件'
+        return
+      }
 
-    setPendingImportUris(uris)
-    this.getUIContext().getRouter().pushUrl({ url: 'pages/ImportTaskOverlayPage' }).catch((err: Error) => {
-      LogHelper.error('ImportEntryPage', 'Route', `pushUrl failed: ${err.message}`)
-    })
+      setPendingImportUris(uris)
+      this.getUIContext().getRouter().pushUrl({ url: 'pages/ImportTaskOverlayPage' }).catch((err: Error) => {
+        LogHelper.error('ImportEntryPage', 'Route', `pushUrl failed: ${err.message}`)
+      })
+    } catch (err) {
+      if (!this.isCurrentImportTask(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('ImportEntryPage', 'Import', `选择导入文件失败: ${message}`)
+      this.resetImportState('文件选择失败')
+    }
   }
 
   private resetImportState(statusText: string): void {

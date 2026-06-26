@@ -91,6 +91,7 @@ public:
      * @return true 正在播放
      */
     bool IsPlaying() const;
+    bool SetVolume(float volume);
     void ProcessPendingInterruptActions();
     bool EnterCallback();
     void ExitCallback();
@@ -107,6 +108,7 @@ public:
      * @return 声道数
      */
     int32_t GetChannelCount() const { return channel_count_; }
+    float GetVolume() const { return volume_.load(); }
 
     void GetCallbackDiag(uint64_t &callbackCount, uint64_t &framesRead,
                          int64_t &lastCallbackMs) const;
@@ -184,6 +186,7 @@ private:
 
     int32_t sample_rate_ = 48000;               // 采样率
     int32_t channel_count_ = 2;                 // 声道数
+    std::atomic<float> volume_{1.0f};           // 当前音量 0.0-1.0
     bool is_playing_ = false;                   // 播放状态
     std::chrono::steady_clock::time_point diag_window_start_{};
     uint64_t diag_callbacks_{0};

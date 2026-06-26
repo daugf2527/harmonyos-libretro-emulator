@@ -9,10 +9,10 @@ export type LibraryDetailActionKey =
   'save_manager' |
   'purge_save'
 
-@Component
+@ComponentV2
 export struct LibraryDetailActionMenu {
-  onClose?: () => void
-  onAction?: (actionKey: LibraryDetailActionKey) => void
+  @Event onClose?: () => void
+  @Event onAction?: (actionKey: LibraryDetailActionKey) => void
 
   build() {
     Stack() {

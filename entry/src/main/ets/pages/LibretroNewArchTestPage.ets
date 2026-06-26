@@ -70,7 +70,9 @@ interface LibretroNapi {
   refactoredResetStats(): boolean;
   refactoredSetSoftwareMaxResolution(w: number, h: number): boolean;
   refactoredGetCoreOptions(): string;
+  refactoredGetCoreOptionsAsync(): Promise<string>;
   refactoredSetCoreOption(key: string, value: string): boolean;
+  refactoredSetCoreOptionAsync(key: string, value: string): Promise<boolean>;
   refactoredSetMinimumAudioLatency(ms: number): boolean;
   refactoredSetAIUpscale(enabled: boolean): boolean;
   refactoredPauseEngine(): boolean;
@@ -128,34 +130,39 @@ interface ResolutionPreset {
   h: number;
 }
 
-interface CoreCheckState {
-  running: boolean;
-  text: string;
+// [2026-06-08 D026] V2:改 @ObservedV2 class + @Trace 字段(原裸 interface)。
+// build() 读 this.coreCheck.running/.text 传给 DevDiagnosticsBlock 子组件,原 @Local 持
+// 裸 interface 时字段就地 mutate(this.coreCheck.running=)不触发 build() 重算→子组件停初值
+// (静默不刷新)。@ObservedV2+@Trace 使字段级 mutate 精准触发依赖该字段的节点重渲染。
+@ObservedV2
+class CoreCheckState {
+  @Trace running: boolean = false;
+  @Trace text: string = '';
 }
 
 
 // RetroPad Constants removed (imported inputs used dynamically)
 
 @Entry
-@Component
+@ComponentV2
 struct LibretroNewArchTestPage {
-  @State status: string = '未启动';
-  @State logs: string[] = [];
-  @State coreOptions: CoreOptionItem[] = [];
-  @State audioStatus: AudioStatusPayload = {
+  @Local status: string = '未启动';
+  @Local logs: string[] = [];
+  @Local coreOptions: CoreOptionItem[] = [];
+  @Local audioStatus: AudioStatusPayload = {
     active: false,
     occupancy: 0,
     underrun: false,
     underruns: 0,
     overruns: 0
   };
-  @State fps: number = 0;
-  @State perfStatsText: string = '';
-  @State geometryText: string = '';
-  @State inputDebugText: string = '';
-  @State inputFocusText: string = '';
-  @State uiInputDebugText: string = '';
-  @State stats: RuntimeStatsDTO = {
+  @Local fps: number = 0;
+  @Local perfStatsText: string = '';
+  @Local geometryText: string = '';
+  @Local inputDebugText: string = '';
+  @Local inputFocusText: string = '';
+  @Local uiInputDebugText: string = '';
+  @Local stats: RuntimeStatsDTO = {
     videoRefreshCalls: 0,
     videoNullFrames: 0,
     videoDupeFrames: 0,
@@ -166,30 +173,34 @@ struct LibretroNewArchTestPage {
     audioUnderruns: 0,
     audioOverruns: 0
   };
-  @State scalingMode: number = 2;
-  @State softwareMaxPresetIndex: number = 1;
-  @State autoAdjust: boolean = true;
-  @State latencyMs: number = 0;
-  @State lastAdjustTs: number = 0;
-  @State lastUnderruns: number = 0;
-  @State selectedPortIndex: number = 0;
-  @State portAssignments: PortAssignState[] = createDefaultPortAssignments();
-  @State inputDevices: InputDeviceInfo[] = [];
-  @State alertMsg: string = '';
-  @State alertVisible: boolean = false;
-  @State drawerVisible: boolean = false;
-  @State logsOverlayVisible: boolean = false;
-  @State useDrawer: boolean = false;
-  @State aiUpscaleEnabled: boolean = false;
-  @State xengineAvailable: boolean = false;
-  @State hideVirtualController: boolean = false;
-  @State coreCheck: CoreCheckState = { running: false, text: '' };
-  @State soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
+  @Local scalingMode: number = 2;
+  @Local softwareMaxPresetIndex: number = 1;
+  @Local autoAdjust: boolean = true;
+  @Local latencyMs: number = 0;
+  @Local lastAdjustTs: number = 0;
+  @Local lastUnderruns: number = 0;
+  @Local selectedPortIndex: number = 0;
+  @Local portAssignments: PortAssignState[] = createDefaultPortAssignments();
+  @Local inputDevices: InputDeviceInfo[] = [];
+  @Local alertMsg: string = '';
+  @Local alertVisible: boolean = false;
+  @Local drawerVisible: boolean = false;
+  @Local logsOverlayVisible: boolean = false;
+  @Local useDrawer: boolean = false;
+  @Local aiUpscaleEnabled: boolean = false;
+  @Local xengineAvailable: boolean = false;
+  @Local hideVirtualController: boolean = false;
+  @Local coreCheck: CoreCheckState = new CoreCheckState();
+  @Local soakState: RuntimeSoakState = { running: false, secondsLeft: 0, summaryText: '' };
   private readonly soakController: RuntimeSoakTestController = new RuntimeSoakTestController();
+  private readonly logDate: Date = new Date();
 
   private xComponentId: string = 'new_arch_xcomponent';
   private eventScope: EventHubScope | undefined = undefined;
   private inputDebugTimer: number = -1;
+  private pageActive: boolean = false;
+  private engineActionToken: number = 0;
+  private coreOptionsRefreshToken: number = 0;
   private uiTouchCount: number = 0;
   private uiMouseCount: number = 0;
   private uiKeyCount: number = 0;
@@ -238,32 +249,40 @@ struct LibretroNewArchTestPage {
     this.applyPortAssignment(this.selectedPortIndex, sourceType, true, this.currentPortAssignment.deviceId);
   };
   private onStartEngine = async (): Promise<void> => {
+    const actionToken = this.beginEngineAction();
     this.log('调用 refactoredStartEngine');
     nativeApi.refactoredClearLastErrorInfo();
     const startResult = nativeApi.refactoredStartEngine();
     this.log(`refactoredStartEngine 返回: ${startResult.success}`);
     if (!startResult.success) { this.status = '启动失败'; return; }
     const started = await nativeApi.refactoredWaitForStateAsync(EngineState.STARTING, 5000);
+    if (!this.isCurrentEngineAction(actionToken)) {
+      return;
+    }
     this.status = started ? '引擎已启动' : '启动超时';
   };
   private onSetFilesDir = (): void => {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) { this.log('获取上下文失败'); return; }
     const filesDir = context.filesDir;
-    this.log(`调用 refactoredSetFilesDir: ${filesDir}`);
+    this.log(`调用 refactoredSetFilesDir: ${LogHelper.describePathForLog(filesDir)}`);
     const ok: boolean = nativeApi.refactoredSetFilesDir(filesDir);
     this.log(`refactoredSetFilesDir 返回: ${ok}`);
   };
   private onLoadCore = async (): Promise<void> => {
+    const actionToken = this.beginEngineAction();
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) { this.log('获取上下文失败'); return; }
     const abiPath = this.resolveAbiPath();
     const corePath = `${context.bundleCodeDir}/libs/${abiPath}/libgambatte_libretro.so`;
-    this.log(`调用 refactoredLoadCore: ${corePath}`);
+    this.log(`调用 refactoredLoadCore: ${LogHelper.describePathForLog(corePath)}`);
     const coreResult = nativeApi.refactoredLoadCore(corePath);
     this.log(`refactoredLoadCore 返回: ${coreResult.success}`);
     if (!coreResult.success) { this.status = '核心加载失败'; return; }
     const loaded = await nativeApi.refactoredWaitForStateAsync(EngineState.CORE_LOADED, 5000);
+    if (!this.isCurrentEngineAction(actionToken)) {
+      return;
+    }
     if (!loaded) {
       const err = nativeApi.refactoredGetLastErrorInfo();
       const detail = err && err.reason ? `原因: ${err.reason}` : '原因未知';
@@ -271,8 +290,9 @@ struct LibretroNewArchTestPage {
     }
     this.status = loaded ? '核心已加载' : '核心加载超时';
   };
-  private onInitOptions = (): void => { this.refreshCoreOptions(); };
+  private onInitOptions = (): void => { void this.refreshCoreOptions(); };
   private onLoadRom = async (): Promise<void> => {
+    const actionToken = this.beginEngineAction();
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) { this.log('获取上下文失败'); return; }
     const resMgr = context.resourceManager;
@@ -281,13 +301,16 @@ struct LibretroNewArchTestPage {
     this.log(`refactoredLoadRom 返回: ${romResult.success}`);
     if (!romResult.success) { this.status = 'ROM加载失败'; return; }
     const running = await nativeApi.refactoredWaitForStateAsync(EngineState.RUNNING, 5000);
+    if (!this.isCurrentEngineAction(actionToken)) {
+      return;
+    }
     if (!running) {
       const err = nativeApi.refactoredGetLastErrorInfo();
       const detail = err && err.reason ? `原因: ${err.reason}` : '原因未知';
       this.log(`LoadRom 超时: ${detail}`);
     }
     this.status = running ? 'ROM已加载，运行中' : 'ROM加载超时';
-    if (romResult.success) { this.refreshCoreOptions(); }
+    if (romResult.success) { void this.refreshCoreOptions(); }
   };
   private onPauseEngine = (): void => {
     this.log('调用 refactoredPauseEngine');
@@ -302,11 +325,18 @@ struct LibretroNewArchTestPage {
     this.status = '运行中';
   };
   private onStopEngine = async (): Promise<void> => {
+    const actionToken = this.beginEngineAction();
     this.log('调用 refactoredStopEngine');
     const ok: boolean = await nativeApi.refactoredStopEngineAsync();
+    if (!this.isCurrentEngineAction(actionToken)) {
+      return;
+    }
     this.log(`refactoredStopEngine 返回: ${ok}`);
     if (!ok) { this.status = '停止失败'; return; }
     const stopped = await nativeApi.refactoredWaitForStateAsync(EngineState.STOPPED, 5000);
+    if (!this.isCurrentEngineAction(actionToken)) {
+      return;
+    }
     this.status = stopped ? '已停止' : '停止超时';
   };
   private onQueryState = (): void => {
@@ -314,41 +344,85 @@ struct LibretroNewArchTestPage {
     const stateNames: string[] = ['INIT', 'CORE_LOADED', 'GAME_LOADED', 'RUNNING', 'PAUSED', 'STOPPING', 'STOPPED', 'STARTING', 'LOADING', 'ERROR'];
     this.log(`当前状态: ${stateNames[state] || state}`);
   };
-  private onQueryStats = (): void => {
+
+  private readRuntimeStats(): RuntimeStatsDTO {
+    const s = nativeApi.refactoredGetStats() as RuntimeStatsDTO;
+    return {
+      videoRefreshCalls: Number(s.videoRefreshCalls) || 0,
+      videoNullFrames: Number(s.videoNullFrames) || 0,
+      videoDupeFrames: Number(s.videoDupeFrames) || 0,
+      audioBatchCalls: Number(s.audioBatchCalls) || 0,
+      audioFramesIn: Number(s.audioFramesIn) || 0,
+      frameCount: Number(s.frameCount) || 0,
+      audioBufferUsage: Number(s.audioBufferUsage) || 0,
+      audioUnderruns: Number(s.audioUnderruns) || 0,
+      audioOverruns: Number(s.audioOverruns) || 0
+    };
+  }
+
+  private applyRuntimeStats(stats: RuntimeStatsDTO): void {
+    this.stats = stats;
+  }
+
+  private syncAudioStatusFromStats(stats: RuntimeStatsDTO): void {
+    const occupancyPercent = Math.max(0, Math.min(100, Math.round((Number(stats.audioBufferUsage) || 0) * 100)));
+    const underruns = Number(stats.audioUnderruns) || 0;
+    const overruns = Number(stats.audioOverruns) || 0;
+    const active = this.audioStatus.active || Number(stats.audioBatchCalls) > 0 || Number(stats.frameCount) > 0;
+
+    this.audioStatus = {
+      active: active,
+      occupancy: occupancyPercent,
+      underrun: underruns > this.lastUnderruns || (active && occupancyPercent <= 10),
+      underruns: underruns,
+      overruns: overruns
+    };
+  }
+
+  private syncAudioAlert(): void {
+    const occupancy = Number(this.audioStatus.occupancy) || 0;
+    const underruns = Number(this.audioStatus.underruns) || 0;
+    const overruns = Number(this.audioStatus.overruns) || 0;
+
+    if (this.audioStatus.underrun) {
+      this.alertVisible = true;
+      this.alertMsg = `音频欠载：Buf ${occupancy}% · U/O ${underruns}/${overruns}`;
+      return;
+    }
+
+    if (this.audioStatus.active && occupancy >= 85) {
+      this.alertVisible = true;
+      this.alertMsg = `缓冲高占用：Buf ${occupancy}% · U/O ${underruns}/${overruns}`;
+      return;
+    }
+
+    this.alertVisible = false;
+    this.alertMsg = '';
+  }
+
+  private refreshRuntimeStats(logMessage: string): void {
     try {
-      const s = nativeApi.refactoredGetStats() as RuntimeStatsDTO;
-      this.stats = {
-        videoRefreshCalls: Number(s.videoRefreshCalls) || 0,
-        videoNullFrames: Number(s.videoNullFrames) || 0,
-        videoDupeFrames: Number(s.videoDupeFrames) || 0,
-        audioBatchCalls: Number(s.audioBatchCalls) || 0,
-        audioFramesIn: Number(s.audioFramesIn) || 0,
-        frameCount: Number(s.frameCount) || 0,
-        audioBufferUsage: Number(s.audioBufferUsage) || 0,
-        audioUnderruns: Number(s.audioUnderruns) || 0,
-        audioOverruns: Number(s.audioOverruns) || 0,
-      };
-      this.log('已刷新统计');
-    } catch (e) { this.log('查询统计失败'); }
+      const stats = this.readRuntimeStats();
+      this.applyRuntimeStats(stats);
+      this.syncAudioStatusFromStats(stats);
+      this.handleAudioStatus();
+      this.log(logMessage);
+    } catch (_) {
+      this.log(`${logMessage}失败`);
+    }
+  }
+
+  private onQueryStats = (): void => {
+    this.refreshRuntimeStats('已刷新统计');
   };
   private onResetStats = (): void => {
     const ok = nativeApi.refactoredResetStats();
     this.log(`重置统计: ${ok}`);
     if (ok) {
-      try {
-        const s = nativeApi.refactoredGetStats() as RuntimeStatsDTO;
-        this.stats = {
-          videoRefreshCalls: Number(s.videoRefreshCalls) || 0,
-          videoNullFrames: Number(s.videoNullFrames) || 0,
-          videoDupeFrames: Number(s.videoDupeFrames) || 0,
-          audioBatchCalls: Number(s.audioBatchCalls) || 0,
-          audioFramesIn: Number(s.audioFramesIn) || 0,
-          frameCount: Number(s.frameCount) || 0,
-          audioBufferUsage: Number(s.audioBufferUsage) || 0,
-          audioUnderruns: Number(s.audioUnderruns) || 0,
-          audioOverruns: Number(s.audioOverruns) || 0,
-        };
-      } catch (_) {}
+      this.lastUnderruns = 0;
+      this.alertVisible = false;
+      this.alertMsg = '';
+      this.refreshRuntimeStats('统计已清零');
     }
   };
   private onAiUpscaleChange = (v: boolean): void => {
@@ -367,15 +441,11 @@ struct LibretroNewArchTestPage {
     const ok: boolean = nativeApi.refactoredSetMinimumAudioLatency(this.latencyMs);
     this.log(`设置最小延迟: ${this.latencyMs}ms => ${ok}`);
   };
-  private onSimulateUnderrun = (): void => {
-    this.audioStatus = { active: true, occupancy: 0, underrun: true, underruns: this.audioStatus.underruns + 1, overruns: this.audioStatus.overruns };
-    this.handleAudioStatus();
-    this.log('触发模拟欠载事件');
+  private onRefreshAudioStatus = (): void => {
+    this.refreshRuntimeStats('已刷新音频状态');
   };
-  private onSimulateHighOccupancy = (): void => {
-    this.audioStatus = { active: true, occupancy: 90, underrun: false, underruns: this.audioStatus.underruns, overruns: this.audioStatus.overruns };
-    this.handleAudioStatus();
-    this.log('触发模拟高占用事件');
+  private onRefreshPerformanceSnapshot = (): void => {
+    this.refreshRuntimeStats('已刷新性能快照');
   };
   private onClearAlert = (): void => { this.alertVisible = false; this.alertMsg = ''; };
   private onCloseDrawer = (): void => { this.drawerVisible = false; };
@@ -418,6 +488,7 @@ struct LibretroNewArchTestPage {
   };
 
   aboutToAppear() {
+    this.pageActive = true;
     this.log('页面加载');
 
     try {
@@ -427,9 +498,15 @@ struct LibretroNewArchTestPage {
     }
     this.eventScope = LibretroEventHub.getInstance().createScope();
     this.eventScope.onOptionsUpdate((_payload) => {
-      this.refreshCoreOptions();
+      if (!this.pageActive) {
+        return;
+      }
+      void this.refreshCoreOptions();
     });
     this.eventScope.onAudioStatus((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.audioStatus = {
         active: payload.active,
         occupancy: Number(payload.occupancy) || 0,
@@ -440,15 +517,27 @@ struct LibretroNewArchTestPage {
       this.handleAudioStatus();
     });
     this.eventScope.onFpsUpdate((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.handleFpsUpdate(payload);
     });
     this.eventScope.onGeometryUpdate((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.handleGeometryUpdate(payload);
     });
     this.eventScope.onCoreMessage((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.handleCoreMessage(payload);
     });
     this.eventScope.onCoreCrash((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.handleCoreCrash(payload);
     });
     this.startInputDebug();
@@ -457,6 +546,9 @@ struct LibretroNewArchTestPage {
   }
 
   aboutToDisappear() {
+    this.pageActive = false;
+    this.engineActionToken += 1;
+    this.coreOptionsRefreshToken += 1;
     if (this.eventScope) {
       this.eventScope.dispose();
       this.eventScope = undefined;
@@ -467,9 +559,28 @@ struct LibretroNewArchTestPage {
   }
 
   log(msg: string) {
-    const time = new Date().toLocaleTimeString();
+    this.logDate.setTime(Date.now());
+    const time = this.logDate.toLocaleTimeString();
     this.logs = [`[${time}] ${msg}`, ...this.logs.slice(0, 19)];
     LogHelper.info('NewArchTest', 'Test', msg);
+  }
+
+  private beginEngineAction(): number {
+    this.engineActionToken += 1;
+    return this.engineActionToken;
+  }
+
+  private isCurrentEngineAction(token: number): boolean {
+    return this.pageActive && token === this.engineActionToken;
+  }
+
+  private beginCoreOptionsRefresh(): number {
+    this.coreOptionsRefreshToken += 1;
+    return this.coreOptionsRefreshToken;
+  }
+
+  private isCurrentCoreOptionsRefresh(token: number): boolean {
+    return this.pageActive && token === this.coreOptionsRefreshToken;
   }
 
   private refreshInputDevices() {
@@ -619,14 +730,28 @@ struct LibretroNewArchTestPage {
     return Math.round(v * 32768);
   }
 
-  refreshCoreOptions() {
-    this.coreOptions = this.getCoreOptions();
+  async refreshCoreOptions(): Promise<void> {
+    const refreshToken = this.beginCoreOptionsRefresh();
+    const nextOptions = await this.getCoreOptions();
+    if (!this.isCurrentCoreOptionsRefresh(refreshToken)) {
+      return;
+    }
+    this.coreOptions = nextOptions;
     this.log('刷新选项完成');
   }
 
   handleAudioStatus() {
+    if (!this.pageActive) {
+      return;
+    }
+    const underruns = Number(this.audioStatus.underruns) || 0;
+    if (underruns > this.lastUnderruns) {
+      this.lastUnderruns = underruns;
+    }
+    this.syncAudioAlert();
+
     if (this.autoAdjust && this.audioStatus.underrun) {
-      const now = new Date().getTime();
+      const now = Date.now();
       if (now - this.lastAdjustTs > 2000) {
         this.latencyMs = Math.min(200, this.latencyMs + 20);
         nativeApi.refactoredSetMinimumAudioLatency(this.latencyMs);
@@ -637,6 +762,9 @@ struct LibretroNewArchTestPage {
   }
 
   handleFpsUpdate(payload: FpsUpdatePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     const v = Number(payload.fps);
     if (!Number.isNaN(v)) this.fps = v;
 
@@ -650,6 +778,9 @@ struct LibretroNewArchTestPage {
   }
 
   handleGeometryUpdate(payload: GeometryUpdatePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     const w = Number(payload.base_width);
     const h = Number(payload.base_height);
     const a = Number(payload.aspect_ratio ?? 0);
@@ -660,10 +791,16 @@ struct LibretroNewArchTestPage {
   }
 
   handleCoreMessage(payload: CoreMessagePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     this.log(`核心消息: ${payload.msg}`);
   }
 
   handleCoreCrash(payload: CoreCrashPayload) {
+    if (!this.pageActive) {
+      return;
+    }
     this.log(`核心异常: ${payload.reason}`);
   }
 
@@ -744,14 +881,22 @@ struct LibretroNewArchTestPage {
         this.coreCheck.text = '获取 Context 失败';
         return;
       }
-      const result = runtimeCoreDiagnosticController.testCoreLoader(corePath);
+      const result = await runtimeCoreDiagnosticController.testCoreLoader(corePath);
+      if (!this.pageActive) {
+        return;
+      }
       this.coreCheck.text = result;
     } catch (e) {
+      if (!this.pageActive) {
+        return;
+      }
       const msg = (e as Error)?.message || String(e);
       this.coreCheck.text = `Failed: ${msg}`;
       LogHelper.error('NewArchTest', 'Core', `符号验证异常: ${msg}`);
     } finally {
-      this.coreCheck.running = false;
+      if (this.pageActive) {
+        this.coreCheck.running = false;
+      }
     }
   }
 
@@ -769,9 +914,13 @@ struct LibretroNewArchTestPage {
   }
 
   private applySoakState(state: RuntimeSoakState): void {
-    this.soakState.running = state.running;
-    this.soakState.secondsLeft = state.secondsLeft;
-    this.soakState.summaryText = state.summaryText;
+    // [D026] 整体替换而非字段就地 mutate:RuntimeSoakState 是 controller 共享 DTO
+    // (不宜改 @ObservedV2 class),故 @Local 整体赋值触发引用变化→build() 重渲染。
+    this.soakState = {
+      running: state.running,
+      secondsLeft: state.secondsLeft,
+      summaryText: state.summaryText
+    };
   }
 
   private onCoreCheckClick = (): void => {
@@ -808,9 +957,9 @@ struct LibretroNewArchTestPage {
     return [];
   }
 }
-  getCoreOptions(): CoreOptionItem[] {
+  async getCoreOptions(): Promise<CoreOptionItem[]> {
     try {
-      const s: string = nativeApi.refactoredGetCoreOptions();
+      const s: string = await nativeApi.refactoredGetCoreOptionsAsync();
       return this.parseOptionsJson(s);
     } catch (_) {
       return [];
@@ -949,14 +1098,14 @@ struct LibretroNewArchTestPage {
           Blank()
           Button('切换')
             .fontSize(EmuTypography.sm)
-            .onClick(() => {
+            .onClick(async () => {
               const values: CoreOptionValue[] = Array.isArray(opt.values) ? opt.values : [];
               const idx = Math.max(0, values.findIndex((v: CoreOptionValue) => v.value === opt.value));
               const next = values.length > 0 ? values[(idx + 1) % values.length] : undefined;
               if (next && next.value) {
-                const ok = nativeApi.refactoredSetCoreOption(opt.key, next.value);
+                const ok = await nativeApi.refactoredSetCoreOptionAsync(opt.key, next.value);
                 if (ok) {
-                  this.refreshCoreOptions();
+                  void this.refreshCoreOptions();
                 }
               }
             })
@@ -1024,13 +1173,13 @@ struct LibretroNewArchTestPage {
       .width('100%')
       .padding(4)
       Row() {
-        Button('模拟欠载')
+        Button('刷新音频状态')
           .fontSize(EmuTypography.sm)
-          .onClick(this.onSimulateUnderrun)
-        Button('模拟高占用')
+          .onClick(this.onRefreshAudioStatus)
+        Button('刷新性能快照')
           .fontSize(EmuTypography.sm)
           .margin({ left: 5 })
-          .onClick(this.onSimulateHighOccupancy)
+          .onClick(this.onRefreshPerformanceSnapshot)
       }
       .width('100%')
       .padding(4)

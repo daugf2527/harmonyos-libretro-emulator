@@ -771,17 +771,17 @@ function escapeSql(value: string): string {
 
 async function loadLibraryIndexFromJson(filesDir: string): Promise<LibraryRecord[]> {
   const indexPath = buildIndexPath(filesDir)
+  const text = await readOptionalText(indexPath)
+  if (!text || text.length === 0) {
+    return []
+  }
   try {
-    const text = await fs.readText(indexPath)
-    if (!text || text.length === 0) {
-      return []
-    }
     const parsed = JSON.parse(text) as Partial<LibraryIndexDocument> | null
     if (!parsed?.records || parsed.records.length === 0) {
       return []
     }
     return parsed.records.map((record: LibraryRecord) => normalizeRecord(record))
-  } catch (err) {
+  } catch (_err) {
     return []
   }
 }
@@ -849,8 +849,28 @@ function buildIndexPath(filesDir: string): string {
 
 async function ensureDirExists(path: string): Promise<void> {
   try {
-    await fs.mkdir(path)
+    await fs.mkdir(path, true)
   } catch (err) {
     return
+  }
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (_err) {
+    return ''
   }
 }

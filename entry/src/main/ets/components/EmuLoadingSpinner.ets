@@ -3,12 +3,12 @@ import { EmuColors, EmuMotion } from '../common/EmuUiTokens'
 // 统一加载旋转指示器：1.2s/圈，符合 EmuMotion.loadingSpinMs 规范。
 // 凡是关键异步操作（保存、校验、切换核心、停止游戏等）应在 loading 期间
 // 显示此组件，并禁用其它按钮（disabled > loading > error > ...）。
-@Component
+@ComponentV2
 export struct EmuLoadingSpinner {
-  @Prop dotSize: number = 16
-  @Prop trackOpacity: number = 0.2
-  @Prop color: string = EmuColors.primary
-  @State private angle: number = 0
+  @Param dotSize: number = 16
+  @Param trackOpacity: number = 0.2
+  @Param color: string = EmuColors.primary
+  @Local private angle: number = 0
   private timer: number = -1
 
   aboutToAppear(): void {

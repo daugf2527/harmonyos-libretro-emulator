@@ -47,16 +47,16 @@ function triggerHaptic(duration: number = 10) {
 }
 
 // D-Pad 组件 (十字键)
-@Component
+@ComponentV2
 export struct DPadControl {
   // 回调函数
-  onKeyPress?: (keyId: number, pressed: boolean) => void;
+  @Event onKeyPress?: (keyId: number, pressed: boolean) => void;
   // 样式配置
-  @Prop buttonSize: number = 70;
-  @Prop buttonOpacity: number = 1.0;
-  @Prop buttonColor: string = '#2c3e50';
-  @Prop iconColor: string = '#FFFFFF';
-  @Prop isTransparent: boolean = false;  // 透明模式 (单折态)
+  @Param buttonSize: number = 70;
+  @Param buttonOpacity: number = 1.0;
+  @Param buttonColor: string = '#2c3e50';
+  @Param iconColor: string = '#FFFFFF';
+  @Param isTransparent: boolean = false;  // 透明模式 (单折态)
 
   build() {
     Column() {
@@ -115,19 +115,19 @@ export struct DPadControl {
 }
 
 // 模拟摇杆组件
-@Component
+@ComponentV2
 export struct AnalogStickControl {
-  onAnalogChange?: (index: number, x: number, y: number, active: boolean) => void;
-  @Prop index: number = 0;
-  @Prop baseSize: number = 140;
-  @Prop knobSize: number = 60;
-  @Prop deadZone: number = 0.08;
-  @Prop baseColor: string = '#263238';
-  @Prop ringColor: string = '#546E7A';
-  @Prop knobColor: string = '#90A4AE';
+  @Event onAnalogChange?: (index: number, x: number, y: number, active: boolean) => void;
+  @Param index: number = 0;
+  @Param baseSize: number = 140;
+  @Param knobSize: number = 60;
+  @Param deadZone: number = 0.08;
+  @Param baseColor: string = '#263238';
+  @Param ringColor: string = '#546E7A';
+  @Param knobColor: string = '#90A4AE';
 
-  @State knobOffsetX: number = 0;
-  @State knobOffsetY: number = 0;
+  @Local knobOffsetX: number = 0;
+  @Local knobOffsetY: number = 0;
 
   build() {
     Stack() {
@@ -214,14 +214,14 @@ export struct AnalogStickControl {
 }
 
 // ABXY 按钮组件
-@Component
+@ComponentV2
 export struct ABXYControl {
   // 回调函数
-  onKeyPress?: (keyId: number, pressed: boolean) => void;
+  @Event onKeyPress?: (keyId: number, pressed: boolean) => void;
   // 样式配置
-  @Prop buttonSize: number = 70;
-  @Prop buttonOpacity: number = 1.0;
-  @Prop isTransparent: boolean = false;
+  @Param buttonSize: number = 70;
+  @Param buttonOpacity: number = 1.0;
+  @Param isTransparent: boolean = false;
 
   build() {
     Stack() {
@@ -287,31 +287,71 @@ export struct ABXYControl {
 }
 
 // Start/Select 按钮组件
-@Component
+@ComponentV2
 export struct StartSelectControl {
   // 回调函数
-  onKeyPress?: (keyId: number, pressed: boolean) => void;
+  @Event onKeyPress?: (keyId: number, pressed: boolean) => void;
   // 样式配置
-  @Prop buttonWidth: number = 90;
-  @Prop buttonHeight: number = 50;
-  @Prop isVertical: boolean = false;  // 垂直布局 (三折态)
+  @Param buttonWidth: number = 90;
+  @Param buttonHeight: number = 50;
+  @Param isVertical: boolean = false;  // 垂直布局 (三折态)
+  @Local private startPressed: boolean = false;
+  @Local private selectPressed: boolean = false;
 
   build() {
     if (this.isVertical) {
       Column({ space: 10 }) {
-        this.FunctionButton('START', RETRO_DEVICE_ID_JOYPAD_START, '#e74c3c')
-        this.FunctionButton('SELECT', RETRO_DEVICE_ID_JOYPAD_SELECT, '#95a5a6')
+        this.FunctionButton(
+          'START',
+          RETRO_DEVICE_ID_JOYPAD_START,
+          '#e74c3c',
+          this.startPressed,
+          (pressed: boolean) => {
+            this.startPressed = pressed;
+          }
+        )
+        this.FunctionButton(
+          'SELECT',
+          RETRO_DEVICE_ID_JOYPAD_SELECT,
+          '#95a5a6',
+          this.selectPressed,
+          (pressed: boolean) => {
+            this.selectPressed = pressed;
+          }
+        )
       }
     } else {
       Row({ space: 10 }) {
-        this.FunctionButton('START', RETRO_DEVICE_ID_JOYPAD_START, '#e74c3c')
-        this.FunctionButton('SELECT', RETRO_DEVICE_ID_JOYPAD_SELECT, '#95a5a6')
+        this.FunctionButton(
+          'START',
+          RETRO_DEVICE_ID_JOYPAD_START,
+          '#e74c3c',
+          this.startPressed,
+          (pressed: boolean) => {
+            this.startPressed = pressed;
+          }
+        )
+        this.FunctionButton(
+          'SELECT',
+          RETRO_DEVICE_ID_JOYPAD_SELECT,
+          '#95a5a6',
+          this.selectPressed,
+          (pressed: boolean) => {
+            this.selectPressed = pressed;
+          }
+        )
       }
     }
   }
 
   @Builder
-  FunctionButton(label: string, keyId: number, color: string) {
+  FunctionButton(
+    label: string,
+    keyId: number,
+    color: string,
+    pressed: boolean,
+    onPressedChange: (pressed: boolean) => void
+  ) {
     Button(label)
       .width(this.buttonWidth)
       .height(this.buttonHeight)
@@ -319,27 +359,39 @@ export struct StartSelectControl {
       .fontWeight(FontWeight.Bold)
       .backgroundColor(color)
       .borderRadius(this.buttonHeight / 2)
-      .onClick(() => {
-        triggerHaptic(15);
-        this.onKeyPress?.(keyId, true);
-        setTimeout(() => {
+      .scale(pressed ? { x: 0.95, y: 0.95 } : { x: 1, y: 1 })
+      .opacity(pressed ? 0.82 : 1)
+      .shadow({
+        radius: pressed ? 18 : 0,
+        color: pressed ? color : '#00000000',
+        offsetX: 0,
+        offsetY: 0
+      })
+      .animation({ duration: 70, curve: Curve.EaseOut })
+      .onTouch((event) => {
+        if (event.type === TouchType.Down) {
+          onPressedChange(true);
+          triggerHaptic(15);
+          this.onKeyPress?.(keyId, true);
+        } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+          onPressedChange(false);
           this.onKeyPress?.(keyId, false);
-        }, 100);
+        }
       })
   }
 }
 
 // 系统按钮组件 (Reset/Menu)
-@Component
+@ComponentV2
 export struct SystemControl {
   // 回调函数
-  onReset?: () => void;
-  onMenu?: () => void;
-  onStop?: () => void;
+  @Event onReset?: () => void;
+  @Event onMenu?: () => void;
+  @Event onStop?: () => void;
   // 样式配置
-  @Prop buttonWidth: number = 90;
-  @Prop buttonHeight: number = 50;
-  @Prop showStop: boolean = true;
+  @Param buttonWidth: number = 90;
+  @Param buttonHeight: number = 50;
+  @Param showStop: boolean = true;
 
   build() {
     Row({ space: 10 }) {

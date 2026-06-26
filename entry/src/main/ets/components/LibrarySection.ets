@@ -1,9 +1,9 @@
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 
-@Component
+@ComponentV2
 export struct LibrarySection {
-  @Prop title: string = ''
-  @Prop codeLabel: string = ''
+  @Param title: string = ''
+  @Param codeLabel: string = ''
 
   build() {
     Row() {

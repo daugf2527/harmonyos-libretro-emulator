@@ -1,27 +1,15 @@
 {
   "app": {
-    "signingConfigs": [
-      {
-        "name": "default",
-        "type": "HarmonyOS",
-        "material": {
-          "certpath": "C:\\Users\\newwo\\.ohos\\config\\default_harmonyos-libretro-emulator_hlkmo-Ax4WQHi5pXitBkdXW0RpPWTtA0oH94xuvQNhQ=.cer",
-          "keyAlias": "debugKey",
-          "keyPassword": "0000001B62CD5789F1EB6E02B1B898926026495A5FF32B300688A302C171DA16134471B0DF957743643EE2",
-          "profile": "C:\\Users\\newwo\\.ohos\\config\\default_harmonyos-libretro-emulator_hlkmo-Ax4WQHi5pXitBkdXW0RpPWTtA0oH94xuvQNhQ=.p7b",
-          "signAlg": "SHA256withECDSA",
-          "storeFile": "C:\\Users\\newwo\\.ohos\\config\\default_harmonyos-libretro-emulator_hlkmo-Ax4WQHi5pXitBkdXW0RpPWTtA0oH94xuvQNhQ=.p12",
-          "storePassword": "0000001B7C6F15AF04FEB49E02D4D6226E2D7EA78B4EBEFF589DA685281807AC7B4922032697E797762176"
-        }
-      }
-    ],
     "products": [
       {
         "name": "default",
-        "signingConfig": "default",
-        "compatibleSdkVersion": "6.0.2(22)",
-        "targetSdkVersion": "6.0.2(22)",
-        "runtimeOS": "HarmonyOS"
+        "compileSdkVersion": "26.0.0",
+        "compatibleSdkVersion": "26.0.0",
+        "targetSdkVersion": "26.0.0",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "nativeCompiler": "BiSheng"
+        }
       }
     ],
     "buildModeSet": [

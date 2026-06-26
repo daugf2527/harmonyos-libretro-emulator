@@ -1,15 +1,15 @@
 import { EmuColors, EmuRadius, EmuSpacing, EmuTypography } from '../common/EmuUiTokens'
 import { EmuIcon } from './EmuIcon'
 
-@Component
+@ComponentV2
 export struct ImportEmptyStateHero {
-  @Prop isScanning: boolean = false
-  @Prop scanProgress: number = 0
-  @Prop buttonPressed: boolean = false
-  @Prop scanStatusText: string = '正在扫描本地文件...'
-  @Prop particleBoosted: boolean = false
-  onPrimaryAction?: () => void
-  onPrimaryTouch?: (pressed: boolean) => void
+  @Param isScanning: boolean = false
+  @Param scanProgress: number = 0
+  @Param buttonPressed: boolean = false
+  @Param scanStatusText: string = '正在扫描本地文件...'
+  @Param particleBoosted: boolean = false
+  @Event onPrimaryAction?: () => void
+  @Event onPrimaryTouch?: (pressed: boolean) => void
 
   build() {
     Column() {

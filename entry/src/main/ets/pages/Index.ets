@@ -16,7 +16,7 @@ import { EmuTypography } from '../common/EmuUiTokens'
 import LogHelper from '../common/LogHelper'
 
 @Entry
-@Component
+@ComponentV2
 struct Index {
   build() {
     Column() {

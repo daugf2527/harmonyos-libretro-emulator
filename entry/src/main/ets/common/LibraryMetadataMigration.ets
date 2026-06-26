@@ -164,13 +164,18 @@ function mergeMetadataIntoLibraryRecord(
   const hasReleaseYear = record.releaseYear !== undefined && record.releaseYear > 0
   const hasPublisher = record.publisher !== undefined && record.publisher.length > 0
 
-  return {
-    ...record,
-    releaseYear: hasReleaseYear ? record.releaseYear : (metadata.releaseYear > 0 ? metadata.releaseYear : undefined),
-    publisher: hasPublisher ? record.publisher : (metadata.publisher.length > 0 ? metadata.publisher : undefined),
-    // genre 暂时不迁移（GameMetadataRecord 中没有此字段）
-    updatedAt: Date.now()
-  }
+  // ArkTS 禁对象 spread（arkts-no-spread）：原 `{ ...record, ... }` 改为
+  // 直接在 record 上按相同逻辑赋值后返回。语义即“把 metadata 合并进 record”；
+  // 调用方后续仅读 record.romFile，mutate 这几个字段无外部副作用。
+  record.releaseYear = hasReleaseYear
+    ? record.releaseYear
+    : (metadata.releaseYear > 0 ? metadata.releaseYear : undefined)
+  record.publisher = hasPublisher
+    ? record.publisher
+    : (metadata.publisher.length > 0 ? metadata.publisher : undefined)
+  // genre 暂时不迁移（GameMetadataRecord 中没有此字段）
+  record.updatedAt = Date.now()
+  return record
 }
 
 /**

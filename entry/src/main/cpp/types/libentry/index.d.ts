@@ -16,7 +16,7 @@
 import type { resourceManager } from '@kit.LocalizationKit';
 
 // Phase 3.1 - CoreLoader 测试接口
-export const testCoreLoader: (corePath: string) => string;
+export const testCoreLoader: (corePath: string) => Promise<string>;
 
 // Phase 1 重构版引擎接口 (独立 C++ 线程)
 export interface RefactoredEvent {
@@ -33,31 +33,33 @@ export interface NapiErrorResult {
   errorCode?: number;
   message?: string;
 }
-export const refactoredStartEngine: () => boolean;
+export const refactoredStartEngine: () => NapiErrorResult;
 export const refactoredStopEngine: () => boolean;
 export function refactoredStopEngineAsync(): Promise<boolean>;
 export const refactoredResetEngine: () => boolean;
 export const refactoredPauseEngine: () => boolean;
 export const refactoredResumeEngine: () => boolean;
-export const refactoredLoadCore: (corePath: string) => boolean;
+export const refactoredLoadCore: (corePath: string) => NapiErrorResult;
 export const refactoredLoadRom: (
   romPath: string,
   resMgr?: resourceManager.ResourceManager
-) => boolean;
+) => NapiErrorResult;
 export function refactoredSwitchGameAsync(
   corePath: string,
   romPath: string,
   filesDir: string,
   resMgr?: resourceManager.ResourceManager,
   timeoutMs?: number,
-  token?: number
+  token?: number,
+  progressCallback?: (progress: number, message: string) => void
 ): Promise<NapiErrorResult>;
 export function refactoredSwitchGameAsync(
   corePath: string,
   romPath: string,
   filesDir: string,
   timeoutMs?: number,
-  token?: number
+  token?: number,
+  progressCallback?: (progress: number, message: string) => void
 ): Promise<NapiErrorResult>;
 export const refactoredGetRawFileList: (
   resMgr: resourceManager.ResourceManager,
@@ -95,8 +97,9 @@ export interface EngineErrorInfo {
 export const refactoredGetLastErrorInfo: () => EngineErrorInfo;
 export const refactoredClearLastErrorInfo: () => boolean;
 export const refactoredSetFilesDir: (filesDir: string) => boolean;
-export const refactoredSetMinimumAudioLatency: (latencyMs: number) => boolean;
+export const refactoredSetMinimumAudioLatency: (latencyMs: number) => boolean; // latencyMs >= 0
 export const refactoredSetAudioSyncMode: (mode: number) => boolean; // 0=NonBlocking, 1=Blocking
+export const refactoredSetAudioVolume: (percent: number) => boolean; // percent 0-100
 
 // Video Config
 export const refactoredSetScalingMode: (mode: number) => boolean; // 0=Hardware, 1=Software, 2=GLES
@@ -109,30 +112,55 @@ export const refactoredSetHwRenderAllowed: (enabled: boolean) => boolean;
 /** @deprecated T8-B-F3: 同步版阻塞 NAPI/UI 主线程最长 5s, 优先用 refactoredGetSaveStateSizeAsync. */
 export const refactoredGetSaveStateSize: () => number;
 export const refactoredGetSaveStateSizeAsync: () => Promise<number>;
+export interface SaveStateBundleResult {
+  stateData: ArrayBuffer;
+  thumbnailRgba: ArrayBuffer | null;
+  thumbnailWidth: number;
+  thumbnailHeight: number;
+}
 export const refactoredSaveState: () => ArrayBuffer | null;
 export const refactoredLoadState: (data: ArrayBuffer) => boolean;
-export const refactoredSaveStateAsync: () => Promise<ArrayBuffer | null>;
+export const refactoredSaveStateAsync: () => Promise<ArrayBuffer>;
+export const refactoredSaveStateBundleAsync: () => Promise<SaveStateBundleResult>;
 export const refactoredLoadStateAsync: (data: ArrayBuffer) => Promise<boolean>;
 
 // SRAM
 export const refactoredGetSRAM: () => ArrayBuffer | null;
 export const refactoredSetSRAM: (data: ArrayBuffer) => boolean;
+export const refactoredGetSRAMAsync: () => Promise<ArrayBuffer | null>;
+export const refactoredSetSRAMAsync: (data: ArrayBuffer) => Promise<boolean>;
 
 // Core Control
 export const refactoredResetCore: () => boolean;
+export const refactoredResetCoreAsync: () => Promise<boolean>;
 
 // Disk Control
 export const refactoredDiskControlSetEjectState: (ejected: boolean) => boolean;
+export const refactoredDiskControlSetEjectStateAsync: (ejected: boolean) => Promise<boolean>;
 export const refactoredDiskControlGetEjectState: () => boolean;
 export const refactoredDiskControlGetImageIndex: () => number;
 export const refactoredDiskControlSetImageIndex: (index: number) => boolean;
+export const refactoredDiskControlSetImageIndexAsync: (index: number) => Promise<boolean>;
 export const refactoredDiskControlGetNumImages: () => number;
+export interface DiskControlSnapshot {
+  ejected: boolean;
+  imageIndex: number;
+  imageCount: number;
+}
+export const refactoredDiskControlGetSnapshotAsync: () => Promise<DiskControlSnapshot>;
 export const refactoredDiskControlReplaceImageIndex: (index: number, path: string) => boolean;
+export const refactoredDiskControlReplaceImageIndexAsync: (index: number, path: string) => Promise<boolean>;
 export const refactoredDiskControlAddImageIndex: () => boolean;
+export const refactoredDiskControlAddImageIndexAsync: () => Promise<boolean>;
 
 // Cheat
 export const refactoredCheatReset: () => boolean;
 export const refactoredCheatSet: (index: number, enabled: boolean, code: string) => boolean;
+export const refactoredCheatResetAsync: () => Promise<boolean>;
+export const refactoredCheatSetAsync: (index: number, enabled: boolean, code: string) => Promise<boolean>;
+
+// Input Port Control
+export const refactoredSetControllerPortDeviceAsync: (port: number, device: number) => Promise<boolean>; // port 0-3, device >= 0
 
 // Stats
 export interface EngineStats {
@@ -157,6 +185,17 @@ export interface EngineStats {
   frameTimeMin: number;
   frameTimeMax: number;
   frameTimeSum: number;
+  queuePushed: number;
+  queuePopped: number;
+  queueDroppedOldest: number;
+  queueDroppedStaleOnPop: number;
+  queueDepthMax: number;
+  renderTickNoFrame: number;
+  renderThreadRenderedFrames: number;
+  renderThreadDroppedFrames: number;
+  vsyncCallbacks: number;
+  vsyncFallbackTicks: number;
+  vsyncRequestFailures: number;
   audioBufferUsage: number;
   audioUnderruns: number;
   audioOverruns: number;
@@ -178,8 +217,9 @@ export const refactoredGetInputDebugStats: () => InputDebugStats;
 export const setInputKeyMapping: (mappingMap: Record<string, number>) => boolean;
 
 // Controller/Region
-export const refactoredSetControllerPortDevice: (port: number, device: number) => boolean;
+export const refactoredSetControllerPortDevice: (port: number, device: number) => boolean; // port 0-3, device >= 0
 export const refactoredGetRegion: () => number;
+export const refactoredGetRegionAsync: () => Promise<number>;
 
 // AV Info
 export interface AVInfo {
@@ -192,7 +232,9 @@ export const refactoredGetAVInfo: () => AVInfo;
 
 // Options
 export const refactoredGetCoreOptions: () => string;
+export const refactoredGetCoreOptionsAsync: () => Promise<string>;
 export const refactoredSetCoreOption: (key: string, value: string) => boolean;
+export const refactoredSetCoreOptionAsync: (key: string, value: string) => Promise<boolean>;
 
 // State Query
 export const refactoredHasCoreLoaded: () => boolean;

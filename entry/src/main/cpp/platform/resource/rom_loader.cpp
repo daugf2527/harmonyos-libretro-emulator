@@ -1,7 +1,9 @@
 #include "rom_loader.h"
+#include "common/file_security.h"
 #include "platform_resource_manager.h"
 #include <filemanagement/file_uri/oh_file_uri.h>
 #include <hilog/log.h>
+#include <cctype>
 #include <cstring>
 
 #undef LOG_DOMAIN
@@ -14,13 +16,55 @@
 
 namespace libretro {
 
+namespace {
+
+bool StartsWithIgnoreCase(const uint8_t* data, size_t size, size_t offset,
+                          const char* prefix) {
+    for (size_t i = 0; prefix[i] != '\0'; ++i) {
+        if (offset + i >= size) {
+            return false;
+        }
+        unsigned char actual = data[offset + i];
+        unsigned char expected = static_cast<unsigned char>(prefix[i]);
+        if (std::tolower(actual) != std::tolower(expected)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool LooksLikeWebDocument(const uint8_t* data, size_t size) {
+    if (!data || size == 0) {
+        return false;
+    }
+
+    size_t offset = 0;
+    if (size >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF) {
+        offset = 3;
+    }
+
+    const size_t scan_limit = size < 4096 ? size : 4096;
+    while (offset < scan_limit && std::isspace(static_cast<unsigned char>(data[offset])) != 0) {
+        ++offset;
+    }
+
+    return StartsWithIgnoreCase(data, size, offset, "<!doctype") ||
+           StartsWithIgnoreCase(data, size, offset, "<html") ||
+           StartsWithIgnoreCase(data, size, offset, "<head") ||
+           StartsWithIgnoreCase(data, size, offset, "<body") ||
+           StartsWithIgnoreCase(data, size, offset, "<?xml");
+}
+
+} // namespace
+
 // ========== 公共接口 ==========
 
 ROMLoadResult ROMLoader::LoadFromUri(const std::string& uri) {
     ROMLoadResult result;
     result.success = false;
     
-    LOGF(LOG_INFO, "Loading ROM from URI: %{public}s", uri.c_str());
+    LOGF(LOG_INFO, "Loading ROM from URI: %{public}s",
+         security::DescribePathForLog(uri).c_str());
     
     // 1. URI 转路径
     std::string path = UriToPath(uri);
@@ -35,7 +79,8 @@ ROMLoadResult ROMLoader::LoadFromUri(const std::string& uri) {
 }
 
 ROMLoadResult ROMLoader::LoadFromPath(const std::string& path) {
-    LOGF(LOG_INFO, "Loading ROM from path: %{public}s", path.c_str());
+    LOGF(LOG_INFO, "Loading ROM from path: %{public}s",
+         security::DescribePathForLog(path).c_str());
     auto *vfs = PlatformResourceManager::GetInstance();
     return LoadFromVfs(path, *vfs);
 }
@@ -49,7 +94,8 @@ ROMLoadResult ROMLoader::LoadFromRawFile(
     result.path = rawfile_path;
     result.size = 0;
 
-    LOGF(LOG_INFO, "Loading ROM from rawfile: %{public}s", rawfile_path.c_str());
+    LOGF(LOG_INFO, "Loading ROM from rawfile: %{public}s",
+         security::DescribePathForLog(rawfile_path).c_str());
 
     if (!resource_manager) {
         result.error_message = "Resource manager is null";
@@ -66,7 +112,8 @@ ROMLoadResult ROMLoader::LoadFromRawFile(
     auto *mgr = PlatformResourceManager::GetInstance();
     if (!mgr->LoadRawFileWithManager(rawfile_path, resource_manager, result.data)) {
         result.error_message = "Failed to read ROM file";
-        LOGF(LOG_ERROR, "%{public}s: %{public}s", result.error_message.c_str(), rawfile_path.c_str());
+        LOGF(LOG_ERROR, "%{public}s: %{public}s", result.error_message.c_str(),
+             security::DescribePathForLog(rawfile_path).c_str());
         return result;
     }
 
@@ -140,6 +187,12 @@ bool ROMLoader::ValidateROM(const uint8_t* data, size_t size) {
         LOGF(LOG_ERROR, "ROM content invalid: File is all zeros");
         return false;
     }
+
+    // 拦截误打包的 HTML/XML 下载页，避免把网页错误内容交给核心解析。
+    if (LooksLikeWebDocument(data, size)) {
+        LOGF(LOG_ERROR, "ROM content invalid: looks like a web document");
+        return false;
+    }
     
     // 可按需扩展校验逻辑：
     // - 检查文件头魔数
@@ -165,7 +218,8 @@ ROMLoadResult ROMLoader::LoadFromVfs(const std::string &path,
 
     if (!vfs.ReadFile(path, result.data)) {
         result.error_message = "Failed to read ROM file";
-        LOGF(LOG_ERROR, "%{public}s: %{public}s", result.error_message.c_str(), path.c_str());
+        LOGF(LOG_ERROR, "%{public}s: %{public}s", result.error_message.c_str(),
+             security::DescribePathForLog(path).c_str());
         return result;
     }
 
@@ -191,7 +245,8 @@ std::string ROMLoader::UriToPath(const std::string& uri) {
     // 验证 URI 格式
     uint32_t length = static_cast<uint32_t>(uri.length());
     if (!OH_FileUri_IsValidUri(uri.c_str(), length)) {
-        LOGF(LOG_ERROR, "Invalid URI format: %{public}s", uri.c_str());
+        LOGF(LOG_ERROR, "Invalid URI format: %{public}s",
+             security::DescribePathForLog(uri).c_str());
         return "";
     }
     
@@ -207,7 +262,8 @@ std::string ROMLoader::UriToPath(const std::string& uri) {
     std::string path(pathResult);
     free(pathResult);  // 释放内存
     
-    LOGF(LOG_INFO, "URI converted to path: %{public}s", path.c_str());
+    LOGF(LOG_INFO, "URI converted to path: %{public}s",
+         security::DescribePathForLog(path).c_str());
     
     return path;
 }

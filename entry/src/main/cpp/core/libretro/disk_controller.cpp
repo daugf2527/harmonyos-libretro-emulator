@@ -122,6 +122,9 @@ bool DiskController::AddImagePath(const std::string& path) {
 
 bool DiskController::IsEjected() const {
   std::lock_guard<std::mutex> lock(mutex_);
+  if (callbacks_.get_eject_state) {
+    return callbacks_.get_eject_state();
+  }
   return ejected_;
 }
 

@@ -1,0 +1,11 @@
+{
+  "apiVersion": "26",
+  "displayName": "Native",
+  "meta": {
+    "metaVersion": "3.0.2"
+  },
+  "path": "native",
+  "platformVersion": "26.0.0",
+  "releaseType": "Beta1",
+  "version": "26.0.0.23"
+}

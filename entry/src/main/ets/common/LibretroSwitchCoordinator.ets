@@ -2,18 +2,19 @@ import testNapi from 'libentry.so';
 import type { resourceManager } from '@kit.LocalizationKit';
 import LogHelper from './LogHelper';
 import { EngineErrorInfo, EngineState } from './LibretroEventHub';
+import { NapiErrorResult } from './ErrorCodes';
 
 // NAPI 接口定义 (遵循 AGENTS.md 规范)
 interface LibretroNapi {
-  refactoredStartEngine(): boolean;
+  refactoredStartEngine(): NapiErrorResult;
   refactoredStopEngine(): boolean;
   refactoredStopEngineAsync(): Promise<boolean>;
   refactoredResetEngine(): boolean;
-  refactoredLoadCore(path: string): boolean;
+  refactoredLoadCore(path: string): NapiErrorResult;
   refactoredLoadRom(
     path: string,
     resMgr?: resourceManager.ResourceManager
-  ): boolean;
+  ): NapiErrorResult;
   refactoredSetFilesDir(path: string): boolean;
   refactoredWaitForState(state: number, timeoutMs?: number): boolean;
   refactoredWaitForStateAsync(
@@ -132,20 +133,20 @@ export default class LibretroSwitchCoordinator {
 
     nativeApi.refactoredClearLastErrorInfo();
 
-    if (!nativeApi.refactoredStartEngine()) {
+    if (!nativeApi.refactoredStartEngine().success) {
       const message = `StartEngine failed`;
       LogHelper.error('LibretroSwitch', 'Engine', message);
       return this.fail('start_game', 'start_engine_failed', message);
     }
 
     if (!nativeApi.refactoredSetFilesDir(req.filesDir)) {
-      const message = `SetFilesDir failed: dir=${req.filesDir}`;
+      const message = `SetFilesDir failed: dir=${LogHelper.describePathForLog(req.filesDir)}`;
       LogHelper.error('LibretroSwitch', 'Engine', message);
       return this.fail('load_core', 'set_files_dir_failed', message);
     }
 
-    if (!nativeApi.refactoredLoadCore(req.corePath)) {
-      const message = `LoadCore failed: core=${req.corePath}`;
+    if (!nativeApi.refactoredLoadCore(req.corePath).success) {
+      const message = `LoadCore failed: core=${LogHelper.describePathForLog(req.corePath)}`;
       LogHelper.error('LibretroSwitch', 'Engine', message);
       return this.fail('load_core', 'load_core_failed', message);
     }
@@ -165,8 +166,8 @@ export default class LibretroSwitchCoordinator {
     }
 
     if (req.romPath &&
-        !nativeApi.refactoredLoadRom(req.romPath, req.resMgr)) {
-      const message = `LoadRom failed: rom=${req.romPath}`;
+        !nativeApi.refactoredLoadRom(req.romPath, req.resMgr).success) {
+      const message = `LoadRom failed: rom=${LogHelper.describePathForLog(req.romPath)}`;
       LogHelper.error('LibretroSwitch', 'Engine', message);
       return this.fail('load_rom', 'load_rom_failed', message);
     }

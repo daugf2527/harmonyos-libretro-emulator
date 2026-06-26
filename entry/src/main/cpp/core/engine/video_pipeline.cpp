@@ -247,6 +247,14 @@ void ResolveTargetSize(const EnvState &env_state,
   }
 }
 
+uint8_t Expand5To8(uint8_t value) {
+  return static_cast<uint8_t>((value << 3) | (value >> 2));
+}
+
+uint8_t Expand6To8(uint8_t value) {
+  return static_cast<uint8_t>((value << 2) | (value >> 4));
+}
+
 } // namespace
 
 const char *VideoPipeline::PreflightDropReasonToString(
@@ -1392,16 +1400,24 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
     return r;
   };
 
+  std::vector<uint8_t> dupeFrame;
   if (!data) {
-    // Dupe frame: reuse last frame cache if available
-    if (!lastFrame_.empty() && lastFrameWidth_ > 0 && lastFrameHeight_ > 0) {
-      data = lastFrame_.data();
-      width = lastFrameWidth_;
-      height = lastFrameHeight_;
-      pitch = lastFramePitch_;
-    } else {
+    // Dupe frame: take a snapshot under lock so background thumbnail capture
+    // cannot race the render thread's frame-cache storage.
+    {
+      std::lock_guard<std::mutex> lock(frame_cache_mutex_);
+      if (!lastFrame_.empty() && lastFrameWidth_ > 0 && lastFrameHeight_ > 0 &&
+          lastFramePitch_ > 0) {
+        dupeFrame = lastFrame_;
+        width = lastFrameWidth_;
+        height = lastFrameHeight_;
+        pitch = lastFramePitch_;
+      }
+    }
+    if (dupeFrame.empty()) {
       return Finish(RenderResult::RENDERED); // No cache, treat as no-op
     }
+    data = dupeFrame.data();
   }
 
   ScalingMode mode = scaling_mode_.load();
@@ -1470,21 +1486,24 @@ VideoPipeline::Render(OHNativeWindow *window, const void *data, unsigned width,
       const size_t bytes_per_pixel = (pixel_format_ == RETRO_PIXEL_FORMAT_XRGB8888) ? 4 : 2;
       const size_t row_bytes = width * bytes_per_pixel;
       const size_t total_bytes = height * row_bytes;
+      {
+        std::lock_guard<std::mutex> lock(frame_cache_mutex_);
+        if (lastFrame_.size() != total_bytes) {
+          lastFrame_.resize(total_bytes);
+        }
 
-      if (lastFrame_.size() != total_bytes) {
-        lastFrame_.resize(total_bytes);
+        // Copy frame data row by row (pitch may differ from width * bpp)
+        const uint8_t *src = static_cast<const uint8_t *>(data);
+        uint8_t *dst = lastFrame_.data();
+        for (unsigned y = 0; y < height; ++y) {
+          std::memcpy(dst + y * row_bytes, src + y * pitch, row_bytes);
+        }
+
+        lastFrameWidth_ = width;
+        lastFrameHeight_ = height;
+        lastFramePitch_ = row_bytes; // Store normalized pitch (width * bpp)
+        lastFramePixelFormat_ = pixel_format_;
       }
-
-      // Copy frame data row by row (pitch may differ from width * bpp)
-      const uint8_t *src = static_cast<const uint8_t *>(data);
-      uint8_t *dst = lastFrame_.data();
-      for (unsigned y = 0; y < height; ++y) {
-        std::memcpy(dst + y * row_bytes, src + y * pitch, row_bytes);
-      }
-
-      lastFrameWidth_ = width;
-      lastFrameHeight_ = height;
-      lastFramePitch_ = row_bytes; // Store normalized pitch (width * bpp)
     }
 
     if (mode == ScalingMode::GLES_SCALING) {
@@ -2014,6 +2033,99 @@ bool VideoPipeline::HasHardwareContextImpl() const {
     return true;
   }
   return graphics_context_ && graphics_context_->HasContext();
+}
+
+bool VideoPipeline::CaptureLastFrameRgba(std::vector<uint8_t> &rgba,
+                                         unsigned &width,
+                                         unsigned &height) const {
+  std::vector<uint8_t> frame;
+  size_t pitch = 0;
+  retro_pixel_format format = RETRO_PIXEL_FORMAT_UNKNOWN;
+  {
+    std::lock_guard<std::mutex> lock(frame_cache_mutex_);
+    if (lastFrame_.empty() || lastFrameWidth_ == 0 || lastFrameHeight_ == 0 ||
+        lastFramePitch_ == 0 ||
+        lastFramePixelFormat_ == RETRO_PIXEL_FORMAT_UNKNOWN) {
+      width = 0;
+      height = 0;
+      rgba.clear();
+      return false;
+    }
+    frame = lastFrame_;
+    width = lastFrameWidth_;
+    height = lastFrameHeight_;
+    pitch = lastFramePitch_;
+    format = lastFramePixelFormat_;
+  }
+
+  const size_t pixelCount =
+      static_cast<size_t>(width) * static_cast<size_t>(height);
+  if (pixelCount == 0) {
+    width = 0;
+    height = 0;
+    rgba.clear();
+    return false;
+  }
+
+  rgba.assign(pixelCount * 4, 0);
+  for (unsigned y = 0; y < height; ++y) {
+    const uint8_t *srcRow = frame.data() + static_cast<size_t>(y) * pitch;
+    uint8_t *dstRow =
+        rgba.data() + static_cast<size_t>(y) * static_cast<size_t>(width) * 4;
+
+    switch (format) {
+    case RETRO_PIXEL_FORMAT_XRGB8888: {
+      for (unsigned x = 0; x < width; ++x) {
+        const size_t srcOffset = static_cast<size_t>(x) * 4;
+        const size_t dstOffset = static_cast<size_t>(x) * 4;
+        dstRow[dstOffset + 0] = srcRow[srcOffset + 2];
+        dstRow[dstOffset + 1] = srcRow[srcOffset + 1];
+        dstRow[dstOffset + 2] = srcRow[srcOffset + 0];
+        dstRow[dstOffset + 3] = 0xFF;
+      }
+      break;
+    }
+    case RETRO_PIXEL_FORMAT_RGB565: {
+      const uint16_t *srcPixels =
+          reinterpret_cast<const uint16_t *>(srcRow);
+      for (unsigned x = 0; x < width; ++x) {
+        const uint16_t pixel = srcPixels[x];
+        const uint8_t r = Expand5To8(static_cast<uint8_t>((pixel >> 11) & 0x1F));
+        const uint8_t g = Expand6To8(static_cast<uint8_t>((pixel >> 5) & 0x3F));
+        const uint8_t b = Expand5To8(static_cast<uint8_t>(pixel & 0x1F));
+        const size_t dstOffset = static_cast<size_t>(x) * 4;
+        dstRow[dstOffset + 0] = r;
+        dstRow[dstOffset + 1] = g;
+        dstRow[dstOffset + 2] = b;
+        dstRow[dstOffset + 3] = 0xFF;
+      }
+      break;
+    }
+    case RETRO_PIXEL_FORMAT_0RGB1555: {
+      const uint16_t *srcPixels =
+          reinterpret_cast<const uint16_t *>(srcRow);
+      for (unsigned x = 0; x < width; ++x) {
+        const uint16_t pixel = srcPixels[x];
+        const uint8_t r = Expand5To8(static_cast<uint8_t>((pixel >> 10) & 0x1F));
+        const uint8_t g = Expand5To8(static_cast<uint8_t>((pixel >> 5) & 0x1F));
+        const uint8_t b = Expand5To8(static_cast<uint8_t>(pixel & 0x1F));
+        const size_t dstOffset = static_cast<size_t>(x) * 4;
+        dstRow[dstOffset + 0] = r;
+        dstRow[dstOffset + 1] = g;
+        dstRow[dstOffset + 2] = b;
+        dstRow[dstOffset + 3] = 0xFF;
+      }
+      break;
+    }
+    default:
+      width = 0;
+      height = 0;
+      rgba.clear();
+      return false;
+    }
+  }
+
+  return true;
 }
 
 } // namespace libretro

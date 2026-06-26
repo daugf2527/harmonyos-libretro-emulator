@@ -17,6 +17,11 @@ const MAPPING_VERSION = 1
 const MAPPING_DIR_NAME = 'input'
 const MAPPING_FILE_NAME = 'key_mapping.json'
 
+function isMissingFileError(message: string): boolean {
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
+}
+
 export function createDefaultInputMappingProfile(): InputMappingProfile {
   return {
     version: MAPPING_VERSION,
@@ -41,11 +46,11 @@ export async function loadInputMappingProfile(
   context: common.UIAbilityContext
 ): Promise<InputMappingProfile> {
   const path = buildMappingPath(context.filesDir)
+  const text = await readOptionalText(path)
+  if (!text || text.length === 0) {
+    return createDefaultInputMappingProfile()
+  }
   try {
-    const text = await fs.readText(path)
-    if (!text || text.length === 0) {
-      return createDefaultInputMappingProfile()
-    }
     const parsed = JSON.parse(text) as Partial<InputMappingProfile> | null
     return {
       version: MAPPING_VERSION,
@@ -54,7 +59,7 @@ export async function loadInputMappingProfile(
     }
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.info('InputMappingRepository', 'Load', `加载配置失败，使用默认: ${message}`)
+    LogHelper.warn('InputMappingRepository', 'Load', `按键映射配置损坏，已回退默认值: ${message}`)
     return createDefaultInputMappingProfile()
   }
 }
@@ -79,7 +84,7 @@ export async function saveInputMappingProfile(
 ): Promise<void> {
   const dirPath = buildMappingDirPath(context.filesDir)
   try {
-    await fs.mkdir(dirPath)
+    await fs.mkdir(dirPath, true)
   } catch (err) {
     // Directory may already exist
   }
@@ -89,9 +94,16 @@ export async function saveInputMappingProfile(
   try {
     file = await fs.open(path, fs.OpenMode.WRITE_ONLY | fs.OpenMode.CREATE | fs.OpenMode.TRUNC)
     await fs.write(file.fd, text)
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.error('InputMappingRepository', 'Save', `保存配置失败: ${message}`)
+    throw err as Error
   } finally {
     if (file) {
-      await fs.close(file.fd)
+      try {
+        await fs.close(file.fd)
+      } catch (_closeErr) {
+      }
     }
   }
   LogHelper.info('InputMappingRepository', 'Save', `配置已保存: ${profile.mappings.length} 个映射`)
@@ -103,4 +115,28 @@ function buildMappingDirPath(filesDir: string): string {
 
 function buildMappingPath(filesDir: string): string {
   return `${filesDir}/${MAPPING_DIR_NAME}/${MAPPING_FILE_NAME}`
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (_err) {
+    return false
+  }
+}
+
+async function readOptionalText(path: string): Promise<string> {
+  if (!(await fileExists(path))) {
+    return ''
+  }
+  try {
+    return await fs.readText(path)
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    if (isMissingFileError(message)) {
+      return ''
+    }
+    return ''
+  }
 }

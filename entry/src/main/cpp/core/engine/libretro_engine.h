@@ -100,6 +100,17 @@ struct RuntimeStats {
   }
 };
 
+struct SaveStateThumbnail {
+  std::vector<uint8_t> rgba;
+  unsigned width = 0;
+  unsigned height = 0;
+};
+
+struct SaveStateCaptureBundle {
+  std::vector<uint8_t> stateData;
+  SaveStateThumbnail thumbnail;
+};
+
 /**
  * @brief 引擎状态机定义
  */
@@ -142,9 +153,9 @@ public:
   // --- 控制接口 (由 UI/JS 线程调用) ---
   bool Start();
   bool Stop();
-  void Pause();
-  void Resume();
-  void Cancel();
+  bool Pause();
+  bool Resume();
+  bool Cancel();
 
   /**
    * @brief 统一重置引擎状态（解决重入问题）
@@ -178,6 +189,7 @@ public:
   // --- SaveState 接口 ---
   size_t GetSaveStateSize();
   bool SaveState(std::vector<uint8_t> &outData);
+  bool CaptureSaveStateBundle(SaveStateCaptureBundle &outBundle);
   bool LoadState(const std::vector<uint8_t> &data);
 
   // --- SRAM 接口 ---
@@ -185,14 +197,14 @@ public:
   bool SetSRAM(const std::vector<uint8_t> &data);
 
   // --- 核心控制 ---
-  void ResetCore();
+  bool ResetCore();
 
   // --- 金手指接口 ---
-  void CheatReset();
+  bool CheatReset();
   bool CheatSet(unsigned index, bool enabled, const std::string &code);
 
   // --- 控制器/区域接口 ---
-  void SetControllerPortDevice(unsigned port, unsigned device);
+  bool SetControllerPortDevice(unsigned port, unsigned device);
   unsigned GetRegion();
 
   // --- AV 信息查询 ---
@@ -239,16 +251,9 @@ public:
   // --- 状态查询 ---
   EngineState GetState() const { return state_.load(); }
   bool IsRunning() const { return state_.load() == EngineState::RUNNING; }
-  bool HasCoreLoaded() const {
-    EngineState st = state_.load();
-    return st == EngineState::CORE_LOADED || st == EngineState::GAME_LOADED ||
-           st == EngineState::RUNNING || st == EngineState::PAUSED ||
-           st == EngineState::STOPPING;
-  }
+  bool HasCoreLoaded() const { return coreLoader_.IsLoaded(); }
   bool HasGameLoaded() const {
-    EngineState st = state_.load();
-    return st == EngineState::GAME_LOADED || st == EngineState::RUNNING ||
-           st == EngineState::PAUSED || st == EngineState::STOPPING;
+    return gameLoaded_.load(std::memory_order_acquire);
   }
   bool WaitForState(EngineState target, uint32_t timeoutMs);
   EngineErrorInfo GetLastErrorInfo() const;
@@ -297,7 +302,9 @@ private:
   void TransitionTo(EngineState newState);
   void UnloadGameIfNeeded(const char *reason);
   void DetectCoreQuirks();
-  bool ExecuteSyncTask(const std::function<void()> &task, uint32_t timeoutMs);
+  bool ApplyFilesDir(const std::string &filesDir);
+  bool ExecuteSyncTask(const std::function<void()> &task, uint32_t timeoutMs,
+                       const char *operation = "ExecuteSyncTask");
 
   // --- 成员变量 ---
   std::atomic<EngineState> state_{EngineState::INIT};
@@ -323,6 +330,7 @@ private:
   EnvState envState_; // Libretro 环境状态
   std::atomic<EnginePhase> phase_{EnginePhase::IDLE};
   std::atomic<int64_t> phaseStartUs_{0};
+  std::atomic<bool> gameLoaded_{false};
 
   // 消息队列与输入快照
   ThreadSafeQueue<EngineMessage> messageQueue_;
@@ -378,8 +386,11 @@ private:
   unsigned videoHeight_{0};
   unsigned videoMaxWidth_{0};
   unsigned videoMaxHeight_{0};
-  double targetFps_{60.0};
-  double audioSampleRate_{44100.0};
+  // [2026-06-08 C-F4] atomic:Engine 线程写,NAPI 线程经 GetFps/GetAudioSampleRate
+  // (refactoredGetAVInfo)读 → 原 plain double 8 字节跨线程读 = 撕裂读(formally UB)。
+  // unsigned(videoWidth_ 等 4 字节对齐)平台本就原子,故仅 double 两个需原子化。
+  std::atomic<double> targetFps_{60.0};
+  std::atomic<double> audioSampleRate_{44100.0};
 
   // 运行时统计
   RuntimeStats stats_;

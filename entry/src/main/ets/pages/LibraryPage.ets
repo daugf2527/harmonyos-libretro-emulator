@@ -1,5 +1,4 @@
 import { common } from '@kit.AbilityKit'
-import { fileIo as fs } from '@kit.CoreFileKit'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav'
 import { LibraryContextMenuOverlay } from '../components/LibraryContextMenuOverlay'
@@ -40,6 +39,7 @@ import {
 } from '../common/LibrarySaveFilePurger'
 import { setPendingLibraryDetailRequest } from '../common/LibraryDetailBridge'
 import { scanLibraryRomSources } from '../common/RuntimeRomSourceScanner'
+import { deleteImportedRomFile } from '../common/RomImportService'
 import LogHelper from '../common/LogHelper'
 
 interface TouchPoint {
@@ -47,13 +47,18 @@ interface TouchPoint {
   y: number
 }
 
-@Component
+@ComponentV2
 struct SpinnerLine {
-  @Prop @Watch('onActiveChange') active: boolean = false
-  @State angle: number = 0
+  @Param active: boolean = false
+  @Local angle: number = 0
   private timer: number = -1
 
-  onActiveChange(): void {
+  @Monitor('active')
+  onActiveChange(monitor: IMonitor): void {
+    this.syncSpinner()
+  }
+
+  private syncSpinner(): void {
     if (this.active && this.timer === -1) {
       this.timer = setInterval(() => {
         this.angle = (this.angle + 14) % 360
@@ -65,7 +70,7 @@ struct SpinnerLine {
   }
 
   aboutToAppear(): void {
-    this.onActiveChange()
+    this.syncSpinner()
   }
 
   aboutToDisappear(): void {
@@ -98,22 +103,22 @@ struct SpinnerLine {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct LibraryPage {
-  @State private selectedPlatform: string = 'ALL'
-  @State private searchKeyword: string = ''
-  @State private allGames: LibraryRecord[] = []
-  @State private searchBusy: boolean = false
-  @State private showSearchResults: boolean = false
-  @State private showContextMenu: boolean = false
-  @State private contextMenuGame: LibraryRecord | undefined = undefined
-  @State private highlightedRecentGameId: string = ''
-  @State private showToast: boolean = false
-  @State private toastMessage: string = '已刷新库 SYNCED'
-  @State private pullRefreshHeight: number = 0
-  @State private pullRefreshOpacity: number = 0
-  @State private refreshing: boolean = false
-  @State private bottomLoaderActive: boolean = false
+  @Local private selectedPlatform: string = 'ALL'
+  @Local private searchKeyword: string = ''
+  @Local private allGames: LibraryRecord[] = []
+  @Local private searchBusy: boolean = false
+  @Local private showSearchResults: boolean = false
+  @Local private showContextMenu: boolean = false
+  @Local private contextMenuGame: LibraryRecord | undefined = undefined
+  @Local private highlightedRecentGameId: string = ''
+  @Local private showToast: boolean = false
+  @Local private toastMessage: string = '已刷新库 SYNCED'
+  @Local private pullRefreshHeight: number = 0
+  @Local private pullRefreshOpacity: number = 0
+  @Local private refreshing: boolean = false
+  @Local private bottomLoaderActive: boolean = false
   private searchTimer: number = -1
   private toastTimer: number = -1
   private refreshTimer: number = -1
@@ -132,18 +137,18 @@ struct LibraryPage {
   private cardTouchStartY: number = 0
   private cardTouchMoved: boolean = false
   private cardLongPressed: boolean = false
-  @State private cachedFilteredGames: LibraryRecord[] = []
-  @State private cachedFilteredRecentGames: LibraryRecord[] = []
-  @State private cachedSearchResults: LibraryRecord[] = []
-  @State private cachedDisplayPlatformFilters: string[] = []
-  @State private hasLastPlayed: boolean = false
-  @State private lastPlayedTitle: string = ''
-  @State private lastPlayedPlatform: string = ''
-  @State private lastPlayedRelative: string = ''
+  @Local private cachedFilteredGames: LibraryRecord[] = []
+  @Local private cachedFilteredRecentGames: LibraryRecord[] = []
+  @Local private cachedSearchResults: LibraryRecord[] = []
+  @Local private cachedDisplayPlatformFilters: string[] = []
+  @Local private hasLastPlayed: boolean = false
+  @Local private lastPlayedTitle: string = ''
+  @Local private lastPlayedPlatform: string = ''
+  @Local private lastPlayedRelative: string = ''
   private lastPlayedRecord: LibraryRecord | undefined = undefined
   // 折叠屏适配状态
-  @State private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
-  @State private selectedGameForDetail: LibraryRecord | undefined = undefined
+  @Local private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
+  @Local private selectedGameForDetail: LibraryRecord | undefined = undefined
   aboutToAppear(): void {
     this.pageActive = true
     void this.refreshLibraryGames()
@@ -240,13 +245,22 @@ struct LibraryPage {
       return
     }
 
-    let sourceRecords: LibraryRecord[] = []
+    let readyRecords: LibraryRecord[] | undefined = undefined
     try {
       const sources = await scanLibraryRomSources(context, () => this.isCurrentLibraryRefresh(refreshToken))
       if (!sources) {
         return
       }
-      sourceRecords = buildLibraryRecordsFromSources(sources)
+      const sourceRecords = buildLibraryRecordsFromSources(sources)
+      if (!this.isCurrentLibraryRefresh(refreshToken)) {
+        return
+      }
+
+      const syncedRecords = await syncLibraryIndex(context, sourceRecords)
+      if (!this.isCurrentLibraryRefresh(refreshToken)) {
+        return
+      }
+      readyRecords = getReadyLibraryRecords(syncedRecords)
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryPage', 'ROM', `刷新库列表失败: ${message}`)
@@ -261,15 +275,10 @@ struct LibraryPage {
       return
     }
 
-    if (!this.isCurrentLibraryRefresh(refreshToken)) {
+    if (!this.isCurrentLibraryRefresh(refreshToken) || !readyRecords) {
       return
     }
-
-    const syncedRecords = await syncLibraryIndex(context, sourceRecords)
-    if (!this.isCurrentLibraryRefresh(refreshToken)) {
-      return
-    }
-    this.applyLibraryGames(getReadyLibraryRecords(syncedRecords))
+    this.applyLibraryGames(readyRecords)
     if (showToast) {
       this.showToastMessage('已刷新库 SYNCED')
     }
@@ -399,8 +408,9 @@ struct LibraryPage {
   }
 
   private async finishPullRefresh(): Promise<void> {
+    const refreshToken = this.libraryRefreshToken + 1
     await this.refreshLibraryGames(true)
-    if (!this.pageActive) {
+    if (!this.isCurrentLibraryRefresh(refreshToken)) {
       return
     }
     this.refreshing = false
@@ -580,8 +590,11 @@ struct LibraryPage {
       return
     }
     try {
-      await fs.unlink(item.romFile)
+      await deleteImportedRomFile(context, item.romFile)
     } catch (err) {
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryPage', 'Delete', `删除文件失败: ${message}`)
       // 使用错误码提供具体错误信息
@@ -592,11 +605,20 @@ struct LibraryPage {
     if (!this.isCurrentPageAction(actionToken)) {
       return
     }
-    await removeLibraryRecord(context, item.romFile)
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
+    try {
+      await removeLibraryRecord(context, item.romFile)
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      await this.refreshLibraryGames()
+    } catch (err) {
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryPage', 'Delete', `删除库记录失败: ${message}`)
+      this.showToastMessage(ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_WRITE_ERROR.numericCode))
     }
-    await this.refreshLibraryGames()
   }
 
   private launchFromContext(): void {
@@ -649,20 +671,29 @@ struct LibraryPage {
     }
     const nextCoverKey = this.getNextCoverKey(target)
     const nextCoverColor = this.resolveCoverColorByKey(nextCoverKey)
-    const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
-    }
-    if (!updated) {
+    try {
+      const updated = await updateLibraryRecordCover(context, target.romFile, nextCoverKey, nextCoverColor)
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      if (!updated) {
+        this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+        return
+      }
+      this.highlightedRecentGameId = updated.id
+      await this.refreshLibraryGames()
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      this.showToastMessage('已切换内置封面 COVER_UPDATED')
+    } catch (err) {
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('LibraryPage', 'Cover', `更新封面失败: ${message}`)
       this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
-      return
     }
-    this.highlightedRecentGameId = updated.id
-    await this.refreshLibraryGames()
-    if (!this.isCurrentPageAction(actionToken)) {
-      return
-    }
-    this.showToastMessage('已切换内置封面 COVER_UPDATED')
   }
 
   private openDetails(item: LibraryRecord): void {
@@ -736,6 +767,9 @@ struct LibraryPage {
         target.fileName,
         () => this.isCurrentPageAction(actionToken)
       )
+      if (!this.isCurrentPageAction(actionToken)) {
+        return
+      }
       if (result.cancelled) {
         return
       }

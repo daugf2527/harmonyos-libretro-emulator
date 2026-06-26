@@ -139,7 +139,8 @@ bool ResolveVfsPath(const char *path, std::string &out) {
 
 void LogVfsReject(const char *op, const char *path) {
   LOGF(LOG_WARN,
-               "VFS %{public}s rejected: %{public}s", op, path ? path : "(null)");
+               "VFS %{public}s rejected: %{public}s", op,
+               security::DescribePathForLog(path ? path : "").c_str());
 }
 } // namespace
 
@@ -338,7 +339,8 @@ static int RETRO_CALLCONV VfsStat(const char *path, int32_t *size) {
     } else if (st.st_size > maxSize) {
       *size = maxSize;
       LOGF(LOG_WARN,
-                   "VFS stat size truncated: %{public}s", resolvedPath.c_str());
+                   "VFS stat size truncated: %{public}s",
+                   security::DescribePathForLog(resolvedPath).c_str());
     } else {
       *size = static_cast<int32_t>(st.st_size);
     }
@@ -754,7 +756,8 @@ bool EnvState::SetBaseDir(const std::string &filesDir) {
   bool success = true;
   auto ensureDir = [&](const std::string &dir) {
     if (!common::EnsureDirExists(dir)) {
-      LOGF(LOG_WARN, "EnsureDirExists failed: %{public}s", dir.c_str());
+      LOGF(LOG_WARN, "EnsureDirExists failed: %{public}s",
+           security::DescribePathForLog(dir).c_str());
       success = false;
     }
   };
@@ -1037,7 +1040,7 @@ bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data) {
     if (!logged) {
       logged = true;
       LOGF(LOG_INFO, "GET_SYSTEM_DIRECTORY -> %{public}s",
-                   state.GetSystemDirectory());
+                   security::DescribePathForLog(state.GetSystemDirectory()).c_str());
     }
     *dir = state.GetSystemDirectory();
     return true;
@@ -1055,7 +1058,7 @@ bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data) {
     if (!logged) {
       logged = true;
       LOGF(LOG_INFO, "GET_SAVE_DIRECTORY -> %{public}s",
-                   state.GetSaveDirectory());
+                   security::DescribePathForLog(state.GetSaveDirectory()).c_str());
     }
     *dir = state.GetSaveDirectory();
     return true;
@@ -1074,7 +1077,7 @@ bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data) {
       logged = true;
       LOGF(LOG_INFO,
                    "GET_CONTENT_DIRECTORY -> %{public}s",
-                   state.GetContentDirectory());
+                   security::DescribePathForLog(state.GetContentDirectory()).c_str());
     }
     *dir = state.GetContentDirectory();
     return true;
@@ -1105,7 +1108,7 @@ bool HandleEnvironmentCommand(EnvState &state, unsigned cmd, void *data) {
     if (!logged) {
       logged = true;
       LOGF(LOG_INFO, "GET_CACHE_DIRECTORY -> %{public}s",
-                   state.GetCacheDirectory());
+                   security::DescribePathForLog(state.GetCacheDirectory()).c_str());
     }
     *dir = state.GetCacheDirectory();
     return true;

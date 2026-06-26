@@ -43,7 +43,7 @@ public:
 
   void SetPortRouter(InputPortRouter *router);
   void SetControllerPortDeviceCallback(
-      std::function<void(unsigned, unsigned)> callback);
+      std::function<bool(unsigned, unsigned)> callback);
 
   bool CanSendVirtual(int port) const;
   bool ResolvePortForDevice(const std::string &deviceId,
@@ -72,7 +72,7 @@ private:
   EventBridge *eventBridge_; // Weak reference to EventBridge for emitting
                              // events (Rumble/Sensor)
   InputPortRouter *portRouter_ = nullptr;
-  std::function<void(unsigned, unsigned)> controller_port_device_callback_;
+  std::function<bool(unsigned, unsigned)> controller_port_device_callback_;
 
   // Static instance for Libretro C-style callbacks
   static std::atomic<InputManager *> g_instance;

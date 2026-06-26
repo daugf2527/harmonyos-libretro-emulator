@@ -13,9 +13,9 @@ interface HelpItem {
 }
 
 @Entry
-@Component
+@ComponentV2
 struct AboutHelpPage {
-  @State private selectedHelpId: string = 'import'
+  @Local private selectedHelpId: string = 'import'
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
   private readonly helpItems: HelpItem[] = [
     { id: 'import', title: '怎么导入游戏？', detail: 'Procedure / Storage / Pathing', value: '使用导入入口选择本地 ROM，导入完成后进入库页同步。' },

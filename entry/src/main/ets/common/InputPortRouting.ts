@@ -116,6 +116,15 @@ export function updatePortAssignments(
   deviceId: string
 ): PortAssignState[] {
   return assignments.map((item: PortAssignState) => {
+    if (sourceType === InputSourceType.Virtual && item.sourceType === InputSourceType.Virtual &&
+      item.portId !== portId) {
+      return {
+        portId: item.portId,
+        sourceType: InputSourceType.None,
+        deviceId: '',
+        isActive: false
+      };
+    }
     if (item.portId !== portId) {
       return item;
     }

@@ -2,15 +2,15 @@ import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuCoverArt } from './EmuCoverArt'
 import { EmuIcon } from './EmuIcon'
 
-@Component
+@ComponentV2
 export struct LibraryDetailHeroPanel {
-  @Prop coverKey: string = ''
-  @Prop heroScale: number = 1
-  @Prop displayTitle: string = ''
-  @Prop localizedTitle: string = ''
-  @Prop coreLabel: string = ''
-  onLaunch?: () => void
-  onQuickAction?: (message: string) => void
+  @Param coverKey: string = ''
+  @Param heroScale: number = 1
+  @Param displayTitle: string = ''
+  @Param localizedTitle: string = ''
+  @Param coreLabel: string = ''
+  @Event onLaunch?: () => void
+  @Event onQuickAction?: (message: string) => void
 
   build() {
     Column({ space: 28 }) {

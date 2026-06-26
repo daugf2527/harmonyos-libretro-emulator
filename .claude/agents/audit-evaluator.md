@@ -15,7 +15,7 @@ model: sonnet
 
 prompt 必须包含:
 
-- `AUDIT_DIR` — 原始 audit 目录绝对路径,例如 `docs/audit/audit-20260527-090735/`
+- `AUDIT_DIR` — 原始 audit 目录绝对路径,例如 `docs/audit/audit-20260527-124137/`
 - `TOPIC` — 单个 topic id,例如 `T3-audio`
 - 隐含约定: fix-verify 报告在 `<AUDIT_DIR>-fixverify/agent-<TOPIC>-fixverify.md`
 - 隐含约定: 原始 finding 报告在 `<AUDIT_DIR>/agent-<TOPIC>.md`

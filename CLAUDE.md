@@ -35,6 +35,12 @@ older clients pull them in on demand when Claude works under those paths.
   bash scripts/ci/check_repo_hygiene.sh
   bash scripts/ci/check_regression_guards.sh
   ```
+- **ArkTS 性能/规范按需检查** (codelinter; ~34s 全 ets / ~20s 每文件; **非编译验证**):
+  ```bash
+  bash scripts/ci/check_arkts_codelinter.sh            # 全 ets 目录
+  bash scripts/ci/check_arkts_codelinter.sh <f.ets>…   # 指定文件(增量)
+  ```
+  补 quick_signals 对 .ets 的性能/AST 规范盲区(cxx-build 只覆盖 C++)。**能力边界**: codelinter 默认仅 `@performance` 规则集，**不抓** ArkTS 语法/类型 error(no-any / V1V2 误用)；correctness 需项目根 `code-linter.json5` 加 `@typescript-eslint` 且本地 CLI 激活不了 → **编译/类型盲区仍只能靠 hvigor/DevEco 复编**。Git Bash 调 codelinter 须 `cmd //c`(双斜杠)。详见 tech-debt-tracker D030 + memory `feedback_codelinter_capability_boundary`。
 - **PR validation**: `.github/workflows/harmonyos-pr-ci.yml` (HarmonyOS CLI tools, `codelinter`, HAP smoke).
 - **Release**: push `v*` tag → `.github/workflows/harmonyos-release.yml` builds + signs + publishes GitHub Release.
 
@@ -69,6 +75,42 @@ older clients pull them in on demand when Claude works under those paths.
 - Deprecated code lives only in `deprecated/legacy/` (excluded from mainline, also in `.claudeignore`).
 - All changes must pass regression guards (`scripts/ci/check_regression_guards.sh`).
 
+## AI Execution SOP
+
+When Claude takes a task in this repo, follow this order:
+
+1. Read task-adjacent truth first:
+   - `build-profile.json5`
+   - `entry/src/main/module.json5`
+   - `docs/harmonyos-sdk-target.md`
+2. Classify the issue before editing:
+   - ArkTS/UI
+   - NAPI contract
+   - engine lifecycle/state machine
+   - video / XComponent / NativeWindow
+   - audio / OHAudio
+   - resource loading / rawfile
+   - file security / core loading
+3. Find at least 3 nearby patterns before introducing a new approach.
+4. Keep edits local to one layer unless the contract itself changed.
+5. If a contract changed, update all dependent surfaces in the same turn:
+   - native export registration
+   - `entry/src/main/cpp/types/libentry/index.d.ts`
+   - ArkTS call sites
+   - repo docs/inventory when applicable
+6. State verification boundaries explicitly. If no hvigor/device/emulator validation ran, say so.
+
+## Where To Look First
+
+- ArkTS page behavior: `entry/src/main/ets/pages/`, `components/`, `common/`
+- NAPI exports: `entry/src/main/cpp/app/napi/`, `module_init.cpp`, `libretro_engine_napi.cpp`
+- Type contract: `entry/src/main/cpp/types/libentry/index.d.ts`
+- Engine state/lifecycle: `entry/src/main/cpp/core/engine/libretro_engine.cpp`
+- Video path: `core/engine/video_pipeline.*`, `platform/graphics/`, `core/engine/window_*`
+- Audio path: `platform/audio/audio_bridge.cpp`, `audio_player.cpp`, `ring_buffer.*`
+- Resource/core loading: `platform/resource/`, `core/libretro/core_loader.*`, `common/file_security.*`
+- Input path: `core/engine/input_manager.*`, `input_snapshot.h`, `app/napi/engine_input_napi.cpp`
+
 ## MCP / Skill 工具决策树
 
 **按语言 + 用途分工**（消除 "cclsp 优先 / serena 备选" 二选一歧义）：
@@ -77,6 +119,7 @@ older clients pull them in on demand when Claude works under those paths.
 |---|---|---|
 | **cclsp** | **C/C++ 只**（本地 `.claude/cclsp.json` 配的 clangd） | find_definition / find_references / get_incoming_calls / get_outgoing_calls / find_workspace_symbols / get_hover / get_diagnostics_for_file / prepare_call_hierarchy |
 | **serena** | 全仓库（C++/ets/md）+ project memory | get_symbols_overview / find_symbol / find_referencing_symbols / list_memories / write_memory / 跨语言文件级符号操作 |
+| **codegraph** | **C/C++ 为主**（`.codegraph/` 索引 + daemon watcher 自动同步） | codegraph_explore / codegraph_search / codegraph_callers / codegraph_impact — 跨文件调用图 / 影响面。**不索引 `.ets`**（0.9.9 `EXTENSION_MAP` 无此扩展）→ ArkTS 符号 / UI 组件查询一律走 serena；**codegraph 空结果 ≠ 无此符号** |
 | **ast-grep** | 任意语言（AST pattern） | find_code / find_code_by_rule — **配对检查**（acquire/release、map/unmap）、threading violation 跨文件扫 |
 | **web-search** | Web | `mcp__web-search__web_fetch`（单 URL）/ `mcp__web-search__web_search`（关键词）— HarmonyOS 官方文档抓取；本机 SDK header 优先（`feedback_websearch_fail_fallback_to_sdk_header`）。**firecrawl 已弃用**（见 memory `feedback_firecrawl_deprecated`） |
 | **sequential-thinking** | — | 罕见 finding 拿不准时多角度推理（不滥用） |
@@ -88,15 +131,17 @@ older clients pull them in on demand when Claude works under those paths.
 | `entry/src/main/cpp/app/napi/**` 改动 | `cclsp__find_references` + `cclsp__get_incoming_calls` | 纯 Grep 会漏 ArkTS 侧 EventBridge / TSFN 引用 |
 | `core/engine/libretro_engine.cpp` 状态机 | `cclsp__find_workspace_symbols` | 跨文件 enum / struct 引用 |
 | NativeBuffer / Resource lifecycle 配对 | `ast-grep__find_code` | `OH_NativeBuffer_*` / `OH_NativeWindow_*` callsite 配对扫描 |
-| C++ 类型 / 接口改动 | `cclsp__find_references` + `cclsp__get_diagnostics_for_file` | 下游 type warning |
+| C++ 类型 / 接口改动 | `cclsp__find_references` + cxx-build 复编 | 下游 type warning（注：cclsp **无** diagnostics 工具；C++ 诊断靠编译，见下方实证边界） |
 | ets 文件符号总览 / 找符号 | `serena__get_symbols_overview` + `serena__find_symbol` | cclsp 不覆盖 ets;ets LSP 走 serena |
 | 多文件 audit / cross-cutting review | `serena__find_referencing_symbols` | 跨文件批量查引用 |
 
-### 何时**可以**退回 Read/Grep
+### 何时**可以/应该**退回 Read/Grep（分语言实证版，2026-06-08 5天质检实测校准）
 
-- **citation 验证**（"这 5 行字节真的在那位置吗"——pure text 对比，LSP 杀鸡用牛刀）—— 见 `.claude/skills/closed-loop/SKILL.md` Step 2/7
-- 单文件一次性 lookup
-- 文档 / 注释类（非代码）
+> 旧版写"MCP 能给更精确答案处用 Grep = 选型错误"是一刀切。实测此 **ArkTS+C++ 混合仓**该按语言分层，Grep 在 .ets 与文本场景往往是**正确**选择，不是 fallback。详见 memory `feedback_mcp_tools_fail_on_ets`。
+
+- **ArkTS `.ets` 的结构/诊断查询**：serena LSP 诊断（`get_diagnostics_for_file`）+ ast-grep 结构匹配（`find_code`/`dump_syntax_tree`）对 `.ets` **一律失效**——不认 ArkUI `struct`/`@ComponentV2`，serena 报 `invalid AST -32001`、ast-grep 返回空（**假阴性**，连已知存在的 `this.x.f=v` 都查不到）。`.ets` 只能：serena **符号级**（`find_symbol`/`get_symbols_overview`，这层 OK）+ **Grep/Read** + 真机/DevEco 编译。
+- **C++ 符号查询的空结果**：cclsp/codegraph **空 callers/references ≠ 不存在**（实测连活着的 `GetEventName`/`Emit` 都查不到）。**绝不据 MCP 空结果下"死代码/无引用"结论**——必须 Grep 实物兜底。
+- **citation 验证**（"这几行字节真的在那位置吗"——pure text 对比，LSP 杀鸡用牛刀）/ 单文件一次性 lookup / 文档注释类 / 配对·banned-pattern·文本匹配
 - LSP 索引未跑 / MCP 暂时不可用（fallback）
 
 ### 工具协同准则
@@ -127,8 +172,13 @@ Restart session and verify with `node --version` plus `/mcp` (all servers should
 - python3 `/c/Users/newwo/bin/python3` (v3.8.1)
 - node/npm `D:\nodejs` (v22.22.0 / v10.8.2)
 - PowerShell `C:\Windows\System32\WindowsPowerShell\v1.0`
-- DevEco Studio `D:\Program Files\DevEco Studio\bin`
-- HarmonyOS CLI `D:\hongmeng\command-line-tools\bin`
+- DevEco Studio `D:\DevEco Studio\bin`
+- HarmonyOS CLI `D:\command-line-tools\bin`
+
+**API26 current baseline**:
+- `targetSdkVersion` / `compatibleSdkVersion`: `26.0.0`
+- primary SDK doc: `docs/harmonyos-sdk-target.md`
+- do not default back to old API22 toolchains under `D:\hongmeng\command-line-tools` or `D:\Program Files\DevEco Studio`
 
 **statusline**: `~/.claude/statusline.sh` uses pure bash JSON parsing (grep + sed) to avoid node/jq dependency.
 
@@ -145,13 +195,20 @@ Restart session and verify with `node --version` plus `/mcp` (all servers should
 | W7 | MCP server OAuth 后启动超时 | 启动前 `$env:MCP_TIMEOUT=10000` |
 | W9 | 不知 Claude Code 健康状态 | 会话内 `/doctor`；命令行 `claude doctor` |
 
-## Web research tips (developer.huawei.com)
+## Web research tips (developer.huawei.com / API26)
 
 1. First try: `mcp__web-search__web_search` 英文 query + `site:developer.huawei.com`。
 2. 单 URL 深读：`mcp__web-search__web_fetch` 传 url + prompt。
-3. 本机 SDK header 优先（OH_* API 契约直接读 `D:\Program Files\DevEco Studio\sdk\...\external_window.h` 等）—— 见 memory `feedback_websearch_fail_fallback_to_sdk_header`。
+3. 本机 SDK header 优先（OH_* API 契约直接读 `D:\command-line-tools\sdk\default\openharmony\...\external_window.h` 或 `D:\DevEco Studio\sdk\default\openharmony\...\external_window.h`）—— 见 memory `feedback_websearch_fail_fallback_to_sdk_header`。
+4. HarmonyOS API26 官方页面很多是 SPA；抓不到正文时，不要猜，回退到本机 SDK header、`docs/harmonyos-sdk-target.md` 和 API diff 页面。
 
 > firecrawl 工具组（scrape / search / parse 等 24 个）已于 2026-05-28 整体弃用，见 memory `feedback_firecrawl_deprecated`。
+
+## Multi-device boundary
+
+- Current module target is `phone` only (`entry/src/main/module.json5`).
+- Do not expand a task into distributed/multi-device adaptation unless the user explicitly asks for it or `deviceTypes` changes.
+- For HarmonyOS new system capabilities, treat them as optional extension points first, not implied requirements for current fixes.
 
 ## 代码搜索工具策略
 

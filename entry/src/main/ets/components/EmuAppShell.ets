@@ -3,17 +3,17 @@ import {
   EmuMetrics, EmuTypography } from '../common/EmuUiTokens'
 import { EmuIcon } from './EmuIcon'
 
-@Component
+@ComponentV2
 export struct EmuHeaderBar {
-  @Prop titleText: string = '碳影 / Carbon Shade'
-  @Prop titleIcon: string = 'memory'
-  @Prop rightLabel: string = ''
-  @Prop rightIcon: string = 'settings_input_component'
-  @Prop activeTextColor: string = ''
-  @Prop mutedTextColor: string = '#888888'
-  @Prop iconSize: number = 18
-  @Prop rightIconSize: number = 20
-  onRightClick?: () => void
+  @Param titleText: string = '碳影 / Carbon Shade'
+  @Param titleIcon: string = 'memory'
+  @Param rightLabel: string = ''
+  @Param rightIcon: string = 'settings_input_component'
+  @Param activeTextColor: string = ''
+  @Param mutedTextColor: string = '#888888'
+  @Param iconSize: number = 18
+  @Param rightIconSize: number = 20
+  @Event onRightClick?: () => void
 
   build() {
     Row() {
@@ -62,7 +62,9 @@ export struct EmuHeaderBar {
   }
 }
 
-@Component
+@ComponentV2
+// Canvas owns a per-instance rendering context; keep this boundary explicit.
+// homecheck-disable-next-line @performance/avoid-overusing-custom-component-check
 export struct EmuPrecisionGridBackdrop {
   private settings: RenderingContextSettings = new RenderingContextSettings(true)
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings)
@@ -101,11 +103,11 @@ export struct EmuPrecisionGridBackdrop {
   }
 }
 
-@Component
+@ComponentV2
 export struct ScanlineBackground {
-  @Prop lineColor: string = '#1400FF41'
-  @Prop lineSpacing: number = 2
-  @Prop alternateColor: string = ''
+  @Param lineColor: string = '#1400FF41'
+  @Param lineSpacing: number = 2
+  @Param alternateColor: string = ''
   private settings: RenderingContextSettings = new RenderingContextSettings(true)
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings)
 
@@ -142,11 +144,11 @@ export struct ScanlineBackground {
   }
 }
 
-@Component
+@ComponentV2
 export struct GridBackground {
-  @Prop gridSize: number = 40
-  @Prop lineColor: string = '#1A484848'
-  @Prop lineWidth: number = 1
+  @Param gridSize: number = 40
+  @Param lineColor: string = '#1A484848'
+  @Param lineWidth: number = 1
   private settings: RenderingContextSettings = new RenderingContextSettings(true)
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings)
 
@@ -187,12 +189,12 @@ export interface BarChartItem {
   isPrimary: boolean
 }
 
-@Component
+@ComponentV2
 export struct BarChartBackground {
-  @Prop bars: BarChartItem[] = []
-  @Prop primaryColor: string = '#00FF41'
-  @Prop secondaryColor: string = '#333333'
-  @Prop barGap: number = 2
+  @Param bars: BarChartItem[] = []
+  @Param primaryColor: string = '#00FF41'
+  @Param secondaryColor: string = '#333333'
+  @Param barGap: number = 2
   private settings: RenderingContextSettings = new RenderingContextSettings(true)
   private context: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.settings)
 

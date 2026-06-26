@@ -147,7 +147,7 @@ static napi_value SetInputKeyMapping(napi_env env, napi_callback_info info) {
   UpdateInputKeyMapping(mappings);
 
   napi_value result = nullptr;
-  if (napi_get_undefined(env, &result) != napi_ok) {
+  if (napi_get_boolean(env, true, &result) != napi_ok) {
     return nullptr;
   }
   return result;

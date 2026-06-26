@@ -7,10 +7,10 @@ import LogHelper from '../common/LogHelper';
 import { common } from '@kit.AbilityKit';
 import { window } from '@kit.ArkUI';
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens';
-import { RuntimeHudMetric } from '../components/RuntimeTopHudBar';
+import { ScanlineBackground } from '../components/EmuAppShell'
 import { RuntimePauseOverlay } from '../components/RuntimePauseOverlay';
 import { RuntimeVirtualControllerLayer } from '../components/RuntimeVirtualControllerLayer';
-import { SingleModeLayout, DualModeLayout, TripleModeLayout } from '../components/FoldableLayouts';
+import { DualModeLayout, TripleModeLayout } from '../components/FoldableLayouts';
 import { ErrorCodeUtils, EngineErrorCodes, FileErrorCodes } from '../common/ErrorCodes';
 import {
   createDefaultPortAssignments,
@@ -21,6 +21,7 @@ import {
 import {
   AudioStatusPayload,
   CoreCrashPayload,
+  DiskControlPayload,
   EngineState,
   EngineStatePayload,
   EventHubScope,
@@ -42,10 +43,6 @@ import {
   loadInputLayoutProfile
 } from '../common/InputLayoutRepository'
 import {
-  RuntimeInputDebugTextState,
-  RuntimeInputDebugTracker
-} from '../common/RuntimeInputDebugTracker'
-import {
   getRuntimeInputDescriptorMask,
   sendRuntimeAnalog,
   sendRuntimeButton
@@ -60,8 +57,15 @@ import {
   resolveRuntimeRomPathForSwitch
 } from '../common/RuntimePathResolver'
 import { RuntimeLibrarySessionTracker } from '../common/RuntimeLibrarySessionTracker'
-import { RuntimeSaveStateController } from '../common/RuntimeSaveStateController'
-import { runtimeSessionController } from '../common/RuntimeSessionController'
+import {
+  RuntimeSaveStateController,
+  RuntimeSaveStateListItem
+} from '../common/RuntimeSaveStateController'
+import {
+  RuntimeAVInfo,
+  RuntimePerformanceStats,
+  runtimeSessionController
+} from '../common/RuntimeSessionController'
 import {
   createDefaultRuntimeRenderSettingsProfile,
   loadRuntimeRenderSettingsProfile,
@@ -69,8 +73,53 @@ import {
   saveRuntimeRenderSettingsProfile
 } from '../common/RuntimeRenderSettingsRepository'
 import { runtimeRenderSettingsController } from '../common/RuntimeRenderSettingsController'
-import { runtimeInputPortController } from '../common/RuntimeInputPortController'
+import {
+  createDefaultRuntimeAudioSettingsProfile,
+  loadRuntimeAudioSettingsProfile,
+  RuntimeAudioSettingsProfile
+} from '../common/RuntimeAudioSettingsRepository'
+import { runtimeAudioSettingsController } from '../common/RuntimeAudioSettingsController'
+import { runtimeCheatController } from '../common/RuntimeCheatController'
+import { runtimeCoreControlController } from '../common/RuntimeCoreControlController'
+import {
+  RuntimeInputDebugStats,
+  RuntimeStatusSnapshot,
+  runtimeCoreDiagnosticController
+} from '../common/RuntimeCoreDiagnosticController'
+import {
+  runtimeCoreOptionsController,
+  RuntimeCoreOptionItem
+} from '../common/RuntimeCoreOptionsController'
+import {
+  createRuntimeCheatItem,
+  loadRuntimeCheatItemsForRom,
+  RuntimeCheatItem,
+  saveRuntimeCheatItemsForRom
+} from '../common/RuntimeCheatRepository'
+import { runtimeDiskControlController } from '../common/RuntimeDiskControlController'
+import { importPickedRuntimeDiskImages } from '../common/RuntimeDiskImageImportService'
+import {
+  RuntimeSramBackupListItem,
+  RuntimeSramController
+} from '../common/RuntimeSramController'
+import {
+  createDefaultRuntimeInputPreferencesProfile,
+  loadRuntimeInputPreferencesProfile
+} from '../common/RuntimeInputPreferencesRepository'
+import {
+  createDefaultRuntimeControllerPortDevices,
+  describeRuntimeControllerPortDevice,
+  getRuntimeControllerPortDeviceForDisplay,
+  RETRO_DEVICE_JOYPAD,
+  runtimeInputPortController
+} from '../common/RuntimeInputPortController'
 import { scanRuntimeRomSources } from '../common/RuntimeRomSourceScanner'
+import {
+  createDefaultRuntimeVisualSettingsProfile,
+  loadRuntimeVisualSettingsProfile,
+  resolveRuntimeVisualAspectRatio,
+  RuntimeVisualSettingsProfile
+} from '../common/RuntimeVisualSettingsRepository'
 
 /**
  * 携带 C++ 回传 errorCode 的切换游戏异常。
@@ -102,50 +151,88 @@ interface PendingSwitch {
   retryCount: number;
 }
 
-interface PerfDisplayState {
-  realtimeFps: number;
-  coreFps: number;
-  audioStatusText: string;
-  perfStatsText: string;
-  geometryText: string;
+// 性能 HUD 状态：保持字段级追踪，避免 2Hz-5Hz 遥测刷新退化成整页重建。
+// 暂停浮层 / 三折信息板只读取其中少数字段，因此必须改字段而不是整体替换对象。
+@ObservedV2
+class PerfDisplayState {
+  @Trace realtimeFps: number = 0;
+  @Trace coreFps: number = 0;
+  @Trace cpuLoadPercent: number = 0;
+  @Trace audioStatusText: string = '';
+  @Trace perfStatsText: string = '';
+  @Trace geometryText: string = '';
 }
 
 @Entry
-@Component
+@ComponentV2
 struct LibretroGamePage {
-  @State currentCore: string = '';
-  @State currentRom: string = '';
-  @State gameRunning: boolean = false;
-  @State gamePaused: boolean = false;
-  @State switching: boolean = false;
-  @State switchError: string = '';
-  @State switchProgress: number = 0;
-  @State switchProgressText: string = '';
-  @State selectedCoreIndex: number = 0;
-  @State selectedRomIndex: number = 0;
-  @State selectedPortIndex: number = 0;
-  private portAssignments: PortAssignState[] = createDefaultPortAssignments();
-  @State perfDisplay: PerfDisplayState = { realtimeFps: 0, coreFps: 0, audioStatusText: '', perfStatsText: '', geometryText: '' };
-  @State inputDebugText: string = '';
-  @State inputFocusText: string = '';
-  @State uiInputDebugText: string = '';
-  @State scalingMode: number = 2; // 默认 GLES (2)
-  @State softwareMaxPresetIndex: number = 1;
-  @State hwRenderAllowed: boolean = true;
-  @State hideVirtualController: boolean = false;
-  @State private idleHintReady: boolean = false;
+  @Local currentCore: string = '';
+  @Local currentRom: string = '';
+  @Local gameRunning: boolean = false;
+  @Local gamePaused: boolean = false;
+  @Local switching: boolean = false;
+  @Local switchError: string = '';
+  @Local switchProgress: number = 0;
+  @Local switchProgressText: string = '';
+  @Local selectedCoreIndex: number = 0;
+  @Local selectedRomIndex: number = 0;
+  @Local selectedPortIndex: number = 0;
+  @Local private portAssignments: PortAssignState[] = createDefaultPortAssignments();
+  @Local perfDisplay: PerfDisplayState = new PerfDisplayState();
+  @Local scalingMode: number = 2; // 默认 GLES (2)
+  @Local swapInterval: number = 1;
+  @Local softwareMaxPresetIndex: number = 1;
+  @Local aiUpscaleEnabled: boolean = false;
+  @Local hwRenderAllowed: boolean = true;
+  @Local hideVirtualController: boolean = false;
+  @Local hideUndeclaredKeys: boolean = false;
+  @Local private idleHintReady: boolean = false;
   // 游戏画面 aspect ratio：0 表示尚未收到 geometry_update（用 fallback 4/3）。
   // handleGeometryUpdate 会写入真实值（如 2048 ≈ 0.81 竖屏、GBA 1.5 横屏）。
-  @State private gameAspectRatio: number = 0;
-  @State runtimeSaveStatusText: string = '存档就绪';
+  @Local private gameAspectRatio: number = 0;
+  @Local runtimeSaveStatusText: string = '存档就绪';
+  @Local private runtimeSaveManagerVisible: boolean = false;
+  @Local private runtimeSaveManagerBusy: boolean = false;
+  @Local private runtimeSaveManagerSummaryText: string = '';
+  @Local private runtimeSaveManagerItems: RuntimeSaveStateListItem[] = [];
+  @Local private runtimeSramManagerVisible: boolean = false;
+  @Local private runtimeSramManagerBusy: boolean = false;
+  @Local private runtimeSramManagerSummaryText: string = '';
+  @Local private runtimeSramManagerItems: RuntimeSramBackupListItem[] = [];
+  @Local private runtimeCheatManagerVisible: boolean = false;
+  @Local private runtimeCheatManagerBusy: boolean = false;
+  @Local private runtimeCheatManagerSupported: boolean = false;
+  @Local private runtimeCheatManagerSummaryText: string = '';
+  @Local private runtimeCheatManagerItems: RuntimeCheatItem[] = [];
+  @Local private runtimeCheatDraftName: string = '';
+  @Local private runtimeCheatDraftCode: string = '';
+  @Local private runtimeCoreOptionsVisible: boolean = false;
+  @Local private runtimeCoreOptionsBusy: boolean = false;
+  @Local private runtimeCoreOptionsSummaryText: string = '';
+  @Local private runtimeCoreOptionsItems: RuntimeCoreOptionItem[] = [];
+  @Local private runtimePortControlVisible: boolean = false;
+  @Local private runtimePortControlSummaryText: string = '';
+  @Local private runtimeControllerPortDevices: number[] = createDefaultRuntimeControllerPortDevices();
+  @Local private runtimeRegionText: string = '';
+  @Local private runtimeStateText: string = '';
+  @Local private runtimeLoadStateText: string = '';
+  @Local private runtimeSaveStateSizeText: string = '';
+  @Local private runtimeInputDebugText: string = '';
+  @Local private diskControlSupported: boolean = false;
+  @Local private diskControlType: string = '';
+  @Local private diskControlImageCount: number = 0;
+  @Local private diskControlImageIndex: number = 0;
+  @Local private diskControlEjected: boolean = false;
+  @Local private diskControlStatusText: string = '';
+  @Local private diskControlBusy: boolean = false;
   // 折叠屏适配状态
-  @State currentFoldMode: 'single' | 'dual' | 'triple' = 'single';
-  @State screenWidth: number = 0;
-  @State screenHeight: number = 0;
-  private runtimeInputLayoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons;
+  @Local currentFoldMode: 'single' | 'dual' | 'triple' = 'single';
+  @Local screenWidth: number = 0;
+  @Local screenHeight: number = 0;
+  @Local private runtimeInputLayoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons;
   // RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS mask:bit N = RETRO_DEVICE_ID_JOYPAD_N 被
   // 当前 core 声明使用,0 = core 未上报(用 fallback 全键集)。@State 触发子组件 re-render。
-  @State private runtimeInputDescriptorMask: number = 0;
+  @Local private runtimeInputDescriptorMask: number = 0;
 
   // 使用包含 "new_arch" 的 ID 以触发 C++ 侧的新引擎逻辑
   private xComponentId: string = 'new_arch_game_xcomponent';
@@ -155,12 +242,30 @@ struct LibretroGamePage {
   private pendingSwitch: PendingSwitch | undefined = undefined;
   private readonly maxSwitchRetries: number = 2;
   private pageActive: boolean = false;
+  private resumeAfterToolPage: boolean = false;
+  private coreSupportsReset: boolean = false;
+  private coreSupportsRegionQuery: boolean = false;
+  private coreSupportsCheatReset: boolean = false;
+  private coreSupportsCheatSet: boolean = false;
   private romListRefreshToken: number = 0;
+  private runtimeSaveManagerTaskToken: number = 0;
+  private runtimeSaveActionTaskToken: number = 0;
+  private runtimeSramManagerTaskToken: number = 0;
+  private runtimeCheatManagerTaskToken: number = 0;
+  private runtimeCoreOptionsTaskToken: number = 0;
+  private runtimePortControlTaskToken: number = 0;
+  private runtimeDiskControlTaskToken: number = 0;
+  private runtimeDiskControlSnapshotToken: number = 0;
+  private runtimeRegionSnapshotTaskToken: number = 0;
+  private runtimeStatusSnapshotTaskToken: number = 0;
+  private runtimeLaunchSettingsTaskToken: number = 0;
   private lastStartOrSwitchAtMs: number = 0;
   private readonly librarySessionTracker: RuntimeLibrarySessionTracker = new RuntimeLibrarySessionTracker();
-  private readonly inputDebugTracker: RuntimeInputDebugTracker = new RuntimeInputDebugTracker();
   private readonly runtimeSaveStateController: RuntimeSaveStateController = new RuntimeSaveStateController();
+  private readonly runtimeSramController: RuntimeSramController = new RuntimeSramController();
   private renderSettingsProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile();
+  private audioSettingsProfile: RuntimeAudioSettingsProfile = createDefaultRuntimeAudioSettingsProfile();
+  @Local private visualSettingsProfile: RuntimeVisualSettingsProfile = createDefaultRuntimeVisualSettingsProfile();
   private readonly startOrSwitchDebounceMs: number = 600;
   private readonly runtimeInputLayoutWidth: number = 440;
   private readonly runtimeInputLayoutHeight: number = 340;
@@ -171,12 +276,6 @@ struct LibretroGamePage {
   private availableRomsCache: RuntimeRomConfig[] = [];
   private availableRomsCacheRef: RuntimeRomConfig[] | null = null;
   private availableRomsCacheCoreIndex: number = -1;
-  // HIGH fix: reuse HUD metrics array instead of allocating in build() every render
-  private hudMetricsCache: RuntimeHudMetric[] = [
-    { label: 'FPS', value: '--.-' },
-    { label: 'LAT', value: '--' },
-    { label: 'CORE', value: '--' }
-  ];
 
   aboutToAppear() {
     this.pageActive = true;
@@ -197,18 +296,36 @@ struct LibretroGamePage {
     this.eventScope.onGeometryUpdate((payload) => {
       this.handleGeometryUpdate(payload);
     });
+    this.eventScope.onDiskControl((payload) => {
+      this.handleDiskControl(payload);
+    });
 
     void this.refreshRomList();
-    this.startInputDebug();
     this.syncPortAssignments();
-    void this.loadRuntimeInputLayout();
-    void this.loadRuntimeRenderSettings();
-    this.refreshHudMetricsCache();
+    this.refreshRuntimePortControlSummaryText();
+    const launchSettingsToken = this.beginRuntimeLaunchSettingsTask();
+    void this.loadRuntimeInputLayout(launchSettingsToken);
+    void this.loadRuntimeRenderSettings(launchSettingsToken);
+    void this.loadRuntimeAudioSettings(launchSettingsToken);
+    void this.loadRuntimeInputPreferences(launchSettingsToken);
+    void this.loadRuntimeVisualSettings(launchSettingsToken);
+    this.maybeResumeAfterToolPage();
   }
 
   aboutToDisappear() {
     this.romListRefreshToken += 1;
     this.pageActive = false;
+    this.runtimeSaveManagerTaskToken += 1;
+    this.runtimeSaveActionTaskToken += 1;
+    this.runtimeSramManagerTaskToken += 1;
+    this.runtimeCheatManagerTaskToken += 1;
+    this.runtimeCoreOptionsTaskToken += 1;
+    this.runtimePortControlTaskToken += 1;
+    this.runtimeDiskControlTaskToken += 1;
+    this.runtimeDiskControlSnapshotToken += 1;
+    this.runtimeRegionSnapshotTaskToken += 1;
+    this.runtimeLaunchSettingsTaskToken += 1;
+    this.resetRuntimeStatusSnapshot();
     this.switchToken += 1;
     this.pendingSwitch = undefined;
     if (this.switching) {
@@ -221,7 +338,6 @@ struct LibretroGamePage {
       this.eventScope = undefined;
     }
     this.stopGame();
-    this.stopInputDebug();
     this.setKeepScreenOn(false);
   }
 
@@ -241,16 +357,31 @@ struct LibretroGamePage {
     return this.pageActive && token === this.switchToken;
   }
 
-  private async loadRuntimeInputLayout(): Promise<void> {
+  private beginRuntimeLaunchSettingsTask(): number {
+    this.runtimeLaunchSettingsTaskToken += 1;
+    return this.runtimeLaunchSettingsTaskToken;
+  }
+
+  private isCurrentRuntimeLaunchSettingsTask(token: number): boolean {
+    return this.pageActive && token === this.runtimeLaunchSettingsTaskToken;
+  }
+
+  private async loadRuntimeInputLayout(token: number): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) {
       return;
     }
     try {
       const profile = await loadInputLayoutProfile(context);
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
       this.runtimeInputLayoutButtons = profile.buttons;
       LogHelper.info('LibretroGame', 'Input', `已加载本地输入布局: ${profile.buttons.length} buttons`);
     } catch (err) {
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
       const message = (err as Error).message || String(err);
       LogHelper.warn('LibretroGame', 'Input', `读取本地输入布局失败: ${message}`);
       // 使用错误码提供更友好的提示
@@ -260,16 +391,190 @@ struct LibretroGamePage {
     }
   }
 
-  private async loadRuntimeRenderSettings(): Promise<void> {
+  private async loadRuntimeRenderSettings(token: number): Promise<void> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) {
       return;
     }
-    const profile = await loadRuntimeRenderSettingsProfile(context);
-    this.renderSettingsProfile = profile;
-    this.scalingMode = profile.scalingMode;
-    this.softwareMaxPresetIndex = profile.softwareMaxPresetIndex;
-    this.hwRenderAllowed = profile.hwRenderAllowed;
+    try {
+      const profile = await loadRuntimeRenderSettingsProfile(context);
+      // T8-C-F5 同范式:本方法由 aboutToAppear fire-and-forget 触发,await 配置读取
+      // 期间用户可能退出页面(aboutToDisappear 置 pageActive=false 并销毁),写
+      // @State(scalingMode/softwareMaxPresetIndex/hwRenderAllowed)前必须检查
+      // pageActive,否则向已销毁页面 setState。对照 quickSave/quickLoad 已有此守卫,
+      // 本方法此前遗漏(D016)。
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
+      this.renderSettingsProfile = profile;
+      this.scalingMode = profile.scalingMode;
+      this.swapInterval = profile.swapInterval;
+      this.softwareMaxPresetIndex = profile.softwareMaxPresetIndex;
+      this.aiUpscaleEnabled = profile.aiUpscaleEnabled;
+      this.hwRenderAllowed = profile.hwRenderAllowed;
+    } catch (err) {
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Render', `读取运行时渲染配置失败: ${message}`);
+      const fallback = createDefaultRuntimeRenderSettingsProfile();
+      this.renderSettingsProfile = fallback;
+      this.scalingMode = fallback.scalingMode;
+      this.swapInterval = fallback.swapInterval;
+      this.softwareMaxPresetIndex = fallback.softwareMaxPresetIndex;
+      this.aiUpscaleEnabled = fallback.aiUpscaleEnabled;
+      this.hwRenderAllowed = fallback.hwRenderAllowed;
+    }
+  }
+
+  private async loadRuntimeAudioSettings(token: number): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      return;
+    }
+    try {
+      const profile = await loadRuntimeAudioSettingsProfile(context);
+      // await 后页面可能已销毁(D016 范式);audioSettingsProfile 虽为 private(无
+      // re-render),仍守卫保持一致 + 避免向已销毁页面写。
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
+      this.audioSettingsProfile = profile;
+      runtimeAudioSettingsController.setVolumePercent(profile.volumePercent);
+      // 若游戏已在运行(用户改设置后返回游戏页等场景),立即应用新延迟。
+      if (this.gameRunning) {
+        runtimeAudioSettingsController.setMinimumAudioLatency(profile.latencyMs);
+      }
+    } catch (err) {
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Audio', `读取运行时音频配置失败: ${message}`);
+      const fallback = createDefaultRuntimeAudioSettingsProfile();
+      this.audioSettingsProfile = fallback;
+      runtimeAudioSettingsController.setVolumePercent(fallback.volumePercent);
+      if (this.gameRunning) {
+        runtimeAudioSettingsController.setMinimumAudioLatency(fallback.latencyMs);
+      }
+    }
+  }
+
+  private async loadRuntimeInputPreferences(token: number): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      this.hideVirtualController = false;
+      this.hideUndeclaredKeys = false;
+      return;
+    }
+    try {
+      const profile = await loadRuntimeInputPreferencesProfile(context);
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
+      this.hideVirtualController = profile.hideVirtualController;
+      this.hideUndeclaredKeys = profile.hideUndeclaredKeys;
+    } catch (_err) {
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
+      const fallback = createDefaultRuntimeInputPreferencesProfile();
+      this.hideVirtualController = fallback.hideVirtualController;
+      this.hideUndeclaredKeys = fallback.hideUndeclaredKeys;
+    }
+  }
+
+  private async loadRuntimeVisualSettings(token: number): Promise<void> {
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      this.visualSettingsProfile = createDefaultRuntimeVisualSettingsProfile();
+      return;
+    }
+    try {
+      const profile = await loadRuntimeVisualSettingsProfile(context);
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
+      this.visualSettingsProfile = profile;
+    } catch (_err) {
+      if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+        return;
+      }
+      this.visualSettingsProfile = createDefaultRuntimeVisualSettingsProfile();
+    }
+  }
+
+  private getRuntimeScreenAspectRatio(): number {
+    const nativeAspectRatio = this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3;
+    return resolveRuntimeVisualAspectRatio(this.visualSettingsProfile.aspectMode, nativeAspectRatio);
+  }
+
+  private getRuntimeScreenCornerRadius(): number {
+    return 4 + Math.round(this.visualSettingsProfile.curvature * 0.32);
+  }
+
+  private getRuntimeScreenSaturationFactor(): number {
+    return Math.max(0, this.visualSettingsProfile.saturation / 100);
+  }
+
+  private getRuntimeScreenScanlineOpacity(): number {
+    if (this.visualSettingsProfile.scanlineIntensity <= 0) {
+      return 0;
+    }
+    return Math.min(0.42, 0.08 + this.visualSettingsProfile.scanlineIntensity * 0.0034);
+  }
+
+  private getRuntimeScreenScanlineSpacing(): number {
+    if (this.visualSettingsProfile.scanlineIntensity >= 70) {
+      return 1;
+    }
+    if (this.visualSettingsProfile.scanlineIntensity >= 35) {
+      return 2;
+    }
+    return 3;
+  }
+
+  private getSoftwareResolutionForPreset(index: number): ResolutionPreset {
+    if (index <= 0) {
+      return { w: 640, h: 480 };
+    }
+    if (index >= 2) {
+      return { w: 1920, h: 1080 };
+    }
+    return { w: 1280, h: 720 };
+  }
+
+  private applyRuntimeRenderSettingsToNative(phase: string): boolean {
+    const okHw = runtimeRenderSettingsController.setHwRenderAllowed(this.renderSettingsProfile.hwRenderAllowed);
+    const okMode = runtimeRenderSettingsController.setScalingMode(this.renderSettingsProfile.scalingMode);
+    const okSwap = runtimeRenderSettingsController.setSwapInterval(this.renderSettingsProfile.swapInterval);
+    let okResolution = true;
+    if (this.renderSettingsProfile.scalingMode === 1) {
+      const resolution = this.getSoftwareResolutionForPreset(this.renderSettingsProfile.softwareMaxPresetIndex);
+      okResolution = runtimeRenderSettingsController.setSoftwareMaxResolution(resolution.w, resolution.h);
+    }
+    const okAi = runtimeRenderSettingsController.setAIUpscale(this.renderSettingsProfile.aiUpscaleEnabled);
+    const ok = okHw && okMode && okSwap && okResolution && okAi;
+    if (!ok) {
+      LogHelper.warn(
+        'LibretroGame',
+        'Render',
+        `运行时渲染配置注入失败(${phase}) mode=${this.renderSettingsProfile.scalingMode} hw=${this.renderSettingsProfile.hwRenderAllowed} swap=${this.renderSettingsProfile.swapInterval} ai=${this.renderSettingsProfile.aiUpscaleEnabled} preset=${this.renderSettingsProfile.softwareMaxPresetIndex}`
+      );
+    }
+    return ok;
+  }
+
+  private async refreshRuntimeLaunchState(): Promise<void> {
+    const token = this.beginRuntimeLaunchSettingsTask();
+    await Promise.all([
+      this.loadRuntimeRenderSettings(token),
+      this.loadRuntimeAudioSettings(token),
+      this.loadRuntimeInputPreferences(token),
+      this.loadRuntimeVisualSettings(token),
+      this.loadRuntimeInputLayout(token)
+    ]);
   }
 
   private async persistRuntimeRenderSettingsProfile(): Promise<void> {
@@ -277,14 +582,21 @@ struct LibretroGamePage {
     if (!context) {
       return;
     }
+    const token = this.beginRuntimeLaunchSettingsTask();
     this.renderSettingsProfile = {
       version: this.renderSettingsProfile.version,
       scalingMode: this.scalingMode,
+      swapInterval: this.swapInterval,
       softwareMaxPresetIndex: this.softwareMaxPresetIndex,
+      aiUpscaleEnabled: this.aiUpscaleEnabled,
       hwRenderAllowed: this.hwRenderAllowed,
       updatedAt: this.renderSettingsProfile.updatedAt
     };
-    this.renderSettingsProfile = await saveRuntimeRenderSettingsProfile(context, this.renderSettingsProfile);
+    const savedProfile = await saveRuntimeRenderSettingsProfile(context, this.renderSettingsProfile);
+    if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
+      return;
+    }
+    this.renderSettingsProfile = savedProfile;
   }
 
   private getCurrentRuntimeRomFile(): string {
@@ -296,32 +608,999 @@ struct LibretroGamePage {
     return rom ? rom.file : '';
   }
 
-  private async quickSaveRuntimeState(): Promise<void> {
-    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    const result = await this.runtimeSaveStateController.quickSave(
-      context,
-      this.gameRunning,
-      this.getCurrentRuntimeRomFile()
-    );
-    // T8-C-F5: await 后必须检查 pageActive,否则离页后仍向已销毁页面写 @State。
-    if (!this.pageActive) {
+  private beginRuntimeSaveManagerTask(): number {
+    this.runtimeSaveManagerTaskToken += 1;
+    return this.runtimeSaveManagerTaskToken;
+  }
+
+  private isCurrentRuntimeSaveManagerTask(token: number): boolean {
+    return this.pageActive && token === this.runtimeSaveManagerTaskToken;
+  }
+
+  private beginRuntimeSaveActionTask(): number {
+    this.runtimeSaveActionTaskToken += 1;
+    return this.runtimeSaveActionTaskToken;
+  }
+
+  private isCurrentRuntimeSaveActionTask(token: number): boolean {
+    return this.pageActive && token === this.runtimeSaveActionTaskToken;
+  }
+
+  private buildRuntimeSaveManagerSummaryText(count: number): string {
+    const romFile = this.getCurrentRuntimeRomFile();
+    if (count > 0) {
+      return romFile.length > 0 ? `当前 ROM 共 ${count} 个即时存档` : `本地共 ${count} 个即时存档`;
+    }
+    return romFile.length > 0 ? '当前 ROM 暂无即时存档' : '暂无即时存档';
+  }
+
+  private closeRuntimeSaveManager(): void {
+    this.runtimeSaveManagerTaskToken += 1;
+    this.runtimeSaveManagerVisible = false;
+    this.runtimeSaveManagerBusy = false;
+    this.runtimeSaveManagerSummaryText = '';
+    this.runtimeSaveManagerItems = [];
+  }
+
+  private toggleRuntimeSaveManager(): void {
+    if (this.runtimeSaveManagerVisible) {
+      this.closeRuntimeSaveManager();
       return;
     }
-    this.runtimeSaveStatusText = result;
+    this.closeRuntimePortControl();
+    this.closeRuntimeCheatManager();
+    this.closeRuntimeCoreOptions();
+    this.closeRuntimeSramManager();
+    this.runtimeSaveManagerVisible = true;
+    void this.refreshRuntimeSaveManagerPanel();
+  }
+
+  private async refreshRuntimeSaveManagerPanel(): Promise<void> {
+    const token = this.beginRuntimeSaveManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveManagerBusy = false;
+      this.runtimeSaveManagerItems = [];
+      this.runtimeSaveManagerSummaryText = '上下文缺失';
+      return;
+    }
+
+    this.runtimeSaveManagerBusy = true;
+    this.runtimeSaveManagerSummaryText = '正在读取当前游戏存档...';
+    try {
+      const items = await this.runtimeSaveStateController.listSaveItemsForRom(
+        context,
+        this.getCurrentRuntimeRomFile()
+      );
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveManagerItems = items;
+      this.runtimeSaveManagerSummaryText = this.buildRuntimeSaveManagerSummaryText(items.length);
+    } catch (err) {
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Save', `读取运行态存档列表失败: ${message}`);
+      this.runtimeSaveManagerItems = [];
+      this.runtimeSaveManagerSummaryText = '读取存档列表失败';
+      this.runtimeSaveStatusText = '读取存档列表失败';
+    } finally {
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveManagerBusy = false;
+    }
+  }
+
+  private async loadRuntimeSaveStateByFileName(fileName: string): Promise<void> {
+    const token = this.beginRuntimeSaveManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.runtimeSaveManagerBusy = true;
+    try {
+      const result = await this.runtimeSaveStateController.loadSaveByFileName(
+        context,
+        this.gameRunning,
+        fileName,
+        {
+          shouldCancel: () => !this.isCurrentRuntimeSaveManagerTask(token)
+        }
+      );
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveStatusText = result;
+    } catch (err) {
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Save', `载入运行态存档失败: ${message}`);
+      this.runtimeSaveStatusText = '读档失败';
+    } finally {
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveManagerBusy = false;
+    }
+  }
+
+  private async deleteRuntimeSaveStateByFileName(fileName: string): Promise<void> {
+    const token = this.beginRuntimeSaveManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.runtimeSaveManagerBusy = true;
+    try {
+      const result = await this.runtimeSaveStateController.deleteSaveByFileName(context, fileName, {
+        shouldCancel: () => !this.isCurrentRuntimeSaveManagerTask(token)
+      });
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveStatusText = result;
+      if (result === '存档已删除' && this.runtimeSaveManagerVisible) {
+        await this.refreshRuntimeSaveManagerPanel();
+      }
+    } catch (err) {
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Save', `删除运行态存档失败: ${message}`);
+      this.runtimeSaveStatusText = '删除存档失败';
+    } finally {
+      if (!this.isCurrentRuntimeSaveManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveManagerBusy = false;
+    }
+  }
+
+  private async quickSaveRuntimeState(): Promise<void> {
+    const token = this.beginRuntimeSaveActionTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    try {
+      const result = await this.runtimeSaveStateController.quickSave(
+        context,
+        this.gameRunning,
+        this.getCurrentRuntimeRomFile(),
+        {
+          shouldCancel: () => !this.isCurrentRuntimeSaveActionTask(token)
+        }
+      );
+      if (!this.isCurrentRuntimeSaveActionTask(token)) {
+        return;
+      }
+      this.runtimeSaveStatusText = result;
+      if (this.runtimeSaveManagerVisible) {
+        await this.refreshRuntimeSaveManagerPanel();
+      }
+    } catch (err) {
+      if (!this.isCurrentRuntimeSaveActionTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Save', `运行态即时存档失败: ${message}`);
+      this.runtimeSaveStatusText = '存档失败';
+    }
   }
 
   private async quickLoadRuntimeState(): Promise<void> {
+    const token = this.beginRuntimeSaveActionTask();
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    const result = await this.runtimeSaveStateController.quickLoad(
-      context,
-      this.gameRunning,
-      this.getCurrentRuntimeRomFile()
-    );
-    // T8-C-F5: 同 quickSaveRuntimeState。
-    if (!this.pageActive) {
+    try {
+      const result = await this.runtimeSaveStateController.quickLoad(
+        context,
+        this.gameRunning,
+        this.getCurrentRuntimeRomFile(),
+        {
+          shouldCancel: () => !this.isCurrentRuntimeSaveActionTask(token)
+        }
+      );
+      if (!this.isCurrentRuntimeSaveActionTask(token)) {
+        return;
+      }
+      this.runtimeSaveStatusText = result;
+    } catch (err) {
+      if (!this.isCurrentRuntimeSaveActionTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Save', `运行态即时读档失败: ${message}`);
+      this.runtimeSaveStatusText = '读档失败';
+    }
+  }
+
+  private beginRuntimeSramManagerTask(): number {
+    this.runtimeSramManagerTaskToken += 1;
+    return this.runtimeSramManagerTaskToken;
+  }
+
+  private isCurrentRuntimeSramManagerTask(token: number): boolean {
+    return this.pageActive && token === this.runtimeSramManagerTaskToken;
+  }
+
+  private buildRuntimeSramManagerSummaryText(count: number): string {
+    const romFile = this.getCurrentRuntimeRomFile();
+    if (count > 0) {
+      return romFile.length > 0 ? `当前 ROM 共 ${count} 个电池存档备份` : `本地共 ${count} 个电池存档备份`;
+    }
+    return romFile.length > 0 ? '当前 ROM 暂无电池存档备份' : '暂无电池存档备份';
+  }
+
+  private closeRuntimeSramManager(): void {
+    this.runtimeSramManagerTaskToken += 1;
+    this.runtimeSramManagerVisible = false;
+    this.runtimeSramManagerBusy = false;
+    this.runtimeSramManagerSummaryText = '';
+    this.runtimeSramManagerItems = [];
+  }
+
+  private toggleRuntimeSramManager(): void {
+    if (this.runtimeSramManagerVisible) {
+      this.closeRuntimeSramManager();
       return;
     }
-    this.runtimeSaveStatusText = result;
+    this.closeRuntimePortControl();
+    this.closeRuntimeSaveManager();
+    this.closeRuntimeCheatManager();
+    this.closeRuntimeCoreOptions();
+    this.runtimeSramManagerVisible = true;
+    void this.refreshRuntimeSramManagerPanel();
+  }
+
+  private async refreshRuntimeSramManagerPanel(): Promise<void> {
+    const token = this.beginRuntimeSramManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const romFile = this.getCurrentRuntimeRomFile();
+    if (!context) {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSramManagerBusy = false;
+      this.runtimeSramManagerItems = [];
+      this.runtimeSramManagerSummaryText = '上下文缺失';
+      return;
+    }
+    if (romFile.length === 0) {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSramManagerBusy = false;
+      this.runtimeSramManagerItems = [];
+      this.runtimeSramManagerSummaryText = 'ROM 上下文缺失';
+      return;
+    }
+
+    this.runtimeSramManagerBusy = true;
+    this.runtimeSramManagerSummaryText = '正在读取当前游戏电池存档...';
+    try {
+      const items = await this.runtimeSramController.listBackupItemsForRom(context, romFile);
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSramManagerItems = items;
+      this.runtimeSramManagerSummaryText = this.buildRuntimeSramManagerSummaryText(items.length);
+    } catch (err) {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'SRAM', `读取运行态 SRAM 列表失败: ${message}`);
+      this.runtimeSramManagerItems = [];
+      this.runtimeSramManagerSummaryText = '读取电池存档列表失败';
+      this.runtimeSaveStatusText = '读取电池存档列表失败';
+    } finally {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSramManagerBusy = false;
+    }
+  }
+
+  private async exportCurrentRuntimeSramBackup(): Promise<void> {
+    const token = this.beginRuntimeSramManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.runtimeSramManagerBusy = true;
+    try {
+      const result = await this.runtimeSramController.exportCurrentSramBackup(
+        context,
+        this.gameRunning,
+        this.getCurrentRuntimeRomFile(),
+        {
+          shouldCancel: () => !this.isCurrentRuntimeSramManagerTask(token)
+        }
+      );
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveStatusText = result;
+      if (result === '电池存档已导出' && this.runtimeSramManagerVisible) {
+        await this.refreshRuntimeSramManagerPanel();
+      }
+    } catch (err) {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'SRAM', `导出运行态 SRAM 失败: ${message}`);
+      this.runtimeSaveStatusText = '导出电池存档失败';
+    } finally {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSramManagerBusy = false;
+    }
+  }
+
+  private async loadRuntimeSramBackupByFileName(fileName: string): Promise<void> {
+    const token = this.beginRuntimeSramManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.runtimeSramManagerBusy = true;
+    try {
+      const result = await this.runtimeSramController.loadBackupByFileName(
+        context,
+        this.gameRunning,
+        this.getCurrentRuntimeRomFile(),
+        fileName,
+        {
+          shouldCancel: () => !this.isCurrentRuntimeSramManagerTask(token)
+        }
+      );
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveStatusText = result;
+    } catch (err) {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'SRAM', `载入运行态 SRAM 失败: ${message}`);
+      this.runtimeSaveStatusText = '载入电池存档失败';
+    } finally {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSramManagerBusy = false;
+    }
+  }
+
+  private async deleteRuntimeSramBackupByFileName(fileName: string): Promise<void> {
+    const token = this.beginRuntimeSramManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.runtimeSramManagerBusy = true;
+    try {
+      const result = await this.runtimeSramController.deleteBackupByFileName(
+        context,
+        this.getCurrentRuntimeRomFile(),
+        fileName,
+        {
+          shouldCancel: () => !this.isCurrentRuntimeSramManagerTask(token)
+        }
+      );
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSaveStatusText = result;
+      if (result === '电池存档已删除' && this.runtimeSramManagerVisible) {
+        await this.refreshRuntimeSramManagerPanel();
+      }
+    } catch (err) {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'SRAM', `删除运行态 SRAM 失败: ${message}`);
+      this.runtimeSaveStatusText = '删除电池存档失败';
+    } finally {
+      if (!this.isCurrentRuntimeSramManagerTask(token)) {
+        return;
+      }
+      this.runtimeSramManagerBusy = false;
+    }
+  }
+
+  private beginRuntimeCheatManagerTask(): number {
+    this.runtimeCheatManagerTaskToken += 1;
+    return this.runtimeCheatManagerTaskToken;
+  }
+
+  private isCurrentRuntimeCheatManagerTask(token: number): boolean {
+    return this.pageActive && token === this.runtimeCheatManagerTaskToken;
+  }
+
+  private getRuntimeCheatCapabilityText(): string {
+    if (this.coreSupportsCheatReset && this.coreSupportsCheatSet) {
+      return '当前核心支持运行态金手指';
+    }
+    if (!this.coreSupportsCheatReset && !this.coreSupportsCheatSet) {
+      return '当前核心未声明金手指接口';
+    }
+    if (!this.coreSupportsCheatReset) {
+      return '当前核心缺少 cheat reset，无法安全重建列表';
+    }
+    return '当前核心缺少 cheat set，无法应用金手指';
+  }
+
+  private buildRuntimeCheatManagerSummaryText(count: number): string {
+    if (!this.runtimeCheatManagerSupported) {
+      return count > 0
+        ? `${this.getRuntimeCheatCapabilityText()} | 已保存 ${count} 条`
+        : this.getRuntimeCheatCapabilityText();
+    }
+
+    const romFile = this.getCurrentRuntimeRomFile();
+    if (count > 0) {
+      return romFile.length > 0 ? `当前 ROM 共 ${count} 条金手指` : `本地共 ${count} 条金手指`;
+    }
+    return romFile.length > 0 ? '当前 ROM 暂无金手指' : '暂无金手指';
+  }
+
+  private closeRuntimeCheatManager(): void {
+    this.runtimeCheatManagerTaskToken += 1;
+    this.runtimeCheatManagerVisible = false;
+    this.runtimeCheatManagerBusy = false;
+    this.runtimeCheatManagerSummaryText = '';
+    this.runtimeCheatManagerItems = [];
+    this.runtimeCheatDraftName = '';
+    this.runtimeCheatDraftCode = '';
+  }
+
+  private toggleRuntimeCheatManager(): void {
+    if (this.runtimeCheatManagerVisible) {
+      this.closeRuntimeCheatManager();
+      return;
+    }
+    this.closeRuntimePortControl();
+    this.closeRuntimeSaveManager();
+    this.closeRuntimeCoreOptions();
+    this.closeRuntimeSramManager();
+    this.runtimeCheatManagerVisible = true;
+    void this.refreshRuntimeCheatManagerPanel();
+  }
+
+  private async refreshRuntimeCheatManagerPanel(): Promise<void> {
+    const token = this.beginRuntimeCheatManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerBusy = false;
+      this.runtimeCheatManagerItems = [];
+      this.runtimeCheatManagerSummaryText = '上下文缺失';
+      return;
+    }
+
+    const romFile = this.getCurrentRuntimeRomFile();
+    if (romFile.length === 0) {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerBusy = false;
+      this.runtimeCheatManagerItems = [];
+      this.runtimeCheatManagerSummaryText = 'ROM 上下文缺失';
+      return;
+    }
+
+    this.runtimeCheatManagerBusy = true;
+    this.runtimeCheatManagerSummaryText = '正在读取当前游戏金手指...';
+    try {
+      const items = await loadRuntimeCheatItemsForRom(context, romFile);
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerItems = items;
+      this.runtimeCheatManagerSummaryText = this.buildRuntimeCheatManagerSummaryText(items.length);
+    } catch (err) {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Cheat', `读取运行态金手指失败: ${message}`);
+      this.runtimeCheatManagerItems = [];
+      this.runtimeCheatManagerSummaryText = '读取金手指列表失败';
+      this.runtimeSaveStatusText = '读取金手指列表失败';
+    } finally {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerBusy = false;
+    }
+  }
+
+  private updateRuntimeCheatDraftName(value: string): void {
+    this.runtimeCheatDraftName = value;
+  }
+
+  private updateRuntimeCheatDraftCode(value: string): void {
+    this.runtimeCheatDraftCode = value;
+  }
+
+  private countEnabledRuntimeCheats(items: RuntimeCheatItem[]): number {
+    let count = 0;
+    items.forEach((item: RuntimeCheatItem) => {
+      if (item.enabled) {
+        count += 1;
+      }
+    });
+    return count;
+  }
+
+  private buildRuntimeCheatItemWithState(
+    item: RuntimeCheatItem,
+    enabled: boolean
+  ): RuntimeCheatItem {
+    return {
+      id: item.id,
+      label: item.label,
+      code: item.code,
+      enabled,
+      updatedAt: Date.now()
+    };
+  }
+
+  private async persistRuntimeCheatItems(
+    nextItems: RuntimeCheatItem[],
+    successText: string,
+    clearDraft: boolean = false
+  ): Promise<void> {
+    const token = this.beginRuntimeCheatManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerBusy = false;
+      this.runtimeCheatManagerSummaryText = '上下文缺失';
+      this.runtimeSaveStatusText = '上下文缺失';
+      return;
+    }
+
+    const romFile = this.getCurrentRuntimeRomFile();
+    if (romFile.length === 0) {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerBusy = false;
+      this.runtimeCheatManagerSummaryText = 'ROM 上下文缺失';
+      this.runtimeSaveStatusText = 'ROM 上下文缺失';
+      return;
+    }
+
+    this.runtimeCheatManagerBusy = true;
+    this.runtimeCheatManagerSummaryText = '正在写入当前游戏金手指...';
+    try {
+      const savedItems = await saveRuntimeCheatItemsForRom(context, romFile, nextItems);
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerItems = savedItems;
+      this.runtimeCheatManagerSummaryText = this.buildRuntimeCheatManagerSummaryText(savedItems.length);
+      if (clearDraft) {
+        this.runtimeCheatDraftName = '';
+        this.runtimeCheatDraftCode = '';
+      }
+
+      if (this.runtimeCheatManagerSupported && this.gameRunning) {
+        const applied = await runtimeCheatController.applyCheatEntries(savedItems, {
+          shouldCancel: () => !this.isCurrentRuntimeCheatManagerTask(token)
+        });
+        if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+          return;
+        }
+        this.runtimeSaveStatusText = applied
+          ? successText
+          : `${successText}，但当前核心同步失败`;
+      } else if (this.runtimeCheatManagerSupported) {
+        this.runtimeSaveStatusText = `${successText}，将在下次运行时恢复`;
+      } else {
+        this.runtimeSaveStatusText = `${successText}，但当前核心未提供完整 cheat 接口`;
+      }
+    } catch (err) {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Cheat', `写入运行态金手指失败: ${message}`);
+      this.runtimeCheatManagerSummaryText = '写入金手指失败';
+      this.runtimeSaveStatusText = '写入金手指失败';
+    } finally {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerBusy = false;
+    }
+  }
+
+  private async addRuntimeCheat(): Promise<void> {
+    const code = this.runtimeCheatDraftCode.trim();
+    if (code.length === 0) {
+      this.runtimeCheatManagerSummaryText = '请输入金手指代码';
+      this.runtimeSaveStatusText = '请输入金手指代码';
+      return;
+    }
+
+    const label = this.runtimeCheatDraftName.trim().length > 0
+      ? this.runtimeCheatDraftName.trim()
+      : `金手指 ${this.runtimeCheatManagerItems.length + 1}`;
+    const nextItems = [
+      ...this.runtimeCheatManagerItems,
+      createRuntimeCheatItem(label, code, true)
+    ];
+    await this.persistRuntimeCheatItems(nextItems, '金手指已添加并启用', true);
+  }
+
+  private async toggleRuntimeCheatItem(id: string): Promise<void> {
+    let nextEnabled = false;
+    let matched = false;
+    const nextItems = this.runtimeCheatManagerItems.map((item: RuntimeCheatItem) => {
+      if (item.id !== id) {
+        return item;
+      }
+      matched = true;
+      nextEnabled = !item.enabled;
+      return this.buildRuntimeCheatItemWithState(item, nextEnabled);
+    });
+    if (!matched) {
+      return;
+    }
+    await this.persistRuntimeCheatItems(
+      nextItems,
+      nextEnabled ? '金手指已启用' : '金手指已关闭'
+    );
+  }
+
+  private async deleteRuntimeCheatItem(id: string): Promise<void> {
+    const nextItems = this.runtimeCheatManagerItems.filter((item: RuntimeCheatItem) => item.id !== id);
+    if (nextItems.length === this.runtimeCheatManagerItems.length) {
+      return;
+    }
+    await this.persistRuntimeCheatItems(nextItems, '金手指已删除');
+  }
+
+  private async disableAllRuntimeCheats(): Promise<void> {
+    if (this.runtimeCheatManagerItems.length === 0) {
+      this.runtimeSaveStatusText = '当前没有金手指';
+      return;
+    }
+    const nextItems: RuntimeCheatItem[] = [];
+    this.runtimeCheatManagerItems.forEach((item: RuntimeCheatItem) => {
+      nextItems.push(this.buildRuntimeCheatItemWithState(item, false));
+    });
+    await this.persistRuntimeCheatItems(nextItems, '已关闭全部金手指');
+  }
+
+  private async restoreRuntimeCheatsForCurrentRom(notifyStatus: boolean = false): Promise<void> {
+    if (!this.runtimeCheatManagerSupported || !this.gameRunning) {
+      return;
+    }
+
+    const token = this.beginRuntimeCheatManagerTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const romFile = this.getCurrentRuntimeRomFile();
+    if (!context || romFile.length === 0) {
+      return;
+    }
+
+    try {
+      const items = await loadRuntimeCheatItemsForRom(context, romFile);
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerItems = items;
+      this.runtimeCheatManagerSummaryText = this.buildRuntimeCheatManagerSummaryText(items.length);
+      if (items.length === 0) {
+        return;
+      }
+
+      const applied = await runtimeCheatController.applyCheatEntries(items, {
+        shouldCancel: () => !this.isCurrentRuntimeCheatManagerTask(token)
+      });
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      const enabledCount = this.countEnabledRuntimeCheats(items);
+      if (notifyStatus && enabledCount > 0) {
+        this.runtimeSaveStatusText = applied
+          ? `已恢复 ${enabledCount} 条金手指`
+          : '已读取金手指配置，但恢复到当前核心失败';
+      }
+    } catch (err) {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Cheat', `恢复运行态金手指失败: ${message}`);
+      if (notifyStatus) {
+        this.runtimeSaveStatusText = '恢复运行态金手指失败';
+      }
+    } finally {
+      if (!this.isCurrentRuntimeCheatManagerTask(token)) {
+        return;
+      }
+      this.runtimeCheatManagerBusy = false;
+    }
+  }
+
+  private buildRuntimeCoreOptionsSummaryText(count: number): string {
+    if (count > 0) {
+      return `当前核心共 ${count} 个运行时选项`;
+    }
+    return '当前核心未暴露运行时选项';
+  }
+
+  private closeRuntimeCoreOptions(): void {
+    this.runtimeCoreOptionsTaskToken += 1;
+    this.runtimeCoreOptionsVisible = false;
+    this.runtimeCoreOptionsBusy = false;
+    this.runtimeCoreOptionsSummaryText = '';
+    this.runtimeCoreOptionsItems = [];
+  }
+
+  private toggleRuntimeCoreOptions(): void {
+    if (this.runtimeCoreOptionsVisible) {
+      this.closeRuntimeCoreOptions();
+      return;
+    }
+    this.closeRuntimePortControl();
+    this.closeRuntimeSaveManager();
+    this.closeRuntimeCheatManager();
+    this.closeRuntimeSramManager();
+    this.runtimeCoreOptionsVisible = true;
+    void this.refreshRuntimeCoreOptionsPanel();
+  }
+
+  private async refreshRuntimeCoreOptionsPanel(statusPrefix: string = ''): Promise<void> {
+    const token = this.beginRuntimeCoreOptionsTask();
+    this.runtimeCoreOptionsBusy = true;
+    try {
+      const items = await runtimeCoreOptionsController.getOptionsAsync({
+        shouldCancel: () => !this.isCurrentRuntimeCoreOptionsTask(token)
+      });
+      if (!this.isCurrentRuntimeCoreOptionsTask(token)) {
+        return;
+      }
+      this.runtimeCoreOptionsItems = items;
+      const summaryText = this.buildRuntimeCoreOptionsSummaryText(items.length);
+      this.runtimeCoreOptionsSummaryText = statusPrefix.length > 0
+        ? `${statusPrefix} · ${summaryText}`
+        : summaryText;
+    } catch (err) {
+      if (!this.isCurrentRuntimeCoreOptionsTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'CoreOptions', `读取运行时核心选项失败: ${message}`);
+      this.runtimeCoreOptionsItems = [];
+      this.runtimeCoreOptionsSummaryText = '读取核心选项失败';
+      this.runtimeSaveStatusText = '读取核心选项失败';
+    } finally {
+      if (!this.isCurrentRuntimeCoreOptionsTask(token)) {
+        return;
+      }
+      this.runtimeCoreOptionsBusy = false;
+    }
+  }
+
+  private async advanceRuntimeCoreOption(key: string, value: string): Promise<void> {
+    if (this.runtimeCoreOptionsBusy) {
+      return;
+    }
+    const safeKey = typeof key === 'string' ? key.trim() : '';
+    const safeValue = typeof value === 'string' ? value.trim() : '';
+    if (safeKey.length === 0 || safeValue.length === 0) {
+      this.runtimeSaveStatusText = '核心选项写入失败：参数无效';
+      return;
+    }
+
+    this.runtimeCoreOptionsBusy = true;
+    const token = this.beginRuntimeCoreOptionsTask();
+    try {
+      const ok = await runtimeCoreOptionsController.setOptionAsync(safeKey, safeValue, {
+        shouldCancel: () => !this.isCurrentRuntimeCoreOptionsTask(token)
+      });
+      if (!this.isCurrentRuntimeCoreOptionsTask(token)) {
+        return;
+      }
+      if (!ok) {
+        this.runtimeCoreOptionsSummaryText = `写入核心选项失败 (${safeKey})`;
+        this.runtimeSaveStatusText = `核心选项写入失败: ${safeKey}`;
+        return;
+      }
+      this.runtimeSaveStatusText = `核心选项已更新: ${safeKey} -> ${safeValue}`;
+      void this.refreshRuntimeCoreOptionsPanel(`已更新 ${safeKey}`);
+    } catch (err) {
+      if (!this.isCurrentRuntimeCoreOptionsTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'CoreOptions', `写入运行时核心选项失败: ${message}`);
+      this.runtimeCoreOptionsSummaryText = `写入核心选项失败 (${safeKey})`;
+      this.runtimeSaveStatusText = `核心选项写入失败: ${safeKey}`;
+    } finally {
+      if (!this.isCurrentRuntimeCoreOptionsTask(token)) {
+        return;
+      }
+      this.runtimeCoreOptionsBusy = false;
+    }
+  }
+
+  private beginRuntimeCoreOptionsTask(): number {
+    this.runtimeCoreOptionsTaskToken += 1;
+    return this.runtimeCoreOptionsTaskToken;
+  }
+
+  private isCurrentRuntimeCoreOptionsTask(token: number): boolean {
+    return this.pageActive && token === this.runtimeCoreOptionsTaskToken;
+  }
+
+  private syncSelectedVirtualPortFromAssignments(): void {
+    const virtualAssignment = this.portAssignments.find((item: PortAssignState) => {
+      return item.sourceType === InputSourceType.Virtual;
+    });
+    if (virtualAssignment) {
+      this.selectedPortIndex = virtualAssignment.portId;
+    }
+  }
+
+  private getRuntimeControllerDeviceForPort(portId: number): number {
+    const safePortId = portId >= 0 && portId < 4 ? portId : 0;
+    return getRuntimeControllerPortDeviceForDisplay(this.runtimeControllerPortDevices[safePortId]);
+  }
+
+  private setRuntimeControllerDeviceForPort(portId: number, device: number): void {
+    const safePortId = portId >= 0 && portId < 4 ? portId : 0;
+    const nextDevices = this.runtimeControllerPortDevices.slice();
+    while (nextDevices.length < 4) {
+      nextDevices.push(RETRO_DEVICE_JOYPAD);
+    }
+    nextDevices[safePortId] = getRuntimeControllerPortDeviceForDisplay(device);
+    this.runtimeControllerPortDevices = nextDevices;
+  }
+
+  private buildRuntimePortControlSummaryText(statusPrefix: string = ''): string {
+    const portId = this.selectedPortIndex;
+    const deviceLabel = describeRuntimeControllerPortDevice(this.getRuntimeControllerDeviceForPort(portId));
+    if (statusPrefix.length > 0) {
+      return `${statusPrefix} · 当前 P${portId + 1} / ${deviceLabel}`;
+    }
+    return `当前虚拟端口 P${portId + 1}，设备 ${deviceLabel}。部分核心可能忽略设备切换。`;
+  }
+
+  private refreshRuntimePortControlSummaryText(statusPrefix: string = ''): void {
+    this.syncSelectedVirtualPortFromAssignments();
+    this.runtimePortControlSummaryText = this.buildRuntimePortControlSummaryText(statusPrefix);
+  }
+
+  private closeRuntimePortControl(): void {
+    this.runtimePortControlTaskToken += 1;
+    this.runtimePortControlVisible = false;
+  }
+
+  private toggleRuntimePortControl(): void {
+    if (this.runtimePortControlVisible) {
+      this.closeRuntimePortControl();
+      return;
+    }
+    this.closeRuntimeSaveManager();
+    this.closeRuntimeSramManager();
+    this.closeRuntimeCheatManager();
+    this.closeRuntimeCoreOptions();
+    this.runtimePortControlVisible = true;
+    this.refreshRuntimePortControlSummaryText();
+  }
+
+  private async requestRuntimeControllerPortDevice(
+    portId: number,
+    device: number,
+    announce: boolean,
+    statusPrefix: string = ''
+  ): Promise<boolean> {
+    const token = this.beginRuntimePortControlTask();
+    const safePortId = portId >= 0 && portId < 4 ? portId : 0;
+    const deviceLabel = describeRuntimeControllerPortDevice(device);
+    let ok = false;
+    try {
+      ok = await runtimeInputPortController.setControllerPortDeviceAsync(
+        safePortId,
+        device,
+        {
+          shouldCancel: () => !this.isCurrentRuntimePortControlTask(token)
+        }
+      );
+    } catch (err) {
+      if (!this.isCurrentRuntimePortControlTask(token)) {
+        return false;
+      }
+      const message = (err as Error).message || String(err);
+      const failureText = `请求 P${safePortId + 1} 使用 ${deviceLabel} 失败`;
+      this.runtimePortControlSummaryText = failureText;
+      if (announce) {
+        this.runtimeSaveStatusText = failureText;
+      }
+      LogHelper.warn('LibretroGame', 'Input', `手柄类型切换异常: ${message}`);
+      return false;
+    }
+    if (!this.isCurrentRuntimePortControlTask(token)) {
+      return false;
+    }
+    if (!ok) {
+      const failureText = `请求 P${safePortId + 1} 使用 ${deviceLabel} 失败`;
+      this.runtimePortControlSummaryText = failureText;
+      if (announce) {
+        this.runtimeSaveStatusText = failureText;
+      }
+      LogHelper.warn(
+        'LibretroGame',
+        'Input',
+        `手柄类型切换失败: port=${safePortId} device=${device}`
+      );
+      return false;
+    }
+    this.setRuntimeControllerDeviceForPort(safePortId, device);
+    this.refreshRuntimePortControlSummaryText(
+      statusPrefix.length > 0 ? statusPrefix : `已请求 P${safePortId + 1} 使用 ${deviceLabel}`
+    );
+    if (announce) {
+      this.runtimeSaveStatusText = `已请求核心将 P${safePortId + 1} 切换为 ${deviceLabel}`;
+    }
+    return true;
+  }
+
+  private beginRuntimePortControlTask(): number {
+    this.runtimePortControlTaskToken += 1;
+    return this.runtimePortControlTaskToken;
+  }
+
+  private isCurrentRuntimePortControlTask(token: number): boolean {
+    return this.pageActive && token === this.runtimePortControlTaskToken;
+  }
+
+  private async selectRuntimeVirtualPort(portId: number): Promise<void> {
+    if (portId < 0 || portId >= this.portAssignments.length) {
+      return;
+    }
+    const ok = this.applyPortAssignment(portId, InputSourceType.Virtual, true);
+    if (!ok) {
+      const failureText = `切换虚拟端口到 P${portId + 1} 失败`;
+      this.runtimePortControlSummaryText = failureText;
+      this.runtimeSaveStatusText = failureText;
+      return;
+    }
+    this.selectedPortIndex = portId;
+    await this.requestRuntimeControllerPortDevice(
+      portId,
+      this.getRuntimeControllerDeviceForPort(portId),
+      true,
+      `已切换虚拟端口到 P${portId + 1}`
+    );
+  }
+
+  private async applyRuntimeControllerPortDevice(device: number): Promise<void> {
+    const portId = this.selectedPortIndex;
+    const deviceLabel = describeRuntimeControllerPortDevice(device);
+    await this.requestRuntimeControllerPortDevice(
+      portId,
+      device,
+      true,
+      `已请求 P${portId + 1} 使用 ${deviceLabel}`
+    );
+  }
+
+  private async reapplyRuntimeControllerPortDevice(): Promise<void> {
+    const portId = this.selectedPortIndex;
+    const device = this.getRuntimeControllerDeviceForPort(portId);
+    await this.requestRuntimeControllerPortDevice(
+      portId,
+      device,
+      false,
+      `启动后重放 P${portId + 1}`
+    );
   }
 
   private handlePauseTileAction(actionCode: string): void {
@@ -333,31 +1612,733 @@ struct LibretroGamePage {
       void this.quickLoadRuntimeState();
       return;
     }
+    if (actionCode === 'save_manager') {
+      this.toggleRuntimeSaveManager();
+      return;
+    }
+    if (actionCode === 'sram_manager') {
+      this.toggleRuntimeSramManager();
+      return;
+    }
+    if (actionCode === 'cheat_manager') {
+      this.toggleRuntimeCheatManager();
+      return;
+    }
+    if (actionCode === 'core_options') {
+      this.toggleRuntimeCoreOptions();
+      return;
+    }
+    if (actionCode === 'port_control') {
+      this.toggleRuntimePortControl();
+      return;
+    }
     if (actionCode === 'restart_game') {
-      this.resumeGame();
-      void this.startOrSwitchGame(true);
+      void this.restartRuntimeGameFromPause();
       return;
     }
     if (actionCode === 'input_mapping') {
-      this.resumeGame();
-      this.getUIContext().getRouter().pushUrl({ url: 'pages/InputLayoutPage' }).catch((err: Error) => {
-        LogHelper.error('LibretroGame', 'Route', `跳转按键映射页失败: ${err.message}`);
-        this.runtimeSaveStatusText = '按键映射页面打开失败';
-      });
+      this.openRuntimeToolPage('pages/InputLayoutPage', '按键映射');
       return;
     }
     if (actionCode === 'visual_filters') {
-      this.resumeGame();
-      this.getUIContext().getRouter().pushUrl({ url: 'pages/ShaderPreviewPage' }).catch((err: Error) => {
-        LogHelper.error('LibretroGame', 'Route', `跳转画面风格页失败: ${err.message}`);
-        this.runtimeSaveStatusText = '画面风格页面打开失败';
-      });
+      this.openRuntimeToolPage('pages/ShaderPreviewPage', '画面风格');
       return;
     }
-    this.runtimeSaveStatusText = `该操作暂未配置 (${actionCode})`;
+    this.runtimeSaveStatusText = `未知暂停菜单动作 (${actionCode})`;
+  }
+
+  private async restartRuntimeGameFromPause(): Promise<void> {
+    const token = this.switchToken;
+    if (this.coreSupportsReset) {
+      let ok = false;
+      try {
+        ok = await runtimeCoreControlController.resetCoreAsync({
+          shouldCancel: () => !this.isCurrentSwitchTask(token)
+        });
+      } catch (err) {
+        if (!this.isCurrentSwitchTask(token)) {
+          return;
+        }
+        const message = (err as Error).message || String(err);
+        LogHelper.warn('LibretroGame', 'Core', `核心软重置异常: ${message}`);
+        this.runtimeSaveStatusText = '核心软重置异常，改为重新载入当前游戏';
+        this.resumeGame();
+        if (this.isCurrentSwitchTask(token)) {
+          void this.startOrSwitchGame(true);
+        }
+        return;
+      }
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
+      this.runtimeSaveStatusText = ok
+        ? '已发送核心软重置，恢复运行后将从头开始本局'
+        : '核心软重置失败，改为重新载入当前游戏';
+      this.resumeGame();
+      if (!ok && this.isCurrentSwitchTask(token)) {
+        void this.startOrSwitchGame(true);
+      }
+      return;
+    }
+    if (!this.isCurrentSwitchTask(token)) {
+      return;
+    }
+    this.runtimeSaveStatusText = '当前核心未声明软重置，改为重新载入当前游戏';
+    this.resumeGame();
+    if (this.isCurrentSwitchTask(token)) {
+      void this.startOrSwitchGame(true);
+    }
+  }
+
+  private handleDiskControl(payload: DiskControlPayload): void {
+    if (!this.pageActive) {
+      return;
+    }
+    const type = typeof payload.type === 'string' ? payload.type : '';
+    if (type.length === 0) {
+      return;
+    }
+    this.diskControlSupported = true;
+    this.diskControlType = type;
+    this.diskControlStatusText = type === 'ext'
+      ? '检测到扩展换盘接口，暂停后可切换磁盘。'
+      : '检测到基础换盘接口，暂停后可切换磁盘。';
+    if (this.gamePaused) {
+      this.refreshRuntimeDiskControlSnapshot();
+    }
+    LogHelper.info('LibretroGame', 'Event', `disk_control: type=${type}`);
+  }
+
+  private beginRuntimeDiskControlTask(): number {
+    this.runtimeDiskControlTaskToken += 1;
+    return this.runtimeDiskControlTaskToken;
+  }
+
+  private isCurrentRuntimeDiskControlTask(token: number): boolean {
+    return this.pageActive && token === this.runtimeDiskControlTaskToken;
+  }
+
+  private async restoreRuntimeDiskInsertedForStaleTask(restoreInserted: boolean, token: number): Promise<void> {
+    if (!restoreInserted || this.pageActive || this.isCurrentRuntimeDiskControlTask(token)) {
+      return;
+    }
+    try {
+      await runtimeDiskControlController.setEjectStateAsync(false);
+    } catch (err) {
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Disk', `旧换盘任务回滚插回失败: ${message}`);
+    }
+  }
+
+  private getRuntimeDiskControlModeText(): string {
+    if (this.diskControlType === 'ext') {
+      return 'EXT';
+    }
+    if (this.diskControlType === 'basic') {
+      return 'BASIC';
+    }
+    return '';
+  }
+
+  private resetRuntimeCoreCapabilityState(): void {
+    this.coreSupportsReset = false;
+    this.coreSupportsRegionQuery = false;
+    this.coreSupportsCheatReset = false;
+    this.coreSupportsCheatSet = false;
+    this.runtimeCheatManagerSupported = false;
+    this.runtimeRegionText = '';
+  }
+
+  private inspectCurrentCoreCapabilities(corePath: string, token: number): void {
+    void runtimeCoreDiagnosticController.inspectCoreCapabilities(corePath, false, {
+      shouldCancel: () => !this.isCurrentSwitchTask(token)
+    }).then((capabilities) => {
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
+
+      this.coreSupportsReset = capabilities.supportsReset;
+      this.coreSupportsRegionQuery = capabilities.supportsRegion;
+      this.coreSupportsCheatReset = capabilities.supportsCheatReset;
+      this.coreSupportsCheatSet = capabilities.supportsCheatSet;
+      this.runtimeCheatManagerSupported =
+        capabilities.supportsCheatReset && capabilities.supportsCheatSet;
+      this.runtimeCheatManagerSummaryText = this.buildRuntimeCheatManagerSummaryText(
+        this.runtimeCheatManagerItems.length
+      );
+      if (!capabilities.supportsRegion) {
+        this.runtimeRegionText = '';
+      }
+      if (this.gamePaused) {
+        void this.refreshRuntimeRegionSnapshot();
+      }
+      if (this.runtimeCheatManagerSupported && this.gameRunning) {
+        void this.restoreRuntimeCheatsForCurrentRom();
+      }
+    }).catch((err: Error) => {
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
+      this.coreSupportsReset = false;
+      this.coreSupportsRegionQuery = false;
+      this.coreSupportsCheatReset = false;
+      this.coreSupportsCheatSet = false;
+      this.runtimeCheatManagerSupported = false;
+      this.runtimeRegionText = '';
+      this.runtimeCheatManagerSummaryText = this.buildRuntimeCheatManagerSummaryText(
+        this.runtimeCheatManagerItems.length
+      );
+      LogHelper.warn(
+        'LibretroGame',
+        'Core',
+        `核心能力探测失败: ${err.message || String(err)}`
+      );
+    });
+  }
+
+  private async refreshRuntimeRegionSnapshot(): Promise<void> {
+    if (!this.coreSupportsRegionQuery || !this.gameRunning) {
+      this.runtimeRegionSnapshotTaskToken += 1;
+      this.runtimeRegionText = '';
+      return;
+    }
+    const token = this.runtimeRegionSnapshotTaskToken + 1;
+    this.runtimeRegionSnapshotTaskToken = token;
+    let regionCode: number | undefined = undefined;
+    try {
+      regionCode = await runtimeCoreControlController.getRegionCodeAsync({
+        shouldCancel: () => !this.pageActive || token !== this.runtimeRegionSnapshotTaskToken || !this.gameRunning
+      });
+    } catch (err) {
+      if (!this.pageActive || token !== this.runtimeRegionSnapshotTaskToken || !this.gameRunning) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Core', `读取运行时区域失败: ${message}`);
+      this.runtimeRegionText = 'Region: 读取失败';
+      return;
+    }
+    if (!this.pageActive || token !== this.runtimeRegionSnapshotTaskToken || !this.gameRunning) {
+      return;
+    }
+    this.runtimeRegionText = this.formatRuntimeRegionText(regionCode);
+  }
+
+  private formatRuntimeRegionText(regionCode: number | undefined): string {
+    if (regionCode === undefined) {
+      return 'Region: AUTO / UNKNOWN';
+    }
+    if (regionCode === 1) {
+      return 'Region: PAL';
+    }
+    if (regionCode === 0) {
+      return 'Region: NTSC';
+    }
+    return `Region: AUTO / UNKNOWN (${regionCode})`;
+  }
+
+  private resetRuntimeStatusSnapshot(): void {
+    this.runtimeStatusSnapshotTaskToken += 1;
+    this.runtimeStateText = '';
+    this.runtimeLoadStateText = '';
+    this.runtimeSaveStateSizeText = '';
+    this.runtimeInputDebugText = '';
+  }
+
+  private refreshRuntimeStatusSnapshot(): void {
+    const token = this.runtimeStatusSnapshotTaskToken + 1;
+    this.runtimeStatusSnapshotTaskToken = token;
+
+    if (!this.pageActive || !this.gameRunning || !this.gamePaused) {
+      this.runtimeStateText = '';
+      this.runtimeLoadStateText = '';
+      this.runtimeSaveStateSizeText = '';
+      this.runtimeInputDebugText = '';
+      return;
+    }
+
+    void runtimeCoreDiagnosticController.readRuntimeStatusSnapshot({
+      shouldCancel: () => !this.pageActive || token !== this.runtimeStatusSnapshotTaskToken || !this.gamePaused
+    }).then((snapshot: RuntimeStatusSnapshot) => {
+      if (!this.pageActive || token !== this.runtimeStatusSnapshotTaskToken || !this.gamePaused) {
+        return;
+      }
+      this.runtimeStateText = this.formatRuntimeStateText(snapshot.state);
+      this.runtimeLoadStateText = this.formatRuntimeLoadStateText(
+        snapshot.coreLoaded,
+        snapshot.gameLoaded
+      );
+      this.runtimeSaveStateSizeText = this.formatRuntimeSaveStateSizeText(snapshot.saveStateSizeBytes);
+      this.runtimeInputDebugText = this.formatRuntimeInputDebugText(snapshot.inputDebugStats);
+    }).catch((err: Error) => {
+      if (!this.pageActive || token !== this.runtimeStatusSnapshotTaskToken || !this.gamePaused) {
+        return;
+      }
+      this.runtimeStateText = '运行态: 读取失败';
+      this.runtimeLoadStateText = '';
+      this.runtimeSaveStateSizeText = '';
+      this.runtimeInputDebugText = '';
+      LogHelper.warn('LibretroGame', 'Runtime', `读取运行态快照失败: ${err.message || String(err)}`);
+    });
+  }
+
+  private formatRuntimeStateText(state: number): string {
+    switch (state) {
+      case EngineState.CORE_LOADED:
+        return '运行态: 核心已加载';
+      case EngineState.GAME_LOADED:
+        return '运行态: 游戏已加载';
+      case EngineState.RUNNING:
+        return '运行态: 运行中';
+      case EngineState.PAUSED:
+        return '运行态: 已暂停';
+      case EngineState.STOPPING:
+        return '运行态: 停止中';
+      case EngineState.STOPPED:
+        return '运行态: 已停止';
+      case EngineState.STARTING:
+        return '运行态: 启动中';
+      case EngineState.LOADING:
+        return '运行态: 加载中';
+      case EngineState.ERROR:
+        return '运行态: 错误态';
+      case EngineState.INIT:
+        return '运行态: 初始化';
+      default:
+        return `运行态: 未知 (${state})`;
+    }
+  }
+
+  private formatRuntimeLoadStateText(coreLoaded: boolean, gameLoaded: boolean): string {
+    return `Core/Game: ${coreLoaded ? 'Y' : 'N'} / ${gameLoaded ? 'Y' : 'N'}`;
+  }
+
+  private formatRuntimeSaveStateSizeText(byteLength: number): string {
+    return `即时存档大小: ${this.formatRuntimeByteSize(byteLength)}`;
+  }
+
+  private formatRuntimeInputDebugText(stats: RuntimeInputDebugStats): string {
+    return `Input: ` +
+      `T${stats.touchCount}(${stats.lastTouchType}) ` +
+      `M${stats.mouseCount}(${stats.lastMouseAction}) ` +
+      `K${stats.keyCount}(${stats.lastKeyAction}) ` +
+      `F${stats.hasFocus ? 1 : 0} D${stats.mouseDown ? 1 : 0}`;
+  }
+
+  private formatRuntimeByteSize(byteLength: number): string {
+    if (byteLength <= 0) {
+      return '0 B';
+    }
+    if (byteLength < 1024) {
+      return `${byteLength} B`;
+    }
+    if (byteLength < 1024 * 1024) {
+      return `${Math.floor(byteLength / 1024)} KB`;
+    }
+    return `${(byteLength / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  private resetRuntimeDiskControlState(): void {
+    this.runtimeDiskControlTaskToken += 1;
+    this.runtimeDiskControlSnapshotToken += 1;
+    this.diskControlSupported = false;
+    this.diskControlType = '';
+    this.diskControlImageCount = 0;
+    this.diskControlImageIndex = 0;
+    this.diskControlEjected = false;
+    this.diskControlStatusText = '';
+    this.diskControlBusy = false;
+  }
+
+  private refreshRuntimeDiskControlSnapshot(statusPrefix: string = ''): void {
+    if (!this.diskControlSupported) {
+      return;
+    }
+
+    const token = this.runtimeDiskControlSnapshotToken + 1;
+    this.runtimeDiskControlSnapshotToken = token;
+    void runtimeDiskControlController.getSnapshotAsync().then((snapshot) => {
+      if (!this.pageActive || token !== this.runtimeDiskControlSnapshotToken) {
+        return;
+      }
+      this.diskControlImageCount = snapshot.imageCount;
+      this.diskControlImageIndex = snapshot.imageIndex;
+      this.diskControlEjected = snapshot.ejected;
+
+      const modeText = this.diskControlType === 'ext'
+        ? '扩展接口'
+        : (this.diskControlType === 'basic' ? '基础接口' : '已接入');
+      const imageText = snapshot.imageCount > 0
+        ? `当前 ${snapshot.imageIndex + 1}/${snapshot.imageCount} 张`
+        : '当前未报告磁盘映像';
+      const ejectText = snapshot.ejected ? '磁盘已弹出' : '磁盘已插入';
+      const statusText = `换盘接口 ${modeText} | ${imageText} | ${ejectText}`;
+      this.diskControlStatusText = statusPrefix.length > 0
+        ? `${statusPrefix} · ${statusText}`
+        : statusText;
+    }).catch((err: Error) => {
+      if (!this.pageActive || token !== this.runtimeDiskControlSnapshotToken) {
+        return;
+      }
+      this.diskControlStatusText = statusPrefix.length > 0 ? statusPrefix : '读取换盘状态失败';
+      LogHelper.warn('LibretroGame', 'Disk', `读取运行态换盘快照失败: ${err.message || String(err)}`);
+    });
+  }
+
+  private async handleRuntimeDiskToggleEject(): Promise<void> {
+    if (!this.diskControlSupported || this.diskControlBusy) {
+      return;
+    }
+    const token = this.beginRuntimeDiskControlTask();
+    const nextEjected = !this.diskControlEjected;
+    this.diskControlBusy = true;
+    try {
+      const ok = await runtimeDiskControlController.setEjectStateAsync(nextEjected);
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      if (!ok) {
+        this.diskControlBusy = false;
+        this.refreshRuntimeDiskControlSnapshot(
+          nextEjected ? '弹出当前磁盘失败' : '插回当前磁盘失败'
+        );
+        return;
+      }
+      this.diskControlBusy = false;
+      this.refreshRuntimeDiskControlSnapshot(
+        nextEjected ? '当前磁盘已弹出' : '当前磁盘已插回'
+      );
+    } catch (err) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Disk', `切换磁盘弹仓状态异常: ${message}`);
+      this.diskControlBusy = false;
+      this.refreshRuntimeDiskControlSnapshot(
+        nextEjected ? '弹出当前磁盘异常' : '插回当前磁盘异常'
+      );
+    }
+  }
+
+  private async switchRuntimeDisk(step: number): Promise<void> {
+    if (!this.diskControlSupported || this.diskControlBusy) {
+      return;
+    }
+    if (this.diskControlImageCount <= 1) {
+      this.refreshRuntimeDiskControlSnapshot('当前核心未报告可切换的多盘映像');
+      return;
+    }
+    const token = this.beginRuntimeDiskControlTask();
+    this.diskControlBusy = true;
+
+    const maxIndex = this.diskControlImageCount - 1;
+    const targetIndex = Math.max(0, Math.min(maxIndex, this.diskControlImageIndex + step));
+    if (targetIndex === this.diskControlImageIndex) {
+      this.diskControlBusy = false;
+      this.refreshRuntimeDiskControlSnapshot(
+        step < 0 ? '已经是第一张盘' : '已经是最后一张盘'
+      );
+      return;
+    }
+
+    const restoreInserted = !this.diskControlEjected;
+    try {
+      if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(true)) {
+        if (!this.isCurrentRuntimeDiskControlTask(token)) {
+          return;
+        }
+        this.diskControlBusy = false;
+        this.refreshRuntimeDiskControlSnapshot('换盘失败：当前磁盘无法弹出');
+        return;
+      }
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+        return;
+      }
+
+      if (!await runtimeDiskControlController.setImageIndexAsync(targetIndex)) {
+        if (!this.isCurrentRuntimeDiskControlTask(token)) {
+          await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+          return;
+        }
+        if (restoreInserted) {
+          await runtimeDiskControlController.setEjectStateAsync(false);
+        }
+        if (!this.isCurrentRuntimeDiskControlTask(token)) {
+          return;
+        }
+        this.diskControlBusy = false;
+        this.refreshRuntimeDiskControlSnapshot(`切换到第 ${targetIndex + 1} 张盘失败`);
+        return;
+      }
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+        return;
+      }
+
+      if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(false)) {
+        if (!this.isCurrentRuntimeDiskControlTask(token)) {
+          return;
+        }
+        this.diskControlBusy = false;
+        this.refreshRuntimeDiskControlSnapshot(
+          `已切到第 ${targetIndex + 1} 张盘，但插回失败`
+        );
+        return;
+      }
+
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      this.diskControlBusy = false;
+      this.refreshRuntimeDiskControlSnapshot(`已切换到第 ${targetIndex + 1} 张盘`);
+    } catch (err) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Disk', `切换运行时磁盘异常: ${message}`);
+      this.diskControlBusy = false;
+      this.refreshRuntimeDiskControlSnapshot(`切换到第 ${targetIndex + 1} 张盘异常`);
+    }
+  }
+
+  private async handleRuntimeDiskReplaceCurrentImage(): Promise<void> {
+    if (!this.diskControlSupported) {
+      return;
+    }
+    if (this.diskControlImageCount <= 0) {
+      this.refreshRuntimeDiskControlSnapshot('当前没有可替换的磁盘映像');
+      return;
+    }
+
+    const token = this.beginRuntimeDiskControlTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      this.diskControlBusy = false;
+      this.diskControlStatusText = '上下文缺失';
+      return;
+    }
+
+    this.diskControlBusy = true;
+    this.diskControlStatusText = '正在选择新的磁盘镜像...';
+    try {
+      const result = await importPickedRuntimeDiskImages(context, {
+        shouldCancel: () => !this.isCurrentRuntimeDiskControlTask(token)
+      });
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      if (result.canceled || result.importedEntryPath.length === 0) {
+        this.refreshRuntimeDiskControlSnapshot(result.detail.length > 0 ? result.detail : '已取消选择磁盘镜像');
+        return;
+      }
+      const statusText = await this.replaceRuntimeDiskImageAtIndex(
+        this.diskControlImageIndex,
+        result.importedEntryPath,
+        result.importedEntryName,
+        token
+      );
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      this.refreshRuntimeDiskControlSnapshot(statusText);
+    } catch (err) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Disk', `替换运行时磁盘镜像失败: ${message}`);
+      this.refreshRuntimeDiskControlSnapshot('替换磁盘镜像失败');
+    } finally {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      this.diskControlBusy = false;
+    }
+  }
+
+  private async handleRuntimeDiskAppendImage(): Promise<void> {
+    if (!this.diskControlSupported) {
+      return;
+    }
+
+    const token = this.beginRuntimeDiskControlTask();
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    if (!context) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      this.diskControlBusy = false;
+      this.diskControlStatusText = '上下文缺失';
+      return;
+    }
+
+    this.diskControlBusy = true;
+    this.diskControlStatusText = '正在导入新的磁盘镜像...';
+    try {
+      const result = await importPickedRuntimeDiskImages(context, {
+        shouldCancel: () => !this.isCurrentRuntimeDiskControlTask(token)
+      });
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      if (result.canceled || result.importedEntryPath.length === 0) {
+        this.refreshRuntimeDiskControlSnapshot(result.detail.length > 0 ? result.detail : '已取消选择磁盘镜像');
+        return;
+      }
+      const statusText = await this.appendRuntimeDiskImage(
+        result.importedEntryPath,
+        result.importedEntryName,
+        token
+      );
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      this.refreshRuntimeDiskControlSnapshot(statusText);
+    } catch (err) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      const message = (err as Error).message || String(err);
+      LogHelper.error('LibretroGame', 'Disk', `新增运行时磁盘镜像失败: ${message}`);
+      this.refreshRuntimeDiskControlSnapshot('新增磁盘镜像失败');
+    } finally {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return;
+      }
+      this.diskControlBusy = false;
+    }
+  }
+
+  private async replaceRuntimeDiskImageAtIndex(
+    index: number,
+    imagePath: string,
+    imageName: string,
+    token: number
+  ): Promise<string> {
+    const restoreInserted = !this.diskControlEjected;
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(true)) {
+      return '替换磁盘失败：当前磁盘无法弹出';
+    }
+    if (!this.isCurrentRuntimeDiskControlTask(token)) {
+      await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+      return '';
+    }
+    if (!await runtimeDiskControlController.replaceImageIndexAsync(index, imagePath)) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+        return '';
+      }
+      if (restoreInserted) {
+        await runtimeDiskControlController.setEjectStateAsync(false);
+      }
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return '';
+      }
+      return `替换第 ${index + 1} 张盘失败`;
+    }
+    if (!this.isCurrentRuntimeDiskControlTask(token)) {
+      await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+      return '';
+    }
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(false)) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return '';
+      }
+      return `已替换第 ${index + 1} 张盘 (${imageName})，但插回失败`;
+    }
+    if (!this.isCurrentRuntimeDiskControlTask(token)) {
+      return '';
+    }
+    return `已替换第 ${index + 1} 张盘 (${imageName})`;
+  }
+
+  private async appendRuntimeDiskImage(
+    imagePath: string,
+    imageName: string,
+    token: number
+  ): Promise<string> {
+    const restoreInserted = !this.diskControlEjected;
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(true)) {
+      return '新增磁盘失败：当前磁盘无法弹出';
+    }
+    if (!this.isCurrentRuntimeDiskControlTask(token)) {
+      await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+      return '';
+    }
+    if (!await runtimeDiskControlController.addImageIndexAsync()) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+        return '';
+      }
+      if (restoreInserted) {
+        await runtimeDiskControlController.setEjectStateAsync(false);
+      }
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return '';
+      }
+      return '新增磁盘槽位失败';
+    }
+    if (!this.isCurrentRuntimeDiskControlTask(token)) {
+      await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+      return '';
+    }
+
+    const snapshot = await runtimeDiskControlController.getSnapshotAsync();
+    if (!this.isCurrentRuntimeDiskControlTask(token)) {
+      await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+      return '';
+    }
+    const targetIndex = snapshot.imageCount > 0 ? snapshot.imageCount - 1 : this.diskControlImageCount;
+    if (!await runtimeDiskControlController.replaceImageIndexAsync(targetIndex, imagePath)) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        await this.restoreRuntimeDiskInsertedForStaleTask(restoreInserted, token);
+        return '';
+      }
+      if (restoreInserted) {
+        await runtimeDiskControlController.setEjectStateAsync(false);
+      }
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return '';
+      }
+      return `已新增槽位，但写入第 ${targetIndex + 1} 张盘失败`;
+    }
+    if (!this.isCurrentRuntimeDiskControlTask(token)) {
+      return '';
+    }
+    if (restoreInserted && !await runtimeDiskControlController.setEjectStateAsync(false)) {
+      if (!this.isCurrentRuntimeDiskControlTask(token)) {
+        return '';
+      }
+      return `已新增第 ${targetIndex + 1} 张盘 (${imageName})，但插回失败`;
+    }
+    if (!this.isCurrentRuntimeDiskControlTask(token)) {
+      return '';
+    }
+    return `已新增第 ${targetIndex + 1} 张盘 (${imageName})`;
+  }
+
+  private openRuntimeToolPage(url: string, label: string): void {
+    this.resumeAfterToolPage = this.gameRunning || this.gamePaused;
+    if (this.resumeAfterToolPage) {
+      this.runtimeSaveStatusText = `${label}页面已打开，返回后重新载入当前游戏`;
+    }
+    this.getUIContext().getRouter().pushUrl({ url: url }).catch((err: Error) => {
+      this.resumeAfterToolPage = false;
+      LogHelper.error('LibretroGame', 'Route', `跳转${label}页失败: ${err.message}`);
+      this.runtimeSaveStatusText = `${label}页面打开失败`;
+    });
   }
 
   handleEngineState(payload: EngineStatePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     const stateValue = Number(payload.state);
     if (!Number.isFinite(stateValue)) {
       return;
@@ -368,7 +2349,12 @@ struct LibretroGamePage {
     const paused = stateValue === EngineState.PAUSED;
     this.gameRunning = running;
     this.gamePaused = paused;
-    this.refreshHudMetricsCache();
+    if (paused) {
+      this.refreshRuntimePortControlSummaryText();
+      this.refreshRuntimeStatusSnapshot();
+    } else {
+      this.resetRuntimeStatusSnapshot();
+    }
     if (stateValue === EngineState.RUNNING && this.pendingStart) {
       this.pendingStart = false;
       LogHelper.info('LibretroGame', 'Engine', '游戏启动成功');
@@ -383,6 +2369,7 @@ struct LibretroGamePage {
 
   private updatePortAssignment(portId: number, sourceType: InputSourceType, deviceId: string) {
     this.portAssignments = updatePortAssignments(this.portAssignments, portId, sourceType, deviceId);
+    this.syncSelectedVirtualPortFromAssignments();
   }
 
   private applyPortAssignment(
@@ -390,14 +2377,15 @@ struct LibretroGamePage {
     sourceType: InputSourceType,
     updateState: boolean,
     deviceId: string = ''
-  ) {
+  ): boolean {
     const ok = runtimeInputPortController.applyPortAssignment(portId, sourceType, deviceId);
-    if (updateState) {
+    if (ok && updateState) {
       this.updatePortAssignment(portId, sourceType, deviceId);
     }
     if (!ok) {
       LogHelper.warn('LibretroGame', 'Input', `端口映射失败: port=${portId} source=${sourceType}`);
     }
+    return ok;
   }
 
   private beginActiveLibrarySession(romFile: string): void {
@@ -405,11 +2393,19 @@ struct LibretroGamePage {
   }
 
   private async finalizeActiveLibrarySession(): Promise<void> {
-    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    await this.librarySessionTracker.finalize(context);
+    try {
+      const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
+      await this.librarySessionTracker.finalize(context);
+    } catch (err) {
+      const message = (err as Error).message || String(err);
+      LogHelper.warn('LibretroGame', 'Library', `结束运行会话失败: ${message}`);
+    }
   }
 
   handleCoreCrash(payload: CoreCrashPayload) {
+    if (!this.pageActive) {
+      return;
+    }
     let message = payload.reason;
     if (payload.step) {
       message += ` (${payload.step})`;
@@ -422,11 +2418,22 @@ struct LibretroGamePage {
     this.switching = false;
     this.gameRunning = false;
     this.gamePaused = false;
+    this.closeRuntimeSaveManager();
+    this.closeRuntimeSramManager();
+    this.closeRuntimeCheatManager();
+    this.closeRuntimeCoreOptions();
+    this.closeRuntimePortControl();
+    this.resetRuntimeCoreCapabilityState();
+    this.resetRuntimeDiskControlState();
+    this.resetRuntimeStatusSnapshot();
     void this.finalizeActiveLibrarySession();
     LogHelper.error('LibretroGame', 'Event', `core_crash: ${message}`);
   }
 
   handleFpsUpdate(payload: FpsUpdatePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     const fps = Number(payload.fps);
     const displayFps = (!Number.isNaN(fps))
       ? this.normalizeFpsForDisplay(fps)
@@ -440,17 +2447,10 @@ struct LibretroGamePage {
     const buf = Number(payload.audioBufferUsage ?? 0);
     this.librarySessionTracker.updateFrameStats(fps, drops, dupes, nulls, underruns, overruns, buf);
 
-    // 整体替换触发 @State 刷新（V1 不支持字段级 mutate 观测；ArkTS 禁对象 spread，显式列字段）
-    this.perfDisplay = {
-      realtimeFps: this.perfDisplay.realtimeFps,
-      coreFps: displayFps,
-      audioStatusText: this.perfDisplay.audioStatusText,
-      perfStatsText: `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`,
-      geometryText: this.perfDisplay.geometryText
-    };
-    if (!Number.isNaN(fps)) {
-      this.refreshHudMetricsCache();
-    }
+    // 仅更新被依赖的字段，避免整页 re-render 干扰输入触发路径。
+    this.perfDisplay.coreFps = displayFps;
+    this.perfDisplay.perfStatsText = `D:${drops} Du:${dupes} N:${nulls} U/O:${underruns}/${overruns} Buf:${buf.toFixed(0)}%`;
+    this.syncRuntimePerformanceSnapshot();
   }
 
   // 限制 FPS 显示范围：> 240 视为没有 v-sync 限速的瞬时跑分值，
@@ -467,36 +2467,29 @@ struct LibretroGamePage {
   }
 
   handleAudioStatus(payload: AudioStatusPayload) {
+    if (!this.pageActive) {
+      return;
+    }
     const occupancy = Number(payload.occupancy);
     const underruns = Number(payload.underruns);
     if (Number.isNaN(occupancy) || Number.isNaN(underruns)) {
       return;
     }
     this.librarySessionTracker.updateAudioStatus(occupancy, underruns, Number(payload.overruns));
-    // 整体替换触发 @State 刷新（ArkTS 禁对象 spread，显式列字段）
-    this.perfDisplay = {
-      realtimeFps: this.perfDisplay.realtimeFps,
-      coreFps: this.perfDisplay.coreFps,
-      audioStatusText: `Buf:${occupancy.toFixed(0)}% U:${underruns}`,
-      perfStatsText: this.perfDisplay.perfStatsText,
-      geometryText: this.perfDisplay.geometryText
-    };
+    this.perfDisplay.audioStatusText =
+      `Buf:${occupancy.toFixed(0)}% U/O:${underruns}/${Number(payload.overruns ?? 0)}`;
   }
 
   handleGeometryUpdate(payload: GeometryUpdatePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     const w = Number(payload.base_width);
     const h = Number(payload.base_height);
     const a = Number(payload.aspect_ratio ?? 0);
     if (w > 0 && h > 0) {
       const aspectText = (a > 0) ? a.toFixed(3) : (w / h).toFixed(3);
-      // 整体替换触发 @State 刷新（ArkTS 禁对象 spread，显式列字段）
-      this.perfDisplay = {
-        realtimeFps: this.perfDisplay.realtimeFps,
-        coreFps: this.perfDisplay.coreFps,
-        audioStatusText: this.perfDisplay.audioStatusText,
-        perfStatsText: this.perfDisplay.perfStatsText,
-        geometryText: `Base:${w}x${h} AR:${aspectText}`
-      };
+      this.perfDisplay.geometryText = `Base:${w}x${h} AR:${aspectText}`;
       // 让 ArkUI 容器按真实游戏画面比例渲染 XComponent，避免拉伸。
       // 例如 2048 是 376×464（竖屏 ≈ 0.81），GBA 是 240×160（横屏 1.5）。
       const ratio = (a > 0) ? a : (w / h);
@@ -510,22 +2503,6 @@ struct LibretroGamePage {
     if (mask !== this.runtimeInputDescriptorMask) {
       this.runtimeInputDescriptorMask = mask;
     }
-  }
-
-  private startInputDebug() {
-    this.inputDebugTracker.start((state: RuntimeInputDebugTextState) => {
-      this.applyInputDebugTextState(state);
-    });
-  }
-
-  private stopInputDebug() {
-    this.inputDebugTracker.stop();
-  }
-
-  private applyInputDebugTextState(state: RuntimeInputDebugTextState): void {
-    this.inputDebugText = state.inputDebugText;
-    this.inputFocusText = state.inputFocusText;
-    this.uiInputDebugText = state.uiInputDebugText;
   }
 
   updateRomOptions() {
@@ -577,6 +2554,7 @@ struct LibretroGamePage {
     this.updateRomOptions();
     this.applyPendingLibraryLaunchRequest()
     this.idleHintReady = true
+    this.maybeResumeAfterToolPage()
   }
 
   private applyPendingLibraryLaunchRequest(): void {
@@ -595,7 +2573,11 @@ struct LibretroGamePage {
     const availableRoms = this.getAvailableRoms()
     const romIndex = availableRoms.findIndex((rom: RuntimeRomConfig) => rom.file === request.romFile)
     if (romIndex < 0) {
-      LogHelper.warn('LibretroGame', 'Library', `未找到目标 ROM: ${request.romFile}`)
+      LogHelper.warn(
+        'LibretroGame',
+        'Library',
+        `未找到目标 ROM: ${LogHelper.describePathForLog(request.romFile)}`
+      )
       return
     }
 
@@ -619,23 +2601,32 @@ struct LibretroGamePage {
     return consumePendingLibraryLaunchRequest()
   }
 
+  private maybeResumeAfterToolPage(): void {
+    if (!this.resumeAfterToolPage || this.gameRunning || this.switching) {
+      return
+    }
+    const core = this.cores[this.selectedCoreIndex]
+    const rom = this.getAvailableRoms()[this.selectedRomIndex]
+    if (!core || !rom) {
+      return
+    }
+    this.resumeAfterToolPage = false
+    this.runtimeSaveStatusText = '已返回运行页，正在重新载入当前游戏'
+    void this.startOrSwitchGame(true)
+  }
+
   private getRuntimeFpsText(): string {
     const fps = this.perfDisplay.coreFps > 0 ? this.perfDisplay.coreFps : this.perfDisplay.realtimeFps;
     return fps > 0 ? fps.toFixed(1) : '--.-';
   }
 
-  private getRuntimeLatencyText(): string {
-    if (this.librarySessionTracker.audioBufferUsage > 0) {
-      return `${Math.max(1, Math.round(this.librarySessionTracker.audioBufferUsage * 8))}ms`;
-    }
-    return '--';
+  private getRuntimeCpuLoadPercent(): number {
+    return this.perfDisplay.cpuLoadPercent > 0 ? this.perfDisplay.cpuLoadPercent : 0;
   }
 
-  private getRuntimeCoreText(): string {
-    if (this.currentCore.length > 0) {
-      return this.currentCore.replace('.so', '').toUpperCase();
-    }
-    return '--';
+  private getRuntimeCpuLoadText(): string {
+    const load = this.getRuntimeCpuLoadPercent();
+    return load > 0 ? `${load}%` : '--';
   }
 
   private getRuntimeProcessText(): string {
@@ -645,14 +2636,63 @@ struct LibretroGamePage {
     return 'IDLE';
   }
 
-  private refreshHudMetricsCache(): void {
-    this.hudMetricsCache[0].value = this.getRuntimeFpsText();
-    this.hudMetricsCache[1].value = this.getRuntimeLatencyText();
-    this.hudMetricsCache[2].value = this.getRuntimeCoreText();
+  private resetRuntimePerformanceDisplay(): void {
+    this.perfDisplay.realtimeFps = 0;
+    this.perfDisplay.coreFps = 0;
+    this.perfDisplay.cpuLoadPercent = 0;
+    this.perfDisplay.audioStatusText = '';
+    this.perfDisplay.perfStatsText = '';
+    this.perfDisplay.geometryText = '';
   }
 
-  private getRuntimeHudMetrics(): RuntimeHudMetric[] {
-    return this.hudMetricsCache;
+  private syncRuntimePerformanceSnapshot(): void {
+    try {
+      const stats = runtimeSessionController.getStats();
+      const avInfo = runtimeSessionController.getAVInfo();
+      const loadPercent = this.estimateFrameLoadPercent(stats, avInfo);
+      this.perfDisplay.cpuLoadPercent = loadPercent;
+
+      const frameCount = Number(stats.frameCount);
+      const avgFrameUs = frameCount > 0 ? Number(stats.frameTimeSum) / frameCount : 0;
+      if (avgFrameUs > 0) {
+        const measuredFps = 1000000 / avgFrameUs;
+        if (Number.isFinite(measuredFps) && measuredFps > 0) {
+          this.perfDisplay.realtimeFps = Math.min(240, measuredFps);
+        } else {
+          this.perfDisplay.realtimeFps = 0;
+        }
+      } else {
+        this.perfDisplay.realtimeFps = 0;
+      }
+    } catch (_) {
+    }
+  }
+
+  private estimateFrameLoadPercent(
+    stats: RuntimePerformanceStats,
+    avInfo: RuntimeAVInfo
+  ): number {
+    const frameCount = Number(stats.frameCount);
+    const frameTimeSum = Number(stats.frameTimeSum);
+    if (!Number.isFinite(frameCount) || frameCount <= 0 || !Number.isFinite(frameTimeSum) || frameTimeSum <= 0) {
+      return 0;
+    }
+
+    const avgFrameUs = frameTimeSum / frameCount;
+    const targetFps = Number(avInfo.fps) > 0
+      ? Number(avInfo.fps)
+      : (this.perfDisplay.coreFps > 0 ? this.perfDisplay.coreFps : 60);
+    if (!Number.isFinite(targetFps) || targetFps <= 0) {
+      return 0;
+    }
+
+    const frameBudgetUs = 1000000 / targetFps;
+    if (!Number.isFinite(frameBudgetUs) || frameBudgetUs <= 0) {
+      return 0;
+    }
+
+    const percent = Math.round((avgFrameUs / frameBudgetUs) * 100);
+    return Math.max(0, Math.min(250, percent));
   }
 
   // 折叠态检测：根据屏幕宽高比判断折叠态
@@ -689,7 +2729,10 @@ struct LibretroGamePage {
         // 双折态：Digital GameBoy 布局
         DualModeLayout({
           xComponentId: this.xComponentId,
-          screenAspectRatio: this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3,
+          screenAspectRatio: this.getRuntimeScreenAspectRatio(),
+          scanlineIntensity: this.visualSettingsProfile.scanlineIntensity,
+          screenCurvature: this.visualSettingsProfile.curvature,
+          screenSaturation: this.visualSettingsProfile.saturation,
           onKeyPress: (keyId: number, pressed: boolean) => {
             this.setButton(keyId, pressed);
           },
@@ -704,9 +2747,12 @@ struct LibretroGamePage {
         // 三折态：Switch Layout 布局
         TripleModeLayout({
           xComponentId: this.xComponentId,
-          screenAspectRatio: this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3,
+          screenAspectRatio: this.getRuntimeScreenAspectRatio(),
+          scanlineIntensity: this.visualSettingsProfile.scanlineIntensity,
+          screenCurvature: this.visualSettingsProfile.curvature,
+          screenSaturation: this.visualSettingsProfile.saturation,
           fps: this.perfDisplay.coreFps,
-          cpuUsage: 0,
+          cpuUsage: this.getRuntimeCpuLoadPercent(),
           onKeyPress: (keyId: number, pressed: boolean) => {
             this.setButton(keyId, pressed);
           },
@@ -787,6 +2833,46 @@ struct LibretroGamePage {
           processText: this.getRuntimeProcessText(),
           saveStatusText: this.runtimeSaveStatusText,
           fpsText: this.getRuntimeFpsText(),
+          cpuLoadText: this.getRuntimeCpuLoadText(),
+          perfStatsText: this.perfDisplay.perfStatsText,
+          audioStatusText: this.perfDisplay.audioStatusText,
+          geometryText: this.perfDisplay.geometryText,
+          regionText: this.runtimeRegionText,
+          runtimeStateText: this.runtimeStateText,
+          runtimeLoadStateText: this.runtimeLoadStateText,
+          runtimeSaveStateSizeText: this.runtimeSaveStateSizeText,
+          runtimeInputDebugText: this.runtimeInputDebugText,
+          diskControlVisible: this.diskControlSupported,
+          diskControlModeText: this.getRuntimeDiskControlModeText(),
+          diskControlStatusText: this.diskControlStatusText,
+          diskImageIndex: this.diskControlImageIndex,
+          diskImageCount: this.diskControlImageCount,
+          diskEjected: this.diskControlEjected,
+          diskControlBusy: this.diskControlBusy,
+          saveManagerVisible: this.runtimeSaveManagerVisible,
+          saveManagerBusy: this.runtimeSaveManagerBusy,
+          saveManagerSummaryText: this.runtimeSaveManagerSummaryText,
+          saveManagerItems: this.runtimeSaveManagerItems,
+          sramManagerVisible: this.runtimeSramManagerVisible,
+          sramManagerBusy: this.runtimeSramManagerBusy,
+          sramManagerSummaryText: this.runtimeSramManagerSummaryText,
+          sramManagerItems: this.runtimeSramManagerItems,
+          cheatManagerVisible: this.runtimeCheatManagerVisible,
+          cheatManagerBusy: this.runtimeCheatManagerBusy,
+          cheatManagerSupported: this.runtimeCheatManagerSupported,
+          cheatManagerSummaryText: this.runtimeCheatManagerSummaryText,
+          cheatManagerItems: this.runtimeCheatManagerItems,
+          cheatDraftName: this.runtimeCheatDraftName,
+          cheatDraftCode: this.runtimeCheatDraftCode,
+          coreOptionsVisible: this.runtimeCoreOptionsVisible,
+          coreOptionsBusy: this.runtimeCoreOptionsBusy,
+          coreOptionsSummaryText: this.runtimeCoreOptionsSummaryText,
+          coreOptionsItems: this.runtimeCoreOptionsItems,
+          portControlVisible: this.runtimePortControlVisible,
+          portControlSummaryText: this.runtimePortControlSummaryText,
+          portAssignments: this.portAssignments,
+          selectedPortIndex: this.selectedPortIndex,
+          selectedControllerDevice: this.getRuntimeControllerDeviceForPort(this.selectedPortIndex),
           onResume: () => {
             this.resumeGame();
           },
@@ -795,6 +2881,96 @@ struct LibretroGamePage {
           },
           onAction: (actionCode: string) => {
             this.handlePauseTileAction(actionCode);
+          },
+          onDiskToggleEject: () => {
+            void this.handleRuntimeDiskToggleEject();
+          },
+          onDiskSelectPrevious: () => {
+            void this.switchRuntimeDisk(-1);
+          },
+          onDiskSelectNext: () => {
+            void this.switchRuntimeDisk(1);
+          },
+          onDiskRefresh: () => {
+            this.refreshRuntimeDiskControlSnapshot();
+          },
+          onDiskReplaceCurrent: () => {
+            void this.handleRuntimeDiskReplaceCurrentImage();
+          },
+          onDiskAppendImage: () => {
+            void this.handleRuntimeDiskAppendImage();
+          },
+          onSaveManagerToggle: () => {
+            this.toggleRuntimeSaveManager();
+          },
+          onSaveManagerCreate: () => {
+            void this.quickSaveRuntimeState();
+          },
+          onSaveManagerRefresh: () => {
+            void this.refreshRuntimeSaveManagerPanel();
+          },
+          onSaveManagerLoad: (fileName: string) => {
+            void this.loadRuntimeSaveStateByFileName(fileName);
+          },
+          onSaveManagerDelete: (fileName: string) => {
+            void this.deleteRuntimeSaveStateByFileName(fileName);
+          },
+          onSramManagerToggle: () => {
+            this.toggleRuntimeSramManager();
+          },
+          onSramManagerCreate: () => {
+            void this.exportCurrentRuntimeSramBackup();
+          },
+          onSramManagerRefresh: () => {
+            void this.refreshRuntimeSramManagerPanel();
+          },
+          onSramManagerLoad: (fileName: string) => {
+            void this.loadRuntimeSramBackupByFileName(fileName);
+          },
+          onSramManagerDelete: (fileName: string) => {
+            void this.deleteRuntimeSramBackupByFileName(fileName);
+          },
+          onCheatManagerToggle: () => {
+            this.toggleRuntimeCheatManager();
+          },
+          onCheatManagerRefresh: () => {
+            void this.refreshRuntimeCheatManagerPanel();
+          },
+          onCheatManagerAdd: () => {
+            void this.addRuntimeCheat();
+          },
+          onCheatManagerDisableAll: () => {
+            void this.disableAllRuntimeCheats();
+          },
+          onCheatManagerDraftNameChange: (value: string) => {
+            this.updateRuntimeCheatDraftName(value);
+          },
+          onCheatManagerDraftCodeChange: (value: string) => {
+            this.updateRuntimeCheatDraftCode(value);
+          },
+          onCheatManagerToggleItem: (id: string) => {
+            void this.toggleRuntimeCheatItem(id);
+          },
+          onCheatManagerDelete: (id: string) => {
+            void this.deleteRuntimeCheatItem(id);
+          },
+          onCoreOptionsToggle: () => {
+            this.toggleRuntimeCoreOptions();
+          },
+          onCoreOptionsRefresh: () => {
+            void this.refreshRuntimeCoreOptionsPanel();
+          },
+          onCoreOptionAdvance: (key: string, value: string) => {
+            void this.advanceRuntimeCoreOption(key, value);
+          },
+          onPortControlToggle: () => {
+            this.toggleRuntimePortControl();
+          },
+          onVirtualPortSelect: (portId: number) => {
+            void this.selectRuntimeVirtualPort(portId);
+          },
+          onControllerDeviceSelect: (device: number) => {
+            void this.applyRuntimeControllerPortDevice(device);
           }
         })
       }
@@ -870,41 +3046,46 @@ struct LibretroGamePage {
       // gameAspectRatio 居中显示（2048 竖屏 ~0.81、GBA 横屏 1.5 等），
       // 不再被强行拉成全屏比例。
       Stack({ alignContent: Alignment.Center }) {
-        XComponent({
-          id: this.xComponentId,
-          type: XComponentType.SURFACE,
-          libraryname: 'entry'
-        })
-          .aspectRatio(this.gameAspectRatio > 0 ? this.gameAspectRatio : 4 / 3)
-          .constraintSize({ maxWidth: '100%', maxHeight: '100%' })
-          .focusable(true)
-          .focusOnTouch(true)
-          .onTouch((event) => {
-            this.inputDebugTracker.recordTouch(Number(event.type));
+        Stack({ alignContent: Alignment.Center }) {
+          XComponent({
+            id: this.xComponentId,
+            type: XComponentType.SURFACE,
+            libraryname: 'entry'
           })
-          .onMouse((event) => {
-            this.inputDebugTracker.recordMouse(Number(event.action));
-          })
-          .onKeyEvent((event) => {
-            if (!event) {
-              return;
-            }
-            this.inputDebugTracker.recordKey(Number(event.type));
-          })
-          .onLoad(() => {
-            LogHelper.info(
-              'LibretroGame',
-              'UI',
-              `XComponent 加载完成 (New Arch) id=${this.xComponentId}`
-            );
-          })
-          .onDestroy(() => {
-            LogHelper.info(
-              'LibretroGame',
-              'UI',
-              `XComponent 销毁 (New Arch) id=${this.xComponentId}`
-            );
-          })
+            .aspectRatio(this.getRuntimeScreenAspectRatio())
+            .constraintSize({ maxWidth: '100%', maxHeight: '100%' })
+            .focusable(true)
+            .focusOnTouch(true)
+            .onLoad(() => {
+              LogHelper.info(
+                'LibretroGame',
+                'UI',
+                `XComponent 加载完成 (New Arch) id=${this.xComponentId}`
+              );
+            })
+            .onDestroy(() => {
+              LogHelper.info(
+                'LibretroGame',
+                'UI',
+                `XComponent 销毁 (New Arch) id=${this.xComponentId}`
+              );
+            })
+
+          if (this.visualSettingsProfile.scanlineIntensity > 0) {
+            ScanlineBackground({
+              lineColor: '#2400FF41',
+              lineSpacing: this.getRuntimeScreenScanlineSpacing(),
+              alternateColor: '#0F000000'
+            })
+              .aspectRatio(this.getRuntimeScreenAspectRatio())
+              .constraintSize({ maxWidth: '100%', maxHeight: '100%' })
+              .opacity(this.getRuntimeScreenScanlineOpacity())
+              .hitTestBehavior(HitTestMode.None)
+          }
+        }
+        .saturate(this.getRuntimeScreenSaturationFactor())
+        .borderRadius(this.getRuntimeScreenCornerRadius())
+        .clip(true)
       }
       .width('100%')
       .layoutWeight(this.gameRunning && !this.gamePaused && !this.hideVirtualController ? 65 : 100)
@@ -917,7 +3098,7 @@ struct LibretroGamePage {
             buttons: this.runtimeInputLayoutButtons,
             layoutWidth: this.runtimeInputLayoutWidth,
             layoutHeight: this.runtimeInputLayoutHeight,
-            inputDescriptorMask: this.runtimeInputDescriptorMask,
+            inputDescriptorMask: this.hideUndeclaredKeys ? this.runtimeInputDescriptorMask : 0,
             onButtonChange: (keyId: number, pressed: boolean) => {
               this.setButton(keyId, pressed);
             },
@@ -957,6 +3138,7 @@ struct LibretroGamePage {
     this.switching = true;
     this.switchProgress = 0;
     this.switchProgressText = '准备切换...';
+    this.resetRuntimePerformanceDisplay();
     const core = this.cores[this.selectedCoreIndex];
     const availableRoms = this.getAvailableRoms();
     const rom = availableRoms[this.selectedRomIndex];
@@ -986,22 +3168,40 @@ struct LibretroGamePage {
       }
       this.lastStartOrSwitchAtMs = nowMs;
     }
+    this.resetRuntimeCoreCapabilityState();
+    this.resetRuntimeDiskControlState();
+    this.resetRuntimeStatusSnapshot();
+    this.closeRuntimeSaveManager();
+    this.closeRuntimeSramManager();
+    this.closeRuntimeCheatManager();
+    this.closeRuntimeCoreOptions();
+    this.closeRuntimePortControl();
     const token = this.switchToken + 1;
     this.switchToken = token;
-    await this.finalizeActiveLibrarySession();
-    if (!this.isCurrentSwitchTask(token)) {
-      return;
-    }
-
-    LogHelper.info(
-      'LibretroGame',
-      'Engine',
-      `[NewArch] 开始游戏: ${core.name} - ${rom.name}`
-    );
     this.switchError = '';
     let success = false;
 
     try {
+      await this.finalizeActiveLibrarySession();
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
+
+      await this.refreshRuntimeLaunchState();
+      if (!this.isCurrentSwitchTask(token)) {
+        return;
+      }
+      const renderConfigApplied = this.applyRuntimeRenderSettingsToNative('prelaunch');
+      if (!renderConfigApplied) {
+        this.runtimeSaveStatusText = '运行时画面配置写入失败，已继续按当前引擎状态启动';
+      }
+
+      LogHelper.info(
+        'LibretroGame',
+        'Engine',
+        `[NewArch] 开始游戏: ${core.name} - ${rom.name}`
+      );
+
       // 1. 获取上下文
       const context = this.getUIContext().getHostContext() as
         common.UIAbilityContext;
@@ -1018,8 +3218,9 @@ struct LibretroGamePage {
       if (!this.isCurrentSwitchTask(token)) {
         return;
       }
-      LogHelper.info('LibretroGame', 'Engine', `加载 Core: ${corePath}`);
-      LogHelper.info('LibretroGame', 'Engine', `加载 ROM: ${rom.file}`);
+      this.inspectCurrentCoreCapabilities(corePath, token);
+      LogHelper.info('LibretroGame', 'Engine', `加载 Core: ${LogHelper.describePathForLog(corePath)}`);
+      LogHelper.info('LibretroGame', 'Engine', `加载 ROM: ${LogHelper.describePathForLog(rom.file)}`);
       const resolved = resolveRuntimeRomPathForSwitch(
         rom.file,
         resMgr,
@@ -1031,7 +3232,7 @@ struct LibretroGamePage {
       LogHelper.info(
         'LibretroGame',
         'Engine',
-        `Resolved ROM path: ${resolved.romPath}, useResMgr=${resolved.useResMgr}`
+        `Resolved ROM path: ${LogHelper.describePathForLog(resolved.romPath)}, useResMgr=${resolved.useResMgr}`
       );
       const result = await runtimeSessionController.switchGame({
         corePath,
@@ -1041,6 +3242,9 @@ struct LibretroGamePage {
         token,
         resourceManager: resolved.useResMgr ? resMgr : undefined,
         progressCallback: (progress: number, message: string) => {
+          if (!this.isCurrentSwitchTask(token)) {
+            return;
+          }
           this.switchProgress = progress;
           this.switchProgressText = message;
         }
@@ -1063,11 +3267,26 @@ struct LibretroGamePage {
       this.gameRunning = true;
       this.gamePaused = false;
       this.pendingStart = false;
+      this.applyRuntimeRenderSettingsToNative('postlaunch');
+      // D019: 游戏启动成功(引擎 RUNNING、AudioBridge 已 Reset(sample_rate))后应用
+      // 音频缓冲延迟,加深 RingBuffer 水位抗 callback 抖动(模拟器/低端机 underrun)。
+      // 生产路径此前从不调用,沿用默认 latency=0(浅缓冲),故模拟器抖动即 underrun。
+      runtimeAudioSettingsController.setMinimumAudioLatency(this.audioSettingsProfile.latencyMs);
+      runtimeAudioSettingsController.setVolumePercent(this.audioSettingsProfile.volumePercent);
+      void this.reapplyRuntimeControllerPortDevice();
       // core 在 retro_load_game / retro_run 早期 frame 通过 SET_INPUT_DESCRIPTORS
       // 声明使用的按键,这里在 switchGame 成功后立刻拉一次。
       this.runtimeInputDescriptorMask = getRuntimeInputDescriptorMask();
-      this.refreshHudMetricsCache();
-      await markLibraryRecordPlayed(context, rom.file);
+      this.syncRuntimePerformanceSnapshot();
+      if (this.runtimeCheatManagerSupported) {
+        void this.restoreRuntimeCheatsForCurrentRom(true);
+      }
+      try {
+        await markLibraryRecordPlayed(context, rom.file);
+      } catch (markErr) {
+        const message = (markErr as Error).message || String(markErr);
+        LogHelper.warn('LibretroGame', 'Library', `更新最近游玩记录失败: ${message}`);
+      }
       if (!this.isCurrentSwitchTask(token)) {
         return;
       }
@@ -1112,6 +3331,7 @@ struct LibretroGamePage {
         void runtimeSessionController.stopAsync();
       }
       this.switching = false;
+      let nextSwitch: PendingSwitch | undefined = undefined;
       if (this.pendingSwitch) {
         const pending = this.pendingSwitch;
         this.pendingSwitch = undefined;
@@ -1129,8 +3349,9 @@ struct LibretroGamePage {
             this.switchError = `切换失败: ${this.switchError || '未知错误'} (已重试 ${pending.retryCount} 次)`;
             return;
           }
-          // 增加重试计数
-          this.pendingSwitch = {
+          // 同一请求的失败重试直接作为下一次切换执行，避免把重试再次留在
+          // pending 队列里并在成功后触发重复切换。
+          nextSwitch = {
             coreIndex: pending.coreIndex,
             romIndex: pending.romIndex,
             retryCount: pending.retryCount + 1
@@ -1140,15 +3361,18 @@ struct LibretroGamePage {
             'Engine',
             `切换失败，准备重试 (${pending.retryCount + 1}/${this.maxSwitchRetries})`
           );
+        } else {
+          nextSwitch = pending;
         }
-
+      }
+      if (nextSwitch) {
         // 执行 pending 切换
-        this.selectedCoreIndex = pending.coreIndex;
+        this.selectedCoreIndex = nextSwitch.coreIndex;
         this.updateRomOptions();
         const availableRoms = this.getAvailableRoms();
         this.selectedRomIndex =
-          pending.romIndex < availableRoms.length ? pending.romIndex : 0;
-        this.startOrSwitchGame(true);
+          nextSwitch.romIndex < availableRoms.length ? nextSwitch.romIndex : 0;
+        void this.startOrSwitchGame(true);
       }
     }
   }
@@ -1169,8 +3393,15 @@ struct LibretroGamePage {
   // 暂停游戏
   pauseGame() {
     if (this.gameRunning && !this.gamePaused) {
+      this.syncRuntimePerformanceSnapshot();
       runtimeSessionController.pause();
       this.gamePaused = true;
+      void this.refreshRuntimeRegionSnapshot();
+      this.refreshRuntimePortControlSummaryText();
+      this.refreshRuntimeStatusSnapshot();
+      if (this.diskControlSupported) {
+        this.refreshRuntimeDiskControlSnapshot();
+      }
       this.setKeepScreenOn(false);
       LogHelper.info('LibretroGame', 'Engine', '游戏已暂停');
     }
@@ -1181,6 +3412,12 @@ struct LibretroGamePage {
     if (this.gameRunning && this.gamePaused) {
       runtimeSessionController.resume();
       this.gamePaused = false;
+      this.resetRuntimeStatusSnapshot();
+      this.closeRuntimeSaveManager();
+      this.closeRuntimeSramManager();
+      this.closeRuntimeCheatManager();
+      this.closeRuntimeCoreOptions();
+      this.closeRuntimePortControl();
       this.setKeepScreenOn(true);
       LogHelper.info('LibretroGame', 'Engine', '游戏已继续');
     }
@@ -1194,7 +3431,16 @@ struct LibretroGamePage {
       void runtimeSessionController.stopAsync();
       this.gameRunning = false;
       this.gamePaused = false;
+      this.closeRuntimeSaveManager();
+      this.closeRuntimeSramManager();
+      this.closeRuntimeCheatManager();
+      this.closeRuntimeCoreOptions();
+      this.closeRuntimePortControl();
       this.runtimeInputDescriptorMask = 0;
+      this.resetRuntimePerformanceDisplay();
+      this.resetRuntimeCoreCapabilityState();
+      this.resetRuntimeDiskControlState();
+      this.resetRuntimeStatusSnapshot();
       LogHelper.info('LibretroGame', 'Engine', '游戏已停止');
     }
   }

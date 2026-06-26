@@ -18,15 +18,15 @@ export function createEmuBottomNavItems(activeKey: EmuBottomNavKey): EmuBottomNa
   ]
 }
 
-@Component
+@ComponentV2
 export struct EmuBottomNav {
-  @Prop items: EmuBottomNavItem[] = []
-  @Prop activeFontColor: string = '#FFFFFFFF'
-  @Prop inactiveFontColor: string = '#FF666666'
-  @Prop indicatorStyle: string = 'line'
-  @Prop overallOpacity: number = 1
-  @Prop panelBackgroundColor: string = '#F2000000'
-  onItemClick?: (key: string) => void
+  @Param items: EmuBottomNavItem[] = []
+  @Param activeFontColor: string = '#FFFFFFFF'
+  @Param inactiveFontColor: string = '#FF666666'
+  @Param indicatorStyle: string = 'line'
+  @Param overallOpacity: number = 1
+  @Param panelBackgroundColor: string = '#F2000000'
+  @Event onItemClick?: (key: string) => void
 
   private isDotIndicator(): boolean {
     return this.indicatorStyle === 'dot'

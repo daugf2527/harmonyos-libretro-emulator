@@ -55,7 +55,6 @@ For cross-layer architecture see the root `CLAUDE.md`.
 | `LibretroGamePage.ets` | `inputSourceOptions` @State→private, explicit assign | Avoid per-access re-allocation, reduce re-renders |
 | `LibretroGamePage.ets` | `@Builder ControlPanelOverlay()` | First @Builder extraction, ~83 lines out of build() |
 | `LibretroGamePage.ets` | Cache `getAvailableRoms()` with reference-equality | O(roms) → O(1) after hit |
-| `LibretroGamePage.ets` | `getRuntimeHudMetrics()` reuses `hudMetricsCache` array | Avoids per-render array allocation (60×/sec at 60fps) |
 
 ### 2026-05-11 Canvas/scanline/LazyForEach session:
 

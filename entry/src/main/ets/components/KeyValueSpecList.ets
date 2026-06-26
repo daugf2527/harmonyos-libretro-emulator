@@ -5,10 +5,10 @@ export interface KeyValueSpecItem {
   value: string
 }
 
-@Component
+@ComponentV2
 export struct KeyValueSpecList {
-  @Prop title: string = ''
-  @Prop items: KeyValueSpecItem[] = []
+  @Param title: string = ''
+  @Param items: KeyValueSpecItem[] = []
 
   @Builder
   private SpecRow(item: KeyValueSpecItem) {
@@ -46,7 +46,7 @@ export struct KeyValueSpecList {
       Column() {
         ForEach(this.items, (item: KeyValueSpecItem) => {
           this.SpecRow(item)
-        }, (item: KeyValueSpecItem) => item.label)
+        }, (item: KeyValueSpecItem, index: number) => `${index}:${item.label}:${item.value}`)
       }
       .width('100%')
     }

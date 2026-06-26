@@ -10,14 +10,15 @@ if not exist "%ComSpec%" set "ComSpec=%SystemRoot%\System32\cmd.exe"
 set "SYSTEM32_DIR=%SystemRoot%\System32"
 set "POWERSHELL_DIR=%SystemRoot%\System32\WindowsPowerShell\v1.0"
 
-echo %PATH% | find /I "%SYSTEM32_DIR%" >nul
+echo %PATH% | "%SYSTEM32_DIR%\findstr.exe" /I /C:"%SYSTEM32_DIR%" >nul
 if errorlevel 1 set "PATH=%SYSTEM32_DIR%;%PATH%"
 
-echo %PATH% | find /I "%POWERSHELL_DIR%" >nul
+echo %PATH% | "%SYSTEM32_DIR%\findstr.exe" /I /C:"%POWERSHELL_DIR%" >nul
 if errorlevel 1 set "PATH=%POWERSHELL_DIR%;%PATH%"
 
 if defined HARMONY_HVIGORW_BIN if exist "%HARMONY_HVIGORW_BIN%" goto run_hvigor
 if defined HARMONY_COMMANDLINE_TOOLS_HOME if exist "%HARMONY_COMMANDLINE_TOOLS_HOME%\bin\hvigorw.bat" set "HARMONY_HVIGORW_BIN=%HARMONY_COMMANDLINE_TOOLS_HOME%\bin\hvigorw.bat"
+if not defined HARMONY_HVIGORW_BIN if exist "D:\command-line-tools\bin\hvigorw.bat" set "HARMONY_HVIGORW_BIN=D:\command-line-tools\bin\hvigorw.bat"
 if not defined HARMONY_HVIGORW_BIN if exist "D:\hongmeng\command-line-tools\bin\hvigorw.bat" set "HARMONY_HVIGORW_BIN=D:\hongmeng\command-line-tools\bin\hvigorw.bat"
 
 :run_hvigor

@@ -3,19 +3,19 @@ import { EmuCoverArt } from './EmuCoverArt'
 
 export type GameCardVariant = 'recent' | 'list'
 
-@Component
+@ComponentV2
 export struct GameCard {
-  @Prop title: string = ''
-  @Prop subtitle: string = ''
-  @Prop platform: string = ''
-  @Prop coverColor: string = '#2C2C2C'
-  @Prop coverKey: string = ''
-  @Prop coverUrl: string = ''
-  @Prop variant: GameCardVariant = 'recent'
-  @Prop @Watch('onHighlightChanged') isHighlighted: boolean = false
-  onCardClick?: () => void
-  @State private scannerOffset: number = -120
-  @State private glowOpacity: number = 0.28
+  @Param title: string = ''
+  @Param subtitle: string = ''
+  @Param platform: string = ''
+  @Param coverColor: string = '#2C2C2C'
+  @Param coverKey: string = ''
+  @Param coverUrl: string = ''
+  @Param variant: GameCardVariant = 'recent'
+  @Param isHighlighted: boolean = false
+  @Event onCardClick?: () => void
+  @Local private scannerOffset: number = -120
+  @Local private glowOpacity: number = 0.28
   private scannerTimer: number = -1
   private scannerFrame: number = 0
   private isOnScreen: boolean = true
@@ -28,7 +28,8 @@ export struct GameCard {
     this.stopScannerLoop()
   }
 
-  private onHighlightChanged(): void {
+  @Monitor('isHighlighted')
+  private onHighlightChanged(monitor: IMonitor): void {
     this.syncScannerLoop()
   }
 
