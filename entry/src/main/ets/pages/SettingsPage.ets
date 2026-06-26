@@ -163,6 +163,9 @@ struct SettingsPage {
   private visualPersistTimer: number = -1
   private audioPersistTimer: number = -1
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.updateFoldableMode(data)
   }
 

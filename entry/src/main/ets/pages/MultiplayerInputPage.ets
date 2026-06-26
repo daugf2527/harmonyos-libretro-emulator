@@ -57,9 +57,15 @@ struct MultiplayerInputPage {
   @Local private foldStatus: display.FoldStatus = display.FoldStatus.FOLD_STATUS_UNKNOWN
   @Local private displayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.foldStatus = data
   }
   private displayModeListener: (data: display.FoldDisplayMode) => void = (data: display.FoldDisplayMode) => {
+    if (!this.pageActive) {
+      return
+    }
     this.displayMode = data
   }
 

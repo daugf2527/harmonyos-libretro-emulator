@@ -56,6 +56,9 @@ struct SaveStatePage {
   private readonly coverColors: string[] = ['#274530', '#27405E', '#4A3628', '#39364A']
   private readonly formatDate: Date = new Date(0)
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.detectFoldMode()
   }
 
@@ -306,7 +309,8 @@ struct SaveStatePage {
         return
       }
       await saveStateData(context, bundle.stateData, this.currentRomFile, {
-        thumbnail: buildSaveSlotThumbnail(bundle)
+        thumbnail: buildSaveSlotThumbnail(bundle),
+        shouldCancel: () => !this.isCurrentPageTask(token)
       })
       if (!this.isCurrentPageTask(token)) {
         return

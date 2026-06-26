@@ -96,6 +96,9 @@ struct ImportEntryPage {
   private importTaskToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('library')
   private foldDisplayModeListener: (mode: display.FoldDisplayMode) => void = (mode: display.FoldDisplayMode) => {
+    if (!this.pageActive) {
+      return
+    }
     this.foldDisplayMode = mode
   }
 

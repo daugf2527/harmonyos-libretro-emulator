@@ -62,6 +62,9 @@ struct InputLayoutPage {
   private readonly editorLayoutHeight: number = 340
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('input')
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.detectFoldMode()
   }
   private readonly controllerCards: ControllerCardItem[] = [

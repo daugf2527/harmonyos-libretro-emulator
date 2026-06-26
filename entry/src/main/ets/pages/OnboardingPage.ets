@@ -73,6 +73,9 @@ struct OnboardingPage {
   @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.lifecycle.isActive()) {
+      return
+    }
     this.updateFoldDisplayMode()
   }
 

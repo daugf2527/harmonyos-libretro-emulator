@@ -498,9 +498,15 @@ struct LibretroNewArchTestPage {
     }
     this.eventScope = LibretroEventHub.getInstance().createScope();
     this.eventScope.onOptionsUpdate((_payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       void this.refreshCoreOptions();
     });
     this.eventScope.onAudioStatus((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.audioStatus = {
         active: payload.active,
         occupancy: Number(payload.occupancy) || 0,
@@ -511,15 +517,27 @@ struct LibretroNewArchTestPage {
       this.handleAudioStatus();
     });
     this.eventScope.onFpsUpdate((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.handleFpsUpdate(payload);
     });
     this.eventScope.onGeometryUpdate((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.handleGeometryUpdate(payload);
     });
     this.eventScope.onCoreMessage((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.handleCoreMessage(payload);
     });
     this.eventScope.onCoreCrash((payload) => {
+      if (!this.pageActive) {
+        return;
+      }
       this.handleCoreCrash(payload);
     });
     this.startInputDebug();
@@ -723,6 +741,9 @@ struct LibretroNewArchTestPage {
   }
 
   handleAudioStatus() {
+    if (!this.pageActive) {
+      return;
+    }
     const underruns = Number(this.audioStatus.underruns) || 0;
     if (underruns > this.lastUnderruns) {
       this.lastUnderruns = underruns;
@@ -741,6 +762,9 @@ struct LibretroNewArchTestPage {
   }
 
   handleFpsUpdate(payload: FpsUpdatePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     const v = Number(payload.fps);
     if (!Number.isNaN(v)) this.fps = v;
 
@@ -754,6 +778,9 @@ struct LibretroNewArchTestPage {
   }
 
   handleGeometryUpdate(payload: GeometryUpdatePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     const w = Number(payload.base_width);
     const h = Number(payload.base_height);
     const a = Number(payload.aspect_ratio ?? 0);
@@ -764,10 +791,16 @@ struct LibretroNewArchTestPage {
   }
 
   handleCoreMessage(payload: CoreMessagePayload) {
+    if (!this.pageActive) {
+      return;
+    }
     this.log(`核心消息: ${payload.msg}`);
   }
 
   handleCoreCrash(payload: CoreCrashPayload) {
+    if (!this.pageActive) {
+      return;
+    }
     this.log(`核心异常: ${payload.reason}`);
   }
 

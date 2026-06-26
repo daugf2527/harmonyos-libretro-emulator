@@ -44,6 +44,9 @@ struct CoreManagerPage {
   private coreRefreshToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
+    if (!this.pageActive) {
+      return
+    }
     this.updateFoldDisplayMode()
   }
 

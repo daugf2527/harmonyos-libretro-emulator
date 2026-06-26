@@ -248,12 +248,16 @@ struct CoreLoaderTest {
 
   aboutToDisappear() {
     this.pageActive = false;
-    this.testTaskToken += 1;
+    this.invalidateTestTask();
   }
 
   private beginTestTask(): number {
     this.testTaskToken += 1;
     return this.testTaskToken;
+  }
+
+  private invalidateTestTask(): void {
+    this.testTaskToken += 1;
   }
 
   private isCurrentTestTask(token: number): boolean {
@@ -283,6 +287,7 @@ struct CoreLoaderTest {
           .optionFont({ size: 16 })
           .width('90%')
           .onSelect((index: number) => {
+            this.invalidateTestTask();
             this.selectedCoreIndex = index;
             this.updateCorePath();
             this.isLoading = false;

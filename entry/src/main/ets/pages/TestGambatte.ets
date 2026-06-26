@@ -383,6 +383,9 @@ struct TestGambatte {
 
     this.eventScope = LibretroEventHub.getInstance().createScope();
     this.eventScope.onFpsUpdate((payload: FpsUpdatePayload) => {
+      if (!this.pageActive) {
+        return;
+      }
       const fps = Number(payload.fps);
       if (!Number.isNaN(fps)) {
         this.currentFps = fps;
