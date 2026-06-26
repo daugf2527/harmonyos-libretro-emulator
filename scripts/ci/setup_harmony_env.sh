@@ -84,6 +84,44 @@ if [[ -d "${sdk_overlay_dir}" ]]; then
   cp "${sdk_overlay_dir}/openharmony/previewer/oh-uni-package.json" "${tool_home}/sdk/default/openharmony/previewer/oh-uni-package.json"
 fi
 
+print_sdk_diagnostics() {
+  local sdk_root="${tool_home}/sdk/default"
+  local oh_root="${sdk_root}/openharmony"
+
+  echo "[INFO] SDK diagnostics: sdk root = ${sdk_root}"
+  if [[ -f "${sdk_root}/sdk-pkg.json" ]]; then
+    echo "[INFO] sdk-pkg.json"
+    cat "${sdk_root}/sdk-pkg.json"
+  else
+    echo "[WARN] sdk-pkg.json missing: ${sdk_root}/sdk-pkg.json"
+  fi
+
+  echo "[INFO] OpenHarmony component directories"
+  find "${oh_root}" -maxdepth 1 -mindepth 1 -type d | sort || true
+
+  local component
+  for component in native ets js toolchains previewer; do
+    local component_dir="${oh_root}/${component}"
+    local manifest="${component_dir}/oh-uni-package.json"
+    if [[ -d "${component_dir}" ]]; then
+      echo "[INFO] Component ${component}: present"
+      du -sh "${component_dir}" || true
+      if [[ -f "${manifest}" ]]; then
+        echo "[INFO] ${component} manifest"
+        cat "${manifest}"
+      else
+        echo "[WARN] ${component} manifest missing: ${manifest}"
+      fi
+      echo "[INFO] ${component} sample files"
+      find "${component_dir}" -maxdepth 2 -type f | sort | head -n 20 || true
+    else
+      echo "[WARN] Component ${component}: missing directory ${component_dir}"
+    fi
+  done
+}
+
+print_sdk_diagnostics
+
 node_home=""
 if [[ -d "${tool_home}/tool/node/bin" ]]; then
   node_home="${tool_home}/tool/node/bin"

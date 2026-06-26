@@ -73,13 +73,21 @@ filter_unsigned_sign_warning() {
   sed -E "/Will skip sign 'hos_hap'/d;/No signingConfigs profile is configured/d;/configure the signingConfigs/d"
 }
 
+run_hvigor_assemble() {
+  "${hvigorw_bin}" assembleHap --mode module \
+    -p module="${module_target}" \
+    -p product="${product_name}" \
+    -p buildMode="${build_mode}" \
+    --no-daemon "$@"
+}
+
 echo "[INFO] Running hvigor unsigned build..."
 "${hvigorw_bin}" clean --no-daemon
-"${hvigorw_bin}" assembleHap --mode module \
-  -p module="${module_target}" \
-  -p product="${product_name}" \
-  -p buildMode="${build_mode}" \
-  --no-daemon 2>&1 | filter_unsigned_sign_warning
+if ! run_hvigor_assemble 2>&1 | filter_unsigned_sign_warning; then
+  echo "[WARN] hvigor assembleHap failed, rerunning with --stacktrace for diagnostics..."
+  run_hvigor_assemble --stacktrace 2>&1 | filter_unsigned_sign_warning
+  exit 1
+fi
 
 mapfile -t hap_files < <(find "${ROOT_DIR}/entry/build" -type f -name "*.hap" | sort)
 if (( ${#hap_files[@]} == 0 )); then
