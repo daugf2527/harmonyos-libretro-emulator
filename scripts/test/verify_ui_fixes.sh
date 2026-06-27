@@ -55,16 +55,16 @@ assert_no_grep "No always-on '正在读取游戏库' spinner" \
   "正在读取游戏库" "$F"
 
 echo ""
-echo "=== Fix 2: ROM scanner walks subdirectories with hilog ==="
+echo "=== Fix 2: ROM scanner uses sandbox-imported ROM sources ==="
 F=entry/src/main/ets/common/RuntimeRomSourceScanner.ets
-assert_grep "Subdir list includes gba/nes/snes/etc" \
-  "gba.*nes.*snes.*gb_gbc.*md.*nds.*misc.*arcade" "$F"
-assert_grep "BundledRomEntry interface declared (no inline obj-literal type)" \
-  "^interface BundledRomEntry" "$F"
-assert_no_grep "No inline obj-literal type Promise<{...}>" \
-  "Promise<\{[^}]+\}\[?\]?" "$F"
-assert_grep "Per-subdir hilog emitted" \
-  "LogHelper\.info.*RuntimeRomSourceScanner" "$F"
+assert_grep "Runtime scanner reads sandbox ROM filenames" \
+  "listSandboxRomFiles\(context\.filesDir\)" "$F"
+assert_grep "Runtime scanner builds imported ROM launch path" \
+  "buildImportedRomFilePath\(context\.filesDir, fileName\)" "$F"
+assert_grep "Library scanner tags sources as IMPORTED" \
+  "sourceType: 'IMPORTED'" "$F"
+assert_no_grep "No rawfile roms path dependency remains" \
+  "rawfile/roms|roms/" "$F"
 
 echo ""
 echo "=== Fix 3: Button layout editor has real drag (PanGesture) ==="
@@ -257,7 +257,7 @@ assert_grep "Pause overlay wires disk append callback" \
 assert_grep "Pause overlay shows replace-current disk button" \
   "Button\\('替换当前盘'\\)" "$F"
 assert_grep "Pause overlay shows append disk button" \
-  "Button\\('新增一张'\\)" "$F"
+  "Button\\('新增光盘'\\)" "$F"
 
 F=entry/src/main/ets/common/RuntimeDiskControlController.ets
 assert_grep "RuntimeDiskControlController exposes replaceImageIndex" \
@@ -337,9 +337,9 @@ assert_grep "Default render profile seeds aiUpscaleEnabled" \
 
 F=entry/src/main/ets/pages/SettingsPage.ets
 assert_grep "SettingsPage exposes VSync advanced row" \
-  "'VSync'" "$F"
+  "'垂直同步'" "$F"
 assert_grep "SettingsPage exposes AI Upscale advanced row" \
-  "'AI Upscale'" "$F"
+  "'AI 超分'" "$F"
 assert_grep "SettingsPage toggles swap interval" \
   "toggleSwapInterval\\(" "$F"
 assert_grep "SettingsPage toggles AI upscale" \
