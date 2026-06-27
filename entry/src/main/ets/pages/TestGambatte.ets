@@ -18,6 +18,7 @@ import { common } from '@kit.AbilityKit';
 import { resourceManager } from '@kit.LocalizationKit';
 import { EmuStateColors, EmuTypography } from '../common/EmuUiTokens';
 import { NapiErrorResult } from '../common/ErrorCodes';
+import { buildImportedRomFilePath, listSandboxRomFiles } from '../common/RomImportService';
 
 // NAPI 接口定义 (遵循 AGENTS.md 规范)
 interface LibretroNapi {
@@ -30,10 +31,6 @@ interface LibretroNapi {
     resMgr?: resourceManager.ResourceManager
   ): NapiErrorResult;
   refactoredSetFilesDir(path: string): boolean;
-  refactoredGetRawFileListAsync(
-    resMgr: resourceManager.ResourceManager,
-    dir: string
-  ): Promise<string[]>;
   refactoredWaitForStateAsync(
     state: number,
     timeoutMs?: number
@@ -846,11 +843,11 @@ struct TestGambatte {
       }
       LogHelper.info('TestGambatte', 'ROM', 'ROM 加载成功');
 
-      this.testStatus = '已提交到新引擎 (Phase 1)';
+      this.testStatus = '启动请求已提交，正在等待运行';
       this.lastTestResult = {
         success: true
       };
-      LogHelper.info('TestGambatte', 'Engine', 'NewArch 请求已提交');
+      LogHelper.info('TestGambatte', 'Engine', '启动请求已提交');
 
     } catch (error) {
       if (!this.isCurrentTestTask(token)) {
@@ -1054,7 +1051,7 @@ struct TestGambatte {
 
       // Load ROM (如果有)
       if (rom) {
-        const loadRomResult = nativeApi.refactoredLoadRom(rom.file, resMgr);
+      const loadRomResult = nativeApi.refactoredLoadRom(rom.file, resMgr);
         if (!loadRomResult.success) {
           return this.classifyFromLastError(
             core,
@@ -1406,27 +1403,23 @@ struct TestGambatte {
       if (!this.pageActive) {
         return;
       }
-      this.roms = this.buildRomConfigs([]);
+      this.roms = this.buildRomConfigs([], '')
       this.updateRomOptions();
       return;
     }
 
-    let files: string[] = [];
+    let files: string[] = []
     try {
-      const rawList: string[] = await nativeApi.refactoredGetRawFileListAsync(
-        context.resourceManager,
-        'roms'
-      );
-      files = rawList.filter(item => typeof item === 'string') as string[];
+      files = await listSandboxRomFiles(context.filesDir)
     } catch (err) {
-      const msg = (err as Error).message || String(err);
-      LogHelper.error('TestGambatte', 'ROM', `扫描 ROM 列表失败: ${msg}`);
+      const msg = (err as Error).message || String(err)
+      LogHelper.error('TestGambatte', 'ROM', `扫描导入 ROM 列表失败: ${msg}`)
     }
 
     if (!this.pageActive) {
       return;
     }
-    this.roms = this.buildRomConfigs(files);
+    this.roms = this.buildRomConfigs(files, context.filesDir);
     this.updateRomOptions();
     
     // 更新当前选择的 ROM 描述
@@ -1434,7 +1427,7 @@ struct TestGambatte {
     this.currentRomDescription = availableRoms[this.selectedRomIndex]?.description || '没有可用的 ROM';
   }
 
-  private buildRomConfigs(files: string[]): RomConfig[] {
+  private buildRomConfigs(files: string[], filesDir: string): RomConfig[] {
     const uniqueFiles = Array.from(new Set(files.filter(fileName => fileName)));
 
     uniqueFiles.sort((a, b) => a.localeCompare(b));
@@ -1451,10 +1444,14 @@ struct TestGambatte {
         return;
       }
       coreIds.forEach((coreId) => {
+        const romPath = buildImportedRomFilePath(filesDir, fileName)
+        if (romPath.length === 0) {
+          return
+        }
         roms.push({
           id: `${coreId}:${fileName}`,
           name: fileName,
-          file: `roms/${fileName}`,
+          file: romPath,
           core: coreId,
           description: fileName
         });

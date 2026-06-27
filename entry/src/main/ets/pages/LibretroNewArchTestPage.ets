@@ -40,6 +40,7 @@ import {
   RuntimeSoakState,
   RuntimeSoakTestController
 } from '../common/RuntimeSoakTestController';
+import { buildImportedRomFilePath, listSandboxRomFiles } from '../common/RomImportService';
 
 // NAPI 接口定义 (遵循 AGENTS.md 规范)
 interface LibretroNapi {
@@ -295,9 +296,24 @@ struct LibretroNewArchTestPage {
     const actionToken = this.beginEngineAction();
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
     if (!context) { this.log('获取上下文失败'); return; }
-    const resMgr = context.resourceManager;
-    this.log('调用 refactoredLoadRom: roms/snake_v0.1.gb');
-    const romResult = nativeApi.refactoredLoadRom('roms/snake_v0.1.gb', resMgr);
+    const localFiles = await listSandboxRomFiles(context.filesDir);
+    if (!this.isCurrentEngineAction(actionToken)) {
+      return;
+    }
+    const fileName = localFiles[0];
+    if (!fileName) {
+      this.log('未找到可用的导入 ROM，请先通过导入入口添加合法 ROM');
+      this.status = '缺少导入 ROM';
+      return;
+    }
+    const romPath = buildImportedRomFilePath(context.filesDir, fileName);
+    if (romPath.length === 0) {
+      this.log(`ROM 路径无效: ${fileName}`);
+      this.status = 'ROM路径无效';
+      return;
+    }
+    this.log(`调用 refactoredLoadRom: ${LogHelper.describePathForLog(romPath)}`);
+    const romResult = nativeApi.refactoredLoadRom(romPath);
     this.log(`refactoredLoadRom 返回: ${romResult.success}`);
     if (!romResult.success) { this.status = 'ROM加载失败'; return; }
     const running = await nativeApi.refactoredWaitForStateAsync(EngineState.RUNNING, 5000);
