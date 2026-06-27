@@ -2,14 +2,14 @@
 # scripts/test/check_core_compatibility.sh
 #
 # M3 Layer 1 — 生成核心兼容性测试清单 build/test-manifest.json。
-# 扫描已编译的 libretro 核心 (.so) 与测试 ROM，产出供 Layer 2 (ArkTS 真机
+# 扫描已编译的 libretro 核心 (.so) 与本地测试 ROM 夹具，产出供 Layer 2 (ArkTS 真机
 # CoreCompatibilityTest) 消费的清单。设计见 docs/design/m3-automated-test-design.md。
 #
 # Usage:
 #   bash scripts/test/check_core_compatibility.sh
 #
 # Exit code:
-#   0 = 清单生成成功（核心/ROM 目录不存在时输出空清单，仍 0，不阻塞 CI/quick_signals）
+#   0 = 清单生成成功（核心/本地 ROM 目录不存在时输出空清单，仍 0，不阻塞 CI/quick_signals）
 #   1 = 写入失败等硬错误
 #
 # 与设计文档的差异（实物核对 2026-06-05）：
@@ -24,7 +24,7 @@ cd "${ROOT_DIR}"
 
 # === 路径常量 ===
 CORES_DIR="entry/build/default/intermediates/libs/default/arm64"
-ROMS_DIR="entry/src/main/resources/rawfile/roms"
+ROMS_DIR="${M3_TEST_ROMS_DIR:-build/test-roms}"
 OUTPUT_DIR="build"
 OUTPUT_JSON="${OUTPUT_DIR}/test-manifest.json"
 
@@ -64,7 +64,11 @@ if [[ -d "${ROMS_DIR}" ]]; then
     is_rom_file "$(basename "${f}")" && ROM_FILES+=("${f}")
   done < <(find "${ROMS_DIR}" -type f 2>/dev/null | sort)
 fi
-echo "[M3] roms: ${#ROM_FILES[@]} (dir: ${ROMS_DIR})"
+if [[ -d "${ROMS_DIR}" ]]; then
+  echo "[M3] roms: ${#ROM_FILES[@]} (dir: ${ROMS_DIR})"
+else
+  echo "[M3] roms: ${#ROM_FILES[@]} (optional local dir missing: ${ROMS_DIR})"
+fi
 
 # === 步骤 3: 生成 test-manifest.json（逐行 printf，避免 heredoc 变量展开坑）===
 mkdir -p "${OUTPUT_DIR}" || { echo "[M3] FAIL: cannot mkdir ${OUTPUT_DIR}"; exit 1; }

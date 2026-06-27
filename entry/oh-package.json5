@@ -1,9 +1,9 @@
 {
-  "license": "",
+  "license": "Apache-2.0",
   "devDependencies": {},
-  "author": "",
+  "author": "HarmonyOS Libretro Emulator contributors",
   "name": "entry",
-  "description": "Please describe the basic information.",
+  "description": "HarmonyOS libretro frontend shell for local emulator experiences.",
   "main": "",
   "version": "1.0.0",
   "dependencies": {

@@ -38,6 +38,10 @@ jobs:
         shell: bash
         run: bash scripts/ci/check_repo_hygiene.sh
 
+      - name: Release Readiness Guard
+        shell: bash
+        run: bash scripts/ci/check_release_readiness.sh
+
       - name: Regression Guards
         shell: bash
         run: bash scripts/ci/check_regression_guards.sh

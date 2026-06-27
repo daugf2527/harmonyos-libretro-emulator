@@ -110,14 +110,14 @@ Current pages in `entry/src/main/resources/base/profile/main_pages.json`:
 ### Core `.so`
 
 - Directory: `entry/libs/arm64-v8a/`
-- The repository currently ships many cores (e.g., Gambatte, Nestopia, FCEUmm, Snes9x, mGBA, melonds, FBNeo, MAME2010, PCSX-ReARMed, etc.)
-- Actual usability depends on device capability, core behavior, and ROM completeness
+- The current development repository contains multiple bundled core binaries for bring-up and compatibility work.
+- Any store-release build should review those binaries individually for redistribution rights, required notices, and product-scope fit before shipping.
 
 ### ROM
 
-- Built-in rawfile directory: `entry/src/main/resources/rawfile/roms/`
-- Existing subfolders are grouped by platform (e.g., `gb_gbc/`, `gba/`, `nes/`, `snes/`, `md/`, `arcade/`, `nds/`)
-- `LibretroGamePage` scans `roms/` and maps available cores using extension rules
+- Store-release builds should rely on user-imported ROM files stored in the app sandbox.
+- Bundled rawfile ROM samples and bundled cover-art placeholders have been removed from the repository's release path, and `scripts/ci/check_release_readiness.sh` blocks them from being reintroduced into the working tree.
+- Production use should rely on ROM files imported by the user, with the user responsible for having legal rights to that content.
 
 ## Quick Start
 
@@ -150,8 +150,8 @@ entry/src/main/ets/
   common/              EventHub, logging, switch coordinator
   config/              emulator metadata config
 
-entry/src/main/resources/
-  rawfile/roms/        built-in ROM assets
+build/
+  test-roms/           optional local-only ROM fixtures for M3 manifest generation (gitignored; never shipped)
 ```
 
 ## Known Limitations
@@ -159,6 +159,7 @@ entry/src/main/resources/
 - HW render support exists, but stability/performance still varies by core/device combination
 - Shipping multiple cores does not imply all are fully playable on every target
 - Release readiness still requires device-specific stability validation (switching, background/foreground, rotation, long-run)
+- Store release readiness also requires copyright clearance for bundled assets, hosted privacy-policy pages, end-user legal documents, final screenshots, and audited store metadata. See `docs/release/`.
 
 ---
 

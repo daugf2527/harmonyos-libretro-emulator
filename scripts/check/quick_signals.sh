@@ -25,9 +25,9 @@ cd "${ROOT_DIR}"
 
 CXX_BUILD_DIR="entry/.cxx/default/default/debug/arm64-v8a"
 
-# M3 core-compat: 核心 .so 产物 + ROM 目录（任一存在即可生成清单）
+# M3 core-compat: 核心 .so 产物 + 本地测试 ROM 目录（任一存在即可生成清单）
 M3_CORES_DIR="entry/build/default/intermediates/libs/default/arm64"
-M3_ROMS_DIR="entry/src/main/resources/rawfile/roms"
+M3_ROMS_DIR="${M3_TEST_ROMS_DIR:-build/test-roms}"
 
 # hvigor bundles its own cmake outside $PATH. Fall back through known
 # install locations before giving up.
@@ -98,7 +98,7 @@ run_check skill-contract bash scripts/ci/check_skill_contract.sh
 if [[ -d "${M3_CORES_DIR}" || -d "${M3_ROMS_DIR}" ]]; then
   run_check core-compat bash scripts/test/check_core_compatibility.sh
 else
-  skip_check core-compat "核心产物/ROM 目录均不存在；需先 DevEco Sync/编译"
+  skip_check core-compat "核心产物/本地测试 ROM 目录均不存在；需先 DevEco Sync/编译，或设置 M3_TEST_ROMS_DIR"
 fi
 
 if [[ -f "${CXX_BUILD_DIR}/build.ninja" ]]; then

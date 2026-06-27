@@ -96,7 +96,7 @@ EventBridge (C++) -> LibretroEventHub (ArkTS)
 1. 用 DevEco Studio 打开工程。
 2. 选择 `entry` 模块执行 Build / Run。
 3. 从 `pages/LibretroGamePage` 或 `pages/LibretroNewArchTestPage` 进入。
-4. 选择 core + ROM，观察事件与日志（`hilog`）确认状态。
+4. 导入你有合法使用权的 ROM 后，选择 core + ROM，观察事件与日志（`hilog`）确认状态。
 
 ## 7. 目录速览
 
@@ -172,6 +172,12 @@ bash scripts/ci/check_regression_guards.sh
 - `harmonyos-pr-ci.yml`：PR 质量门禁
 - `harmonyos-release.yml`：`v*` tag 自动构建、签名、发布 GitHub Release
 - `harmonyos-device-deploy.yml`：手动从指定 run 下载 HAP 并部署到 self-hosted 设备
+
+## 12. 上架发布边界
+
+- 仓库已移除 `entry/src/main/resources/rawfile/roms/` bundled ROM 样例与商业风格封面资源；商店版仅应依赖用户自行导入、且具备合法使用权的 ROM。
+- `scripts/ci/check_release_readiness.sh` 已作为守卫，持续阻止 `rawfile/roms` 与 `cover_*.png` 这类高风险资源重新进入工作树。
+- 商店版发布前还必须补齐：隐私政策 URL、用户协议/EULA、版权与第三方组件说明、最终图标/截图/简介，以及经审核的应用名称与联系方式。
 
 兼容保留：
 

@@ -68,7 +68,7 @@
 
 **功能**:
 1. 扫描 `entry/build/default/intermediates/libs/default/arm64/*.so` 核心文件
-2. 扫描 `entry/src/main/resources/rawfile/roms/**/*` ROM 文件
+2. 扫描本地测试 ROM 目录（默认 `build/test-roms/**/*`，可由 `M3_TEST_ROMS_DIR` 覆盖）
 3. 生成测试清单 JSON
 4. 验证核心文件与兼容矩阵一致性
 
@@ -84,7 +84,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CORES_DIR="$REPO_ROOT/entry/build/default/intermediates/libs/default/arm64"
-ROMS_DIR="$REPO_ROOT/entry/src/main/resources/rawfile/roms"
+ROMS_DIR="${M3_TEST_ROMS_DIR:-$REPO_ROOT/build/test-roms}"
 OUTPUT_JSON="$REPO_ROOT/build/test-manifest.json"
 
 # 1. 扫描核心文件
