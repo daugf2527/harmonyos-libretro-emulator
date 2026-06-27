@@ -567,7 +567,7 @@ grep -E "Vulkan presenter initialized|Hardware Renderer Initialized|Vulkan swapc
 
 ### 9.3 相关文档
 - `docs/plans/2026-02-06-new-arch-technical-whitepaper.md` - 架构白皮书
-- `问题.md` - 已知问题清单（Vulkan Swapchain Resize 风险）
+- `docs/reference/known-issues.md` - 已知问题清单（Vulkan Swapchain Resize 风险）
 - `Roadmap.md` - M5 里程碑定义
 
 ---
@@ -1100,4 +1100,4 @@ hdc shell hilog -x | grep "Render degraded to software"
 **文档维护**:
 - 验证过程中发现的新问题应及时更新到"已知风险点"
 - 验证通过后更新 `Roadmap.md` M5 状态
-- 遗留问题同步到 `问题.md`
+- 遗留问题同步到 `docs/reference/known-issues.md`

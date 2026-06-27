@@ -1,22 +1,22 @@
 # `_2/_3/_4/_7/_12/_13/_14/_15` Artifact-to-Runtime Gap Audit
 
 > 日期：2026-05-04
-> 范围：`stitch_game_emulator_design_plan/_2/_3/_4/_7/_12/_13/_14/_15`。
-> 方法：对照 `code.html`、`screen.png`、`截图验证/README.md` 中登记的最新运行截图，以及当前 ETS 承载页/组件。
+> 范围：`docs/design/stitch-game-emulator-plan/_2/_3/_4/_7/_12/_13/_14/_15`。
+> 方法：对照 `code.html`、`screen.png`、`docs/verification/runtime-screenshots-2026-05-04/README.md` 中登记的最新运行截图，以及当前 ETS 承载页/组件。
 > 边界：audit-only；本轮不改 ArkTS；未编译、未预览、未真机。`_3` 和 `_7` 缺 2026-05-04 最新运行截图，运行态结论只能标缺证据。
 
 ## Evidence Manifest
 
 | 设计目录 | 设计资产 | 最新截图 | ETS 承载 |
 | --- | --- | --- | --- |
-| `_15 Onboarding` | `stitch_game_emulator_design_plan/_15/code.html`、`screen.png` | `截图验证/02_boot_welcome_quick_start.png` | `entry/src/main/ets/pages/OnboardingPage.ets` |
-| `_13 Import Entry` | `stitch_game_emulator_design_plan/_13/code.html`、`screen.png` | `截图验证/03_import_authorization_required.png`；`01/04` 作为库页空态入口辅助证据 | `entry/src/main/ets/pages/ImportEntryPage.ets`、`entry/src/main/ets/components/ImportEmptyStateHero.ets` |
-| `_14 Import Task Overlay` | `stitch_game_emulator_design_plan/_14/code.html`、`screen.png` | `截图验证/05_import_task_empty_dialog.png` | `entry/src/main/ets/pages/ImportTaskOverlayPage.ets`、`entry/src/main/ets/common/RomImportService.ets`、`entry/src/main/ets/common/ImportTaskBridge.ets` |
-| `_12 Library Home` | `stitch_game_emulator_design_plan/_12/code.html`、`screen.png` | `截图验证/01_library_empty_import.png`、`04_library_empty_import_alt.png`、`06_library_loading_assets.png`、`07_library_search_snes_loading.png` | `entry/src/main/ets/pages/LibraryPage.ets`、`entry/src/main/ets/components/LibrarySearchPanel.ets`、`entry/src/main/ets/components/LibraryGameSections.ets`、`entry/src/main/ets/components/LibraryContextMenuOverlay.ets` |
-| `_2 Multiplayer Input` | `stitch_game_emulator_design_plan/_2/code.html`、`screen.png` | `截图验证/08_input_netplay_center.png` | `entry/src/main/ets/pages/MultiplayerInputPage.ets`、`entry/src/main/ets/common/RuntimeInputPortController.ets` |
-| `_7 Runtime Controller` | `stitch_game_emulator_design_plan/_7/code.html`、`screen.png` | 缺最新截图 | `entry/src/main/ets/pages/LibretroGamePage.ets`、`entry/src/main/ets/components/RuntimeTopHudBar.ets`、`entry/src/main/ets/components/RuntimeVirtualControllerLayer.ets`、`entry/src/main/ets/components/RuntimeControlPanel.ets` |
-| `_4 Settings` | `stitch_game_emulator_design_plan/_4/code.html`、`screen.png` | `截图验证/09_system_basic_settings.png`、`10_system_advanced_settings.png`、`11_system_telemetry_audio.png` | `entry/src/main/ets/pages/SettingsPage.ets` |
-| `_3 Shader Preview` | `stitch_game_emulator_design_plan/_3/code.html`、`screen.png` | 缺最新截图 | `entry/src/main/ets/pages/ShaderPreviewPage.ets`、`entry/src/main/ets/common/RuntimeRenderSettingsController.ets` |
+| `_15 Onboarding` | `docs/design/stitch-game-emulator-plan/_15/code.html`、`screen.png` | `docs/verification/runtime-screenshots-2026-05-04/02_boot_welcome_quick_start.png` | `entry/src/main/ets/pages/OnboardingPage.ets` |
+| `_13 Import Entry` | `docs/design/stitch-game-emulator-plan/_13/code.html`、`screen.png` | `docs/verification/runtime-screenshots-2026-05-04/03_import_authorization_required.png`；`01/04` 作为库页空态入口辅助证据 | `entry/src/main/ets/pages/ImportEntryPage.ets`、`entry/src/main/ets/components/ImportEmptyStateHero.ets` |
+| `_14 Import Task Overlay` | `docs/design/stitch-game-emulator-plan/_14/code.html`、`screen.png` | `docs/verification/runtime-screenshots-2026-05-04/05_import_task_empty_dialog.png` | `entry/src/main/ets/pages/ImportTaskOverlayPage.ets`、`entry/src/main/ets/common/RomImportService.ets`、`entry/src/main/ets/common/ImportTaskBridge.ets` |
+| `_12 Library Home` | `docs/design/stitch-game-emulator-plan/_12/code.html`、`screen.png` | `docs/verification/runtime-screenshots-2026-05-04/01_library_empty_import.png`、`04_library_empty_import_alt.png`、`06_library_loading_assets.png`、`07_library_search_snes_loading.png` | `entry/src/main/ets/pages/LibraryPage.ets`、`entry/src/main/ets/components/LibrarySearchPanel.ets`、`entry/src/main/ets/components/LibraryGameSections.ets`、`entry/src/main/ets/components/LibraryContextMenuOverlay.ets` |
+| `_2 Multiplayer Input` | `docs/design/stitch-game-emulator-plan/_2/code.html`、`screen.png` | `docs/verification/runtime-screenshots-2026-05-04/08_input_netplay_center.png` | `entry/src/main/ets/pages/MultiplayerInputPage.ets`、`entry/src/main/ets/common/RuntimeInputPortController.ets` |
+| `_7 Runtime Controller` | `docs/design/stitch-game-emulator-plan/_7/code.html`、`screen.png` | 缺最新截图 | `entry/src/main/ets/pages/LibretroGamePage.ets`、`entry/src/main/ets/components/RuntimeTopHudBar.ets`、`entry/src/main/ets/components/RuntimeVirtualControllerLayer.ets`、`entry/src/main/ets/components/RuntimeControlPanel.ets` |
+| `_4 Settings` | `docs/design/stitch-game-emulator-plan/_4/code.html`、`screen.png` | `docs/verification/runtime-screenshots-2026-05-04/09_system_basic_settings.png`、`10_system_advanced_settings.png`、`11_system_telemetry_audio.png` | `entry/src/main/ets/pages/SettingsPage.ets` |
+| `_3 Shader Preview` | `docs/design/stitch-game-emulator-plan/_3/code.html`、`screen.png` | 缺最新截图 | `entry/src/main/ets/pages/ShaderPreviewPage.ets`、`entry/src/main/ets/common/RuntimeRenderSettingsController.ets` |
 
 ## Overall Findings
 
@@ -325,7 +325,7 @@
 ## Verification Notes
 
 - 本轮只读检查了 8 个目录的 `code.html` / `screen.png` 存在性。
-- 读取了 `截图验证/README.md`，最新截图仅映射 `_2/_4/_12/_13/_14/_15`。
+- 读取了 `docs/verification/runtime-screenshots-2026-05-04/README.md`，最新截图仅映射 `_2/_4/_12/_13/_14/_15`。
 - 生成并查看了临时 contact sheet：`%TEMP%/harmony_design_sheet_20260504.png`、`%TEMP%/harmony_runtime_sheet_20260504.png`，未写入仓库。
 - 复跑固定布局扫描命令；命中均来自既有 ETS 代码。本轮 audit-only 未修改 ArkTS，因此没有新增固定布局风险。命中类型主要是 token 级尺寸、输入热区/扫描线/按钮反馈等既有业务尺寸，后续修 UI 时需按页面逐项复判。
 - 未编译、未真机、未运行测试脚本。

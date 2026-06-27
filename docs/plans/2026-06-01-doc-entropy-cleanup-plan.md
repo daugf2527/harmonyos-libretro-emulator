@@ -52,7 +52,7 @@
 - **被引用**:`audit-20260527-124137/`、`gc-code-drift-20260528/29`(见上方安全检查)
 - **里程碑审计活文档**:`docs/audit/m0-*.md`(其中 `m0-t29-verification-plan.md` 被 `verification-backlog-index.md` 引用)、`m2-t31-*`、`m4-t46-*`
 - **正式规格/设计**:`docs/design/**`、`docs/2026-02-06-new-arch-technical-whitepaper.md`、白皮书类
-- **活文档**:Roadmap / blockers / tech-debt-tracker / 问题.md / input-mapper / input_port_routing_guide
+- **活文档**:Roadmap / blockers / tech-debt-tracker / docs/reference/known-issues.md / input-mapper / input_port_routing_guide
 
 ---
 

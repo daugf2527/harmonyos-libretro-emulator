@@ -22,7 +22,7 @@
 
 ## 缺口清单（代码层）
 
-> **注意**: 详细问题与修复建议已迁移至 `问题.md`。  
+> **注意**: 详细问题与修复建议已迁移至 `docs/reference/known-issues.md`。
 > **最近更新**: 2026-05-31 代码审计后删除已修复问题（详见 `docs/2026-05-31-code-reality-audit.md`）
 
 ### 输入
@@ -128,7 +128,7 @@
 
 ## 参考
 
-- 技术白皮书与官方摘录已迁移至 `鸿蒙开发文档.txt`。
+- 技术白皮书与官方摘录已迁移至 `docs/reference/harmonyos-reference-notes.txt`。
 
 ## 代码深度评估报告 (Code Depth Evaluation Report)
 

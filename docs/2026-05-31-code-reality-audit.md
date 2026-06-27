@@ -2,7 +2,7 @@
 
 **审计日期**: 2026-05-31  
 **审计方法**: cclsp/serena MCP 工具 + 3 个并行 agent 深挖代码实物  
-**对比基准**: Roadmap.md + 问题.md 的文档描述
+**对比基准**: Roadmap.md + docs/reference/known-issues.md 的文档描述
 
 ---
 

@@ -51,7 +51,7 @@ rg -n "\.position\(|\.markAnchor\(|\.translate\(|\.offset\(|\.width\('[0-9]+vp'\
 ### 2026-05-04 UI 静态收口
 
 - `docs/2026-04-30-design-page-acceptance-matrix.md`
-  - 已把 `截图验证/README.md` 中 11 张 2026-05-04 截图 evidence 回写到 `_2`、`_4`、`_12`、`_13`、`_14`、`_15` 的矩阵行。
+  - 已把 `docs/verification/runtime-screenshots-2026-05-04/README.md` 中 11 张 2026-05-04 截图 evidence 回写到 `_2`、`_4`、`_12`、`_13`、`_14`、`_15` 的矩阵行。
   - 未改变 `已完成` 列；截图只作为可见状态 evidence，不升级为运行态完成。
 
 - `entry/src/main/ets/components/RuntimeVirtualControllerLayer.ets`

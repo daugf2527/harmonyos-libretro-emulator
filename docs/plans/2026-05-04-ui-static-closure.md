@@ -21,16 +21,16 @@
 
 ## 参考入口
 
-- 截图索引：`截图验证/README.md`
+- 截图索引：`docs/verification/runtime-screenshots-2026-05-04/README.md`
 - 静态扫描报告：`docs/2026-05-04-arkts-ui-static-scan.md`
 - 设计矩阵：`docs/2026-04-30-design-page-acceptance-matrix.md`
-- 设计目录：`stitch_game_emulator_design_plan/_1` 到 `_15`
+- 设计目录：`docs/design/stitch-game-emulator-plan/_1` 到 `_15`
 
 ## Task 1: 回写截图验收到设计矩阵
 
 **Files:**
 - Modify: `docs/2026-04-30-design-page-acceptance-matrix.md`
-- Read: `截图验证/README.md`
+- Read: `docs/verification/runtime-screenshots-2026-05-04/README.md`
 
 **Step 1: 重新核对截图索引**
 
@@ -84,8 +84,8 @@ Expected:
 ## Task 2: 复查 `ImportEntryPage` 粒子定位
 
 **Files:**
-- Read: `stitch_game_emulator_design_plan/_13/screen.png`
-- Read: `stitch_game_emulator_design_plan/_13/code.html`
+- Read: `docs/design/stitch-game-emulator-plan/_13/screen.png`
+- Read: `docs/design/stitch-game-emulator-plan/_13/code.html`
 - Modify: `entry/src/main/ets/pages/ImportEntryPage.ets`
 - Maybe modify: `entry/src/main/ets/components/ImportEmptyStateHero.ets`
 
@@ -130,8 +130,8 @@ Expected:
 ## Task 3: 复查 `RuntimeVirtualControllerLayer` Quick Save rail
 
 **Files:**
-- Read: `stitch_game_emulator_design_plan/_7/screen.png`
-- Read: `stitch_game_emulator_design_plan/_7/code.html`
+- Read: `docs/design/stitch-game-emulator-plan/_7/screen.png`
+- Read: `docs/design/stitch-game-emulator-plan/_7/code.html`
 - Modify: `entry/src/main/ets/components/RuntimeVirtualControllerLayer.ets`
 - Maybe modify: `entry/src/main/ets/pages/LibretroGamePage.ets`
 
@@ -172,8 +172,8 @@ Expected:
 ## Task 4: 复查 `ShaderPreviewPage` 固定宽度
 
 **Files:**
-- Read: `stitch_game_emulator_design_plan/_3/screen.png`
-- Read: `stitch_game_emulator_design_plan/_3/code.html`
+- Read: `docs/design/stitch-game-emulator-plan/_3/screen.png`
+- Read: `docs/design/stitch-game-emulator-plan/_3/code.html`
 - Modify: `entry/src/main/ets/pages/ShaderPreviewPage.ets`
 
 **Step 1: 定位固定宽度**

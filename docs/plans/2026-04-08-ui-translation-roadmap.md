@@ -14,10 +14,10 @@
 
 本计划覆盖以下 4 个 Stitch 设计稿的原生化：
 
-- `stitch_game_emulator_design_plan/_13/code.html` -> 导入入口页
-- `stitch_game_emulator_design_plan/_11/code.html` -> 游戏库页
-- `stitch_game_emulator_design_plan/_10/code.html` -> 详情启动页
-- `stitch_game_emulator_design_plan/_4/code.html` -> 正式设置页
+- `docs/design/stitch-game-emulator-plan/_13/code.html` -> 导入入口页
+- `docs/design/stitch-game-emulator-plan/_11/code.html` -> 游戏库页
+- `docs/design/stitch-game-emulator-plan/_10/code.html` -> 详情启动页
+- `docs/design/stitch-game-emulator-plan/_4/code.html` -> 正式设置页
 
 不在本次范围内：
 
@@ -102,7 +102,7 @@
 - Modify: `entry/src/main/ets/pages/Index.ets`
 
 **Design Source:**
-- `stitch_game_emulator_design_plan/_13/code.html`
+- `docs/design/stitch-game-emulator-plan/_13/code.html`
 
 **Page Responsibility:**
 - 当游戏库为空时展示空状态
@@ -155,8 +155,8 @@
 - Modify: `entry/src/main/ets/pages/ImportTaskOverlayPage.ets`
 
 **Design Source:**
-- Primary: `stitch_game_emulator_design_plan/_11/code.html`
-- Defer variant controls from: `stitch_game_emulator_design_plan/_12/code.html`
+- Primary: `docs/design/stitch-game-emulator-plan/_11/code.html`
+- Defer variant controls from: `docs/design/stitch-game-emulator-plan/_12/code.html`
 
 **Page Responsibility:**
 - 展示平台筛选
@@ -228,7 +228,7 @@
 - Modify: `entry/src/main/ets/pages/LibretroGamePage.ets`
 
 **Design Source:**
-- `stitch_game_emulator_design_plan/_10/code.html`
+- `docs/design/stitch-game-emulator-plan/_10/code.html`
 
 **Page Responsibility:**
 - 展示游戏封面、描述、平台、核心信息
@@ -289,7 +289,7 @@
 - Modify: `entry/src/main/ets/pages/LibretroGamePage.ets`
 
 **Design Source:**
-- `stitch_game_emulator_design_plan/_4/code.html`
+- `docs/design/stitch-game-emulator-plan/_4/code.html`
 
 **Page Responsibility:**
 - 承担正式用户设置，而不是工程调试控制台

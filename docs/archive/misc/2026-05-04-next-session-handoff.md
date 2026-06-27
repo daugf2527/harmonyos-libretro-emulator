@@ -15,7 +15,7 @@
 
 ## 本轮已完成
 
-- 新增 `截图验证/README.md`：为 2026-05-04 的 11 张运行截图 / 验收截图建立索引。
+- 新增 `docs/verification/runtime-screenshots-2026-05-04/README.md`：为 2026-05-04 的 11 张运行截图 / 验收截图建立索引。
 - 新增 `docs/2026-05-04-arkts-ui-static-scan.md`：记录固定布局扫描命令、当前命中和复查优先级。
 - 新增本文件：用于新窗口短交接。
 - 追加 2026-05-21 ETS 页面切换性能排障结论：`Canvas` 不是设置页 / 手柄页切入钝感的主因，底部顶级导航使用 `pushUrl` 叠栈才是主因；改为平级 `replaceUrl` 后，切页明显恢复。
@@ -28,17 +28,17 @@
 
 - 已修改：`entry/src/main/ets/pages/ImportTaskOverlayPage.ets`
 - 已修改：`entry/src/main/ets/pages/MultiplayerInputPage.ets`
-- 未跟踪目录 / 文件包括：`.appanalyzer/`、`.claude/`、`.codex`、`.firecrawl/`、`CLAUDE.md`、`codex*`、`nul`、`stitch_game_emulator_design_plan/`、`截图验证/`
+- 未跟踪目录 / 文件包括：`.appanalyzer/`、`.claude/`、`.codex`、`.firecrawl/`、`CLAUDE.md`、`codex*`、`nul`、`docs/design/stitch-game-emulator-plan/`、`docs/verification/runtime-screenshots-2026-05-04/`
 
 本轮新增文件：
 
-- `截图验证/README.md`
+- `docs/verification/runtime-screenshots-2026-05-04/README.md`
 - `docs/2026-05-04-arkts-ui-static-scan.md`
 - `docs/2026-05-04-next-session-handoff.md`
 
 ## 下一步建议
 
-1. 如果用户继续做验收文档：把 `截图验证/README.md` 与 `docs/2026-04-30-design-page-acceptance-matrix.md` 逐页回写，不要只按截图文件名判断完成度。
+1. 如果用户继续做验收文档：把 `docs/verification/runtime-screenshots-2026-05-04/README.md` 与 `docs/2026-04-30-design-page-acceptance-matrix.md` 逐页回写，不要只按截图文件名判断完成度。
 2. 如果用户继续做 UI 静态收口：优先复查 `ImportEntryPage.ets` 粒子定位、`RuntimeVirtualControllerLayer.ets` Quick Save rail、`ShaderPreviewPage.ets` 固定宽度。
 3. 如果用户要求提交：先 `git status --short`，只 stage 本轮文档和用户确认要提交的 ETS 文件，避免混入未跟踪工具目录。
 4. 如果用户继续查“页面切换慢”：先看底部 tab 是否误用 `pushUrl`，再看是否有共享 `blur`、`aboutToAppear()` 同步 native 调用、来源页未在切路由前停掉定时器 / 刷新任务；不要优先怀疑 `Canvas`。

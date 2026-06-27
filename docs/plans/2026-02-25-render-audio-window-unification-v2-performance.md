@@ -13,8 +13,8 @@
 ## 1. 本轮复盘：当前方案/现码的漏洞（含证据）
 
 1. 崩溃主因不是 ROM，而是窗口生产者状态失配。  
-证据：`日志.txt` 显示 `SIGSEGV` 落在 `OH_NativeWindow_NativeWindowRequestBuffer` 调用栈。  
-参考：[日志.txt:57](/mnt/d/windsulf/daugf2527-repos/harmonyos-libretro-emulator/日志.txt:57)、[日志.txt:65](/mnt/d/windsulf/daugf2527-repos/harmonyos-libretro-emulator/日志.txt:65)、[日志.txt:68](/mnt/d/windsulf/daugf2527-repos/harmonyos-libretro-emulator/日志.txt:68)
+证据：`docs/verification/nativewindow-crash-log.txt` 显示 `SIGSEGV` 落在 `OH_NativeWindow_NativeWindowRequestBuffer` 调用栈。
+参考：[nativewindow-crash-log.txt](/D:/windsulf/daugf2527-repos/harmonyos-libretro-emulator/docs/verification/nativewindow-crash-log.txt:57)、[nativewindow-crash-log.txt](/D:/windsulf/daugf2527-repos/harmonyos-libretro-emulator/docs/verification/nativewindow-crash-log.txt:65)、[nativewindow-crash-log.txt](/D:/windsulf/daugf2527-repos/harmonyos-libretro-emulator/docs/verification/nativewindow-crash-log.txt:68)
 
 2. `forceRebind + 同指针 + software` 分支未做破坏性重建，存在 stale surface 风险。  
 参考：[render_thread.cpp:290](/mnt/d/windsulf/daugf2527-repos/harmonyos-libretro-emulator/entry/src/main/cpp/core/engine/render_thread.cpp:290)
