@@ -372,7 +372,8 @@ NativeSoIntegration/
 │       │   └── game2048_wrapper.cpp # NAPI 封装
 │       └── ets/pages/
 │           └── Game2048.ets         # ArkTS 渲染
-└── README_2048游戏移植方案.md       # 本文档
+└── deprecated/legacy/2048-port/
+    └── README_2048游戏移植方案.md   # 本文档
 ```
 
 ---

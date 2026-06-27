@@ -6,6 +6,9 @@
 
 set -e  # 遇到错误立即退出
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+CMAKE_FILE="$SCRIPT_DIR/CMakeLists_libretro_2048_harmonyos.txt"
+
 echo "========================================="
 echo "编译 Libretro 2048 核心 (鸿蒙 ARM64)"
 echo "========================================="
@@ -70,9 +73,9 @@ echo ""
 echo "步骤 2: 准备优化的 CMakeLists.txt..."
 echo "----------------------------------------"
 
-if [ -f "$PROJECT_DIR/CMakeLists_libretro_2048_harmonyos.txt" ]; then
+if [ -f "$CMAKE_FILE" ]; then
     echo "✅ 找到优化的 CMakeLists.txt"
-    cp "$PROJECT_DIR/CMakeLists_libretro_2048_harmonyos.txt" "$CORES_DIR/$CORE_NAME/CMakeLists.txt"
+    cp "$CMAKE_FILE" "$CORES_DIR/$CORE_NAME/CMakeLists.txt"
     echo "✅ 已替换为优化版本"
 else
     echo "⚠️  未找到优化版本,使用原始 CMakeLists.txt"
