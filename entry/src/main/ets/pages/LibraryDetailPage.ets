@@ -38,7 +38,6 @@ import {
   getLibraryDetailRomVersionLabel,
   getLibraryDetailRuntimeSummaryText,
   getLibraryDetailYearLabel,
-  getLibraryLaunchFileLabel,
   hasLibraryDetailRuntimeSnapshot,
   LibraryDetailTelemetrySnapshot
 } from '../common/LibraryDetailPresenter'
@@ -68,16 +67,12 @@ struct AnimatedDetailBody {
   @Param telemetryFpsText: string = ''
   @Param telemetryAudioText: string = ''
   @Param telemetryDropText: string = ''
-  @Param telemetryProfile: number[] = []
   @Param overviewText: string = ''
   @Param runtimeSummaryText: string = ''
   @Param coreSpecItems: KeyValueSpecItem[] = []
   @Event onLaunch?: () => void
-  @Event onQuickAction?: (message: string) => void
   @Event onToggleDetails?: () => void
   @Local private heroScale: number = 1.04
-  @Local private telemetryScanOffset: number = -180
-  @Local private telemetryGlowOpacity: number = 0.2
   private visualTimer: number = -1
 
   aboutToAppear(): void {
@@ -88,8 +83,6 @@ struct AnimatedDetailBody {
     this.visualTimer = setInterval(() => {
       frame += 1
       this.heroScale = 1.08 + Math.sin(frame / 18) * 0.035
-      this.telemetryScanOffset = -180 + (frame % 100) * 5
-      this.telemetryGlowOpacity = 0.14 + (Math.sin(frame / 6) + 1) * 0.1
     }, 90)
   }
 
@@ -113,11 +106,6 @@ struct AnimatedDetailBody {
             if (this.onLaunch) {
               this.onLaunch()
             }
-          },
-          onQuickAction: (message: string) => {
-            if (this.onQuickAction) {
-              this.onQuickAction(message)
-            }
           }
         })
         LibraryDetailInfoPanel({
@@ -128,9 +116,6 @@ struct AnimatedDetailBody {
           telemetryFpsText: this.telemetryFpsText,
           telemetryAudioText: this.telemetryAudioText,
           telemetryDropText: this.telemetryDropText,
-          telemetryProfile: this.telemetryProfile,
-          telemetryScanOffset: this.telemetryScanOffset,
-          telemetryGlowOpacity: this.telemetryGlowOpacity,
           overviewText: this.overviewText,
           runtimeSummaryText: this.runtimeSummaryText,
           onToggleDetails: () => {
@@ -140,7 +125,7 @@ struct AnimatedDetailBody {
           }
         })
         KeyValueSpecList({
-          title: 'CORE SPECIFICATIONS',
+          title: '核心信息',
           items: this.coreSpecItems
         })
       }
@@ -157,14 +142,14 @@ struct AnimatedDetailBody {
 @ComponentV2
 struct LibraryDetailPage {
   @Local private libraryRecord: LibraryRecord | undefined = undefined
+  @Local private detailLoadFailed: boolean = false
   @Local private showExtendedDetails: boolean = false
   @Local private showActionMenu: boolean = false
   @Local private showToast: boolean = false
   @Local private toastMessage: string = ''
   @Local private isLaunching: boolean = false
-  @Local private launchProgress: number = 0
-  @Local private launchStatusText: string = 'READY_TO_HANDOFF'
-  private readonly coverCycleKeys: string[] = ['', 'metroid_fusion', 'zelda_triforce']
+  @Local private launchStatusText: string = '准备启动游戏'
+  private readonly coverCycleKeys: string[] = ['', 'moss_signal', 'aurora_grid', 'ember_glow']
   private readonly coverPalette: string[] = ['#274530', '#27405E', '#4E2A41', '#5A4331']
   private readonly navItems = createEmuBottomNavItems('library')
   private toastTimer: number = -1
@@ -209,12 +194,18 @@ struct LibraryDetailPage {
     const token = this.beginPageTask()
     const romFile = this.resolveRequestedRomFile()
     if (romFile.length === 0) {
-      this.showToastMessage('未找到详情上下文 DETAIL_MISSING')
+      this.libraryRecord = undefined
+      this.invalidateDerivedCaches()
+      this.detailLoadFailed = false
+      this.showToastMessage('没有找到要查看的游戏')
       return
     }
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.showToastMessage('上下文不可用 CONTEXT_MISSING')
+      this.libraryRecord = undefined
+      this.invalidateDerivedCaches()
+      this.detailLoadFailed = true
+      this.showToastMessage('现在还拿不到这条游戏的本地资料，请回到游戏库后重试')
       return
     }
     try {
@@ -223,10 +214,14 @@ struct LibraryDetailPage {
         return
       }
       if (!record) {
-        this.showToastMessage('条目不存在 RECORD_NOT_FOUND')
+        this.libraryRecord = undefined
+        this.invalidateDerivedCaches()
+        this.detailLoadFailed = false
+        this.showToastMessage('这条游戏已经不在当前游戏库里了')
         return
       }
       this.libraryRecord = record
+      this.detailLoadFailed = false
       this.invalidateDerivedCaches()
       this.applyTelemetrySnapshot(record)
     } catch (err) {
@@ -235,7 +230,10 @@ struct LibraryDetailPage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryDetailPage', 'Data', `读取详情条目失败: ${message}`)
-      this.showToastMessage('详情读取失败 DETAIL_LOAD_FAIL')
+      this.libraryRecord = undefined
+      this.invalidateDerivedCaches()
+      this.detailLoadFailed = true
+      this.showToastMessage('这条游戏详情没有读出来，请稍后重试')
     }
   }
 
@@ -281,7 +279,7 @@ struct LibraryDetailPage {
   }
 
   private get launchCpuText(): string {
-    return `FPS: ${this.getSnapshot().fpsText}`
+    return `帧率: ${this.getSnapshot().fpsText}`
   }
   private get telemetryFpsText(): string {
     return this.getSnapshot().fpsText
@@ -301,8 +299,7 @@ struct LibraryDetailPage {
     this.showActionMenu = false
     this.isLaunching = true
     this.applyTelemetrySnapshot(record)
-    this.launchProgress = 100
-    this.launchStatusText = 'HANDOFF_TO_ENGINE_PAGE'
+    this.launchStatusText = '正在切换到运行页'
     await Promise.resolve()
     if (!this.isCurrentPageTask(token)) {
       return
@@ -327,7 +324,7 @@ struct LibraryDetailPage {
     }).catch((err: Error) => {
       this.isLaunching = false
       LogHelper.error('LibraryDetailPage', 'Route', `跳转游戏页失败: ${err.message}`)
-      this.showToastMessage('启动失败 ROUTE_PUSH_FAIL')
+      this.showToastMessage('这款游戏现在还打不开，请稍后再试')
     })
   }
 
@@ -340,11 +337,14 @@ struct LibraryDetailPage {
   }
 
   private resolveCoverColorByKey(key: string): string {
-    if (key === 'metroid_fusion') {
+    if (key === 'moss_signal') {
       return '#274530'
     }
-    if (key === 'zelda_triforce') {
+    if (key === 'aurora_grid') {
       return '#27405E'
+    }
+    if (key === 'ember_glow') {
+      return '#5A4331'
     }
     return this.coverPalette[0]
   }
@@ -365,7 +365,7 @@ struct LibraryDetailPage {
     const token = this.beginPageTask()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.showToastMessage('封面更新失败 CONTEXT_MISSING')
+      this.showToastMessage('现在还不能切换封面样式，请稍后再试')
       return
     }
     const nextCoverKey = this.getNextCoverKey(target)
@@ -376,21 +376,21 @@ struct LibraryDetailPage {
         return
       }
       if (!updated) {
-        this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+        this.showToastMessage('没有找到要更新的游戏条目')
         return
       }
       this.libraryRecord = updated
       this.invalidateDerivedCaches()
       this.applyTelemetrySnapshot(updated)
       this.showActionMenu = false
-      this.showToastMessage('已切换内置封面 COVER_UPDATED')
+      this.showToastMessage('已切换封面样式')
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
         return
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryDetailPage', 'Cover', `更新封面失败: ${message}`)
-      this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+      this.showToastMessage('封面样式没有更新成功，请稍后重试')
     }
   }
 
@@ -402,7 +402,7 @@ struct LibraryDetailPage {
     const token = this.beginPageTask()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.showToastMessage('存档删除失败 CONTEXT_MISSING')
+      this.showToastMessage('现在还不能管理这款游戏的存档，请稍后再试')
       return
     }
     try {
@@ -418,25 +418,26 @@ struct LibraryDetailPage {
         return
       }
       if (result.deletedCount === 0) {
-        this.showToastMessage('未找到对应存档 SAVE_EMPTY')
+        this.showToastMessage('这款游戏还没有可删除的存档')
         this.showActionMenu = false
         return
       }
       this.showActionMenu = false
-      this.showToastMessage(`已删除 ${result.deletedCount} 个存档 SAVE_PURGED`)
+      this.showToastMessage(`已删除 ${result.deletedCount} 个存档`)
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
         return
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryDetailPage', 'Save', `删除存档失败: ${message}`)
-      this.showToastMessage('存档删除失败 SAVE_PURGE_FAIL')
+      this.showToastMessage('存档没有删除成功，请稍后重试')
     }
   }
 
   private openLibraryPage(): void {
     this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
       LogHelper.error('LibraryDetailPage', 'Route', `返回库页失败: ${err.message}`)
+      this.showToastMessage('现在还回不到游戏库，请稍后再试')
     })
   }
 
@@ -451,18 +452,13 @@ struct LibraryDetailPage {
     }
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('LibraryDetailPage', 'Route', `pushUrl ${route} failed: ${err.message}`)
+      this.showToastMessage('这个页面现在还打不开，请稍后再试')
     })
   }
 
   private handleActionMenuClick(actionKey: LibraryDetailActionKey): void {
     if (actionKey === 'launch') {
       this.launchGame()
-      return
-    }
-    if (actionKey === 'details') {
-      const record = this.libraryRecord
-      this.showActionMenu = false
-      this.showToastMessage(record ? `当前已在 ${record.title} 详情页` : '当前已在详情页')
       return
     }
     if (actionKey === 'cover') {
@@ -479,6 +475,7 @@ struct LibraryDetailPage {
         } as LibraryDetailRouteParams
       }).catch((err: Error) => {
         LogHelper.error('LibraryDetailPage', 'Route', `跳转资料编辑失败: ${err.message}`)
+        this.showToastMessage('资料编辑页现在还打不开，请稍后再试')
       })
       return
     }
@@ -492,6 +489,7 @@ struct LibraryDetailPage {
         } as LibraryDetailRouteParams
       }).catch((err: Error) => {
         LogHelper.error('LibraryDetailPage', 'Route', `跳转存档管理失败: ${err.message}`)
+        this.showToastMessage('存档管理页现在还打不开，请稍后再试')
       })
       return
     }
@@ -583,9 +581,9 @@ struct LibraryDetailPage {
       return this.cachedCoreSpecItems
     }
     this.cachedCoreSpecItems = [
-      { label: 'ROM Version', value: getLibraryDetailRomVersionLabel(record) },
-      { label: 'Processor Cluster', value: getLibraryDetailEngineLabel(record) },
-      { label: 'Memory Mode', value: getLibraryDetailMemoryModeLabel(record) }
+      { label: 'ROM 版本', value: getLibraryDetailRomVersionLabel(record) },
+      { label: '核心引擎', value: getLibraryDetailEngineLabel(record) },
+      { label: '内存模式', value: getLibraryDetailMemoryModeLabel(record) }
     ]
     this.cachedCoreSpecRomFile = record.romFile
     return this.cachedCoreSpecItems
@@ -593,18 +591,18 @@ struct LibraryDetailPage {
 
   private buildPrimaryCells(record: LibraryRecord): LibraryDetailSummaryCellData[] {
     return [
-      { title: 'CN NAME', value: getLibraryDetailLocalizedTitle(record) },
-      { title: 'YEAR', value: getLibraryDetailYearLabel(record) },
-      { title: 'CONSOLE', value: getLibraryDetailConsoleLabel(record) }
+      { title: '本地名称', value: getLibraryDetailLocalizedTitle(record) },
+      { title: '年份', value: getLibraryDetailYearLabel(record) },
+      { title: '平台', value: getLibraryDetailConsoleLabel(record) }
     ]
   }
 
   private buildExtendedCells(record: LibraryRecord): LibraryDetailSummaryCellData[] {
     return [
-      { title: 'PUBLISHER', value: getLibraryDetailPublisherLabel(record) },
-      { title: 'PLAYTIME', value: getLibraryDetailPlaytimeLabel(record) },
-      { title: 'ENGINE', value: getLibraryDetailEngineLabel(record) },
-      { title: 'REGION', value: getLibraryDetailRegionLabel(record) }
+      { title: '发行方', value: getLibraryDetailPublisherLabel(record) },
+      { title: '累计时长', value: getLibraryDetailPlaytimeLabel(record) },
+      { title: '核心引擎', value: getLibraryDetailEngineLabel(record) },
+      { title: '区域', value: getLibraryDetailRegionLabel(record) }
     ]
   }
 
@@ -614,7 +612,7 @@ struct LibraryDetailPage {
       coverKey: record.coverKey,
       displayTitle: getLibraryDetailDisplayTitle(record),
       localizedTitle: getLibraryDetailLocalizedTitle(record),
-      coreLabel: record.preferredCoreId.toUpperCase(),
+      coreLabel: getLibraryDetailEngineLabel(record),
       showExtendedDetails: this.showExtendedDetails,
       primaryCells: this.buildPrimaryCells(record),
       extendedCells: this.buildExtendedCells(record),
@@ -622,15 +620,11 @@ struct LibraryDetailPage {
       telemetryFpsText: this.telemetryFpsText,
       telemetryAudioText: this.telemetryCpuText,
       telemetryDropText: this.telemetryGpuText,
-      telemetryProfile: this.getSnapshot().profile,
       overviewText: getLibraryDetailOverviewText(record),
       runtimeSummaryText: getLibraryDetailRuntimeSummaryText(record),
       coreSpecItems: this.getCoreSpecItems(record),
       onLaunch: () => {
         this.beginLaunchSequence(record)
-      },
-      onQuickAction: (message: string) => {
-        this.showToastMessage(message)
       },
       onToggleDetails: () => {
         this.showExtendedDetails = !this.showExtendedDetails
@@ -640,19 +634,19 @@ struct LibraryDetailPage {
 
   private getLocalStatusText(): string {
     if (!this.libraryRecord) {
-      return '本地资料加载中'
+      return '本地资料未读取'
     }
     if (hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord)) {
       return '本地运行记录'
     }
-    return '本地资料已加载'
+    return '本地资料已读到'
   }
 
   private getLaunchRuntimeStatusText(): string {
     if (!this.libraryRecord) {
-      return 'NO DATA'
+      return '运行记录未读取'
     }
-    return hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord) ? 'RECORDED' : 'NO DATA'
+    return hasLibraryDetailRuntimeSnapshot(this.libraryRecord as LibraryRecord) ? '已有记录' : '还没有运行记录'
   }
 
   @Builder
@@ -682,12 +676,14 @@ struct LibraryDetailPage {
   @Builder
   private EmptyState() {
     Column({ space: 18 }) {
-      Text('未找到详情页数据')
+      Text(this.detailLoadFailed ? '这条游戏详情暂时没有读出来' : '当前没有可显示的游戏详情')
         .fontSize(24)
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.onSurface)
 
-      Text('请从游戏库条目的“查看详情”进入。')
+      Text(this.detailLoadFailed ?
+        '本地资料这次没有加载成功，请稍后重试，或先回到游戏库重新进入。' :
+        '请回到游戏库，从具体条目的“查看详情”进入。')
         .fontSize(EmuTypography.md)
         .fontColor('#CCABABAB')
 
@@ -765,11 +761,10 @@ struct LibraryDetailPage {
       if (this.isLaunching && this.libraryRecord) {
         LibraryLaunchOverlay({
           coverKey: (this.libraryRecord as LibraryRecord).coverKey,
-          progress: this.launchProgress,
           statusText: this.launchStatusText,
           cpuText: this.launchCpuText,
           runtimeStatusText: this.getLaunchRuntimeStatusText(),
-          fileLabel: getLibraryLaunchFileLabel(this.libraryRecord as LibraryRecord)
+          fileLabel: getLibraryDetailLocalizedTitle(this.libraryRecord as LibraryRecord)
         })
       }
     }

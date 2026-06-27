@@ -1,4 +1,4 @@
-import { BarChartBackground, BarChartItem, EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
+import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
@@ -24,10 +24,9 @@ interface ControllerSlotItem {
 interface LobbyRoomItem {
   id: string
   title: string
-  game: string
-  latency: string
-  players: string
-  status: string
+  description: string
+  detail: string
+  actionText: string
   color: string
 }
 
@@ -39,6 +38,7 @@ interface InputLogItem {
   isPrimary: boolean
 }
 
+type DeviceListState = 'loading' | 'ready' | 'error'
 
 @Entry
 @ComponentV2
@@ -47,11 +47,15 @@ struct MultiplayerInputPage {
   @Local private deviceCountText: string = '0'
   @Local private selectedRoomId: string = 'local'
   @Local private localLatencyText: string = '本地触控'
-  @Local private inputLogTitleText: string = '等待输入'
-  @Local private inputLogDetailText: string = '刷新设备后可查看当前外接手柄状态'
+  @Local private inputLogTitleText: string = '等待刷新设备列表'
+  @Local private inputLogDetailText: string = '刷新后可查看当前已读取到的本机输入设备'
+  @Local private deviceListState: DeviceListState = 'loading'
+  @Local private showToast: boolean = false
+  @Local private toastMessage: string = ''
   private readonly navItems = createEmuBottomNavItems('input')
   private pageActive: boolean = false
   private refreshToken: number = 0
+  private toastTimer: number = -1
 
   // 折叠屏状态
   @Local private foldStatus: display.FoldStatus = display.FoldStatus.FOLD_STATUS_UNKNOWN
@@ -72,48 +76,30 @@ struct MultiplayerInputPage {
   private readonly lobbyRooms: LobbyRoomItem[] = [
     {
       id: 'local',
-      title: '本地游玩',
-      game: '当前运行输入桥',
-      latency: '0ms',
-      players: '1 / 1',
-      status: 'READY',
+      title: '本地输入源',
+      description: '当前页提供本地触控入口和本机外设枚举结果',
+      detail: '下方以本机设备枚举结果和触控入口说明为准',
+      actionText: '查看设备',
       color: EmuColors.primary
     },
     {
       id: 'adapter',
-      title: 'Netplay 联机',
-      game: '中继 / 房间服务未配置',
-      latency: '--',
-      players: 'OFFLINE',
-      status: '未配置',
+      title: '联网说明',
+      description: '当前版本不提供房间、在线同步或联网对战',
+      detail: '如需联机功能，需要后续版本单独接入',
+      actionText: '仅作说明',
       color: EmuColors.error
     },
     {
       id: 'layout',
       title: '按键布局编辑',
-      game: '触控按键与热区校准',
-      latency: '本地',
-      players: 'P1',
-      status: '可编辑',
+      description: '可前往布局页调整触控按键位置与映射',
+      detail: '修改后需手动保存才会生效',
+      actionText: '打开编辑',
       color: EmuColors.secondary
     }
   ]
   @Local private controllerSlots: ControllerSlotItem[] = []
-
-  private readonly telemetryBars: BarChartItem[] = [
-    { height: 24, isPrimary: false }, { height: 30, isPrimary: false },
-    { height: 18, isPrimary: true },  { height: 22, isPrimary: true },
-    { height: 26, isPrimary: true },  { height: 44, isPrimary: false },
-    { height: 16, isPrimary: true },  { height: 20, isPrimary: true },
-    { height: 34, isPrimary: false }, { height: 14, isPrimary: true },
-    { height: 18, isPrimary: true },  { height: 20, isPrimary: true },
-    { height: 28, isPrimary: false }, { height: 23, isPrimary: true },
-    { height: 17, isPrimary: true },  { height: 21, isPrimary: true },
-    { height: 24, isPrimary: false }, { height: 22, isPrimary: true },
-    { height: 30, isPrimary: false }, { height: 16, isPrimary: true },
-    { height: 14, isPrimary: true },  { height: 20, isPrimary: true },
-    { height: 40, isPrimary: false }, { height: 18, isPrimary: true }
-  ]
 
   @Local private inputLogs: InputLogItem[] = []
 
@@ -153,30 +139,86 @@ struct MultiplayerInputPage {
   }
 
   private buildControllerSlots(): ControllerSlotItem[] {
+    if (this.deviceListState === 'loading') {
+      return [
+        {
+          id: 'p1',
+          label: '玩家 1',
+          name: '虚拟手柄 P1',
+          deviceId: '本地触控布局',
+          status: '检查中',
+          powerText: '读取中',
+          pollingRate: '读取中',
+          latency: '读取中',
+          protocol: '待读取',
+          isActive: false
+        },
+        {
+          id: 'p2',
+          label: '外接手柄',
+          name: '正在读取设备列表',
+          deviceId: '请稍候',
+          status: '检查中',
+          powerText: '读取中',
+          pollingRate: '读取中',
+          latency: '读取中',
+          protocol: '待读取',
+          isActive: false
+        }
+      ]
+    }
+    if (this.deviceListState === 'error') {
+      return [
+        {
+          id: 'p1',
+          label: '玩家 1',
+          name: '虚拟手柄 P1',
+          deviceId: '本地触控布局',
+          status: '状态待确认',
+          powerText: '本地入口',
+          pollingRate: '待确认',
+          latency: '待确认',
+          protocol: '待确认',
+          isActive: false
+        },
+        {
+          id: 'p2',
+          label: '外接手柄',
+          name: '本机输入设备列表没有读到',
+          deviceId: '请稍后重试',
+          status: '待重试',
+          powerText: '待重试',
+          pollingRate: '待重试',
+          latency: '待重试',
+          protocol: '待确认',
+          isActive: false
+        }
+      ]
+    }
     const hasExternal = this.deviceNamesText.length > 0
     return [
       {
         id: 'p1',
         label: '玩家 1',
         name: '虚拟手柄 P1',
-        deviceId: 'RETRO_PAD_TOUCH',
-        status: '已连接',
-        powerText: '本地',
-        pollingRate: 'FRAME',
+        deviceId: '本地触控布局',
+        status: '本地入口',
+        powerText: '触控布局',
+        pollingRate: '页面说明',
         latency: this.localLatencyText,
-        protocol: 'RETRO_PAD',
-        isActive: true
+        protocol: '需进游戏确认',
+        isActive: false
       },
       {
         id: 'p2',
         label: '外接手柄',
-        name: hasExternal ? this.deviceNamesText : '等待连接手柄',
-        deviceId: hasExternal ? `${this.deviceCountText} 个输入设备` : '等待 HID / 蓝牙手柄',
-        status: hasExternal ? '已连接' : '未绑定',
-        powerText: hasExternal ? '输入总线' : '无设备',
-        pollingRate: hasExternal ? '设备轮询' : '--',
-        latency: hasExternal ? '系统直连' : '--',
-        protocol: hasExternal ? 'HID' : '等待接入',
+        name: hasExternal ? this.deviceNamesText : '当前没有枚举到外接手柄',
+        deviceId: hasExternal ? `${this.deviceCountText} 个外接设备` : '当前没有枚举到外接设备',
+        status: hasExternal ? '已列出' : '未列出',
+        powerText: hasExternal ? '设备列表' : '无设备',
+        pollingRate: hasExternal ? '系统枚举' : '--',
+        latency: hasExternal ? '本机设备' : '--',
+        protocol: hasExternal ? '待分配' : '接入后可分配',
         isActive: hasExternal
       }
     ]
@@ -184,18 +226,48 @@ struct MultiplayerInputPage {
 
   private async refreshDevices(): Promise<void> {
     const token = this.beginRefresh()
+    this.deviceListState = 'loading'
+    this.controllerSlots = this.buildControllerSlots()
+    this.inputLogTitleText = '正在读取本机输入设备'
+    this.inputLogDetailText = '当前正在刷新本机输入设备列表'
     await Promise.resolve();  // Audit C-F5: yield main thread before NAPI call
     if (!this.isCurrentRefresh(token)) {
       return
     }
-    const devices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
+    let devices: InputDeviceInfo[] = []
+    try {
+      devices = runtimeInputPortController.listInputDevices()
+    } catch (err) {
+      if (!this.isCurrentRefresh(token)) {
+        return
+      }
+      const message = (err as Error).message || String(err)
+      LogHelper.error('MultiplayerInputPage', 'Input', `读取输入设备列表失败: ${message}`)
+      this.deviceListState = 'error'
+      this.deviceNamesText = ''
+      this.deviceCountText = '0'
+      this.localLatencyText = '待确认'
+      this.controllerSlots = this.buildControllerSlots()
+      this.inputLogs = [
+        {
+          id: 'device-read-failed',
+          time: '[本地]',
+          eventName: '设备列表',
+          state: '待重试',
+          isPrimary: false
+        }
+      ]
+      this.inputLogTitleText = '本机输入设备没有读出来'
+      this.inputLogDetailText = '请稍后重试，确认本机输入设备列表'
+      return
+    }
     const names: string[] = []
     const logs: InputLogItem[] = [
       {
         id: 'local-touch',
         time: '[本地]',
         eventName: '触控布局',
-        state: '就绪',
+        state: '本地入口',
         isPrimary: true
       }
     ]
@@ -208,22 +280,28 @@ struct MultiplayerInputPage {
         id: `device-${index}`,
         time: '[设备]',
         eventName: deviceName.length > 0 ? deviceName : `设备 ${index + 1}`,
-        state: `${item.deviceId}`.trim().length > 0 ? '已识别' : '已连接',
+        state: `${item.deviceId}`.trim().length > 0 ? '已枚举' : '已读取',
         isPrimary: true
       })
     })
     if (!this.isCurrentRefresh(token)) {
       return
     }
+    this.deviceListState = 'ready'
     this.deviceNamesText = names.join(' / ')
     this.deviceCountText = `${devices.length}`
-    this.localLatencyText = devices.length > 0 ? '多源输入' : '本地触控'
+    this.localLatencyText = devices.length > 0 ? '本机已枚举外设' : '当前仅本地触控入口'
     this.controllerSlots = this.buildControllerSlots()
     this.inputLogs = logs
-    this.inputLogTitleText = devices.length > 0 ? `已识别 ${devices.length} 个外接设备` : '未检测到外接手柄'
+    this.inputLogTitleText = devices.length > 0 ? `已列出 ${devices.length} 个外接设备` : '当前没有枚举到外接设备'
     this.inputLogDetailText = devices.length > 0 ?
-      '当前已读取本机输入设备列表' :
-      '当前仅启用本地触控布局'
+      '当前页面展示的是本机已读取到的设备列表' :
+      '当前页面仅显示本地触控布局'
+  }
+
+  private getExternalDeviceCount(): number {
+    const count = Number(this.deviceCountText)
+    return Number.isFinite(count) && count > 0 ? count : 0
   }
 
   private onBottomNavClick(key: string): void {
@@ -233,13 +311,30 @@ struct MultiplayerInputPage {
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('MultiplayerInputPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
+      this.showToastMessage('这个页面现在还打不开，请稍后再试')
     })
   }
 
   private openInputLayoutEditor(): void {
     this.getUIContext().getRouter().pushUrl({ url: 'pages/InputLayoutPage' }).catch((err: Error) => {
       LogHelper.error('MultiplayerInputPage', 'Route', `pushUrl InputLayoutPage failed: ${err.message}`)
+      this.showToastMessage('输入布局页现在还打不开，请稍后再试')
     })
+  }
+
+  private showToastMessage(message: string): void {
+    this.toastMessage = message
+    this.showToast = true
+    if (this.toastTimer !== -1) {
+      clearTimeout(this.toastTimer)
+    }
+    this.toastTimer = setTimeout(() => {
+      if (!this.pageActive) {
+        return
+      }
+      this.showToast = false
+      this.toastTimer = -1
+    }, 2400)
   }
 
   @Builder
@@ -278,7 +373,7 @@ struct MultiplayerInputPage {
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-          Text(`ID: ${item.deviceId}`)
+          Text(`来源：${item.deviceId}`)
             .fontSize(EmuTypography.xs)
                         .fontColor('#666666')
             .maxLines(1)
@@ -303,9 +398,9 @@ struct MultiplayerInputPage {
       .alignItems(VerticalAlign.Bottom)
 
       Row({ space: 8 }) {
-        this.MetricBox('轮询', item.pollingRate, false)
-        this.MetricBox('延迟', item.latency, item.isActive)
-        this.MetricBox('协议', item.protocol, false)
+        this.MetricBox('同步', item.pollingRate, false)
+        this.MetricBox('来源', item.latency, item.isActive)
+        this.MetricBox('映射', item.protocol, false)
       }
       .width('100%')
     }
@@ -343,31 +438,29 @@ struct MultiplayerInputPage {
       Row() {
         Row({ space: 8 }) {
           EmuIcon({ name: 'explore', tone: 'muted', iconSize: 18 })
-          Text('NETPLAY\n联机')
+          Text('当前页范围')
             .fontSize(EmuTypography.sm)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
             .letterSpacing(2)
-            .lineHeight(20)
         }
         .alignItems(VerticalAlign.Center)
 
         Row({ space: 12 }) {
-          Text('中继：未配置')
+          Text('当前页只提供本机输入说明和布局入口')
             .fontSize(EmuTypography.xs)
                         .fontColor('#777777')
 
-          Button('创建\n房间')
+          Button('打开布局')
             .height(44)
             .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurface)
-            .backgroundColor(Color.Transparent)
+            .fontWeight(FontWeight.Bold)
+            .backgroundColor(EmuColors.surfaceContainerHigh)
             .border({ width: 0.5, color: EmuColors.outlineVariant, style: BorderStyle.Solid })
             .borderRadius(0)
-            .opacity(0.45)
-            .enabled(false)
             .onClick(() => {
-              this.selectedRoomId = 'adapter'
+              this.openInputLayoutEditor()
             })
         }
         .alignItems(VerticalAlign.Center)
@@ -412,40 +505,25 @@ struct MultiplayerInputPage {
           .fontColor(EmuColors.onSurface)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text(room.game)
+        Text(room.description)
           .fontSize(EmuTypography.xs)
                     .fontColor('#666666')
-          .maxLines(1)
+          .maxLines(2)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(room.detail)
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
 
-      Column({ space: 4 }) {
-        Text('延迟')
-          .fontSize(9)
-          .fontColor('#666666')
-        Text(room.latency)
-          .fontSize(EmuTypography.sm)
-                    .fontColor(room.color)
-      }
-      .alignItems(HorizontalAlign.End)
-
-      Column({ space: 4 }) {
-        Text('人数')
-          .fontSize(9)
-          .fontColor('#666666')
-        Text(room.players)
-          .fontSize(EmuTypography.sm)
-                    .fontColor(EmuColors.onSurface)
-      }
-      .alignItems(HorizontalAlign.End)
-
-      Text(room.status)
+      Text(room.actionText)
         .fontSize(9)
-                .fontColor(room.status === '未配置' ? EmuColors.error : room.color)
+                .fontColor(room.id === 'adapter' ? EmuColors.error : room.color)
         .padding({ left: 6, right: 6, top: 3, bottom: 3 })
-        .backgroundColor(room.status === '未配置' ? '#227E2B17' : '#1800FF41')
+        .backgroundColor(room.id === 'adapter' ? '#227E2B17' : '#1800FF41')
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
 
@@ -467,10 +545,18 @@ struct MultiplayerInputPage {
   @Builder
   private TelemetrySection() {
     Column({ space: 14 }) {
+      const externalDeviceCount = this.getExternalDeviceCount()
+      const touchStatus = this.deviceListState === 'ready' ? '入口已展示' :
+        (this.deviceListState === 'error' ? '待确认' : '读取中')
+      const externalStatus = this.deviceListState === 'ready' ?
+        (externalDeviceCount > 0 ? `${externalDeviceCount} 个` : '未枚举到') :
+        (this.deviceListState === 'error' ? '待确认' : '读取中')
+      const modeText = this.deviceListState === 'ready' ? this.localLatencyText :
+        (this.deviceListState === 'error' ? '待确认' : '读取中')
       Row() {
         Row({ space: 8 }) {
           EmuIcon({ name: 'equalizer', iconSize: 16 })
-          Text('输入延迟抖动')
+          Text('本机枚举摘要')
             .fontSize(11)
                         .fontColor(EmuColors.onSurface)
             .letterSpacing(1.2)
@@ -478,14 +564,14 @@ struct MultiplayerInputPage {
         .alignItems(VerticalAlign.Center)
 
         Row({ space: 8 }) {
-          Text('实时')
+          Text('本机枚举')
             .fontSize(8)
                         .fontColor(EmuColors.primary)
             .padding({ left: 6, right: 6, top: 3, bottom: 3 })
             .backgroundColor('#1800FF41')
             .border({ width: 0.5, color: '#3300FF41', style: BorderStyle.Solid })
 
-          Text('采样：16.6ms')
+          Text('设备列表')
             .fontSize(8)
                         .fontColor('#777777')
         }
@@ -494,37 +580,26 @@ struct MultiplayerInputPage {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      Stack() {
-        EmuPrecisionGridBackdrop()
-          .opacity(0.26)
+      Column({ space: 8 }) {
+        Row({ space: 8 }) {
+          this.MetricBox('触控入口', touchStatus, this.deviceListState === 'ready')
+          this.MetricBox('外设枚举', externalStatus, this.deviceListState === 'ready' && externalDeviceCount > 0)
+          this.MetricBox('本机摘要', modeText, this.deviceListState === 'ready' && externalDeviceCount > 0)
+        }
+        .width('100%')
 
-        BarChartBackground({
-          bars: this.telemetryBars,
-          primaryColor: EmuColors.primary,
-          secondaryColor: EmuColors.surfaceContainerHighest,
-          barGap: 2
-        })
+        Text(this.deviceListState === 'error' ?
+          '本机输入设备状态这次没有读出来，请稍后重试。' :
+          '设备名称以下方列表为准，当前页不展示实时延迟曲线。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
           .width('100%')
-          .height('100%')
-          .padding({ left: 10, right: 10, bottom: 10 })
-
-        Row()
-          .width('100%')
-          .height(1)
-          .backgroundColor('#3300FF41')
-          .align(Alignment.Center)
-
-        Text('抖动样本：本地输入')
-          .fontSize(8)
-                    .fontColor('#777777')
-          .align(Alignment.TopStart)
-          .margin({ left: 12, top: 10 })
       }
       .width('100%')
       .height(132)
+      .padding(12)
       .backgroundColor(EmuColors.surfaceContainerLowest)
       .border({ width: 0.5, color: '#22333333', style: BorderStyle.Solid })
-      .clip(true)
     }
     .layoutWeight(2)
     .padding(16)
@@ -537,7 +612,7 @@ struct MultiplayerInputPage {
     Column({ space: 12 }) {
       Row({ space: 8 }) {
         EmuIcon({ name: 'info', tone: 'muted', iconSize: 16 })
-        Text('输入检测')
+        Text('设备列表')
           .fontSize(11)
                     .fontColor(EmuColors.onSurface)
           .letterSpacing(1.2)
@@ -550,6 +625,13 @@ struct MultiplayerInputPage {
         .width('100%')
 
       Text(this.inputLogDetailText)
+        .fontSize(EmuTypography.xs)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .width('100%')
+
+      Text(this.deviceListState === 'error' ?
+        '当前页只拿到未读取结果，不代表设备真的没有连接。' :
+        '当前页仅展示本机输入设备列表，不代表联网或多人同步状态。')
         .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
         .width('100%')
@@ -746,43 +828,70 @@ struct MultiplayerInputPage {
     .layoutWeight(1)
   }
 
-  build() {
-    Column() {
-      EmuHeaderBar({
-        titleText: '碳影 / Carbon Shade',
-        titleIcon: 'terminal',
-        rightLabel: '输入映射与联机中心',
-        rightIcon: 'settings_input_component',
-        activeTextColor: EmuColors.primary,
-        iconSize: 16,
-        rightIconSize: 18,
-        onRightClick: () => {
-          this.openInputLayoutEditor()
-        }
+  @Builder
+  private Toast() {
+    Row({ space: 8 }) {
+      EmuIcon({
+        name: 'check_circle',
+        iconSize: 14
       })
+      Text(this.toastMessage)
+        .fontSize(EmuTypography.xs)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#004C0C')
+        .letterSpacing(1)
+    }
+    .padding({ left: 14, right: 14, top: 8, bottom: 8 })
+    .backgroundColor(EmuColors.primary)
+    .borderRadius(999)
+    .shadow({ radius: 18, color: '#6600FF41', offsetX: 0, offsetY: 0 })
+    .align(Alignment.Bottom)
+    .margin({ bottom: 96 })
+  }
 
-      // 根据折叠态选择布局
-      if (this.isTripleFoldExpanded()) {
-        // 三折态全展开（G态）
-        this.TripleFoldLayout()
-      } else if (this.isDoubleFoldExpanded()) {
-        // 双折态展开（M态）
-        this.DoubleFoldLayout()
-      } else {
-        // 单折态/折叠态（F态）
-        this.SingleFoldLayout()
+  build() {
+    Stack() {
+      Column() {
+        EmuHeaderBar({
+          titleText: '碳影 / Carbon Shade',
+          titleIcon: 'terminal',
+          rightLabel: '本机输入与布局',
+          rightIcon: 'settings_input_component',
+          activeTextColor: EmuColors.primary,
+          iconSize: 16,
+          rightIconSize: 18,
+          onRightClick: () => {
+            this.openInputLayoutEditor()
+          }
+        })
+
+        // 根据折叠态选择布局
+        if (this.isTripleFoldExpanded()) {
+          // 三折态全展开（G态）
+          this.TripleFoldLayout()
+        } else if (this.isDoubleFoldExpanded()) {
+          // 双折态展开（M态）
+          this.DoubleFoldLayout()
+        } else {
+          // 单折态/折叠态（F态）
+          this.SingleFoldLayout()
+        }
+
+        EmuBottomNav({
+          items: this.navItems,
+          activeFontColor: EmuColors.primary,
+          inactiveFontColor: '#FF666666',
+          indicatorStyle: 'line',
+          panelBackgroundColor: '#FF000000',
+          onItemClick: (key: string) => {
+            this.onBottomNavClick(key)
+          }
+        })
       }
 
-      EmuBottomNav({
-        items: this.navItems,
-        activeFontColor: EmuColors.primary,
-        inactiveFontColor: '#FF666666',
-        indicatorStyle: 'line',
-        panelBackgroundColor: '#FF000000',
-        onItemClick: (key: string) => {
-          this.onBottomNavClick(key)
-        }
-      })
+      if (this.showToast) {
+        this.Toast()
+      }
     }
     .width('100%')
     .height('100%')

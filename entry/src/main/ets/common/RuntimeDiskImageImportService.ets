@@ -15,6 +15,13 @@ export interface RuntimeDiskImageImportOptions {
   shouldCancel?: () => boolean
 }
 
+interface RuntimeDiskPickerSelectionResult {
+  uris: string[]
+  canceled: boolean
+  failed: boolean
+  message: string
+}
+
 interface RuntimeDiskImagePlan {
   uri: string
   fileName: string
@@ -46,19 +53,34 @@ export async function importPickedRuntimeDiskImages(
   context: common.UIAbilityContext,
   options?: RuntimeDiskImageImportOptions
 ): Promise<RuntimeDiskImageImportResult> {
-  const uris = await pickRuntimeDiskImageUris(context)
-  return importRuntimeDiskImageUris(context, uris, options)
+  const selection = await pickRuntimeDiskImageUris(context)
+  if (selection.failed) {
+    return {
+      canceled: false,
+      importedEntryName: '',
+      importedEntryPath: '',
+      copiedCount: 0,
+      detail: selection.message
+    }
+  }
+  return importRuntimeDiskImageUris(context, selection.uris, options, selection.canceled)
 }
 
 async function pickRuntimeDiskImageUris(
   context: common.UIAbilityContext
-): Promise<string[]> {
+): Promise<RuntimeDiskPickerSelectionResult> {
   const documentSelectOptions = new picker.DocumentSelectOptions() as PickerSelectOptionsCompat
   documentSelectOptions.maxSelectNumber = 12
   const documentPicker = new picker.DocumentViewPicker(context)
   try {
     const uris = await documentPicker.select(documentSelectOptions)
-    return uris ?? []
+    const safeUris = uris ?? []
+    return {
+      uris: safeUris,
+      canceled: safeUris.length === 0,
+      failed: false,
+      message: safeUris.length === 0 ? '这次没有选中磁盘镜像' : ''
+    }
   } catch (err) {
     const pickerError = err as BusinessError
     LogHelper.warn(
@@ -66,19 +88,25 @@ async function pickRuntimeDiskImageUris(
       'Picker',
       `选择磁盘镜像取消或失败: ${pickerError.code}, ${pickerError.message}`
     )
-    return []
+    return {
+      uris: [],
+      canceled: false,
+      failed: true,
+      message: '系统文件选择器这次没有成功返回磁盘镜像，请稍后再试'
+    }
   }
 }
 
 async function importRuntimeDiskImageUris(
   context: common.UIAbilityContext,
   uris: string[],
-  options?: RuntimeDiskImageImportOptions
+  options?: RuntimeDiskImageImportOptions,
+  selectionCanceled: boolean = false
 ): Promise<RuntimeDiskImageImportResult> {
   const result = createEmptyRuntimeDiskImageImportResult()
   if (!uris || uris.length === 0) {
-    result.canceled = true
-    result.detail = '已取消选择磁盘镜像'
+    result.canceled = selectionCanceled
+    result.detail = selectionCanceled ? '这次没有选中磁盘镜像' : '这次没有拿到可导入的磁盘镜像'
     return result
   }
 
@@ -132,8 +160,8 @@ async function importRuntimeDiskImageUris(
   result.importedEntryPath = `${diskDir}/${primaryResult.plan.fileName}`
   result.copiedCount = orderedPlans.length
   result.detail = orderedPlans.length > 1
-    ? `已导入 ${orderedPlans.length} 个磁盘镜像文件`
-    : '已导入磁盘镜像'
+    ? `已写入 ${orderedPlans.length} 个磁盘镜像文件`
+    : '已写入磁盘镜像文件'
   return result
 }
 
@@ -282,15 +310,6 @@ async function resolveMultiFileDependencyNames(
   if (!MULTIFILE_ENTRY_EXTENSIONS.includes(ext)) {
     return []
   }
-  if (!(await pathExists(uri))) {
-    LogHelper.warn(
-      'RuntimeDiskImport',
-      'Dependency',
-      `多文件入口不存在 ${LogHelper.describePathForLog(fileName)}`
-    )
-    return []
-  }
-
   let text = ''
   try {
     text = await fs.readText(uri)
@@ -301,7 +320,7 @@ async function resolveMultiFileDependencyNames(
       'Dependency',
       `读取多文件入口失败 ${LogHelper.describePathForLog(fileName)}: ${message}`
     )
-    return []
+    throw new Error(`RUNTIME_DISK_MULTIFILE_ENTRY_READ_FAILED:${fileName}`)
   }
 
   if (ext === 'cue') {
@@ -488,7 +507,20 @@ async function pathExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as { code?: string | number }).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

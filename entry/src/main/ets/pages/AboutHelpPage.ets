@@ -16,12 +16,15 @@ interface HelpItem {
 @ComponentV2
 struct AboutHelpPage {
   @Local private selectedHelpId: string = 'import'
+  @Local private showToast: boolean = false
+  @Local private toastMessage: string = ''
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
+  private toastTimer: number = -1
   private readonly helpItems: HelpItem[] = [
-    { id: 'import', title: '怎么导入游戏？', detail: 'Procedure / Storage / Pathing', value: '使用导入入口选择本地 ROM，导入完成后进入库页同步。' },
-    { id: 'input', title: '按键没反应怎么办？', detail: 'Input / Mapping / Calibration', value: '进入 INPUT 页面检查端口映射；布局编辑只保存本地 UI 配置。' },
-    { id: 'legal', title: '合规声明', detail: 'Compliance / Licensing / EULA', value: '应用不提供商业 ROM；用户需自行确认 ROM 与 BIOS 使用权。' },
-    { id: 'version', title: '当前版本', detail: 'System Architecture / Build Info', value: '碳影 / Carbon Shade / HarmonyOS ArkUI native shell。' }
+    { id: 'import', title: '怎么导入游戏？', detail: '本地文件选择 / 导入目录 / 库页刷新', value: '从导入入口选择你有合法使用权的本地 ROM 或镜像文件。文件写入完成后，回到库页会在刷新扫描后出现。' },
+    { id: 'input', title: '按键没反应怎么办？', detail: '输入设备检查 / 端口分配 / 布局调整', value: '先到输入设备页查看当前能否列出本机输入设备，再检查端口分配和触控布局。当前页展示的是本机枚举结果与触控入口，不代表联网或实时输入诊断。' },
+    { id: 'legal', title: '合规声明', detail: '内容来源 / 使用责任 / 本地导入', value: '应用不提供 ROM 下载，也不提供在线内容。请自行确认 ROM、BIOS 和核心文件的来源、授权与使用权。' },
+    { id: 'version', title: '当前提供什么？', detail: '本地模拟体验 / 当前功能范围', value: '当前版本提供本地导入、游戏库、输入、存档和画面设置等能力，不包含在线服务。' }
   ]
 
   private onBottomNavClick(key: string): void {
@@ -31,7 +34,20 @@ struct AboutHelpPage {
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('AboutHelpPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
+      this.showToastMessage('这个页面现在还打不开，请稍后再试')
     })
+  }
+
+  private showToastMessage(message: string): void {
+    this.toastMessage = message
+    this.showToast = true
+    if (this.toastTimer !== -1) {
+      clearTimeout(this.toastTimer)
+    }
+    this.toastTimer = setTimeout(() => {
+      this.showToast = false
+      this.toastTimer = -1
+    }, 2400)
   }
 
   @Builder
@@ -42,7 +58,7 @@ struct AboutHelpPage {
           .width(5)
           .height(5)
           .backgroundColor(EmuColors.primary)
-        Text('Status: LOCAL_ABOUT_READY')
+        Text('帮助说明')
           .fontSize(EmuTypography.xs)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(2)
@@ -55,7 +71,7 @@ struct AboutHelpPage {
         .fontColor(EmuColors.onSurface)
         .letterSpacing(0)
 
-      Text('碳影是基于 libretro 的本地模拟运行壳。当前页面仅展示已接入的本地能力；联网资料与远端服务尚未纳入当前版本。')
+      Text('碳影是基于 libretro 的本地模拟应用。这里集中说明导入、输入、版权和当前版本提供的能力。')
         .fontSize(13)
         .fontColor(EmuColors.onSurfaceVariant)
         .lineHeight(20)
@@ -70,16 +86,16 @@ struct AboutHelpPage {
     Column({ space: 14 }) {
       Row() {
         Column({ space: 4 }) {
-          Text('当前版本')
+          Text('当前提供')
             .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
           Row({ space: 8 }) {
-            Text('v1.0.2')
+            Text('本地模拟体验')
               .fontSize(24)
               .fontWeight(FontWeight.Medium)
               .fontColor(EmuColors.onSurface)
-            Text('STABLE')
+            Text('当前版本')
               .fontSize(EmuTypography.xs)
                             .fontColor(EmuColors.primary)
           }
@@ -88,11 +104,11 @@ struct AboutHelpPage {
         .alignItems(HorizontalAlign.Start)
 
         Column({ space: 4 }) {
-          Text('数据来源')
+          Text('内容范围')
             .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.secondary)
             .letterSpacing(1.4)
-          Text('本地模式')
+          Text('仅本地导入与本地游玩')
             .fontSize(13)
                         .fontColor(EmuColors.onSurfaceVariant)
         }
@@ -158,7 +174,7 @@ struct AboutHelpPage {
   @Builder
   private HelpList() {
     Column({ space: 0 }) {
-      Text('文档与说明')
+      Text('使用说明')
         .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.secondary)
         .letterSpacing(2)
@@ -181,7 +197,7 @@ struct AboutHelpPage {
           .height(2)
           .backgroundColor(EmuColors.primary)
 
-        Text('面向本地模拟体验\n构建于 HarmonyOS ArkUI\n基于 libretro 运行架构')
+        Text('面向本地模拟体验\n构建于 HarmonyOS ArkUI\n基于 libretro 运行')
           .fontSize(13)
                     .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.6)
@@ -212,42 +228,72 @@ struct AboutHelpPage {
     .alignItems(VerticalAlign.Center)
   }
 
+  @Builder
+  private Toast() {
+    Row({ space: 8 }) {
+      Row()
+        .width(18)
+        .height(18)
+        .borderRadius(9)
+        .backgroundColor(EmuColors.primary)
+
+      Text(this.toastMessage)
+        .fontSize(11)
+        .fontWeight(FontWeight.Bold)
+        .fontColor(EmuColors.primary)
+        .fontFamily('monospace')
+        .letterSpacing(0.8)
+    }
+    .padding({ left: 16, right: 16, top: 10, bottom: 10 })
+    .backgroundColor('#2200FF41')
+    .border({ width: 0.5, color: '#6600FF41', style: BorderStyle.Solid })
+    .borderRadius(999)
+    .align(Alignment.Bottom)
+    .margin({ bottom: 96 })
+  }
+
   build() {
-    Column() {
-      EmuHeaderBar({
-        titleText: '碳影 / Carbon Shade',
-        titleIcon: 'memory',
-        rightLabel: '系统',
-        rightIcon: 'settings_input_component',
-        activeTextColor: EmuColors.primary,
-        iconSize: 16,
-        rightIconSize: 18
-      })
+    Stack() {
+      Column() {
+        EmuHeaderBar({
+          titleText: '碳影 / Carbon Shade',
+          titleIcon: 'memory',
+          rightLabel: '系统',
+          rightIcon: 'settings_input_component',
+          activeTextColor: EmuColors.primary,
+          iconSize: 16,
+          rightIconSize: 18
+        })
 
-      Scroll() {
-        Column({ space: 28 }) {
-          this.StatusHeader()
-          this.VersionPanel()
-          this.HelpList()
-          this.FooterBrand()
+        Scroll() {
+          Column({ space: 28 }) {
+            this.StatusHeader()
+            this.VersionPanel()
+            this.HelpList()
+            this.FooterBrand()
+          }
+          .width('100%')
+          .constraintSize({ maxWidth: 680 })
+          .padding({ left: 24, right: 24, top: 34, bottom: 40 })
         }
+        .layoutWeight(1)
         .width('100%')
-        .constraintSize({ maxWidth: 680 })
-        .padding({ left: 24, right: 24, top: 34, bottom: 40 })
-      }
-      .layoutWeight(1)
-      .width('100%')
 
-      EmuBottomNav({
-        items: this.navItems,
-        activeFontColor: EmuColors.primary,
-        inactiveFontColor: '#FF666666',
-        indicatorStyle: 'dot',
-        panelBackgroundColor: '#FF000000',
-        onItemClick: (key: string) => {
-          this.onBottomNavClick(key)
-        }
-      })
+        EmuBottomNav({
+          items: this.navItems,
+          activeFontColor: EmuColors.primary,
+          inactiveFontColor: '#FF666666',
+          indicatorStyle: 'dot',
+          panelBackgroundColor: '#FF000000',
+          onItemClick: (key: string) => {
+            this.onBottomNavClick(key)
+          }
+        })
+      }
+
+      if (this.showToast) {
+        this.Toast()
+      }
     }
     .width('100%')
     .height('100%')

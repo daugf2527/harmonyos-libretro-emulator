@@ -30,12 +30,12 @@ export interface RuntimeInputPortTaskOptions {
 export const RUNTIME_CONTROLLER_PORT_DEVICE_OPTIONS: RuntimeControllerPortDeviceOption[] = [
   {
     device: RETRO_DEVICE_JOYPAD,
-    label: 'Joypad',
+    label: '标准手柄',
     detail: '标准方向键 / 功能键'
   },
   {
     device: RETRO_DEVICE_ANALOG,
-    label: 'Analog',
+    label: '双摇杆',
     detail: '启用双摇杆 / 模拟轴'
   }
 ]
@@ -44,13 +44,17 @@ const nativeApi = testNapi as RuntimeInputPortNapi
 
 export class RuntimeInputPortController {
   listInputDevices(): InputDeviceInfo[] {
+    if (!testNapi) {
+      const err = new Error('engine not ready')
+      LogHelper.warn('RuntimeInputPort', 'Input', '获取设备列表跳过: engine not ready')
+      throw err
+    }
     try {
-      if (!testNapi) { return []; }  // Audit C-F4: guard before engine loads
       return nativeApi.refactoredListInputDevices() || []
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeInputPort', 'Input', `获取设备列表失败: ${message}`)
-      return []
+      throw err as Error
     }
   }
 
@@ -136,12 +140,12 @@ export function normalizeRuntimeControllerPortDevice(device: number): number {
 export function describeRuntimeControllerPortDevice(device: number): string {
   const safeDevice = validateRuntimeControllerPortDevice(device)
   if (safeDevice === undefined) {
-    return 'Unknown'
+    return '未知设备'
   }
   const found = RUNTIME_CONTROLLER_PORT_DEVICE_OPTIONS.find((item: RuntimeControllerPortDeviceOption) => {
     return item.device === safeDevice
   })
-  return found ? found.label : `Device ${safeDevice}`
+  return found ? found.label : `设备 ${safeDevice}`
 }
 
 function validateRuntimeControllerPortDevice(device: number): number | undefined {

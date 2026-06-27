@@ -334,7 +334,12 @@ async function buildManifestFromDirectory(context: common.UIAbilityContext): Pro
     }
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('SaveStateRepository', 'Index', `扫描存档目录失败: ${message}`)
+    if (!(await fileExists(saveDir))) {
+      LogHelper.warn('SaveStateRepository', 'Index', `存档目录不存在，按空目录处理: ${message}`)
+    } else {
+      LogHelper.warn('SaveStateRepository', 'Index', `扫描存档目录失败: ${message}`)
+      throw err as Error
+    }
   }
   return {
     version: SAVE_STATE_VERSION,
@@ -655,8 +660,11 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -666,7 +674,20 @@ async function readOptionalText(path: string): Promise<string> {
   }
   try {
     return await fs.readText(path)
-  } catch (_err) {
-    return ''
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return ''
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as ErrorWithCode).code
+  if (errorCode === ERR_CODE_ENOENT || errorCode === ERR_CODE_ENOENT_NUM || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

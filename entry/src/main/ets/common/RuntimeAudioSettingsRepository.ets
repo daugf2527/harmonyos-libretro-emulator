@@ -10,6 +10,10 @@ export interface RuntimeAudioSettingsProfile {
   updatedAt: number
 }
 
+interface RuntimeAudioSettingsFileErrorWithCode {
+  code?: string | number
+}
+
 const RUNTIME_AUDIO_SETTINGS_VERSION = 2
 const RUNTIME_AUDIO_SETTINGS_DIR_NAME = 'runtime'
 const RUNTIME_AUDIO_SETTINGS_FILE_NAME = 'audio_settings.json'
@@ -46,11 +50,14 @@ export async function loadRuntimeAudioSettingsProfile(
   }
   try {
     const parsed = JSON.parse(text) as Partial<RuntimeAudioSettingsProfile> | null
+    if (!isRuntimeAudioSettingsProfileShapeValid(parsed)) {
+      throw new Error('runtime_audio_settings_invalid')
+    }
     return normalizeRuntimeAudioSettingsProfile(parsed)
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('RuntimeAudioSettingsRepository', 'Load', `音频配置损坏，已回退默认值: ${message}`)
-    return createDefaultRuntimeAudioSettingsProfile()
+    LogHelper.warn('RuntimeAudioSettingsRepository', 'Load', `音频配置读取失败: ${message}`)
+    throw err as Error
   }
 }
 
@@ -95,6 +102,18 @@ export function normalizeRuntimeAudioSettingsProfile(
     volumePercent: clampVolumePercent(profile?.volumePercent),
     updatedAt: Number(profile?.updatedAt) || 0
   }
+}
+
+function isRuntimeAudioSettingsProfileShapeValid(
+  profile: Partial<RuntimeAudioSettingsProfile> | null | undefined
+): boolean {
+  if (!profile || typeof profile !== 'object') {
+    return false
+  }
+  return 'version' in profile &&
+    'updatedAt' in profile &&
+    'latencyMs' in profile &&
+    'volumePercent' in profile
 }
 
 export function getAudioLatencyForPreset(index: number): number {
@@ -190,8 +209,11 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -201,7 +223,20 @@ async function readOptionalText(path: string): Promise<string> {
   }
   try {
     return await fs.readText(path)
-  } catch (_err) {
-    return ''
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return ''
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as RuntimeAudioSettingsFileErrorWithCode).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

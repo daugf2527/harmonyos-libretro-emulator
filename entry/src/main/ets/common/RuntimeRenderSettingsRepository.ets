@@ -12,6 +12,10 @@ export interface RuntimeRenderSettingsProfile {
   updatedAt: number
 }
 
+interface RuntimeRenderSettingsFileErrorWithCode {
+  code?: string | number
+}
+
 const RUNTIME_RENDER_SETTINGS_VERSION = 2
 const RUNTIME_RENDER_SETTINGS_DIR_NAME = 'runtime'
 const RUNTIME_RENDER_SETTINGS_FILE_NAME = 'render_settings.json'
@@ -38,11 +42,14 @@ export async function loadRuntimeRenderSettingsProfile(
   }
   try {
     const parsed = JSON.parse(text) as Partial<RuntimeRenderSettingsProfile> | null
+    if (!isRuntimeRenderSettingsProfileShapeValid(parsed)) {
+      throw new Error('runtime_render_settings_invalid')
+    }
     return normalizeRuntimeRenderSettingsProfile(parsed)
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('RuntimeRenderSettingsRepository', 'Load', `渲染配置损坏，已回退默认值: ${message}`)
-    return createDefaultRuntimeRenderSettingsProfile()
+    LogHelper.warn('RuntimeRenderSettingsRepository', 'Load', `渲染配置读取失败: ${message}`)
+    throw err as Error
   }
 }
 
@@ -93,6 +100,21 @@ export function normalizeRuntimeRenderSettingsProfile(
     hwRenderAllowed: profile?.hwRenderAllowed !== false,
     updatedAt: Number(profile?.updatedAt) || 0
   }
+}
+
+function isRuntimeRenderSettingsProfileShapeValid(
+  profile: Partial<RuntimeRenderSettingsProfile> | null | undefined
+): boolean {
+  if (!profile || typeof profile !== 'object') {
+    return false
+  }
+  return 'version' in profile &&
+    'updatedAt' in profile &&
+    'scalingMode' in profile &&
+    'swapInterval' in profile &&
+    'softwareMaxPresetIndex' in profile &&
+    'aiUpscaleEnabled' in profile &&
+    'hwRenderAllowed' in profile
 }
 
 export function describeRenderMode(mode: number): string {
@@ -167,8 +189,11 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -178,7 +203,20 @@ async function readOptionalText(path: string): Promise<string> {
   }
   try {
     return await fs.readText(path)
-  } catch (_err) {
-    return ''
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return ''
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as RuntimeRenderSettingsFileErrorWithCode).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

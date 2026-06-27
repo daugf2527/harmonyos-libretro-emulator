@@ -42,16 +42,16 @@ export class RuntimeSramController {
       return '需在运行中导出电池存档'
     }
     if (!context) {
-      return '上下文缺失'
+      return '当前页还没准备好，暂时不能导出电池存档'
     }
     if (romFile.trim().length === 0) {
-      return 'ROM 上下文缺失'
+      return '当前游戏记录不完整，暂时找不到对应的电池存档'
     }
 
     try {
       const data = await this.getCurrentSramAsync()
       if (!data || data.byteLength <= 0) {
-        return '当前核心未暴露 SRAM'
+        return '当前游戏没有可导出的电池存档数据'
       }
       if (options?.shouldCancel?.()) {
         return '电池存档操作已取消'
@@ -64,9 +64,12 @@ export class RuntimeSramController {
         'SRAM',
         `运行态 SRAM 备份已写入: rom=${LogHelper.describePathForLog(romFile)} file=${LogHelper.describePathForLog(saved.fileName)} bytes=${saved.byteLength}`
       )
-      return '电池存档已导出'
+      return '电池存档备份文件已写出'
     } catch (err) {
       const message = (err as Error).message || String(err)
+      if (message === 'RUNTIME_SRAM_CANCELED') {
+        return '电池存档操作已取消'
+      }
       LogHelper.error('RuntimeSram', 'SRAM', `导出运行态 SRAM 失败: ${message}`)
       return '导出电池存档失败'
     }
@@ -76,8 +79,11 @@ export class RuntimeSramController {
     context: common.UIAbilityContext | undefined,
     romFile: string
   ): Promise<RuntimeSramBackupListItem[]> {
-    if (!context || romFile.trim().length === 0) {
-      return []
+    if (!context) {
+      throw new Error('runtime sram context missing')
+    }
+    if (romFile.trim().length === 0) {
+      throw new Error('runtime sram rom context missing')
     }
     const items = await listRuntimeSramBackupsForRom(context, romFile)
     const listItems: RuntimeSramBackupListItem[] = []
@@ -98,10 +104,10 @@ export class RuntimeSramController {
       return '需在运行中载入电池存档'
     }
     if (!context) {
-      return '上下文缺失'
+      return '当前页还没准备好，暂时不能载入电池存档'
     }
     if (romFile.trim().length === 0) {
-      return 'ROM 上下文缺失'
+      return '当前游戏记录不完整，暂时找不到对应的电池存档'
     }
     if (fileName.trim().length === 0) {
       return '电池存档文件无效'
@@ -120,6 +126,9 @@ export class RuntimeSramController {
       return applied ? '电池存档已载入' : '当前核心未接受 SRAM 写入'
     } catch (err) {
       const message = (err as Error).message || String(err)
+      if (message === 'RUNTIME_SRAM_CANCELED') {
+        return '电池存档操作已取消'
+      }
       LogHelper.error('RuntimeSram', 'SRAM', `载入运行态 SRAM 失败: ${message}`)
       return '载入电池存档失败'
     }
@@ -132,10 +141,10 @@ export class RuntimeSramController {
     options?: RuntimeSramTaskOptions
   ): Promise<string> {
     if (!context) {
-      return '上下文缺失'
+      return '当前页还没准备好，暂时不能删除电池存档'
     }
     if (romFile.trim().length === 0) {
-      return 'ROM 上下文缺失'
+      return '当前游戏记录不完整，暂时找不到对应的电池存档'
     }
     if (fileName.trim().length === 0) {
       return '电池存档文件无效'
@@ -147,9 +156,12 @@ export class RuntimeSramController {
       }
       await deleteRuntimeSramBackup(context, romFile, fileName)
       LogHelper.info('RuntimeSram', 'SRAM', `运行态 SRAM 备份已删除: file=${LogHelper.describePathForLog(fileName)}`)
-      return '电池存档已删除'
+      return '电池存档备份文件已删除'
     } catch (err) {
       const message = (err as Error).message || String(err)
+      if (message === 'RUNTIME_SRAM_CANCELED') {
+        return '电池存档操作已取消'
+      }
       LogHelper.error('RuntimeSram', 'SRAM', `删除运行态 SRAM 备份失败: ${message}`)
       return '删除电池存档失败'
     }
@@ -197,7 +209,7 @@ function buildRuntimeSramBackupListItem(
   return {
     id: item.id,
     fileName: item.fileName,
-    slotLabel: `电池位_${slotNumber}`,
+    slotLabel: `电池存档 ${slotNumber}`,
     detail: `${normalizeRuntimeSramTitle(item.fileName)} | ${formatRuntimeSramBytes(item.byteLength)}`,
     createdLabel: item.createdAt > 0 ? formatRuntimeSramDateTime(item.createdAt) : '本地',
     isLatest: index === 0

@@ -26,23 +26,30 @@ export interface RuntimeCoreOptionsTaskOptions {
   shouldCancel?: () => boolean
 }
 
+class RuntimeCoreOptionsCanceledError extends Error {
+  constructor() {
+    super('RUNTIME_CORE_OPTIONS_CANCELED')
+  }
+}
+
 export class RuntimeCoreOptionsController {
   getOptions(): RuntimeCoreOptionItem[] {
+    if (!testNapi) {
+      LogHelper.warn('RuntimeCoreOptions', 'Engine', '读取核心选项跳过: engine not ready')
+      throw new Error('engine not ready')
+    }
     try {
-      if (!testNapi) {
-        return []
-      }
       return this.parseOptionsJson(nativeApi.refactoredGetCoreOptions())
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreOptions', 'Engine', `读取核心选项失败: ${message}`)
-      return []
+      throw err as Error
     }
   }
 
   async getOptionsAsync(options?: RuntimeCoreOptionsTaskOptions): Promise<RuntimeCoreOptionItem[]> {
     if (options?.shouldCancel?.()) {
-      return []
+      throw new RuntimeCoreOptionsCanceledError()
     }
     if (!testNapi) {
       LogHelper.warn('RuntimeCoreOptions', 'Engine', '读取核心选项跳过: engine not ready')
@@ -51,7 +58,7 @@ export class RuntimeCoreOptionsController {
     try {
       const raw = await nativeApi.refactoredGetCoreOptionsAsync()
       if (options?.shouldCancel?.()) {
-        return []
+        throw new RuntimeCoreOptionsCanceledError()
       }
       return this.parseOptionsJson(raw)
     } catch (err) {
@@ -95,7 +102,7 @@ export class RuntimeCoreOptionsController {
     }
 
     if (options?.shouldCancel?.()) {
-      return false
+      throw new RuntimeCoreOptionsCanceledError()
     }
 
     if (!testNapi) {
@@ -106,7 +113,7 @@ export class RuntimeCoreOptionsController {
     try {
       const ok = await nativeApi.refactoredSetCoreOptionAsync(safeKey, safeValue)
       if (options?.shouldCancel?.()) {
-        return false
+        throw new RuntimeCoreOptionsCanceledError()
       }
       return ok
     } catch (err) {
@@ -119,10 +126,10 @@ export class RuntimeCoreOptionsController {
   private parseOptionsJson(raw: string): RuntimeCoreOptionItem[] {
     const parsed = JSON.parse(raw) as Partial<RuntimeCoreOptionItem>[] | null
     if (!Array.isArray(parsed)) {
-      return []
+      throw new Error('runtime_core_options_invalid')
     }
 
-    return parsed
+    const items = parsed
       .map((item: Partial<RuntimeCoreOptionItem>): RuntimeCoreOptionItem => {
         const key = typeof item.key === 'string' ? item.key.trim() : ''
         const desc = typeof item.desc === 'string' ? item.desc.trim() : ''
@@ -146,6 +153,11 @@ export class RuntimeCoreOptionsController {
         }
       })
       .filter((item: RuntimeCoreOptionItem) => item.key.length > 0)
+
+    if (parsed.length > 0 && items.length === 0) {
+      throw new Error('runtime_core_options_items_invalid')
+    }
+    return items
   }
 }
 

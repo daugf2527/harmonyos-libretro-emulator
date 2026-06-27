@@ -71,7 +71,7 @@ struct ShaderPreviewPage {
   private readonly aspectOptions: ShaderAspectOptionItem[] = [
     { key: '4:3', label: '4:3' },
     { key: '16:9', label: '16:9' },
-    { key: 'native', label: 'NATIVE' }
+    { key: 'native', label: '原始比例' }
   ]
   private pageActive: boolean = false
   private taskToken: number = 0
@@ -122,7 +122,7 @@ struct ShaderPreviewPage {
     const token = this.beginTask()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.statusText = '上下文不可用'
+      this.statusText = '现在还读不到视觉配置，请稍后再试'
       return
     }
     try {
@@ -130,14 +130,14 @@ struct ShaderPreviewPage {
       if (!this.isCurrentTask(token)) {
         return
       }
-      this.applyProfile(profile, '视觉配置已载入')
+      this.applyProfile(profile, '视觉配置已读到')
     } catch (err) {
       if (!this.isCurrentTask(token)) {
         return
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('ShaderPreviewPage', 'Visual', `读取视觉配置失败: ${message}`)
-      this.statusText = '读取视觉配置失败'
+      this.statusText = '视觉配置没有读到，请稍后重试'
     }
   }
 
@@ -145,7 +145,7 @@ struct ShaderPreviewPage {
     const token = this.beginTask()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.statusText = '上下文不可用'
+      this.statusText = '现在还不能保存视觉配置，请稍后再试'
       return
     }
     try {
@@ -160,16 +160,16 @@ struct ShaderPreviewPage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('ShaderPreviewPage', 'Visual', `保存视觉配置失败: ${message}`)
-      this.statusText = '保存视觉配置失败'
+      this.statusText = '视觉配置没有保存成功，请稍后重试'
     }
   }
 
   private resetPreset(): void {
-    void this.persistProfile(createDefaultRuntimeVisualSettingsProfile(), '已重置视觉配置')
+    void this.persistProfile(createDefaultRuntimeVisualSettingsProfile(), '已把视觉配置重置到本地')
   }
 
   private savePreviewConfig(): void {
-    void this.persistProfile(this.cloneProfile(), '已保存视觉配置')
+    void this.persistProfile(this.cloneProfile(), '已把视觉配置保存到本地')
   }
 
   private clampPercent(value: number): number {
@@ -216,11 +216,13 @@ struct ShaderPreviewPage {
     if (key === 'library') {
       this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
         LogHelper.error('ShaderPreviewPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
+        this.statusText = '现在还回不到游戏库，请稍后再试'
       })
       return
     }
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('ShaderPreviewPage', 'Route', `pushUrl ${route} failed: ${err.message}`)
+      this.statusText = '这个页面现在还打不开，请稍后再试'
     })
   }
 
@@ -326,7 +328,7 @@ struct ShaderPreviewPage {
     Stack() {
       Row({ space: 1 }) {
         this.PreviewPane('原始画面', '原始输出', false)
-        this.PreviewPane('滤镜预览', '运行页效果', true)
+        this.PreviewPane('滤镜预览', '保存后用于运行页', true)
       }
       .width('100%')
       .height('100%')
@@ -380,7 +382,7 @@ struct ShaderPreviewPage {
   private ParameterPanel() {
     Column({ space: 18 }) {
       Row() {
-        Text('实时视觉滤镜预览')
+        Text('视觉滤镜预览')
           .fontSize(EmuTypography.sm)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurface)
@@ -393,7 +395,7 @@ struct ShaderPreviewPage {
       .justifyContent(FlexAlign.SpaceBetween)
 
       Column({ space: 10 }) {
-        Text('显示比例 display_aspect')
+        Text('显示比例')
           .fontSize(9)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurfaceVariant)
@@ -484,7 +486,7 @@ struct ShaderPreviewPage {
         .backgroundColor('#3300FF41')
 
       Row() {
-        Text('运行页应用')
+        Text('运行中生效')
           .fontSize(EmuTypography.xs)
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(1.4)

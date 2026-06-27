@@ -146,14 +146,15 @@ function buildCoverColor(index: number): string {
 }
 
 function resolveCoverKey(fileName: string): string {
-  const normalized = fileName.toLowerCase()
-  if (normalized.indexOf('metroid') >= 0 || normalized.indexOf('castlevania') >= 0 ||
-    normalized.indexOf('aria') >= 0) {
-    return 'metroid_fusion'
+  const platform = resolvePlatform(fileName)
+  if (platform === 'GB' || platform === 'GBA') {
+    return 'moss_signal'
   }
-  if (normalized.indexOf('zelda') >= 0 || normalized.indexOf('chrono') >= 0 ||
-    normalized.indexOf('final fantasy') >= 0) {
-    return 'zelda_triforce'
+  if (platform === 'FC' || platform === 'SNES') {
+    return 'aurora_grid'
+  }
+  if (platform === 'MD' || platform === 'NDS' || platform === 'PS' || platform === 'ARCADE') {
+    return 'ember_glow'
   }
   return ''
 }

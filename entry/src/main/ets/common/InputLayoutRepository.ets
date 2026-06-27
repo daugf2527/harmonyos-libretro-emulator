@@ -27,22 +27,22 @@ export interface RetroButtonOption {
 }
 
 export const RETRO_BUTTON_OPTIONS: RetroButtonOption[] = [
-  { retroButtonId: 0, label: 'B', caption: 'B / Secondary' },
+  { retroButtonId: 0, label: 'B', caption: 'B / 副按键' },
   { retroButtonId: 1, label: 'X', caption: 'X' },
-  { retroButtonId: 2, label: 'SELECT', caption: 'Select' },
-  { retroButtonId: 3, label: 'START', caption: 'Start' },
-  { retroButtonId: 4, label: 'UP', caption: 'D-Pad Up' },
-  { retroButtonId: 5, label: 'DOWN', caption: 'D-Pad Down' },
-  { retroButtonId: 6, label: 'LEFT', caption: 'D-Pad Left' },
-  { retroButtonId: 7, label: 'RIGHT', caption: 'D-Pad Right' },
-  { retroButtonId: 8, label: 'A', caption: 'A / Primary' },
+  { retroButtonId: 2, label: 'SELECT', caption: '选择键' },
+  { retroButtonId: 3, label: 'START', caption: '开始键' },
+  { retroButtonId: 4, label: 'UP', caption: '方向键上' },
+  { retroButtonId: 5, label: 'DOWN', caption: '方向键下' },
+  { retroButtonId: 6, label: 'LEFT', caption: '方向键左' },
+  { retroButtonId: 7, label: 'RIGHT', caption: '方向键右' },
+  { retroButtonId: 8, label: 'A', caption: 'A / 主按键' },
   { retroButtonId: 9, label: 'Y', caption: 'Y' },
-  { retroButtonId: 10, label: 'L', caption: 'L Shoulder' },
-  { retroButtonId: 11, label: 'R', caption: 'R Shoulder' },
-  { retroButtonId: 12, label: 'L2', caption: 'L2 Trigger' },
-  { retroButtonId: 13, label: 'R2', caption: 'R2 Trigger' },
-  { retroButtonId: 14, label: 'L3', caption: 'L3 Stick' },
-  { retroButtonId: 15, label: 'R3', caption: 'R3 Stick' }
+  { retroButtonId: 10, label: 'L', caption: '左肩键' },
+  { retroButtonId: 11, label: 'R', caption: '右肩键' },
+  { retroButtonId: 12, label: 'L2', caption: '左扳机键' },
+  { retroButtonId: 13, label: 'R2', caption: '右扳机键' },
+  { retroButtonId: 14, label: 'L3', caption: '左摇杆按压' },
+  { retroButtonId: 15, label: 'R3', caption: '右摇杆按压' }
 ]
 
 const DEFAULT_RETRO_ID_BUTTON_PAIRS: RetroButtonOption[] = [
@@ -73,6 +73,18 @@ export function getRetroButtonOptionLabel(retroButtonId: number): string {
 const INPUT_LAYOUT_VERSION = 1
 const INPUT_LAYOUT_DIR_NAME = 'input'
 const INPUT_LAYOUT_FILE_NAME = 'input_layout.json'
+const REQUIRED_INPUT_LAYOUT_BUTTON_IDS: string[] = [
+  'up',
+  'left',
+  'right',
+  'down',
+  'select',
+  'start',
+  'b',
+  'a',
+  'l',
+  'r'
+]
 
 function isMissingFileError(message: string): boolean {
   const normalized = message.toLowerCase()
@@ -107,11 +119,14 @@ export async function loadInputLayoutProfile(context: common.UIAbilityContext): 
   }
   try {
     const parsed = JSON.parse(text) as Partial<InputLayoutProfile> | null
+    if (!parsed || !Array.isArray(parsed.buttons) || parsed.buttons.length === 0) {
+      throw new Error('input_layout_buttons_invalid')
+    }
     return normalizeProfile(parsed)
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('InputLayoutRepository', 'Load', `输入布局配置损坏，已回退默认值: ${message}`)
-    return createDefaultInputLayoutProfile()
+    LogHelper.warn('InputLayoutRepository', 'Load', `输入布局配置读取失败: ${message}`)
+    throw err as Error
   }
 }
 
@@ -152,15 +167,27 @@ export async function resetInputLayoutProfile(context: common.UIAbilityContext):
 }
 
 function normalizeProfile(profile: Partial<InputLayoutProfile> | null | undefined): InputLayoutProfile {
-  const buttons: InputLayoutButton[] = []
-  if (profile?.buttons) {
-    profile.buttons.forEach((button: InputLayoutButton) => {
-      buttons.push(normalizeButton(button))
-    })
+  if (!profile?.buttons || !Array.isArray(profile.buttons) || profile.buttons.length === 0) {
+    throw new Error('input_layout_buttons_invalid')
   }
-  if (buttons.length === 0) {
-    return createDefaultInputLayoutProfile()
+  const normalizedButtonMap = new Map<string, InputLayoutButton>()
+  profile.buttons.forEach((button: InputLayoutButton) => {
+    const normalizedButton = normalizeButton(button)
+    if (normalizedButtonMap.has(normalizedButton.id)) {
+      throw new Error('input_layout_button_duplicate')
+    }
+    normalizedButtonMap.set(normalizedButton.id, normalizedButton)
+  })
+  if (normalizedButtonMap.size !== REQUIRED_INPUT_LAYOUT_BUTTON_IDS.length) {
+    throw new Error('input_layout_buttons_incomplete')
   }
+  const buttons: InputLayoutButton[] = REQUIRED_INPUT_LAYOUT_BUTTON_IDS.map((buttonId: string) => {
+    const normalizedButton = normalizedButtonMap.get(buttonId)
+    if (!normalizedButton) {
+      throw new Error('input_layout_buttons_incomplete')
+    }
+    return normalizedButton
+  })
   return {
     version: INPUT_LAYOUT_VERSION,
     mode: normalizeText(profile?.mode, 'RETRO_PAD_TOUCH'),
@@ -171,6 +198,9 @@ function normalizeProfile(profile: Partial<InputLayoutProfile> | null | undefine
 
 function normalizeButton(button: Partial<InputLayoutButton>): InputLayoutButton {
   const safeId = normalizeText(button.id, 'button')
+  if (!REQUIRED_INPUT_LAYOUT_BUTTON_IDS.includes(safeId)) {
+    throw new Error('input_layout_button_id_invalid')
+  }
   const fallbackRetroId = getDefaultRetroButtonId(safeId)
   return {
     id: safeId,
@@ -256,8 +286,12 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    if (isMissingFileError(message)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -272,6 +306,6 @@ async function readOptionalText(path: string): Promise<string> {
     if (isMissingFileError(message)) {
       return ''
     }
-    return ''
+    throw err as Error
   }
 }

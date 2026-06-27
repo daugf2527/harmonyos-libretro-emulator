@@ -46,6 +46,7 @@ struct SaveStatePage {
   @Local private showToast: boolean = false
   @Local private syncStatusText: string = '本地存档'
   @Local private loading: boolean = false
+  @Local private saveItemsReady: boolean = true
   @Local private currentRomFile: string = ''
   @Local private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
   @Local private selectedSaveItem: SaveSlotItem | null = null
@@ -138,8 +139,10 @@ struct SaveStatePage {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
+      this.saveItemsReady = false
       this.saveItems = []
-      this.syncStatusText = '无法访问上下文'
+      this.selectedSaveItem = null
+      this.syncStatusText = '现在还读不到本地存档，请稍后再试'
       return
     }
     this.loading = true
@@ -151,6 +154,7 @@ struct SaveStatePage {
       const visibleEntries = this.filterSaveItemsForCurrentRom(entries)
       const nextItems: SaveSlotItem[] = []
       const selectedSaveId = this.selectedSaveItem?.id ?? ''
+      this.saveItemsReady = true
       visibleEntries.forEach((item: SaveStateManifestItem, index: number) => {
         nextItems.push(this.buildSaveSlot(context, item, index))
       })
@@ -168,8 +172,10 @@ struct SaveStatePage {
       // 使用错误码提供用户友好的错误消息
       const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_LIST_ERROR.numericCode)
       LogHelper.info('SaveStatePage', 'Save', `错误提示: ${userMsg}`)
+      this.saveItemsReady = false
       this.saveItems = []
-      this.syncStatusText = '暂无存档'
+      this.selectedSaveItem = null
+      this.syncStatusText = userMsg.length > 0 ? userMsg : '本地存档没有读出来，请稍后重试'
     }
     if (!this.isCurrentPageTask(token)) {
       return
@@ -192,9 +198,16 @@ struct SaveStatePage {
 
   private buildSaveStatusText(count: number): string {
     if (count > 0) {
-      return this.currentRomFile.length > 0 ? '当前游戏存档已就绪' : '本地存档索引已就绪'
+      return this.currentRomFile.length > 0 ? '已找到当前游戏存档' : '已建立本地存档索引'
     }
-    return this.currentRomFile.length > 0 ? '当前游戏暂无存档' : '暂无存档'
+    return this.currentRomFile.length > 0 ? '当前游戏还没有存档' : '当前还没有存档'
+  }
+
+  private getSaveCountText(): string {
+    if (!this.saveItemsReady) {
+      return '未读取'
+    }
+    return `${this.saveItems.length} 个`
   }
 
   private buildSaveSlot(
@@ -207,10 +220,10 @@ struct SaveStatePage {
     return {
       id: item.id,
       fileName: item.fileName,
-      slotLabel: `存档位_${slotNumber}`,
+      slotLabel: `存档 ${slotNumber}`,
       detail: `${this.normalizeTitle(item.fileName)} | ${this.formatBytes(item.byteLength)}`,
       durationLabel: item.createdAt > 0 ? this.formatDateTime(item.createdAt) : '本地',
-      isActive: index === 0,
+      isActive: false,
       coverColor: this.coverColors[colorIndex],
       byteLength: item.byteLength,
       thumbnailUrl: buildSaveStateThumbnailUri(context.filesDir, item.thumbnailFileName)
@@ -221,7 +234,17 @@ struct SaveStatePage {
     const dotIndex = fileName.lastIndexOf('.')
     const baseName = dotIndex > 0 ? fileName.substring(0, dotIndex) : fileName
     const cleaned = baseName.replace(/[_-]+/g, ' ')
-    return cleaned.length > 0 ? cleaned : '未知存档'
+    return cleaned.length > 0 ? cleaned : '未命名存档'
+  }
+
+  private getCurrentGameDisplayTitle(): string {
+    if (this.currentRomFile.length === 0) {
+      return '未关联游戏'
+    }
+    const normalized = this.currentRomFile.replace(/\\/g, '/')
+    const slashIndex = normalized.lastIndexOf('/')
+    const fileName = slashIndex >= 0 ? normalized.substring(slashIndex + 1) : normalized
+    return this.normalizeTitle(fileName)
   }
 
   private formatBytes(byteLength: number): string {
@@ -286,9 +309,7 @@ struct SaveStatePage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('SaveStatePage', 'Save', `删除存档失败: ${message}`)
-      // 使用错误码提供具体错误信息
-      const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_WRITE_ERROR.numericCode)
-      this.showToastMessage(userMsg)
+      this.showToastMessage('存档没有删除成功，请稍后重试')
     }
   }
 
@@ -296,7 +317,7 @@ struct SaveStatePage {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
-      this.showToastMessage(ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_SAVE_FAILED.numericCode))
+      this.showToastMessage('现在还不能创建即时存档，请稍后再试')
       return
     }
     try {
@@ -305,7 +326,7 @@ struct SaveStatePage {
         return
       }
       if (!bundle.stateData || bundle.stateData.byteLength <= 0) {
-        this.showToastMessage(ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_SAVE_FAILED.numericCode))
+        this.showToastMessage('当前运行里没有可保存的即时存档数据')
         return
       }
       await saveStateData(context, bundle.stateData, this.currentRomFile, {
@@ -315,7 +336,7 @@ struct SaveStatePage {
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      this.showToastMessage('即时存档已保存')
+      this.showToastMessage('即时存档文件已写入')
       await this.refreshSaveItems()
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
@@ -323,9 +344,7 @@ struct SaveStatePage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('SaveStatePage', 'Save', `写入即时存档失败: ${message}`)
-      // 使用错误码提供具体错误信息
-      const userMsg = ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_SAVE_FAILED.numericCode)
-      this.showToastMessage(userMsg)
+      this.showToastMessage('这次没有完成即时存档，请稍后重试')
     }
   }
 
@@ -333,7 +352,7 @@ struct SaveStatePage {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
-      this.showToastMessage(ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_LOAD_FAILED.numericCode))
+      this.showToastMessage('现在还不能读取这个存档，请稍后再试')
       return
     }
     try {
@@ -347,7 +366,7 @@ struct SaveStatePage {
       this.showToastMessage(
         loaded
           ? '即时存档已读取'
-          : ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_LOAD_FAILED.numericCode)
+          : '这个存档没有成功载入到当前游戏'
       )
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
@@ -355,9 +374,7 @@ struct SaveStatePage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('SaveStatePage', 'Save', `读取即时存档失败: ${message}`)
-      // 使用错误码提供具体错误信息
-      const userMsg = ErrorCodeUtils.getUserMessage(EngineErrorCodes.SAVE_STATE_LOAD_FAILED.numericCode)
-      this.showToastMessage(userMsg)
+      this.showToastMessage('这个存档没有读出来，请稍后重试')
     }
   }
 
@@ -369,11 +386,13 @@ struct SaveStatePage {
     if (key === 'library') {
       this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
         LogHelper.error('SaveStatePage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
+        this.showToastMessage('现在还回不到游戏库，请稍后再试')
       })
       return
     }
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('SaveStatePage', 'Route', `pushUrl ${route} failed: ${err.message}`)
+      this.showToastMessage('这个页面现在还打不开，请稍后再试')
     })
   }
 
@@ -458,7 +477,7 @@ struct SaveStatePage {
   private TelemetryStrip() {
     Row() {
       this.StatusColumn('存储', this.currentRomFile.length > 0 ? '当前游戏' : '本地文件')
-      this.StatusColumn('存档位', `${this.saveItems.length}/99`)
+      this.StatusColumn('存档数量', this.getSaveCountText())
       this.StatusColumn('归档', this.loading ? '正在读取本地...' : this.syncStatusText)
     }
     .width('100%')
@@ -534,111 +553,85 @@ struct SaveStatePage {
 
   @Builder
   private SaveSlotRow(item: SaveSlotItem) {
-    Stack() {
-      Row() {
-        Row({ space: 0 }) {
-          this.SwipeAction('读档', EmuColors.primary, item.fileName)
-          this.SwipeAction('删除', EmuColors.error, item.fileName)
-        }
-        .align(Alignment.BottomEnd)
+    Row({ space: 16 }) {
+      Stack() {
+        this.SaveThumbnailContent(item)
+
+        Row()
+          .width('100%')
+          .height(2)
+          .backgroundColor(EmuColors.primary)
+          .align(Alignment.Center)
+          .opacity(this.selectedSaveItem?.id === item.id ? 0.78 : 0.18)
       }
-      .width('100%')
-      .height('100%')
-      .justifyContent(FlexAlign.End)
+      .width(80)
+      .height(56)
+      .borderRadius(3)
+      .border({ width: 0.5, color: '#4D484848', style: BorderStyle.Solid })
+      .clip(true)
 
-      Row({ space: 16 }) {
-        Stack() {
-          this.SaveThumbnailContent(item)
+      Column({ space: 4 }) {
+        Text(this.normalizeTitle(item.fileName))
+          .fontSize(EmuTypography.md)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(EmuColors.onSurface)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-          Row()
-            .width('100%')
-            .height(2)
-            .backgroundColor(EmuColors.primary)
-            .align(Alignment.Center)
-            .opacity(item.isActive ? 0.78 : 0.18)
-        }
-        .width(80)
-        .height(56)
-        .borderRadius(3)
-        .border({ width: 0.5, color: '#4D484848', style: BorderStyle.Solid })
-        .clip(true)
+        Text(`${item.slotLabel} | ${item.detail}`)
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+      }
+      .layoutWeight(1)
+      .alignItems(HorizontalAlign.Start)
 
-        Column({ space: 4 }) {
-          Text(this.normalizeTitle(item.fileName))
-            .fontSize(EmuTypography.md)
-            .fontWeight(FontWeight.Medium)
-            .fontColor(EmuColors.onSurface)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
+      Column({ space: 8 }) {
+        this.DurationBadge(item)
 
-          Text(`${item.slotLabel} | ${item.detail}`)
+        if (this.currentFoldMode === 'single') {
+          Text('删除')
             .fontSize(EmuTypography.xs)
-                        .fontColor(EmuColors.onSurfaceVariant)
-            .maxLines(1)
-            .textOverflow({ overflow: TextOverflow.Ellipsis })
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-
-        Column({ space: 6 }) {
-          this.DurationBadge(item)
-
-          Text('≡')
+            .fontWeight(FontWeight.Bold)
+            .fontColor(EmuColors.error)
+            .padding({ left: 6, right: 6, top: 3, bottom: 3 })
+            .border({ width: 0.5, color: EmuColors.error, style: BorderStyle.Solid })
+            .onClick(() => {
+              this.requestDelete(item.fileName)
+            })
+        } else {
+          Text('›')
             .fontSize(EmuTypography.md)
             .fontColor(EmuColors.onSurfaceVariant)
         }
-        .alignItems(HorizontalAlign.End)
       }
-      .width('100%')
-      .height(96)
-      .padding({ left: item.isActive ? 18 : 24, right: 24 })
-      .backgroundColor(this.selectedSaveItem?.id === item.id ? '#1A1A1A' : EmuColors.surfaceContainerLowest)
-      .border({ width: { bottom: 0.5 }, color: '#262626', style: BorderStyle.Solid })
-      .translate({ x: item.isActive ? -184 : 0 })
-      .onClick(() => {
-        this.onSaveItemClick(item)
-      })
+      .alignItems(HorizontalAlign.End)
     }
     .width('100%')
     .height(96)
+    .padding({ left: 24, right: 24 })
+    .backgroundColor(this.selectedSaveItem?.id === item.id ? '#1A1A1A' : EmuColors.surfaceContainerLowest)
+    .border({ width: { bottom: 0.5 }, color: '#262626', style: BorderStyle.Solid })
     .clip(true)
+    .onClick(() => {
+      this.onSaveItemClick(item)
+    })
   }
 
   @Builder
   private DurationBadge(item: SaveSlotItem) {
-    if (item.isActive) {
+    if (this.selectedSaveItem?.id === item.id) {
       Text(item.durationLabel)
         .fontSize(9)
-                .fontColor(EmuColors.primary)
+        .fontColor(EmuColors.primary)
         .padding({ left: 6, right: 6, top: 2, bottom: 2 })
         .border({ width: 0.5, color: EmuColors.primary, style: BorderStyle.Solid })
     } else {
       Text(item.durationLabel)
         .fontSize(EmuTypography.xs)
-                .fontColor(EmuColors.onSurfaceVariant)
+        .fontColor(EmuColors.onSurfaceVariant)
     }
-  }
-
-  @Builder
-  private SwipeAction(label: string, color: string, fileName: string) {
-    Row() {
-      Text(label)
-        .fontSize(EmuTypography.xs)
-        .fontWeight(FontWeight.Bold)
-        .fontColor(label === '读档' ? '#004C0C' : '#450900')
-        .letterSpacing(1)
-    }
-    .width(92)
-    .height('100%')
-    .justifyContent(FlexAlign.Center)
-    .backgroundColor(color)
-    .onClick(() => {
-      if (label === '删除') {
-        this.requestDelete(fileName)
-      } else {
-        void this.loadSave(fileName)
-      }
-    })
   }
 
   @Builder
@@ -660,11 +653,20 @@ struct SaveStatePage {
           .fontColor(EmuColors.onSurfaceVariant)
           .opacity(0.48)
 
-        Text('已到存档列表末尾')
+        Text(this.saveItemsReady ?
+          (this.currentRomFile.length > 0 ? '当前游戏还没有存档' : '当前还没有存档') :
+          '当前存档列表没有读出来')
           .fontSize(EmuTypography.sm)
-                    .fontColor(EmuColors.onSurfaceVariant)
-          .letterSpacing(4)
-          .opacity(0.48)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .fontWeight(FontWeight.Medium)
+
+        Text(this.saveItemsReady ?
+          '进入游戏后创建存档，或在这里新建一个即时存档。' :
+          '这次没有拿到本地存档目录，请稍后重试。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .textAlign(TextAlign.Center)
+          .maxLines(2)
       }
       .width('100%')
       .height(252)
@@ -814,7 +816,7 @@ struct SaveStatePage {
         this.DetailRow('存档位', item.slotLabel)
         this.DetailRow('大小', this.getSaveItemSizeText(item))
         this.DetailRow('创建时间', item.durationLabel)
-        this.DetailRow('游戏', this.currentRomFile.length > 0 ? this.currentRomFile : '未知')
+        this.DetailRow('游戏', this.getCurrentGameDisplayTitle())
       }
       .width('100%')
       .padding(16)

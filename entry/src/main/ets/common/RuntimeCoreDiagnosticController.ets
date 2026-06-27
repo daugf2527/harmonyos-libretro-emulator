@@ -35,6 +35,7 @@ export interface RuntimeStatusSnapshot {
   gameLoaded: boolean
   saveStateSizeBytes: number
   inputDebugStats: RuntimeInputDebugStats
+  isComplete: boolean
 }
 
 const nativeApi = testNapi as RuntimeCoreDiagnosticNapi
@@ -48,21 +49,21 @@ export class RuntimeCoreDiagnosticController {
 
   async testCoreLoader(path: string, options?: RuntimeCoreDiagnosticTaskOptions): Promise<string> {
     if (options?.shouldCancel?.()) {
-      return 'Error: operation canceled'
+      return '操作已取消'
     }
     if (!testNapi) {
-      return 'Error: engine not ready'
+      return '当前还没连上运行中的引擎'
     }
     try {
       const report = await nativeApi.testCoreLoader(path)
       if (options?.shouldCancel?.()) {
-        return 'Error: operation canceled'
+        return '操作已取消'
       }
       return report
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreDiagnostic', 'Core', `核心符号探测失败: ${message}`)
-      return `Error: ${message}`
+      return `探测失败：${message}`
     }
   }
 
@@ -98,11 +99,15 @@ export class RuntimeCoreDiagnosticController {
       return buildDefaultRuntimeStatusSnapshot()
     }
     const snapshot = buildDefaultRuntimeStatusSnapshot()
+    let baseSnapshotReady = false
+    let saveStateSizeReady = false
+    let inputDebugReady = false
     try {
       const stateValue = Number(nativeApi.refactoredGetState())
       snapshot.state = Number.isFinite(stateValue) ? stateValue : 0
       snapshot.coreLoaded = Boolean(nativeApi.refactoredHasCoreLoaded())
       snapshot.gameLoaded = Boolean(nativeApi.refactoredHasGameLoaded())
+      baseSnapshotReady = true
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreDiagnostic', 'Runtime', `读取运行态基础快照失败: ${message}`)
@@ -120,6 +125,7 @@ export class RuntimeCoreDiagnosticController {
       snapshot.saveStateSizeBytes = Number.isFinite(saveStateSizeValue) && saveStateSizeValue > 0
         ? Math.round(saveStateSizeValue)
         : 0
+      saveStateSizeReady = true
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreDiagnostic', 'Runtime', `读取运行态存档大小失败: ${message}`)
@@ -131,11 +137,13 @@ export class RuntimeCoreDiagnosticController {
 
     try {
       snapshot.inputDebugStats = normalizeRuntimeInputDebugStats(nativeApi.refactoredGetInputDebugStats())
+      inputDebugReady = true
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeCoreDiagnostic', 'Runtime', `读取运行态输入统计失败: ${message}`)
     }
 
+    snapshot.isComplete = baseSnapshotReady && saveStateSizeReady && inputDebugReady
     return snapshot
   }
 
@@ -159,7 +167,7 @@ function buildCanceledRuntimeCoreCapabilities(): RuntimeCoreCapabilities {
     supportsRegion: false,
     supportsCheatReset: false,
     supportsCheatSet: false,
-    report: 'Error: operation canceled'
+    report: '操作已取消'
   }
 }
 
@@ -169,7 +177,8 @@ function buildDefaultRuntimeStatusSnapshot(): RuntimeStatusSnapshot {
     coreLoaded: false,
     gameLoaded: false,
     saveStateSizeBytes: 0,
-    inputDebugStats: createDefaultRuntimeInputDebugStats()
+    inputDebugStats: createDefaultRuntimeInputDebugStats(),
+    isComplete: false
   }
 }
 

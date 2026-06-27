@@ -3,7 +3,6 @@ import { EmuIcon } from './EmuIcon'
 
 export type LibraryDetailActionKey =
   'launch' |
-  'details' |
   'metadata' |
   'cover' |
   'save_manager' |
@@ -29,7 +28,6 @@ export struct LibraryDetailActionMenu {
         Column({ space: 0 }) {
           this.MenuTextAction('启动游戏', 'play_arrow', false, 'launch')
           this.ActionMenuDivider()
-          this.MenuTextAction('查看详情', 'info', false, 'details')
           this.MenuTextAction('编辑资料', 'info', false, 'metadata')
           this.MenuCoverAction()
           this.ActionMenuDivider()
@@ -43,7 +41,7 @@ export struct LibraryDetailActionMenu {
         .shadow({ radius: 30, color: '#99000000', offsetX: 0, offsetY: 10 })
 
         Row() {
-          Text('取消 CANCEL')
+          Text('取消')
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor('#CCABABAB')
@@ -114,7 +112,7 @@ export struct LibraryDetailActionMenu {
           opacityValue: 0.88
         })
 
-        Text('AUTO')
+        Text('本地')
           .fontSize(EmuTypography.xl)
           .fontWeight(FontWeight.Medium)
           .fontColor('#B8B8B8')

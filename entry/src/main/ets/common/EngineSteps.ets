@@ -114,7 +114,7 @@ export const ENGINE_STEP_METADATA: Record<EngineStep, EngineStepMetadata> = {
   [EngineStep.CORE_LOADED]: {
     step: EngineStep.CORE_LOADED,
     displayName: '核心已加载',
-    description: 'Libretro 核心已就绪',
+    description: '核心已加载，可继续选择游戏',
     isFinalState: false,
     isError: false,
     isInteractive: false
@@ -123,7 +123,7 @@ export const ENGINE_STEP_METADATA: Record<EngineStep, EngineStepMetadata> = {
   [EngineStep.GAME_LOADED]: {
     step: EngineStep.GAME_LOADED,
     displayName: '游戏已加载',
-    description: 'ROM 已加载，准备运行',
+    description: 'ROM 已加载，等待开始运行',
     isFinalState: false,
     isError: false,
     isInteractive: false

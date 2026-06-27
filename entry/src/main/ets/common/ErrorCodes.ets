@@ -154,7 +154,7 @@ export class FileErrorCodes {
     description: '文件列表读取失败',
     severity: ErrorSeverity.WARNING,
     strategy: ErrorHandlingStrategy.FALLBACK,
-    userMessage: '无法读取文件列表，将显示空列表'
+    userMessage: '列表内容暂时没有读出来，请稍后重试'
   };
 }
 
@@ -464,7 +464,7 @@ export class JsonErrorCodes {
     description: 'JSON 解析失败',
     severity: ErrorSeverity.ERROR,
     strategy: ErrorHandlingStrategy.FALLBACK,
-    userMessage: '配置文件格式错误，将使用默认配置'
+    userMessage: '配置文件格式错误，请检查后重试'
   };
 
   /** JSON 格式无效 */
@@ -484,7 +484,7 @@ export class JsonErrorCodes {
     description: 'JSON 必需字段缺失',
     severity: ErrorSeverity.WARNING,
     strategy: ErrorHandlingStrategy.FALLBACK,
-    userMessage: '配置不完整，将使用默认值'
+    userMessage: '配置不完整，请补齐后重试'
   };
 
   /** JSON 字段类型错误 */

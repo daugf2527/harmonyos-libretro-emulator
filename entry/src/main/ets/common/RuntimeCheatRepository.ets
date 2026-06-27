@@ -21,6 +21,15 @@ interface RuntimeCheatStore {
   updatedAt: number
 }
 
+interface RuntimeCheatStoreReadResult {
+  exists: boolean
+  text: string
+}
+
+interface RuntimeCheatFileErrorWithCode {
+  code?: string | number
+}
+
 const RUNTIME_CHEAT_STORE_VERSION = 1
 const RUNTIME_CHEAT_DIR_NAME = 'runtime'
 const RUNTIME_CHEAT_FILE_NAME = 'cheats.json'
@@ -129,15 +138,18 @@ async function loadRuntimeCheatStore(
   context: common.UIAbilityContext
 ): Promise<RuntimeCheatStore> {
   const path = buildRuntimeCheatPath(context.filesDir)
-  const text = await readOptionalText(path)
-  if (!text || text.length === 0) {
+  const result = await readOptionalText(path)
+  if (!result.exists || result.text.length === 0) {
     return createDefaultRuntimeCheatStore()
   }
   try {
-    const parsed = JSON.parse(text) as Partial<RuntimeCheatStore> | null
+    const parsed = JSON.parse(result.text) as Partial<RuntimeCheatStore> | null
+    if (!parsed || !Array.isArray(parsed.roms)) {
+      throw new Error('runtime_cheat_store_invalid')
+    }
     return normalizeRuntimeCheatStore(parsed)
-  } catch (_err) {
-    return createDefaultRuntimeCheatStore()
+  } catch (err) {
+    throw err as Error
   }
 }
 
@@ -163,6 +175,9 @@ function normalizeRuntimeCheatStore(
       normalizedEntries.push(normalizedEntry)
     }
   })
+  if (entries.length > 0 && normalizedEntries.length === 0) {
+    throw new Error('runtime_cheat_entries_invalid')
+  }
 
   return {
     version: RUNTIME_CHEAT_STORE_VERSION,
@@ -295,18 +310,43 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
-async function readOptionalText(path: string): Promise<string> {
+async function readOptionalText(path: string): Promise<RuntimeCheatStoreReadResult> {
   if (!(await fileExists(path))) {
-    return ''
+    return {
+      exists: false,
+      text: ''
+    }
   }
   try {
-    return await fs.readText(path)
-  } catch (_err) {
-    return ''
+    return {
+      exists: true,
+      text: await fs.readText(path)
+    }
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return {
+        exists: false,
+        text: ''
+      }
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as RuntimeCheatFileErrorWithCode).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

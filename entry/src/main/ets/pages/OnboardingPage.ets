@@ -65,11 +65,11 @@ struct OnboardingPage {
   @Local private startButtonPressed: boolean = false
   @Local private authorizeButtonPressed: boolean = false
   @Local private permissions: PermissionItem[] = [
-    { key: 'DOCUMENT_PICKER', label: 'DOCUMENT_PICKER', status: 'PENDING', detail: '等待检查系统文件选择器' },
-    { key: 'SANDBOX_IMPORT', label: 'SANDBOX_IMPORT', status: 'PENDING', detail: '等待检查应用沙箱写入能力' },
+    { key: 'DOCUMENT_PICKER', label: '系统文件选择器', status: 'PENDING', detail: '正在检查是否可打开系统文件选择器' },
+    { key: 'SANDBOX_IMPORT', label: '应用导入目录', status: 'PENDING', detail: '正在检查应用是否可写入导入目录' },
   ]
   @Local private protocolStatus: ProtocolStatus = 'PENDING'
-  @Local private protocolDetailText: string = '正在检查导入前置条件'
+  @Local private protocolDetailText: string = '正在检查导入前需要的文件访问能力'
   @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private lifecycle: PageLifecycleGuard = new PageLifecycleGuard()
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
@@ -147,25 +147,27 @@ struct OnboardingPage {
     this.authorizeButtonPressed = false
     this.getUIContext().getRouter().replaceUrl({ url: 'pages/ImportEntryPage' }).catch((err: Error) => {
       LogHelper.error('OnboardingPage', 'Route', `replaceUrl failed: ${err.message}`)
+      this.protocolDetailText = '导入入口现在还打不开，请稍后再试'
     })
   }
 
   private openLibraryPage(): void {
     this.getUIContext().getRouter().replaceUrl({ url: 'pages/LibraryPage' }).catch((err: Error) => {
       LogHelper.error('OnboardingPage', 'Route', `replaceUrl failed: ${err.message}`)
+      this.protocolDetailText = '游戏库现在还打不开，请稍后再试'
     })
   }
 
   private async refreshImportReadiness(): Promise<void> {
     const token = this.lifecycle.beginTask()
     this.protocolStatus = 'PENDING'
-    this.protocolDetailText = '正在检查系统文件选择器与沙箱目录'
+    this.protocolDetailText = '正在检查系统文件选择器和本地导入目录'
     this.permissions = this.permissions.map((item: PermissionItem): PermissionItem => {
       return {
         key: item.key,
         label: item.label,
         status: 'PENDING',
-        detail: item.key === 'DOCUMENT_PICKER' ? '等待检查系统文件选择器' : '等待检查应用沙箱写入能力'
+        detail: item.key === 'DOCUMENT_PICKER' ? '正在检查是否可打开系统文件选择器' : '正在检查应用是否可写入导入目录'
       }
     })
     const nextPermissions = await this.checkImportReadiness()
@@ -177,24 +179,24 @@ struct OnboardingPage {
     const anyDenied = nextPermissions.some((item: PermissionItem) => item.status === 'DENIED')
     if (allGranted) {
       this.protocolStatus = 'VERIFIED'
-      this.protocolDetailText = '导入前置条件已就绪'
+      this.protocolDetailText = '导入前置检查已通过，后续导入结果仍以实际打开和写入为准'
       return
     }
     if (anyDenied) {
       this.protocolStatus = 'DENIED'
-      this.protocolDetailText = '至少一个导入前置条件不可用'
+      this.protocolDetailText = '至少还有一项导入所需的文件访问能力没有准备好'
       return
     }
     this.protocolStatus = 'PENDING'
-    this.protocolDetailText = '仍有导入前置条件待确认'
+    this.protocolDetailText = '还有文件访问能力正在检查中'
   }
 
   private async checkImportReadiness(): Promise<PermissionItem[]> {
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
       return [
-        this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', '未获取到 UIAbilityContext'),
-        this.createPermissionItem('SANDBOX_IMPORT', 'DENIED', '未获取到 UIAbilityContext')
+        this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', '现在还不能检查系统文件选择器，请稍后再试'),
+        this.createPermissionItem('SANDBOX_IMPORT', 'DENIED', '现在还不能检查本地导入目录，请稍后再试')
       ]
     }
     const documentPickerStatus = this.checkDocumentPickerAvailability(context)
@@ -203,20 +205,25 @@ struct OnboardingPage {
   }
 
   private createPermissionItem(key: string, status: PermissionStatus, detail: string): PermissionItem {
-    return { key: key, label: key, status: status, detail: detail }
+    return {
+      key: key,
+      label: key === 'DOCUMENT_PICKER' ? '系统文件选择器' : '应用导入目录',
+      status: status,
+      detail: detail
+    }
   }
 
   private checkDocumentPickerAvailability(context: common.UIAbilityContext): PermissionItem {
     try {
       const documentPicker = new picker.DocumentViewPicker(context)
       if (documentPicker) {
-        return this.createPermissionItem('DOCUMENT_PICKER', 'GRANTED', '系统文件选择器实例可创建')
+        return this.createPermissionItem('DOCUMENT_PICKER', 'GRANTED', '已通过实例创建检查，后续仍以实际打开结果为准')
       }
     } catch (err) {
-      const message = (err as Error).message || String(err)
-      return this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', `文件选择器不可用: ${message}`)
+      void err
+      return this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', '当前设备现在还打不开系统文件选择器')
     }
-    return this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', '文件选择器实例创建失败')
+    return this.createPermissionItem('DOCUMENT_PICKER', 'DENIED', '系统文件选择器现在还不能正常打开')
   }
 
   private async checkSandboxImportAvailability(context: common.UIAbilityContext): Promise<PermissionItem> {
@@ -227,21 +234,31 @@ struct OnboardingPage {
       await fs.mkdir(`${romDir}/imported`, true)
       await fs.mkdir(`${romDir}/temp`, true)
       await fs.access(romDir)
-      return this.createPermissionItem('SANDBOX_IMPORT', 'GRANTED', `导入目录可访问: ${romDir}`)
+      return this.createPermissionItem('SANDBOX_IMPORT', 'GRANTED', '已通过目录创建与访问检查，后续仍以实际写入结果为准')
     } catch (err) {
-      const message = (err as Error).message || String(err)
-      return this.createPermissionItem('SANDBOX_IMPORT', 'DENIED', `导入目录不可写: ${message}`)
+      void err
+      return this.createPermissionItem('SANDBOX_IMPORT', 'DENIED', '应用现在还不能写入本地导入目录')
     }
   }
 
   private getPermissionStatusText(item: PermissionItem): string {
     if (item.status === 'GRANTED') {
-      return `${item.label}: GRANTED`
+      return `${item.label}: 当前检查通过`
     }
     if (item.status === 'DENIED') {
-      return `${item.label}: DENIED`
+      return `${item.label}: 未准备好`
     }
-    return `${item.label}: PENDING...`
+    return `${item.label}: 检查中`
+  }
+
+  private getProtocolStatusLabel(): string {
+    if (this.protocolStatus === 'VERIFIED') {
+      return '当前检查通过'
+    }
+    if (this.protocolStatus === 'DENIED') {
+      return '需要处理'
+    }
+    return '准备中'
   }
 
   private getPermissionDotColor(item: PermissionItem): string {
@@ -547,19 +564,21 @@ struct OnboardingPage {
       Row() {
         Column({ space: 4 }) {
           Text('状态').fontSize(EmuTypography.xs).fontColor('#FF666666').letterSpacing(2)
-          Text('本地就绪').fontSize(EmuTypography.xs).fontColor('#FF9D9E9E')
+          Text(this.protocolStatus === 'VERIFIED' ? '当前可尝试导入' : (this.protocolStatus === 'DENIED' ? '需要处理文件访问' : '正在准备'))
+            .fontSize(EmuTypography.xs)
+            .fontColor('#FF9D9E9E')
         }
         .alignItems(HorizontalAlign.Start)
 
         Column({ space: 4 }) {
-          Text('核心').fontSize(EmuTypography.xs).fontColor('#FF666666').letterSpacing(2)
-          Text('Core 已启用').fontSize(EmuTypography.xs).fontColor('#FF9D9E9E')
+          Text('模式').fontSize(EmuTypography.xs).fontColor('#FF666666').letterSpacing(2)
+          Text('本地文件导入').fontSize(EmuTypography.xs).fontColor('#FF9D9E9E')
         }
         .alignItems(HorizontalAlign.Center)
 
         Column({ space: 4 }) {
-          Text('延迟').fontSize(EmuTypography.xs).fontColor('#FF666666').letterSpacing(2)
-          Text('0.02ms').fontSize(EmuTypography.xs).fontColor(Colors.primary)
+          Text('说明').fontSize(EmuTypography.xs).fontColor('#FF666666').letterSpacing(2)
+          Text('不提供 ROM 下载').fontSize(EmuTypography.xs).fontColor(Colors.primary)
         }
         .alignItems(HorizontalAlign.End)
       }
@@ -675,7 +694,7 @@ struct OnboardingPage {
                         .fontColor('#FF666666')
             .letterSpacing(1)
 
-          Text(this.protocolStatus)
+          Text(this.getProtocolStatusLabel())
             .fontSize(EmuTypography.xs)
                         .fontColor(this.getProtocolColor())
             .letterSpacing(1)
@@ -770,7 +789,7 @@ struct OnboardingPage {
   @Builder
   private Footer() {
     Row() {
-      Text('Kinetic Obsidian Protocol • Build 2405.01')
+      Text('仅支持本地文件导入与本地游玩')
         .fontSize(9)
                 .fontColor('#66666666')
         .letterSpacing(3)

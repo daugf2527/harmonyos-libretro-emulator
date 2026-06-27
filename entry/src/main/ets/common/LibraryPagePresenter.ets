@@ -47,16 +47,7 @@ export function buildLibraryPlatforms(games: LibraryRecord[]): string[] {
 }
 
 export function buildDisplayPlatformFilters(games: LibraryRecord[]): string[] {
-  const displayItems: string[] = ['ALL', 'GBA', 'SNES', 'MD']
-  buildLibraryPlatforms(games).forEach((item: string) => {
-    if (item === 'ALL' || item === 'FC') {
-      return
-    }
-    if (!displayItems.includes(item)) {
-      displayItems.push(item)
-    }
-  })
-  return displayItems
+  return buildLibraryPlatforms(games)
 }
 
 function buildSearchSource(games: LibraryRecord[]): LibraryRecord[] {

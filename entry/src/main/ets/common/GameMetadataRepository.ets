@@ -17,6 +17,10 @@ interface GameMetadataDocument {
   records: GameMetadataRecord[]
 }
 
+interface MetadataFileErrorWithCode {
+  code?: string | number
+}
+
 const METADATA_VERSION = 1
 const METADATA_DIR_NAME = 'metadata'
 const METADATA_FILE_NAME = 'game_metadata.json'
@@ -66,20 +70,21 @@ async function loadMetadataDocument(context: common.UIAbilityContext): Promise<G
   }
   try {
     const parsed = JSON.parse(text) as Partial<GameMetadataDocument> | null
-    const records: GameMetadataRecord[] = []
-    if (parsed?.records) {
-      parsed.records.forEach((record: GameMetadataRecord) => {
-        records.push(normalizeMetadataRecord(record))
-      })
+    if (!parsed || !Array.isArray(parsed.records)) {
+      throw new Error('metadata_records_invalid')
     }
+    const records: GameMetadataRecord[] = []
+    parsed.records.forEach((record: GameMetadataRecord) => {
+      records.push(normalizeMetadataRecord(record))
+    })
     return {
       version: METADATA_VERSION,
       records: records
     }
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('GameMetadataRepository', 'Load', `metadata 索引损坏，已回退为空: ${message}`)
-    return createEmptyMetadataDocument()
+    LogHelper.warn('GameMetadataRepository', 'Load', `metadata 索引读取失败: ${message}`)
+    throw err as Error
   }
 }
 
@@ -97,6 +102,7 @@ async function saveMetadataDocument(
   } catch (err) {
     const message = (err as Error).message || String(err)
     LogHelper.error('GameMetadataRepository', 'Save', `保存本地 metadata 失败: ${message}`)
+    throw err as Error
   } finally {
     if (file) {
       try {
@@ -164,8 +170,11 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -175,7 +184,20 @@ async function readOptionalText(path: string): Promise<string> {
   }
   try {
     return await fs.readText(path)
-  } catch (_err) {
-    return ''
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return ''
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as MetadataFileErrorWithCode).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

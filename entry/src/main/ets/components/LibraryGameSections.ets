@@ -70,6 +70,7 @@ export interface LibraryGameSectionsState {
   highlightedRecentGameId: string
   bottomLoaderActive: boolean
   spinnerAngle: number
+  loadFailed: boolean
 }
 
 @ComponentV2
@@ -79,6 +80,7 @@ export struct LibraryGameSections {
   @Param highlightedRecentGameId: string = ''
   @Param bottomLoaderActive: boolean = false
   @Param spinnerAngle: number = 0
+  @Param loadFailed: boolean = false
   @Event onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
   @Event onHideSearchResults?: () => void
   @Event onListScrolled?: (yOffset: number) => void
@@ -225,11 +227,13 @@ export struct LibraryGameSections {
         Text('📁')
           .fontSize(36)
           .opacity(0.6)
-        Text('游戏库为空')
+        Text(this.loadFailed ? '游戏库暂时没有读出来' : '游戏库为空')
           .fontSize(EmuTypography.md)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurface)
-        Text('下拉刷新，或从"导入"按钮添加 ROM')
+        Text(this.loadFailed ?
+          '这次没有拿到游戏库内容，请下拉重试，或稍后再回来。' :
+          '下拉刷新，或从"导入"按钮添加 ROM')
           .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)

@@ -17,21 +17,24 @@ export function getLibraryTelemetryCells(records: LibraryRecord[]): LibraryTelem
   const latest = getLatestRuntimeRecord(records)
   const fps = latest ? latest.lastRuntimeFps : 0
   const audioPercent = latest ? toPercent(latest.lastRuntimeAudioBufferUsage) : 0
+  const latestRunText = latest ?
+    formatLastPlayedRelative(latest.lastRuntimeUpdatedAt) || '已有运行记录' :
+    '暂无记录'
   return [
     {
-      label: 'SESSION',
-      value: latest ? 'LAST RUN' : 'NO DATA',
+      label: '最近一次记录',
+      value: latestRunText,
       progress: latest ? 100 : 4,
       progressColor: latest ? '#8800FF41' : '#22484848'
     },
     {
-      label: 'FPS',
+      label: '帧率',
       value: fps > 0 ? fps.toFixed(1) : '--.-',
       progress: clampPercent((fps / 60) * 100),
       progressColor: fps > 0 ? '#8800FF41' : '#22484848'
     },
     {
-      label: 'AUDIO',
+      label: '音频缓冲',
       value: latest ? `${Math.round(audioPercent)}%` : '--',
       progress: clampPercent(audioPercent),
       progressColor: latest ? '#6600FF41' : '#22484848'

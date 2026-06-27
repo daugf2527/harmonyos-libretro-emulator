@@ -420,12 +420,12 @@ export struct TripleModeLayout {
   @Builder
   InfoPanel() {
     Column() {
-      Text(`FPS: ${this.fps > 0 ? this.fps.toFixed(1) : '--.-'}`)
+      Text(`帧率: ${this.fps > 0 ? this.fps.toFixed(1) : '--.-'}`)
         .fontSize(EmuTypography.md)
         .fontColor(Color.White)
         .margin({ bottom: 5 })
 
-      Text(this.cpuUsage > 0 ? `LOAD: ${this.cpuUsage}%` : 'LOAD: --')
+      Text(this.cpuUsage > 0 ? `负载: ${this.cpuUsage}%` : '负载: --')
         .fontSize(EmuTypography.md)
         .fontColor(Color.White)
     }

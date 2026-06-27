@@ -314,28 +314,30 @@ export class RuntimeSessionController {
   }
 
   getStats(): RuntimePerformanceStats {
+    if (!testNapi) {
+      LogHelper.warn('RuntimeSession', 'Engine', '读取运行时统计跳过: engine not ready')
+      throw new Error('engine not ready')
+    }
     try {
-      if (!testNapi) {
-        return createDefaultRuntimePerformanceStats()
-      }
       return nativeApi.refactoredGetStats()
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeSession', 'Engine', `读取运行时统计失败: ${message}`)
-      return createDefaultRuntimePerformanceStats()
+      throw err as Error
     }
   }
 
   getAVInfo(): RuntimeAVInfo {
+    if (!testNapi) {
+      LogHelper.warn('RuntimeSession', 'Engine', '读取音视频信息跳过: engine not ready')
+      throw new Error('engine not ready')
+    }
     try {
-      if (!testNapi) {
-        return createDefaultRuntimeAVInfo()
-      }
       return nativeApi.refactoredGetAVInfo()
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeSession', 'Engine', `读取音视频信息失败: ${message}`)
-      return createDefaultRuntimeAVInfo()
+      throw err as Error
     }
   }
 }

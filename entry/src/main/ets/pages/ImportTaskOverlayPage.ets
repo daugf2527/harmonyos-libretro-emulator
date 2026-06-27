@@ -2,7 +2,7 @@ import { common } from '@kit.AbilityKit'
 import { EmuHeaderBar, GridBackground } from '../components/EmuAppShell'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
 import { EmuIcon } from '../components/EmuIcon'
-import { consumePendingImportUris } from '../common/ImportTaskBridge'
+import { consumePendingImportTask } from '../common/ImportTaskBridge'
 import { EmuColors, EmuStateColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuButton, EmuButtonKind, EmuButtonShape, EmuButtonSize } from '../components/EmuButton'
 import LogHelper from '../common/LogHelper'
@@ -83,21 +83,21 @@ struct ImportTaskOverlayPage {
   @Local private overlayOpacity: number = 1
   @Local private overlayScale: number = 1
   @Local private cancelPressed: boolean = false
-  @Local private etaText: string = '剩余约 02:45'
-  @Local private sourceText: string = '来源：本地文件选择器'
+  @Local private etaText: string = '剩余时间待估算'
+  @Local private sourceText: string = '文件来源：尚未选择'
   @Local private transferRateText: string = '--'
   @Local private progressPercent: number = 0
-  @Local private processStatusText: string = '等待导入任务...'
-  @Local private processIdText: string = '本地导入'
+  @Local private processStatusText: string = '等待开始导入'
+  @Local private processIdText: string = '本地文件导入'
   @Local private conflictTitleText: string = '检测到同名文件'
   @Local private conflictMessageText: string = '请选择本次导入任务的冲突处理策略'
   @Local private conflictDetailText: string = ''
   @Local private conflictNamesPreviewText: string = ''
   @Local private conflictNames: string[] = []
-  @Local private resultTitleText: string = '导入成功'
-  @Local private resultMessageText: string = '3个项目已成功添加至游戏库'
+  @Local private resultTitleText: string = '导入结果'
+  @Local private resultMessageText: string = '文件写入结果会在这里显示'
   @Local private resultDetailText: string = ''
-  @Local private currentProgressText: string = '正在导入 1/3'
+  @Local private currentProgressText: string = '等待开始导入'
   @Local private importedNamesPreviewText: string = ''
   @Local private resultItems: RomImportItemResult[] = []
   private hasActualImportResult: boolean = false
@@ -116,9 +116,13 @@ struct ImportTaskOverlayPage {
     this.cancelRequested = false
     this.importTaskToken += 1
     const token = this.importTaskToken
-    const pendingUris = consumePendingImportUris()
-    if (pendingUris.length > 0) {
-      void this.prepareActualImport(pendingUris, token)
+    const pendingTask = consumePendingImportTask()
+    if (pendingTask.state === 'PENDING' && pendingTask.uris.length > 0) {
+      void this.prepareActualImport(pendingTask.uris, token)
+      return
+    }
+    if (pendingTask.state === 'CONSUMED' && pendingTask.selectedCount > 0) {
+      this.showConsumedImportTask(pendingTask.selectedCount)
       return
     }
     this.showMissingImportTask()
@@ -142,16 +146,37 @@ struct ImportTaskOverlayPage {
     this.resultItems = []
     this.progressPercent = 0
     this.feedbackState = 'ERROR'
-    this.resultTitleText = '没有导入任务'
-    this.resultMessageText = '请从导入入口选择真实 ROM 文件后继续'
-    this.resultDetailText = '没有待处理的导入任务'
+    this.resultTitleText = '还没选择要导入的文件'
+    this.resultMessageText = '请先从导入页选择本地文件'
+    this.resultDetailText = '返回上一页选择本地文件后再继续导入'
     this.importedNamesPreviewText = ''
     this.processStatusText = '没有待导入文件'
-    this.processIdText = '导入队列为空'
-    this.currentProgressText = '等待选择文件'
-    this.sourceText = '来源：未选择文件'
+    this.processIdText = '尚未选择文件'
+    this.currentProgressText = '等待选择要导入的文件'
+    this.sourceText = '文件来源：尚未选择文件'
     this.transferRateText = '--'
     this.etaText = '剩余约 --'
+  }
+
+  private showConsumedImportTask(selectedCount: number): void {
+    this.hasActualImportResult = true
+    this.latestImportResult = undefined
+    this.currentImportUris = []
+    this.resultItems = []
+    this.progressPercent = 0
+    this.feedbackState = 'ERROR'
+    this.resultTitleText = '这批导入流程已中断'
+    this.resultMessageText = selectedCount > 0 ?
+      `刚才选择的 ${selectedCount} 个文件没有保留在当前导入页里` :
+      '刚才选择的文件没有保留在当前导入页里'
+    this.resultDetailText = '请返回导入页重新选择同一批文件后再试'
+    this.importedNamesPreviewText = ''
+    this.processStatusText = '需要重新开始这批导入'
+    this.processIdText = selectedCount > 0 ? `上一批文件：${selectedCount} 个` : '上一批文件未保留'
+    this.currentProgressText = '需要重新选择要导入的文件'
+    this.sourceText = '文件来源：上一批选择未保留'
+    this.transferRateText = '--'
+    this.etaText = '请重新选择文件'
   }
 
   private switchState(nextState: FeedbackState): void {
@@ -211,8 +236,8 @@ struct ImportTaskOverlayPage {
     }
     if (result.importedCount > 0 || result.overwrittenCount > 0) {
       this.feedbackState = 'SUCCESS'
-      this.resultTitleText = '导入完成'
-      this.resultMessageText = `成功写入 ${result.importedCount + result.overwrittenCount} 个项目`
+      this.resultTitleText = '文件写入完成'
+      this.resultMessageText = `已写入 ${result.importedCount + result.overwrittenCount} 个本地文件`
       this.resultDetailText = this.buildResultDetailText(result)
       this.importedNamesPreviewText = this.buildNamesPreview(
         result.importedNames.length > 0 ? result.importedNames : result.overwrittenNames
@@ -220,11 +245,11 @@ struct ImportTaskOverlayPage {
       return
     }
     this.feedbackState = 'ERROR'
-    this.resultTitleText = '导入失败'
+    this.resultTitleText = '这批文件还没写进本地目录'
     if (result.skippedCount > 0 && result.failedCount === 0) {
-      this.resultMessageText = '所选文件已存在或格式暂不支持'
+      this.resultMessageText = '没有可导入的新文件'
     } else {
-      this.resultMessageText = '未能导入任何可用 ROM'
+      this.resultMessageText = '这次没有找到可成功写入本地目录的游戏文件'
     }
     this.resultDetailText = this.buildResultDetailText(result)
     this.importedNamesPreviewText = this.buildNamesPreview(result.failedNames.length > 0 ? result.failedNames : result.skippedNames)
@@ -242,7 +267,7 @@ struct ImportTaskOverlayPage {
       details.push(`跳过 ${result.skippedCount}`)
     }
     if (result.failedCount > 0) {
-      details.push(`失败 ${result.failedCount}`)
+      details.push(`未成功 ${result.failedCount}`)
     }
     return details.join(' / ')
   }
@@ -261,21 +286,11 @@ struct ImportTaskOverlayPage {
     this.currentImportUris = [...uris]
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      const failedResult: RomImportResult = {
-        selectedCount: uris.length,
-        importedCount: 0,
-        overwrittenCount: 0,
-        skippedCount: 0,
-        failedCount: uris.length,
-        canceled: false,
-        importedNames: [],
-        overwrittenNames: [],
-        skippedNames: [],
-        failedNames: [],
-        items: []
-      }
       if (this.isCurrentImportTask(token)) {
-        this.applyImportResult(failedResult)
+        this.applyImportResult(this.buildFailedImportResult(uris.length, false))
+        this.resultTitleText = '当前导入流程暂时不可继续'
+        this.resultMessageText = '这批文件还没有开始导入'
+        this.resultDetailText = '请退出当前页面后重新进入导入流程'
       }
       return
     }
@@ -297,9 +312,9 @@ struct ImportTaskOverlayPage {
       const message = (err as Error).message || String(err)
       LogHelper.error('ImportTaskOverlayPage', 'Import', `准备导入任务失败: ${message}`)
       this.applyImportResult(this.buildFailedImportResult(uris.length, false))
-      this.resultTitleText = '导入准备失败'
-      this.resultMessageText = '无法读取冲突信息或导入上下文'
-      this.resultDetailText = '请返回上一页重新选择文件'
+      this.resultTitleText = '暂时没法继续导入'
+      this.resultMessageText = '这批文件还没有开始导入'
+      this.resultDetailText = '请返回上一页重新选择文件后再试'
     }
   }
 
@@ -309,16 +324,16 @@ struct ImportTaskOverlayPage {
     this.latestImportResult = undefined
     this.progressPercent = 0
     this.conflictTitleText = '检测到同名文件'
-    this.conflictMessageText = `发现 ${summary.conflictCount} 个文件已存在，请选择导入策略`
-    this.conflictDetailText = '可选：全部跳过 / 全部覆盖 / 取消本次任务'
+    this.conflictMessageText = `发现 ${summary.conflictCount} 个同名文件，请选择保留现有文件还是替换为新文件`
+    this.conflictDetailText = '可选：保留现有文件 / 替换现有文件 / 取消本次导入'
     this.conflictNamesPreviewText = this.buildNamesPreview(summary.conflictNames)
     this.conflictNames = [...summary.conflictNames]
-    this.processStatusText = '等待处理同名文件'
+    this.processStatusText = '请决定如何处理同名文件'
     this.processIdText = `同名文件：${summary.conflictCount}`
     this.currentProgressText = '等待冲突处理策略'
-    this.sourceText = '来源：本地导入队列'
+    this.sourceText = '文件来源：当前保留的本地文件'
     this.transferRateText = `${summary.conflictCount} 个冲突`
-    this.etaText = '等待选择'
+    this.etaText = '等待你选择处理方式'
   }
 
   private async startActualImport(uris: string[], token: number): Promise<void> {
@@ -330,21 +345,11 @@ struct ImportTaskOverlayPage {
     this.importStartedAtMs = Date.now()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      const failedResult: RomImportResult = {
-        selectedCount: uris.length,
-        importedCount: 0,
-        overwrittenCount: 0,
-        skippedCount: 0,
-        failedCount: uris.length,
-        canceled: false,
-        importedNames: [],
-        overwrittenNames: [],
-        skippedNames: [],
-        failedNames: [],
-        items: []
-      }
       if (this.isCurrentImportTask(token)) {
-        this.applyImportResult(failedResult)
+        this.applyImportResult(this.buildFailedImportResult(uris.length, false))
+        this.resultTitleText = '当前导入流程暂时不可继续'
+        this.resultMessageText = '这批文件还没有开始导入'
+        this.resultDetailText = '请退出当前页面后重新进入导入流程'
       }
       return
     }
@@ -375,9 +380,9 @@ struct ImportTaskOverlayPage {
       const message = (err as Error).message || String(err)
       LogHelper.error('ImportTaskOverlayPage', 'Import', `执行导入失败: ${message}`)
       this.applyImportResult(this.buildFailedImportResult(uris.length, this.cancelRequested))
-      this.resultTitleText = this.cancelRequested ? '导入已取消' : '导入失败'
-      this.resultMessageText = this.cancelRequested ? '导入任务已取消' : '导入过程中发生错误'
-      this.resultDetailText = '请检查文件格式或稍后重试'
+      this.resultTitleText = this.cancelRequested ? '导入已取消' : '这批文件还没写进本地目录'
+      this.resultMessageText = this.cancelRequested ? '这批导入任务已取消' : '这批文件没有成功写入本地目录'
+      this.resultDetailText = this.resolveImportFailureDetail(message)
     }
   }
 
@@ -421,10 +426,20 @@ struct ImportTaskOverlayPage {
       const message = (err as Error).message || String(err)
       LogHelper.error('ImportTaskOverlayPage', 'Import', `覆盖导入失败: ${message}`)
       this.applyImportResult(this.buildFailedImportResult(this.currentImportUris.length, this.cancelRequested))
-      this.resultTitleText = this.cancelRequested ? '导入已取消' : '覆盖导入失败'
-      this.resultMessageText = this.cancelRequested ? '导入任务已取消' : '覆盖已有文件时发生错误'
-      this.resultDetailText = '请检查磁盘空间、文件权限或稍后重试'
+      this.resultTitleText = this.cancelRequested ? '导入已取消' : '覆盖旧文件没有完成'
+      this.resultMessageText = this.cancelRequested ? '这批导入任务已取消' : '旧文件替换到一半时停下来了'
+      this.resultDetailText = this.resolveImportFailureDetail(message)
     }
+  }
+
+  private resolveImportFailureDetail(message: string): string {
+    if (message.startsWith('IMPORT_MULTIFILE_ENTRY_READ_FAILED:')) {
+      const fileName = message.substring('IMPORT_MULTIFILE_ENTRY_READ_FAILED:'.length).trim()
+      return fileName.length > 0 ?
+        `多文件入口 ${fileName} 没有读出来，请确认文件仍可访问后再试` :
+        '多文件入口没有读出来，请确认文件仍可访问后再试'
+    }
+    return '请检查文件格式、配套依赖、磁盘空间或文件权限后再试'
   }
 
   private buildFailedImportResult(selectedCount: number, canceled: boolean): RomImportResult {
@@ -460,7 +475,7 @@ struct ImportTaskOverlayPage {
     }
     const currentIndex = progress.currentFileIndex > 0 ? progress.currentFileIndex : Math.min(completed + 1, total)
     this.currentProgressText = `正在导入 ${Math.min(currentIndex, total)}/${total}`
-    this.sourceText = progress.currentFileName.length > 0 ? `来源：${progress.currentFileName}` : '来源：本地文件选择器'
+    this.sourceText = progress.currentFileName.length > 0 ? `当前文件：${progress.currentFileName}` : '文件来源：本地文件选择器'
     this.transferRateText = this.buildTransferRateText(progress, completedBytes)
     this.processStatusText = this.getImportStageText(progress.stage)
     this.processIdText = `进度：${completed}/${total}`
@@ -479,7 +494,7 @@ struct ImportTaskOverlayPage {
 
   private getImportStageText(stage: string): string {
     if (stage === 'COPYING') {
-      return '正在复制 ROM...'
+      return '正在复制游戏文件...'
     }
     if (stage === 'OVERWRITING') {
       return '正在覆盖同名文件...'
@@ -488,16 +503,16 @@ struct ImportTaskOverlayPage {
       return '已覆盖同名文件'
     }
     if (stage === 'SKIPPED') {
-      return '已跳过同名文件'
+      return '已保留现有文件'
     }
     if (stage === 'EXISTS') {
-      return '文件已存在'
+      return '发现同名文件'
     }
     if (stage === 'DONE') {
-      return '导入完成'
+      return '文件写入完成'
     }
     if (stage === 'FAILED') {
-      return '导入失败'
+      return '未导入成功'
     }
     if (stage === 'MISSING_DEPENDENCY') {
       return '缺少导入依赖'
@@ -505,7 +520,7 @@ struct ImportTaskOverlayPage {
     if (stage === 'CANCELED') {
       return '已取消'
     }
-    return stage
+    return '正在处理文件...'
   }
 
   private buildEtaText(progress: RomImportProgress, completedBytes: number, totalBytes: number): string {
@@ -539,7 +554,7 @@ struct ImportTaskOverlayPage {
 
   private getResultStatusText(item: RomImportItemResult): string {
     if (item.status === 'IMPORTED') {
-      return '已导入'
+      return '已写入'
     }
     if (item.status === 'OVERWRITTEN') {
       return '已覆盖'
@@ -548,7 +563,7 @@ struct ImportTaskOverlayPage {
       return '已跳过'
     }
     if (item.status === 'FAILED') {
-      return '失败'
+      return '未成功'
     }
     return '已取消'
   }
@@ -562,6 +577,56 @@ struct ImportTaskOverlayPage {
     }
     // FAILED 与 CANCELLED 当前统一为 danger 色；若需视觉区分两态，应在 EmuStateColors 加 cancelled token。
     return EmuStateColors.dangerDefault
+  }
+
+  private getResultDetailText(item: RomImportItemResult): string {
+    const detail = `${item.detail}`.trim()
+    if (detail.length === 0) {
+      return item.status === 'FAILED' ? '这项文件还没有写进本地目录，请稍后重试' : '已处理当前文件'
+    }
+    if (detail === 'IMPORT_DIR_REJECTED') {
+      return '游戏库导入目录现在还不能写入'
+    }
+    if (detail.startsWith('MISSING_DEPENDENCY: ')) {
+      return `缺少配套文件：${detail.substring('MISSING_DEPENDENCY: '.length)}`
+    }
+    if (detail.startsWith('IMPORT_MULTIFILE_ENTRY_READ_FAILED:')) {
+      const fileName = detail.substring('IMPORT_MULTIFILE_ENTRY_READ_FAILED:'.length).trim()
+      return fileName.length > 0 ?
+        `这个多文件入口没有读出来：${fileName}` :
+        '这个多文件入口没有读出来，请确认文件仍可访问'
+    }
+    if (detail === '不支持的文件格式') {
+      return '当前文件格式暂不支持导入'
+    }
+    if (detail === '目标文件已存在') {
+      return '游戏库里已经有同名文件'
+    }
+    if (detail === '依赖文件已存在') {
+      return '配套依赖文件已存在，已跳过重复导入'
+    }
+    if (detail === '已覆盖写入目标文件') {
+      return '已用这次选择的文件替换旧文件'
+    }
+    if (detail === '已成功写入本地游戏目录') {
+      return '已写入本地游戏目录'
+    }
+    if (detail === '已作为多文件依赖写入本地游戏目录') {
+      return '已作为配套文件写入本地目录'
+    }
+    if (detail === '任务在复制开始前取消') {
+      return '导入已取消，文件还没开始复制'
+    }
+    if (detail === '覆盖过程中取消，原文件已保留') {
+      return '导入已取消，原有文件已经保留'
+    }
+    if (detail === '复制过程中取消，已清理未完成文件') {
+      return '导入已取消，未完成的文件已经清理'
+    }
+    if (detail.startsWith('IMPORT_') || detail.endsWith('_REJECTED') || detail.endsWith('_ERROR')) {
+      return item.status === 'FAILED' ? '当前文件还没有写进本地目录' : '当前文件已跳过'
+    }
+    return detail
   }
 
   @Builder
@@ -579,7 +644,7 @@ struct ImportTaskOverlayPage {
                 .maxLines(1)
                 .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-              Text(item.detail)
+              Text(this.getResultDetailText(item))
                 .width('100%')
                 .fontSize(EmuTypography.xs)
                                 .fontColor(Colors.onSurfaceVariant)
@@ -636,20 +701,24 @@ struct ImportTaskOverlayPage {
   }
 
   private handleRetryAction(): void {
-    if (this.hasActualImportResult) {
-      this.replaceUrl('pages/ImportEntryPage')
+    if (this.currentImportUris.length > 0) {
+      void this.startActualImport(this.currentImportUris, this.importTaskToken)
       return
     }
-    this.showMissingImportTask()
+    this.replaceUrl('pages/ImportEntryPage')
+  }
+
+  private handleDismissAction(): void {
+    this.replaceUrl('pages/ImportEntryPage')
   }
 
   private handleCancelAction(): void {
     if (!this.hasActualImportResult && this.currentImportUris.length > 0) {
       this.cancelRequested = true
-      this.processStatusText = 'CANCEL_REQUESTED...'
+      this.processStatusText = '正在取消这批导入'
       return
     }
-    this.showMissingImportTask()
+    this.handleDismissAction()
   }
 
   private canOverwriteExisting(): boolean {
@@ -661,6 +730,7 @@ struct ImportTaskOverlayPage {
   private replaceUrl(url: string): void {
     this.getUIContext().getRouter().replaceUrl({ url: url }).catch((err: Error) => {
       LogHelper.error('ImportTaskOverlayPage', 'Route', `replaceUrl failed: ${err.message}`)
+      this.resultMessageText = '现在还跳不回目标页面，请稍后再试'
     })
   }
 
@@ -672,11 +742,13 @@ struct ImportTaskOverlayPage {
     if (key === 'library') {
       this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
         LogHelper.error('ImportTaskOverlayPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
+        this.resultMessageText = '现在还回不到游戏库，请稍后再试'
       })
       return
     }
     this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('ImportTaskOverlayPage', 'Route', `pushUrl ${route} failed: ${err.message}`)
+      this.resultMessageText = '这个页面现在还打不开，请稍后再试'
     })
   }
 
@@ -686,7 +758,7 @@ struct ImportTaskOverlayPage {
         EmuHeaderBar({
           titleText: '碳影 / Carbon Shade',
           titleIcon: 'terminal',
-          rightLabel: '导入监控',
+          rightLabel: '导入进度',
           rightIcon: 'settings_input_component',
           activeTextColor: EmuColors.primary,
           mutedTextColor: '#7A7A7A',
@@ -725,7 +797,7 @@ struct ImportTaskOverlayPage {
       Column({ space: 20 }) {
         Column({ space: 16 }) {
           Row() {
-            Text('System Load')
+            Text('本地导入状态')
               .fontSize(EmuTypography.xs)
                             .fontColor(Colors.onSurfaceVariant)
               .letterSpacing(1.5)
@@ -1081,7 +1153,7 @@ struct ImportTaskOverlayPage {
       }
 
       EmuButton({
-        label: '返回控制台',
+        label: '返回游戏库',
         kind: EmuButtonKind.PRIMARY,
         buttonSize: EmuButtonSize.COMPACT,
         shape: EmuButtonShape.PILL,
@@ -1155,7 +1227,7 @@ struct ImportTaskOverlayPage {
           kind: EmuButtonKind.GHOST,
           buttonSize: EmuButtonSize.COMPACT,
           shape: EmuButtonShape.PILL,
-          onTap: () => { this.handleRetryAction() }
+          onTap: () => { this.handleDismissAction() }
         })
           .layoutWeight(1)
 

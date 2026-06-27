@@ -48,6 +48,13 @@ export interface RomImportConflictSummary {
   conflictNames: string[]
 }
 
+export interface DocumentPickerSelectionResult {
+  uris: string[]
+  canceled: boolean
+  failed: boolean
+  message: string
+}
+
 const DEFAULT_IMPORT_RESULT: RomImportResult = {
   selectedCount: 0,
   importedCount: 0,
@@ -214,7 +221,10 @@ export async function listSandboxRomFiles(filesDir: string): Promise<string[]> {
     names.sort((left: string, right: string) => left.localeCompare(right))
     return listSupportedSandboxRomFiles(names)
   } catch (err) {
-    return []
+    if (isMissingFileError(err)) {
+      return []
+    }
+    throw err as Error
   }
 }
 
@@ -235,17 +245,28 @@ export async function deleteImportedRomFile(context: common.UIAbilityContext, ro
   await fs.unlink(safePath)
 }
 
-export async function pickRomUris(context: common.UIAbilityContext): Promise<string[]> {
+export async function pickRomUris(context: common.UIAbilityContext): Promise<DocumentPickerSelectionResult> {
   const documentSelectOptions = new picker.DocumentSelectOptions() as PickerSelectOptionsCompat
   documentSelectOptions.maxSelectNumber = 30
   const documentPicker = new picker.DocumentViewPicker(context)
   try {
     const uris = await documentPicker.select(documentSelectOptions)
-    return uris ?? []
+    const safeUris = uris ?? []
+    return {
+      uris: safeUris,
+      canceled: safeUris.length === 0,
+      failed: false,
+      message: safeUris.length === 0 ? '这次没有选中文件' : ''
+    }
   } catch (err) {
     const pickerError = err as BusinessError
     LogHelper.warn('RomImport', 'Picker', `选择文件取消或失败: ${pickerError.code}, ${pickerError.message}`)
-    return []
+    return {
+      uris: [],
+      canceled: false,
+      failed: true,
+      message: '系统文件选择器这次没有成功返回文件，请稍后再试'
+    }
   }
 }
 
@@ -510,7 +531,7 @@ export async function importRomUris(
         result,
         fileName,
         'IMPORTED',
-        isDependencyFile ? '已作为多文件依赖写入游戏库目录' : '已成功写入游戏库目录'
+        isDependencyFile ? '已作为多文件依赖写入本地游戏目录' : '已成功写入本地游戏目录'
       )
       completedBytes += currentProgressBytes
       onProgress?.({
@@ -705,24 +726,17 @@ async function resolveMultiFileDependencyNames(uri: string, fileName: string): P
   if (!MULTIFILE_ENTRY_EXTENSIONS.includes(ext)) {
     return []
   }
-  if (!(await pathExists(uri))) {
-    LogHelper.warn(
-      'RomImport',
-      'Dependency',
-      `多文件入口不存在 ${LogHelper.describePathForLog(fileName)}`
-    )
-    return []
-  }
   let text = ''
   try {
     text = await fs.readText(uri)
   } catch (err) {
+    const message = (err as Error).message || String(err)
     LogHelper.warn(
       'RomImport',
       'Dependency',
-      `读取多文件入口失败 ${LogHelper.describePathForLog(fileName)}: ${(err as Error).message || String(err)}`
+      `读取多文件入口失败 ${LogHelper.describePathForLog(fileName)}: ${message}`
     )
-    return []
+    throw new Error(`IMPORT_MULTIFILE_ENTRY_READ_FAILED:${fileName}`)
   }
   if (ext === 'cue') {
     return parseCueDependencyNames(text)
@@ -948,6 +962,19 @@ async function pathExists(path: string): Promise<boolean> {
     await fs.access(path)
     return true
   } catch (err) {
-    return false
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as { code?: string | number }).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

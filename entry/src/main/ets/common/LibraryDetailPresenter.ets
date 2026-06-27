@@ -1,3 +1,4 @@
+import { CoreConfig, LIBRETRO_CORE_CATALOG } from './LibretroCoreCatalog'
 import { LibraryRecord } from './LibraryRepository'
 
 export interface LibraryDetailTelemetrySnapshot {
@@ -43,18 +44,20 @@ export function getLibraryDetailYearLabel(record: LibraryRecord): string {
 }
 
 export function getLibraryDetailOverviewText(record: LibraryRecord): string {
-  // overview 字段已废弃，返回默认值
-  return 'Unknown'
+  if (record.overview !== undefined && record.overview.length > 0) {
+    return record.overview
+  }
+  return '当前还没有本地简介，可在资料编辑里补充。'
 }
 
 export function getLibraryDetailRuntimeSummaryText(record: LibraryRecord): string {
   const segments: string[] = [
-    `该条目来自${getLibraryDetailSourceLabel(record)} ROM 库，当前库状态为 ${getLibraryDetailStatusLabel(record)}。`,
-    `系统识别平台为 ${record.platform}，默认核心为 ${record.preferredCoreId.toUpperCase()}。`,
+    `该条目来自${getLibraryDetailSourceLabel(record)}，当前状态为${getLibraryDetailStatusLabel(record)}。`,
+    `当前库记录的平台标记为 ${record.platform}，核心偏好为 ${getLibraryDetailEngineLabel(record)}。`,
     `ROM 文件名为 ${record.fileName}。`
   ]
   const region = getLibraryDetailRegionLabel(record)
-  if (region !== 'AUTO / UNKNOWN') {
+  if (region !== '未从文件标签识别到区域') {
     segments.push(`文件标签中识别到区域信息 ${region}。`)
   }
   if (record.publisher !== undefined && record.publisher.length > 0) {
@@ -78,30 +81,37 @@ export function getLibraryDetailRegionLabel(record: LibraryRecord): string {
   const tokens = extractTaggedTokens(record.fileName).map((item: string) => item.toUpperCase())
   const joined = tokens.join(' ')
   if (joined.indexOf('NTSC-J') >= 0 || joined.indexOf('JAPAN') >= 0 || joined.indexOf('JP') >= 0) {
-    return 'JP / NTSC'
+    return '日版 / NTSC'
   }
   if (joined.indexOf('NTSC-U') >= 0 || joined.indexOf('USA') >= 0 || joined.indexOf('US') >= 0) {
-    return 'US / NTSC'
+    return '美版 / NTSC'
   }
   if (joined.indexOf('PAL') >= 0 || joined.indexOf('EU') >= 0 || joined.indexOf('EUR') >= 0 ||
     joined.indexOf('EUROPE') >= 0) {
-    return 'EU / PAL'
+    return '欧版 / PAL'
   }
   if (joined.indexOf('WORLD') >= 0) {
-    return 'WORLD'
+    return '全球版'
   }
-  return 'AUTO / UNKNOWN'
+  return '未从文件标签识别到区域'
 }
 
 export function getLibraryDetailEngineLabel(record: LibraryRecord): string {
-  return `EMU_CORE_${record.preferredCoreId.toUpperCase()}`
+  if (record.preferredCoreId.length === 0) {
+    return '未匹配核心'
+  }
+  const matchedCore = LIBRETRO_CORE_CATALOG.find((item: CoreConfig) => item.id === record.preferredCoreId)
+  if (matchedCore) {
+    return matchedCore.name
+  }
+  return record.preferredCoreId.replace(/_/g, ' ')
 }
 
 export function getLibraryDetailPublisherLabel(record: LibraryRecord): string {
   if (record.publisher !== undefined && record.publisher.length > 0) {
     return record.publisher
   }
-  return 'Unknown'
+  return '未填写'
 }
 
 export function getLibraryDetailPlaytimeLabel(record: LibraryRecord): string {
@@ -112,21 +122,25 @@ export function getLibraryDetailPlaytimeLabel(record: LibraryRecord): string {
 }
 
 export function getLibraryDetailRomVersionLabel(record: LibraryRecord): string {
-  const platform = getLibraryDetailConsoleLabel(record)
-  const fileBase = cleanLibraryFileName(record.fileName).replace(/\s+/g, '_').toUpperCase()
-  return `${platform}_v1.0_${fileBase.substring(0, Math.min(16, fileBase.length))}`
+  const taggedTokens = extractTaggedTokens(record.fileName)
+  const matchedTag = taggedTokens.find((item: string) => /(^|[\s_-])(rev|v)\s*[a-z0-9.]+/i.test(item))
+  if (matchedTag) {
+    return matchedTag.trim()
+  }
+  const cleanedFileName = cleanLibraryFileName(record.fileName)
+  const inlineMatch = cleanedFileName.match(/\b(Rev\.?\s*[A-Z0-9]+|v\s*\d+(?:\.\d+)*)\b/i)
+  if (inlineMatch && inlineMatch[1]) {
+    return inlineMatch[1].trim()
+  }
+  return '未标注'
 }
 
 export function getLibraryDetailMemoryModeLabel(record: LibraryRecord): string {
-  return record.sourceType === 'IMPORTED' ? 'DIRECT_MAPPING_L2' : 'BUNDLE_MOUNT_RO'
+  return record.sourceType === 'IMPORTED' ? '应用沙箱文件' : '应用内置资源'
 }
 
 export function getLibraryDetailStatusLabel(record: LibraryRecord): string {
-  return record.lastPlayedAt > 0 ? 'PLAYED' : 'READY'
-}
-
-export function getLibraryLaunchFileLabel(record: LibraryRecord): string {
-  return record.fileName.replace(/\s+/g, '_').toUpperCase()
+  return record.lastPlayedAt > 0 ? '已产生启动记录' : '尚未产生启动记录'
 }
 
 export function hasLibraryDetailRuntimeSnapshot(record: LibraryRecord): boolean {
@@ -157,7 +171,7 @@ export function cleanLibraryFileName(fileName: string): string {
 }
 
 function getLibraryDetailSourceLabel(record: LibraryRecord): string {
-  return record.sourceType === 'IMPORTED' ? 'USER IMPORT' : 'BUNDLED'
+  return record.sourceType === 'IMPORTED' ? '用户导入文件' : '应用内置资源'
 }
 
 function formatLibraryDetailDuration(durationMs: number): string {

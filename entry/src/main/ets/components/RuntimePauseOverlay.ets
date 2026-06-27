@@ -20,7 +20,7 @@ interface RuntimePauseAction {
 @ComponentV2
 export struct RuntimePauseOverlay {
   @Param processText: string = ''
-  @Param saveStatusText: string = '存档就绪'
+  @Param saveStatusText: string = '存档状态待确认'
   @Param fpsText: string = '--.-'
   @Param cpuLoadText: string = '--'
   @Param perfStatsText: string = ''
@@ -97,19 +97,27 @@ export struct RuntimePauseOverlay {
   @Event onControllerDeviceSelect?: (device: number) => void
 
   private readonly actions: RuntimePauseAction[] = [
-    { title: '快速存档', code: '当前进度落盘', iconText: '▣', actionCode: 'quick_save' },
-    { title: '快速读档', code: '加载上次存档', iconText: '◫', actionCode: 'quick_load' },
+    { title: '快速存档', code: '保存当前进度', iconText: '▣', actionCode: 'quick_save' },
+    { title: '快速读档', code: '读取最近存档', iconText: '◫', actionCode: 'quick_load' },
     { title: '重启游戏', code: '从头开始本局', iconText: '↻', actionCode: 'restart_game' },
-    { title: '存档管理', code: '查看全部即时存档', iconText: '▤', actionCode: 'save_manager' },
-    { title: '电池存档', code: '导出与载入 SRAM', iconText: '◈', actionCode: 'sram_manager' },
-    { title: '金手指', code: '添加、启停与删除', iconText: '⌘', actionCode: 'cheat_manager' },
-    { title: '核心选项', code: '查看并切换核心变量', iconText: '◎', actionCode: 'core_options' },
-    { title: '端口控制', code: '切换虚拟端口/设备', iconText: '◬', actionCode: 'port_control' },
-    { title: '按键映射', code: '自定义虚拟按键', iconText: '▥', actionCode: 'input_mapping' },
-    { title: '画面风格', code: '切换滤镜与配色', iconText: '▧', actionCode: 'visual_filters' }
+    { title: '即时存档', code: '查看当前游戏存档', iconText: '▤', actionCode: 'save_manager' },
+    { title: '电池存档', code: '管理备份与恢复', iconText: '◈', actionCode: 'sram_manager' },
+    { title: '金手指', code: '添加、启用或删除', iconText: '⌘', actionCode: 'cheat_manager' },
+    { title: '游戏选项', code: '调整当前游戏选项', iconText: '◎', actionCode: 'core_options' },
+    { title: '输入设备', code: '切换控制玩家和设备', iconText: '◬', actionCode: 'port_control' },
+    { title: '触控布局', code: '调整屏上按键位置', iconText: '▥', actionCode: 'input_mapping' },
+    { title: '画面风格', code: '调整滤镜与配色', iconText: '▧', actionCode: 'visual_filters' }
   ]
-  private readonly waveformVerticalIndexes: number[] = [0, 1, 2, 3, 4, 5, 6, 7]
-  private readonly waveformHorizontalIndexes: number[] = [0, 1, 2, 3, 4]
+
+  private shouldShowManagerEmptyState(summaryText: string): boolean {
+    const normalized = summaryText.trim()
+    if (normalized.length === 0) {
+      return true
+    }
+    return normalized.includes('还没有') ||
+      normalized.includes('没有可显示') ||
+      normalized.includes('没有可调整')
+  }
 
   @Builder
   private TopTelemetryBar() {
@@ -128,7 +136,7 @@ export struct RuntimePauseOverlay {
       }
       .alignItems(VerticalAlign.Center)
 
-      Text(`${this.fpsText} FPS | LOAD ${this.cpuLoadText}`)
+      Text(`${this.fpsText} 帧/秒 | 负载 ${this.cpuLoadText}`)
         .fontSize(EmuTypography.xs)
         .fontWeight(FontWeight.Bold)
         .fontFamily('monospace')
@@ -383,7 +391,7 @@ export struct RuntimePauseOverlay {
     if (this.portControlVisible) {
       Column({ space: 10 }) {
         Row() {
-          Text('端口控制')
+          Text('输入设备')
             .fontSize(11)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
@@ -410,7 +418,7 @@ export struct RuntimePauseOverlay {
         Text(
           this.portControlSummaryText.length > 0
             ? this.portControlSummaryText
-            : `当前虚拟端口 P${this.selectedPortIndex + 1}，设备 ${describeRuntimeControllerPortDevice(this.selectedControllerDevice)}。`
+            : `当前由玩家 ${this.selectedPortIndex + 1} 接收操作，设备类型为${describeRuntimeControllerPortDevice(this.selectedControllerDevice)}。`
         )
           .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
@@ -419,7 +427,7 @@ export struct RuntimePauseOverlay {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
 
-        Text('切换端口会把虚拟手柄改绑到对应玩家口；设备类型请求是否生效取决于核心支持。')
+        Text('切换后会把当前触控或虚拟按键分配给对应玩家；是否生效取决于当前游戏支持。')
           .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
           .fontColor('#88A0A0A0')
@@ -427,7 +435,7 @@ export struct RuntimePauseOverlay {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
 
-        Text('虚拟端口')
+        Text('控制玩家')
           .fontSize(10)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
@@ -441,7 +449,7 @@ export struct RuntimePauseOverlay {
         }
         .width('100%')
 
-        Text('手柄类型')
+        Text('设备类型')
           .fontSize(10)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
@@ -475,7 +483,7 @@ export struct RuntimePauseOverlay {
               .fontColor(EmuColors.onSurface)
 
             if (item.isLatest) {
-              Text('LATEST')
+              Text('最近')
                 .fontSize(9)
                 .fontFamily('monospace')
                 .fontWeight(FontWeight.Bold)
@@ -546,7 +554,7 @@ export struct RuntimePauseOverlay {
     if (this.saveManagerVisible) {
       Column({ space: 10 }) {
         Row() {
-          Text('存档管理')
+          Text('即时存档')
             .fontSize(11)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
@@ -573,7 +581,7 @@ export struct RuntimePauseOverlay {
         Text(
           this.saveManagerSummaryText.length > 0
             ? this.saveManagerSummaryText
-            : '当前游戏的即时存档列表。'
+            : '这里列出当前游戏的即时存档。'
         )
           .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
@@ -583,7 +591,7 @@ export struct RuntimePauseOverlay {
           .width('100%')
 
         Row({ space: 10 }) {
-          Button('新建存档')
+          Button('保存当前进度')
             .layoutWeight(1)
             .height(40)
             .fontSize(EmuTypography.sm)
@@ -595,7 +603,7 @@ export struct RuntimePauseOverlay {
               this.onSaveManagerCreate?.()
             })
 
-          Button('刷新')
+          Button('重新读取')
             .width(88)
             .height(40)
             .fontSize(EmuTypography.sm)
@@ -611,15 +619,17 @@ export struct RuntimePauseOverlay {
         .width('100%')
 
         if (this.saveManagerBusy) {
-          Text('正在同步存档...')
+          Text('正在读取即时存档...')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor(EmuColors.primary)
             .width('100%')
         }
 
-        if (!this.saveManagerBusy && this.saveManagerItems.length === 0) {
-          Text('当前 ROM 还没有即时存档。')
+        if (!this.saveManagerBusy &&
+          this.saveManagerItems.length === 0 &&
+          this.shouldShowManagerEmptyState(this.saveManagerSummaryText)) {
+          Text('当前游戏还没有即时存档。')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor('#8AAEAEAE')
@@ -655,7 +665,7 @@ export struct RuntimePauseOverlay {
               .fontColor(EmuColors.onSurface)
 
             if (item.isLatest) {
-              Text('LATEST')
+              Text('最近')
                 .fontSize(9)
                 .fontFamily('monospace')
                 .fontWeight(FontWeight.Bold)
@@ -726,7 +736,7 @@ export struct RuntimePauseOverlay {
     if (this.sramManagerVisible) {
       Column({ space: 10 }) {
         Row() {
-          Text('电池存档')
+          Text('电池存档备份')
             .fontSize(11)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
@@ -753,7 +763,7 @@ export struct RuntimePauseOverlay {
         Text(
           this.sramManagerSummaryText.length > 0
             ? this.sramManagerSummaryText
-            : '当前游戏的电池存档备份列表。'
+            : '这里列出当前游戏的电池存档备份。'
         )
           .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
@@ -763,7 +773,7 @@ export struct RuntimePauseOverlay {
           .width('100%')
 
         Row({ space: 10 }) {
-          Button('导出当前')
+          Button('备份当前')
             .layoutWeight(1)
             .height(40)
             .fontSize(EmuTypography.sm)
@@ -775,7 +785,7 @@ export struct RuntimePauseOverlay {
               this.onSramManagerCreate?.()
             })
 
-          Button('刷新')
+          Button('重新读取')
             .width(88)
             .height(40)
             .fontSize(EmuTypography.sm)
@@ -791,15 +801,17 @@ export struct RuntimePauseOverlay {
         .width('100%')
 
         if (this.sramManagerBusy) {
-          Text('正在同步电池存档...')
+          Text('正在读取电池存档备份...')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor(EmuColors.primary)
             .width('100%')
         }
 
-        if (!this.sramManagerBusy && this.sramManagerItems.length === 0) {
-          Text('当前 ROM 还没有电池存档备份。')
+        if (!this.sramManagerBusy &&
+          this.sramManagerItems.length === 0 &&
+          this.shouldShowManagerEmptyState(this.sramManagerSummaryText)) {
+          Text('当前游戏还没有电池存档备份。')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor('#8AAEAEAE')
@@ -905,7 +917,7 @@ export struct RuntimePauseOverlay {
     if (this.cheatManagerVisible) {
       Column({ space: 10 }) {
         Row() {
-          Text('金手指管理')
+          Text('金手指')
             .fontSize(11)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
@@ -932,7 +944,7 @@ export struct RuntimePauseOverlay {
         Text(
           this.cheatManagerSummaryText.length > 0
             ? this.cheatManagerSummaryText
-            : '当前游戏的运行态金手指列表。'
+            : '这里列出当前游戏保存过的金手指。'
         )
           .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
@@ -1017,7 +1029,7 @@ export struct RuntimePauseOverlay {
               this.onCheatManagerDisableAll?.()
             })
 
-          Button('刷新')
+          Button('重新读取')
             .width(72)
             .height(40)
             .fontSize(EmuTypography.sm)
@@ -1033,18 +1045,20 @@ export struct RuntimePauseOverlay {
         .width('100%')
 
         if (this.cheatManagerBusy) {
-          Text('正在同步金手指...')
+          Text('正在读取金手指...')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor(EmuColors.primary)
             .width('100%')
         }
 
-        if (!this.cheatManagerBusy && this.cheatManagerItems.length === 0) {
+        if (!this.cheatManagerBusy &&
+          this.cheatManagerItems.length === 0 &&
+          this.shouldShowManagerEmptyState(this.cheatManagerSummaryText)) {
           Text(
             this.cheatManagerSupported
-              ? '当前 ROM 还没有运行态金手指。'
-              : '当前核心未提供完整的运行态金手指接口。'
+              ? '当前游戏还没有保存的金手指。'
+              : '当前核心不会在这里提供完整的金手指管理。'
           )
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
@@ -1078,18 +1092,56 @@ export struct RuntimePauseOverlay {
       return currentLabel
     }
     if (currentValue.length > 0) {
-      return currentValue
+      return this.humanizeCoreOptionToken(currentValue)
     }
     return '未设置'
   }
 
-  private getCoreOptionValueDisplayText(item: RuntimeCoreOptionItem): string {
-    const currentValue = typeof item.value === 'string' ? item.value.trim() : ''
-    const currentLabel = this.getCoreOptionCurrentLabel(item)
-    if (currentValue.length > 0 && currentLabel !== currentValue) {
-      return `${currentLabel} (${currentValue})`
+  private humanizeCoreOptionToken(value: string): string {
+    const normalized = value
+      .trim()
+      .replace(/[._-]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    if (normalized.length === 0) {
+      return ''
     }
-    return currentLabel
+    return normalized
+      .split(' ')
+      .map((segment: string) => {
+        if (segment.length <= 3) {
+          return segment.toUpperCase()
+        }
+        return `${segment.charAt(0).toUpperCase()}${segment.slice(1)}`
+      })
+      .join(' ')
+  }
+
+  private getCoreOptionTitle(item: RuntimeCoreOptionItem): string {
+    const desc = typeof item.desc === 'string' ? item.desc.trim() : ''
+    if (desc.length > 0 && desc !== item.key) {
+      return desc
+    }
+    const fallback = this.humanizeCoreOptionToken(item.key)
+    if (fallback.length > 0) {
+      return fallback
+    }
+    return '未命名选项'
+  }
+
+  private getCoreOptionMetaText(item: RuntimeCoreOptionItem): string {
+    const values = Array.isArray(item.values) ? item.values : []
+    if (values.length > 1) {
+      return `共 ${values.length} 个可选项`
+    }
+    if (values.length === 1) {
+      return '当前只有一个可选项'
+    }
+    return '当前没有其他可选项'
+  }
+
+  private getCoreOptionValueDisplayText(item: RuntimeCoreOptionItem): string {
+    return this.getCoreOptionCurrentLabel(item)
   }
 
   private getNextCoreOptionValue(item: RuntimeCoreOptionItem): RuntimeCoreOptionValue | undefined {
@@ -1109,13 +1161,13 @@ export struct RuntimePauseOverlay {
   private getCoreOptionNextText(item: RuntimeCoreOptionItem): string {
     const next = this.getNextCoreOptionValue(item)
     if (!next) {
-      return '没有其他候选值'
+      return '当前没有其他可选项'
     }
     const nextLabel = typeof next.label === 'string' ? next.label.trim() : ''
-    if (nextLabel.length > 0 && nextLabel !== next.value) {
-      return `下一项: ${nextLabel} (${next.value})`
+    if (nextLabel.length > 0) {
+      return `切换后：${nextLabel}`
     }
-    return `下一项: ${next.value}`
+    return `切换后：${this.humanizeCoreOptionToken(next.value)}`
   }
 
   @Builder
@@ -1123,21 +1175,21 @@ export struct RuntimePauseOverlay {
     Column({ space: 8 }) {
       Row() {
         Column({ space: 4 }) {
-          Text(item.desc.length > 0 ? item.desc : item.key)
+          Text(this.getCoreOptionTitle(item))
             .fontSize(EmuTypography.sm)
             .fontWeight(FontWeight.Bold)
             .fontColor(EmuColors.onSurface)
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-          Text(item.key)
+          Text(this.getCoreOptionMetaText(item))
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor('#8AAEAEAE')
             .maxLines(1)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
 
-          Text(`当前: ${this.getCoreOptionValueDisplayText(item)}`)
+          Text(`当前使用：${this.getCoreOptionValueDisplayText(item)}`)
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor('#AEB8B8B8')
@@ -1154,7 +1206,7 @@ export struct RuntimePauseOverlay {
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
 
-        Button('切换')
+        Button('下一项')
           .width(74)
           .height(34)
           .fontSize(EmuTypography.xs)
@@ -1185,7 +1237,7 @@ export struct RuntimePauseOverlay {
     if (this.coreOptionsVisible) {
       Column({ space: 10 }) {
         Row() {
-          Text('核心选项')
+          Text('游戏选项')
             .fontSize(11)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
@@ -1212,7 +1264,7 @@ export struct RuntimePauseOverlay {
         Text(
           this.coreOptionsSummaryText.length > 0
             ? this.coreOptionsSummaryText
-            : '当前核心的运行时可调参数。'
+            : '这里列出当前游戏可调整的选项。'
         )
           .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
@@ -1222,7 +1274,7 @@ export struct RuntimePauseOverlay {
           .width('100%')
 
         Row({ space: 10 }) {
-          Button('刷新')
+          Button('重新读取')
             .width(88)
             .height(40)
             .fontSize(EmuTypography.sm)
@@ -1239,15 +1291,17 @@ export struct RuntimePauseOverlay {
         .width('100%')
 
         if (this.coreOptionsBusy) {
-          Text('正在同步核心选项...')
+          Text('正在读取游戏选项...')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor(EmuColors.primary)
             .width('100%')
         }
 
-        if (!this.coreOptionsBusy && this.coreOptionsItems.length === 0) {
-          Text('当前核心没有运行时选项。')
+        if (!this.coreOptionsBusy &&
+          this.coreOptionsItems.length === 0 &&
+          this.shouldShowManagerEmptyState(this.coreOptionsSummaryText)) {
+          Text('当前核心没有可调整的游戏选项。')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor('#8AAEAEAE')
@@ -1276,14 +1330,14 @@ export struct RuntimePauseOverlay {
     if (this.diskControlVisible) {
       Column({ space: 10 }) {
         Row() {
-          Text('换盘控制')
+          Text('换盘')
             .fontSize(11)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
             .fontColor('#CCABABAB')
             .letterSpacing(1.6)
 
-          Text(this.diskControlModeText.length > 0 ? this.diskControlModeText : 'READY')
+          Text(this.diskControlModeText.length > 0 ? this.diskControlModeText : '可操作')
             .fontSize(10)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
@@ -1299,7 +1353,7 @@ export struct RuntimePauseOverlay {
         Text(
           this.diskControlStatusText.length > 0
             ? this.diskControlStatusText
-            : '当前核心已声明换盘接口。'
+            : '当前游戏支持换盘。'
         )
           .fontSize(EmuTypography.xs)
           .fontFamily('monospace')
@@ -1327,7 +1381,7 @@ export struct RuntimePauseOverlay {
               this.onDiskToggleEject?.()
             })
 
-          Button('刷新')
+          Button('重新读取')
             .width(88)
             .height(42)
             .fontSize(EmuTypography.sm)
@@ -1424,7 +1478,7 @@ export struct RuntimePauseOverlay {
               this.onDiskReplaceCurrent?.()
             })
 
-          Button('新增一张')
+          Button('新增光盘')
             .layoutWeight(1)
             .height(42)
             .fontSize(EmuTypography.sm)
@@ -1440,7 +1494,7 @@ export struct RuntimePauseOverlay {
         .width('100%')
 
         if (this.diskControlBusy) {
-          Text('正在导入磁盘镜像...')
+          Text('正在处理磁盘镜像...')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor(EmuColors.primary)
@@ -1462,14 +1516,14 @@ export struct RuntimePauseOverlay {
         .fontSize(EmuTypography.xxl)
         .fontColor(EmuColors.error)
 
-      Text('结束运行')
+      Text('结束本次运行')
         .fontSize(EmuTypography.md)
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.error)
         .layoutWeight(1)
         .margin({ left: 10 })
 
-      Text('终止会话')
+      Text('返回游戏库')
         .fontSize(EmuTypography.xs)
         .fontFamily('monospace')
         .fontWeight(FontWeight.Bold)
@@ -1491,7 +1545,7 @@ export struct RuntimePauseOverlay {
   private PauseTelemetry() {
     Column({ space: 12 }) {
       Row() {
-        Text('实时遥测')
+        Text('当前运行摘要')
           .fontSize(11)
           .fontFamily('monospace')
           .fontWeight(FontWeight.Bold)
@@ -1528,7 +1582,7 @@ export struct RuntimePauseOverlay {
             .fontSize(EmuTypography.xs)
             .fontWeight(FontWeight.Bold)
             .fontColor('#B3ABABAB')
-          Text(`${this.fpsText} FPS`)
+          Text(`${this.fpsText} 帧/秒`)
             .fontSize(EmuTypography.lg)
             .fontFamily('monospace')
             .fontWeight(FontWeight.Bold)
@@ -1629,57 +1683,27 @@ export struct RuntimePauseOverlay {
         .padding({ left: 18, right: 18 })
       }
 
-      Stack() {
-        this.WaveformGrid()
+      Column({ space: 8 }) {
+        Text('暂停页展示的是当前摘要，不提供连续性能曲线。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
 
-        Path({
-          width: 320,
-          height: 64,
-          commands: 'M0 40 Q20 16 40 40 T80 40 T120 40 T160 40 T200 40 T240 40 T320 40'
-        })
-          .fillOpacity(0)
-          .stroke(EmuColors.primary)
-          .strokeWidth(1.6)
-          .strokeOpacity(0.72)
+        Text('如需判断运行流畅度，请以当前帧率、音频状态和实际游玩体验为准。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
       }
       .width('100%')
       .height(68)
-      .padding({ left: 18, right: 18 })
+      .padding({ left: 18, right: 18, top: 10, bottom: 10 })
+      .justifyContent(FlexAlign.Center)
     }
     .width('100%')
     .padding({ top: 0, bottom: 18 })
     .backgroundColor('#CC050505')
     .border({ width: 0.5, color: '#26333333', style: BorderStyle.Solid })
     .borderRadius(8)
-  }
-
-  @Builder
-  private WaveformGrid() {
-    Stack() {
-      Row({ space: 19 }) {
-        ForEach(this.waveformVerticalIndexes, (item: number) => {
-          Column()
-            .width(1)
-            .height('100%')
-            .backgroundColor('#1600FF41')
-        }, (item: number) => `v-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-
-      Column({ space: 19 }) {
-        ForEach(this.waveformHorizontalIndexes, (item: number) => {
-          Row()
-            .width('100%')
-            .height(1)
-            .backgroundColor('#1600FF41')
-        }, (item: number) => `h-${item}`)
-      }
-      .width('100%')
-      .height('100%')
-    }
-    .width('100%')
-    .height('100%')
   }
 
   build() {
@@ -1713,7 +1737,7 @@ export struct RuntimePauseOverlay {
                 .fontWeight(FontWeight.Bold)
                 .fontColor(EmuColors.onSurface)
 
-              Text(`进程：${this.processText}`)
+              Text(`当前条目：${this.processText}`)
                 .fontSize(EmuTypography.xs)
                 .fontFamily('monospace')
                 .fontColor('#B3ABABAB')

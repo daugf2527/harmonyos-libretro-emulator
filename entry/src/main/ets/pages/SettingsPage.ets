@@ -3,7 +3,7 @@ import { display } from '@kit.ArkUI'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { EmuButton, EmuButtonKind, EmuButtonSize, EmuButtonShape } from '../components/EmuButton'
 import { EmuBottomNav, EmuBottomNavItem, createEmuBottomNavItems } from '../components/EmuBottomNav'
-import { BarChartBackground, BarChartItem, EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
+import { EmuHeaderBar, EmuPrecisionGridBackdrop } from '../components/EmuAppShell'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
 import { loadInputLayoutProfile } from '../common/InputLayoutRepository'
 import { runtimeRenderSettingsController } from '../common/RuntimeRenderSettingsController'
@@ -34,14 +34,15 @@ import {
   saveRuntimeInputPreferencesProfile
 } from '../common/RuntimeInputPreferencesRepository'
 import {
-  getLibraryTelemetryBars,
+  formatLastPlayedRelative,
+  getLastPlayedLibraryRecord,
   getLibraryTelemetryCells,
-  LibraryTelemetryBar,
   LibraryTelemetryCell
 } from '../common/LibraryRuntimeTelemetryPresenter'
 import { LibraryRecord, loadAllLibraryRecords } from '../common/LibraryRepository'
 import { InputDeviceInfo } from '../common/InputPortRouting'
 import { runtimeInputPortController } from '../common/RuntimeInputPortController'
+import { getInputMappingService, InputMappingStatusSnapshot } from '../common/InputMappingService'
 import {
   createDefaultRuntimeVisualSettingsProfile,
   describeRuntimeAspectMode,
@@ -79,9 +80,11 @@ struct LinearSettingRow {
             .fontWeight(FontWeight.Bold)
             .fontColor('#C8ABABAB')
 
-          Text(this.code)
-            .fontSize(9)
-            .fontColor('#77666666')
+          if (this.code.length > 0) {
+            Text(this.code)
+              .fontSize(9)
+              .fontColor('#77666666')
+          }
         }
         .alignItems(VerticalAlign.Bottom)
 
@@ -143,18 +146,21 @@ struct SettingsPage {
   @Local private inputDeviceStatus: string = '正在读取'
   @Local private inputLayoutSummaryText: string = '正在读取布局信息'
   @Local private inputLayoutDetailText: string = '正在读取本地触控布局'
-  @Local private telemetryPrimaryLabel: string = '最近一次运行'
+  @Local private inputMappingSummaryText: string = '正在读取键盘映射'
+  @Local private inputMappingDetailText: string = '应用启动后会读取本地键盘映射配置'
+  @Local private telemetryPrimaryLabel: string = '最近一次记录'
   @Local private telemetryPrimaryValue: string = '--'
   @Local private telemetrySecondaryLabel: string = '音频缓冲'
   @Local private telemetrySecondaryValue: string = '--'
   @Local private telemetryFooterLeft: string = '尚无运行记录'
-  @Local private telemetryFooterRight: string = '进入游戏后会更新摘要'
-  @Local private telemetryBars: BarChartItem[] = this.createEmptyTelemetryBars()
+  @Local private telemetryFooterRight: string = '进入游戏后会生成历史摘要'
+  @Local private telemetryReady: boolean = false
   @Local private renderProfile: RuntimeRenderSettingsProfile = createDefaultRuntimeRenderSettingsProfile()
   @Local private audioProfile: RuntimeAudioSettingsProfile = createDefaultRuntimeAudioSettingsProfile()
   @Local private inputPreferences: RuntimeInputPreferencesProfile = createDefaultRuntimeInputPreferencesProfile()
   @Local private visualProfile: RuntimeVisualSettingsProfile = createDefaultRuntimeVisualSettingsProfile()
-  @Local private advancedStatusText: string = '运行时设置尚未读取'
+  @Local private runtimeProfilesReady: boolean = false
+  @Local private advancedStatusText: string = '正在读取运行时设置'
   @Local private runtimeApplyStatusText: string = '尚未执行运行时写入'
   @Local private foldableMode: FoldableMode = FoldableMode.SINGLE
   @Local private activeGroup: string = 'video'  // 当前选中的设置分组
@@ -181,7 +187,7 @@ struct SettingsPage {
   private readonly aspectOptions: SettingOptionItem[] = [
     { key: '4:3', label: '4:3', isActive: true },
     { key: '16:9', label: '16:9', isActive: false },
-    { key: 'native', label: 'NATIVE', isActive: false }
+    { key: 'native', label: '原始比例', isActive: false }
   ]
 
   private onBottomNavClick(key: string): void {
@@ -191,12 +197,14 @@ struct SettingsPage {
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('SettingsPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
+      this.advancedStatusText = '现在还回不到其他设置页，请稍后再试'
     })
   }
 
   private openPage(url: string, label: string): void {
     this.getUIContext().getRouter().pushUrl({ url: url }).catch((err: Error) => {
       LogHelper.error('SettingsPage', 'Route', `pushUrl ${label} failed: ${err.message}`)
+      this.advancedStatusText = `${label}现在还打不开，请稍后再试`
     })
   }
 
@@ -205,6 +213,9 @@ struct SettingsPage {
   }
 
   private isAspectActive(key: string): boolean {
+    if (!this.runtimeProfilesReady) {
+      return false
+    }
     return this.visualProfile.aspectMode === key
   }
 
@@ -213,54 +224,109 @@ struct SettingsPage {
   }
 
   private onScanlineIntensityChange = (value: number): void => {
+    if (!this.runtimeProfilesReady) {
+      this.runtimeApplyStatusText = '当前视觉配置没有读到，请先重试'
+      return
+    }
     const nextProfile = this.cloneVisualProfile()
     nextProfile.scanlineIntensity = this.clampPercent(value)
     this.scheduleVisualProfilePersist(nextProfile, '扫描线强度')
   }
 
   private onMasterVolumeChange = (value: number): void => {
+    if (!this.runtimeProfilesReady) {
+      this.runtimeApplyStatusText = '当前音频配置没有读到，请先重试'
+      return
+    }
     const nextPercent = this.clampPercent(value)
     this.scheduleAudioProfilePersist(nextPercent, '主音量')
   }
 
   private get gpuBackendText(): string {
-    return this.renderProfile.hwRenderAllowed ? '已允许硬件渲染' : '仅软件路径'
+    if (!this.runtimeProfilesReady) {
+      return '渲染方式待确认'
+    }
+    return this.renderProfile.hwRenderAllowed ? '本地配置：允许硬件渲染' : '本地配置：仅软件路径'
   }
 
   private get renderModeText(): string {
+    if (!this.runtimeProfilesReady) {
+      return '渲染模式待确认'
+    }
     const modeText = describeRenderMode(this.renderProfile.scalingMode)
     if (this.renderProfile.scalingMode === 1) {
-      return `${modeText} · ${describeSoftwareResolutionPreset(this.renderProfile.softwareMaxPresetIndex)}`
+      return `本地配置：${modeText} · ${describeSoftwareResolutionPreset(this.renderProfile.softwareMaxPresetIndex)}`
     }
-    return modeText
+    return `本地配置：${modeText}`
   }
 
   private get softwareResolutionText(): string {
+    if (!this.runtimeProfilesReady) {
+      return '分辨率待确认'
+    }
     return describeSoftwareResolutionPreset(this.renderProfile.softwareMaxPresetIndex)
   }
 
   private get vsyncSummaryText(): string {
+    if (!this.runtimeProfilesReady) {
+      return '垂直同步设置待确认'
+    }
     return this.renderProfile.swapInterval === 0 ?
-      '当前关闭 · 允许非同步提交，可能减少等待但可能出现画面撕裂' :
-      '当前开启 · 跟随显示刷新提交，优先减少画面撕裂'
+      '本地配置：关闭 · 允许非同步提交，可能减少等待但可能出现画面撕裂' :
+      '本地配置：开启 · 跟随显示刷新提交，优先减少画面撕裂'
   }
 
   private get aiUpscaleSummaryText(): string {
+    if (!this.runtimeProfilesReady) {
+      return 'AI 超分设置待确认'
+    }
     return this.renderProfile.aiUpscaleEnabled ?
-      '当前开启 · 设备支持 XEngine 时启用 AI 超分' :
-      '当前关闭 · 保持原始分辨率输出，不支持设备可继续正常运行'
+      '本地配置：开启 · 设备支持 XEngine 时启用 AI 超分' :
+      '本地配置：关闭 · 保持原始分辨率输出，不支持设备可继续正常运行'
+  }
+
+  private get audioLatencySummaryText(): string {
+    if (!this.runtimeProfilesReady) {
+      return '音频延迟待确认'
+    }
+    return `本地配置：${describeAudioLatency(this.audioProfile.latencyMs)}`
   }
 
   private get audioBufferSummaryText(): string {
-    const bufferValue = this.telemetrySecondaryValue && this.telemetrySecondaryValue !== '--' ?
+    const bufferValue = this.telemetryReady && this.telemetrySecondaryValue && this.telemetrySecondaryValue !== '--' ?
       this.telemetrySecondaryValue :
-      '暂无记录'
-    const footer = this.telemetryFooterRight.length > 0 ? this.telemetryFooterRight : '进入游戏后会更新摘要'
+      (this.telemetryReady ? '暂无记录' : '待确认')
+    const footer = this.telemetryFooterRight.length > 0 ? this.telemetryFooterRight : '进入游戏后会生成历史摘要'
     return `${bufferValue} · ${footer}`
   }
 
   private get shaderModeSummaryText(): string {
-    return `${describeRuntimeAspectMode(this.visualProfile.aspectMode)} · 扫描线 ${this.visualProfile.scanlineIntensity}% / 曲率 ${this.visualProfile.curvature}% / 饱和度 ${this.visualProfile.saturation}%`
+    if (!this.runtimeProfilesReady) {
+      return '滤镜配置待确认'
+    }
+    return `本地配置：${describeRuntimeAspectMode(this.visualProfile.aspectMode)} · 扫描线 ${this.visualProfile.scanlineIntensity}% / 曲率 ${this.visualProfile.curvature}% / 饱和度 ${this.visualProfile.saturation}%`
+  }
+
+  private get hideVirtualControllerSummaryText(): string {
+    if (!this.runtimeProfilesReady) {
+      return '屏上手柄显示设置待确认'
+    }
+    return this.inputPreferences.hideVirtualController ?
+      '本地配置：隐藏 · 运行时不渲染屏上手柄' :
+      '本地配置：显示 · 运行时叠加屏上手柄'
+  }
+
+  private get hideUndeclaredKeysSummaryText(): string {
+    if (!this.runtimeProfilesReady) {
+      return '按键显示范围待确认'
+    }
+    return this.inputPreferences.hideUndeclaredKeys ?
+      '本地配置：开启 · 仅显示当前游戏实际会用到的按键' :
+      '本地配置：关闭 · 显示完整虚拟手柄按键集'
+  }
+
+  private get runtimeProfilesUnavailableHintText(): string {
+    return '当前运行配置还没有完整读到，请先重试后再修改'
   }
 
   private cloneRenderProfile(): RuntimeRenderSettingsProfile {
@@ -336,14 +402,16 @@ struct SettingsPage {
     const token = this.beginRefresh()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.inputDeviceStatus = '上下文不可用'
-      this.inputLayoutSummaryText = '无法读取布局信息'
-      this.inputLayoutDetailText = '请重新进入页面'
+      this.runtimeProfilesReady = false
+      this.inputDeviceStatus = '现在还读不到本机设备状态，请稍后再试'
+      this.inputLayoutSummaryText = '本地触控布局现在还没读到'
+      this.inputLayoutDetailText = '本地触控布局信息暂时没有加载出来'
+      this.applyInputMappingStatus(getInputMappingService().getStatusSnapshot())
       this.renderProfile = createDefaultRuntimeRenderSettingsProfile()
       this.inputPreferences = createDefaultRuntimeInputPreferencesProfile()
       this.visualProfile = createDefaultRuntimeVisualSettingsProfile()
       this.audioProfile = createDefaultRuntimeAudioSettingsProfile()
-      this.advancedStatusText = '上下文不可用'
+      this.advancedStatusText = '现在还读不到本地运行设置，请稍后再试'
       this.applyEmptyTelemetry()
       return
     }
@@ -369,6 +437,7 @@ struct SettingsPage {
         return
       }
       this.inputPreferences = inputPreferences
+      this.runtimeProfilesReady = true
       this.refreshAdvancedStatus()
     } catch (err) {
       if (!this.isCurrentRefresh(token)) {
@@ -380,23 +449,36 @@ struct SettingsPage {
       this.inputPreferences = createDefaultRuntimeInputPreferencesProfile()
       this.visualProfile = createDefaultRuntimeVisualSettingsProfile()
       this.audioProfile = createDefaultRuntimeAudioSettingsProfile()
-      this.advancedStatusText = '运行时设置读取失败，已回退默认值'
+      this.runtimeProfilesReady = false
+      this.advancedStatusText = '运行时设置这次没有读出来，请先重试后再判断真实配置'
     }
 
-    const inputDevices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
-    const externalNames: string[] = []
-    inputDevices.forEach((item: InputDeviceInfo) => {
-      const label = `${item.name}`.trim()
-      if (label.length > 0) {
-        externalNames.push(label)
-      }
-    })
+    let externalNames: string[] = []
+    let externalDeviceCount: number = 0
+    let inputDevicesReady: boolean = true
+    try {
+      const inputDevices: InputDeviceInfo[] = runtimeInputPortController.listInputDevices()
+      externalDeviceCount = inputDevices.length
+      inputDevices.forEach((item: InputDeviceInfo) => {
+        const label = `${item.name}`.trim()
+        if (label.length > 0) {
+          externalNames.push(label)
+        }
+      })
+    } catch (err) {
+      inputDevicesReady = false
+      const message = (err as Error).message || String(err)
+      LogHelper.error('SettingsPage', 'Input', `读取输入设备状态失败: ${message}`)
+    }
 
     if (!this.isCurrentRefresh(token)) {
       return
     }
 
-    this.inputDeviceStatus = externalNames.length > 0 ? `已连接 ${externalNames.length} 个设备` : '仅本地触控'
+    this.inputDeviceStatus = inputDevicesReady ?
+      (externalDeviceCount > 0 ? `已枚举 ${externalDeviceCount} 个外接设备` : '当前没有枚举到外接设备') :
+      '本机输入设备没有读出来，请稍后重试'
+    this.applyInputMappingStatus(getInputMappingService().getStatusSnapshot())
 
     try {
       const profile = await loadInputLayoutProfile(context)
@@ -404,15 +486,21 @@ struct SettingsPage {
         return
       }
       this.inputLayoutSummaryText = `本地触控布局 · ${profile.buttons.length} 个按键`
-      this.inputLayoutDetailText = externalNames.length > 0 ?
-        `外接设备：${externalNames.join(' / ')}` :
-        '未检测到外接手柄，当前使用本地触控方案'
+      this.inputLayoutDetailText = !inputDevicesReady ?
+        '外接设备状态没有读出来，当前仅展示本地触控布局信息' :
+        (externalNames.length > 0 ?
+          `外接设备：${externalNames.join(' / ')}` :
+          (externalDeviceCount > 0 ?
+            `已枚举 ${externalDeviceCount} 个外接设备，但当前没有可展示的设备名称` :
+            '当前没有枚举到外接设备，页面仅展示本地触控布局')))
     } catch (_err) {
       if (!this.isCurrentRefresh(token)) {
         return
       }
-      this.inputLayoutSummaryText = '本地触控布局'
-      this.inputLayoutDetailText = '布局读取失败，已回退默认布局'
+      this.inputLayoutSummaryText = '本地触控布局没有读到'
+      this.inputLayoutDetailText = !inputDevicesReady ?
+        '本地触控布局和外接设备状态都没有读出来，请稍后重试' :
+        '本地触控布局没有读到，请稍后重试'
     }
 
     try {
@@ -426,16 +514,23 @@ struct SettingsPage {
         return
       }
       this.applyEmptyTelemetry()
+      this.telemetryReady = false
+      this.telemetryFooterLeft = '本地运行记录没有读出来'
+      this.telemetryFooterRight = '请稍后重试后再查看'
     }
   }
 
   private refreshAdvancedStatus(): void {
-    const backendText = this.renderProfile.hwRenderAllowed ? 'HW_RENDER 已允许' : 'HW_RENDER 已关闭'
+    if (!this.runtimeProfilesReady) {
+      this.advancedStatusText = '当前运行设置还没完整读出来，请先重试后再判断真实配置'
+      return
+    }
+    const backendText = this.renderProfile.hwRenderAllowed ? '本地配置里已开启硬件渲染' : '本地配置里已关闭硬件渲染'
     const softwareText = this.renderProfile.scalingMode === 1 ?
       ` / 软件分辨率上限 ${this.softwareResolutionText}` :
       ''
-    const vsyncText = this.renderProfile.swapInterval === 0 ? 'VSync OFF' : 'VSync ON'
-    const aiText = this.renderProfile.aiUpscaleEnabled ? 'AI Upscale ON' : 'AI Upscale OFF'
+    const vsyncText = this.renderProfile.swapInterval === 0 ? '本地配置里已关闭垂直同步' : '本地配置里已开启垂直同步'
+    const aiText = this.renderProfile.aiUpscaleEnabled ? '本地配置里已开启 AI 超分' : '本地配置里已关闭 AI 超分'
     this.advancedStatusText = `${backendText} / ${describeRenderMode(this.renderProfile.scalingMode)}${softwareText} / ${vsyncText} / ${aiText}`
   }
 
@@ -461,7 +556,7 @@ struct SettingsPage {
 
   private scheduleVisualProfilePersist(profile: RuntimeVisualSettingsProfile, actionLabel: string): void {
     this.visualProfile = profile
-    this.runtimeApplyStatusText = `${actionLabel} 已更新，返回运行页后生效`
+    this.runtimeApplyStatusText = `${actionLabel} 的本地配置已更新，返回运行页后生效`
     if (this.visualPersistTimer !== -1) {
       clearTimeout(this.visualPersistTimer)
     }
@@ -504,12 +599,12 @@ struct SettingsPage {
         return
       }
       this.visualProfile = saved
-      this.runtimeApplyStatusText = `${actionLabel} 已保存，返回运行页后生效`
+      this.runtimeApplyStatusText = `${actionLabel} 的本地配置已保存，返回运行页后生效`
     } catch (_err) {
       if (!this.isCurrentRefresh(token)) {
         return
       }
-      this.runtimeApplyStatusText = `${actionLabel} 保存失败`
+      this.runtimeApplyStatusText = `${actionLabel} 没有保存成功，请稍后重试`
     }
   }
 
@@ -532,14 +627,19 @@ struct SettingsPage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('SettingsPage', 'Render', `保存运行时渲染配置失败: ${message}`)
-      this.runtimeApplyStatusText = '运行时渲染配置保存失败'
+      this.runtimeApplyStatusText = '画面设置没有保存成功，请稍后重试'
     }
   }
 
   private setRuntimeApplyStatus(actionLabel: string, ok: boolean): void {
     this.runtimeApplyStatusText = ok ?
-      `${actionLabel} 已写入运行时` :
-      `${actionLabel} 写入失败，当前页未更新运行时状态`
+      `${actionLabel} 已提交到当前运行` :
+      `${actionLabel} 没有写入成功，当前运行状态保持不变`
+  }
+
+  private applyInputMappingStatus(status: InputMappingStatusSnapshot): void {
+    this.inputMappingSummaryText = status.summaryText
+    this.inputMappingDetailText = status.detailText
   }
 
   private async toggleHwRenderAllowed(): Promise<void> {
@@ -547,7 +647,7 @@ struct SettingsPage {
     const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
     nextProfile.hwRenderAllowed = nextValue
     const ok = runtimeRenderSettingsController.setHwRenderAllowed(nextValue)
-    this.setRuntimeApplyStatus('GPU Backend', ok)
+    this.setRuntimeApplyStatus('硬件渲染', ok)
     if (!ok) {
       return
     }
@@ -559,7 +659,7 @@ struct SettingsPage {
     const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
     nextProfile.swapInterval = nextValue
     const ok = runtimeRenderSettingsController.setSwapInterval(nextValue)
-    this.setRuntimeApplyStatus('VSync', ok)
+    this.setRuntimeApplyStatus('垂直同步', ok)
     if (!ok) {
       return
     }
@@ -571,7 +671,7 @@ struct SettingsPage {
     const nextProfile: RuntimeRenderSettingsProfile = this.cloneRenderProfile()
     nextProfile.aiUpscaleEnabled = nextValue
     const ok = runtimeRenderSettingsController.setAIUpscale(nextValue)
-    this.setRuntimeApplyStatus('AI Upscale', ok)
+    this.setRuntimeApplyStatus('AI 超分', ok)
     if (!ok) {
       return
     }
@@ -597,7 +697,7 @@ struct SettingsPage {
         return
       }
       this.inputPreferences = saved
-      this.setRuntimeApplyStatus('虚拟手柄显示', true)
+      this.runtimeApplyStatusText = '虚拟手柄显示的本地配置已保存，返回运行页后生效'
     } catch (_err) {
       if (!this.isCurrentRefresh(token)) {
         return
@@ -610,7 +710,7 @@ struct SettingsPage {
     const token = this.beginRefresh()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.setRuntimeApplyStatus('按 core 隐藏未声明键', false)
+      this.setRuntimeApplyStatus('按当前游戏隐藏未使用按键', false)
       return
     }
     const nextProfile: RuntimeInputPreferencesProfile = {
@@ -625,12 +725,12 @@ struct SettingsPage {
         return
       }
       this.inputPreferences = saved
-      this.setRuntimeApplyStatus('按 core 隐藏未声明键', true)
+      this.runtimeApplyStatusText = '按当前游戏隐藏未使用按键的本地配置已保存，返回运行页后生效'
     } catch (_err) {
       if (!this.isCurrentRefresh(token)) {
         return
       }
-      this.setRuntimeApplyStatus('按 core 隐藏未声明键', false)
+      this.setRuntimeApplyStatus('按当前游戏隐藏未使用按键', false)
     }
   }
 
@@ -684,7 +784,7 @@ struct SettingsPage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('SettingsPage', 'Audio', `保存运行时音频配置失败: ${message}`)
-      this.runtimeApplyStatusText = '运行时音频配置保存失败'
+      this.runtimeApplyStatusText = '音频设置没有保存成功，请稍后重试'
     }
   }
 
@@ -717,48 +817,31 @@ struct SettingsPage {
     return { width: 1280, height: 720 }
   }
 
-  private createEmptyTelemetryBars(): BarChartItem[] {
-    return [
-      { height: 8, isPrimary: false },
-      { height: 8, isPrimary: false },
-      { height: 8, isPrimary: false },
-      { height: 8, isPrimary: false }
-    ]
-  }
-
   private applyEmptyTelemetry(): void {
-    this.telemetryPrimaryLabel = '最近一次运行'
+    this.telemetryReady = true
+    this.telemetryPrimaryLabel = '最近一次记录'
     this.telemetryPrimaryValue = '--'
     this.telemetrySecondaryLabel = '音频缓冲'
     this.telemetrySecondaryValue = '--'
     this.telemetryFooterLeft = '尚无运行记录'
-    this.telemetryFooterRight = '进入游戏后会更新摘要'
-    this.telemetryBars = this.createEmptyTelemetryBars()
+    this.telemetryFooterRight = '进入游戏后会生成历史摘要'
   }
 
   private applyTelemetry(records: LibraryRecord[]): void {
+    this.telemetryReady = true
     const telemetryCells: LibraryTelemetryCell[] = getLibraryTelemetryCells(records)
-    const telemetryBars: LibraryTelemetryBar[] = getLibraryTelemetryBars(records)
-    this.telemetryPrimaryLabel = telemetryCells[0]?.label ?? '最近一次运行'
-    this.telemetryPrimaryValue = telemetryCells[1]?.value ?? '--.-'
+    const latestRecord = getLastPlayedLibraryRecord(records)
+    const latestRunText = latestRecord ?
+      formatLastPlayedRelative(latestRecord.lastRuntimeUpdatedAt) || '已有运行记录' :
+      '暂无记录'
+    this.telemetryPrimaryLabel = telemetryCells[0]?.label ?? '最近一次记录'
+    this.telemetryPrimaryValue = latestRunText === '暂无记录' ? '--' : latestRunText
     this.telemetrySecondaryLabel = telemetryCells[2]?.label ?? '音频缓冲'
     this.telemetrySecondaryValue = telemetryCells[2]?.value ?? '--'
-    this.telemetryFooterLeft = telemetryCells[0]?.value === 'NO DATA' ? '尚无运行记录' : `会话状态：${telemetryCells[0]?.value ?? 'LAST RUN'}`
+    this.telemetryFooterLeft = latestRunText === '暂无记录' ? '尚无运行记录' : `最近运行：${latestRunText}`
     this.telemetryFooterRight = telemetryCells[1]?.value && telemetryCells[1]?.value !== '--.-' ?
-      `最近 FPS：${telemetryCells[1].value}` :
-      '运行后将生成性能摘要'
-    if (telemetryBars.length === 0) {
-      this.telemetryBars = this.createEmptyTelemetryBars()
-      return
-    }
-    const mappedBars: BarChartItem[] = telemetryBars.map((item: LibraryTelemetryBar): BarChartItem => {
-      const nextBar: BarChartItem = {
-        height: item.height * 3.5,
-        isPrimary: item.color !== '#22484848'
-      }
-      return nextBar
-    })
-    this.telemetryBars = mappedBars
+      `最近帧率：${telemetryCells[1].value}` :
+      '运行后将生成历史摘要'
   }
 
   @Builder
@@ -849,11 +932,13 @@ struct SettingsPage {
         .fontWeight(FontWeight.Bold)
         .fontColor(EmuColors.onSurface)
 
-      Text(code)
-        .fontSize(9)
-        .fontWeight(FontWeight.Bold)
-                .fontColor('#88757575')
-        .letterSpacing(1.2)
+      if (code.length > 0) {
+        Text(code)
+          .fontSize(9)
+          .fontWeight(FontWeight.Bold)
+                  .fontColor('#88757575')
+          .letterSpacing(1.2)
+      }
     }
     .width('100%')
     .alignItems(VerticalAlign.Center)
@@ -867,13 +952,19 @@ struct SettingsPage {
           Text(item.label)
             .fontSize(13)
             .fontWeight(FontWeight.Bold)
-            .fontColor(this.isAspectActive(item.key) ? EmuColors.onSurface : '#B3ABABAB')
+            .fontColor(this.isAspectActive(item.key) ? EmuColors.onSurface :
+              (this.runtimeProfilesReady ? '#B3ABABAB' : '#66757575'))
         }
         .layoutWeight(1)
         .height(40)
         .justifyContent(FlexAlign.Center)
-        .backgroundColor(this.isAspectActive(item.key) ? EmuColors.surfaceContainerHighest : EmuColors.surfaceContainerHigh)
+        .backgroundColor(this.isAspectActive(item.key) ? EmuColors.surfaceContainerHighest :
+          (this.runtimeProfilesReady ? EmuColors.surfaceContainerHigh : '#14141414'))
         .onClick(() => {
+          if (!this.runtimeProfilesReady) {
+            this.runtimeApplyStatusText = '当前视觉配置没有读到，请先重试'
+            return
+          }
           const nextProfile = this.cloneVisualProfile()
           nextProfile.aspectMode = item.key === '4:3' || item.key === '16:9' ? item.key : 'native'
           this.scheduleVisualProfilePersist(nextProfile, '画面比例')
@@ -891,10 +982,11 @@ struct SettingsPage {
     value: number,
     onChange: (value: number) => void
   ) {
+    const displayValue = this.runtimeProfilesReady ? value : 0
     LinearSettingRow({
       label: label,
       code: code,
-      value: value,
+      value: displayValue,
       min: 0,
       max: 100,
       onChange: onChange
@@ -1020,6 +1112,19 @@ struct SettingsPage {
                 .fontColor('#88757575')
         .width('100%')
         .textAlign(TextAlign.Center)
+
+      Column({ space: 6 }) {
+        Text(this.inputMappingSummaryText)
+          .fontSize(EmuTypography.xs)
+          .fontWeight(FontWeight.Bold)
+          .fontColor(EmuColors.onSurface)
+          .width('100%')
+        Text(this.inputMappingDetailText)
+          .fontSize(EmuTypography.xs)
+          .fontColor('#88757575')
+          .width('100%')
+      }
+      .width('100%')
     }
     .width('100%')
     .padding(20)
@@ -1064,14 +1169,21 @@ struct SettingsPage {
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      BarChartBackground({
-        bars: this.telemetryBars,
-        primaryColor: EmuColors.primary,
-        secondaryColor: EmuColors.primary,
-        barGap: 7
-      })
-        .height(92)
-        .width('100%')
+      Column({ space: 8 }) {
+        Text('这里展示的是最近一次运行记录，不是实时变化曲线。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
+
+        Text('如需判断当前运行状态，请进入游戏后以实际画面、声音和操作体验为准。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
+      }
+      .width('100%')
+      .padding(14)
+      .backgroundColor(EmuColors.surfaceContainer)
+      .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
 
       Row() {
         Text(this.telemetryFooterLeft)
@@ -1107,19 +1219,33 @@ struct SettingsPage {
     Column({ space: 14 }) {
       Row({ space: 10 }) {
         this.AdvancedActionButton(
-          this.renderProfile.hwRenderAllowed ? '关闭硬件渲染' : '开启硬件渲染',
+          this.runtimeProfilesReady ?
+            (this.renderProfile.hwRenderAllowed ? '关闭硬件渲染' : '开启硬件渲染') :
+            '重试读取配置',
           () => {
+            if (!this.runtimeProfilesReady) {
+              void this.refreshSettings()
+              return
+            }
             void this.toggleHwRenderAllowed()
           }
         )
-        this.AdvancedActionButton('切换缩放模式', () => {
+        this.AdvancedActionButton(this.runtimeProfilesReady ? '切换缩放模式' : '重试读取配置', () => {
+          if (!this.runtimeProfilesReady) {
+            void this.refreshSettings()
+            return
+          }
           void this.cycleRenderMode()
         })
       }
       .width('100%')
 
       Row({ space: 10 }) {
-        this.AdvancedActionButton('切换软件分辨率上限', () => {
+        this.AdvancedActionButton(this.runtimeProfilesReady ? '切换软件分辨率上限' : '重试读取配置', () => {
+          if (!this.runtimeProfilesReady) {
+            void this.refreshSettings()
+            return
+          }
           void this.cycleSoftwareResolutionPreset()
         })
         this.AdvancedActionButton('打开滤镜预览', () => {
@@ -1128,10 +1254,16 @@ struct SettingsPage {
       }
       .width('100%')
 
-      Text('当前页会把 GPU Backend、缩放/呈现模式、VSync、AI Upscale、软件分辨率上限、主音量，以及屏上手柄/视觉配置写入本地运行配置；返回运行页后会按最新配置生效。')
+      Text('当前页会把硬件渲染、缩放模式、垂直同步、AI 超分、软件分辨率上限、主音量，以及屏上手柄和视觉配置写入本地运行配置；返回运行页后会按最新配置生效。')
         .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
         .width('100%')
+      if (!this.runtimeProfilesReady) {
+        Text(this.runtimeProfilesUnavailableHintText)
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.error)
+          .width('100%')
+      }
     }
     .width('100%')
     .padding(18)
@@ -1245,23 +1377,39 @@ struct SettingsPage {
   @Builder
   private VideoSettings() {
     Column({ space: 18 }) {
-      this.SectionTitle('画面设置', 'VIDEO_PROCESSING')
+      this.SectionTitle('画面设置', '')
 
       Column({ space: 12 }) {
-        Text('画面比例 display_aspect')
+        Text('画面比例')
           .fontSize(EmuTypography.sm)
           .fontWeight(FontWeight.Bold)
           .fontColor('#9AABABAB')
         this.SegmentedAspectControl()
+        if (!this.runtimeProfilesReady) {
+          Text('当前比例配置待确认，按钮样式暂不代表真实设置。')
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .width('100%')
+          Text(this.runtimeProfilesUnavailableHintText)
+            .fontSize(EmuTypography.xs)
+            .fontColor(EmuColors.error)
+            .width('100%')
+        }
       }
       .width('100%')
 
       this.LinearSettingBlock(
         'CRT 复古扫描线强度',
-        'scanline_intensity',
+        '',
         this.visualProfile.scanlineIntensity,
         this.onScanlineIntensityChange
       )
+      if (!this.runtimeProfilesReady) {
+        Text('扫描线强度这次没有读出来，当前滑块只是占位显示。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
+      }
     }
     .width('100%')
   }
@@ -1269,7 +1417,7 @@ struct SettingsPage {
   @Builder
   private InputSettings() {
     Column({ space: 18 }) {
-      this.SectionTitle('输入设备', 'INPUT_INTERFACE')
+      this.SectionTitle('输入设备', '')
       this.InputDeviceCard()
     }
     .width('100%')
@@ -1278,8 +1426,18 @@ struct SettingsPage {
   @Builder
   private AudioSettings() {
     Column({ space: 18 }) {
-      this.SectionTitle('音频音量', 'AUDIO_VOLUME')
-      this.LinearSettingBlock('主音量', 'master_volume', this.audioProfile.volumePercent, this.onMasterVolumeChange)
+      this.SectionTitle('音频音量', '')
+      this.LinearSettingBlock('主音量', '', this.audioProfile.volumePercent, this.onMasterVolumeChange)
+      if (!this.runtimeProfilesReady) {
+        Text('主音量这次没有读出来，当前滑块只是占位显示。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
+        Text(this.runtimeProfilesUnavailableHintText)
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.error)
+          .width('100%')
+      }
     }
     .width('100%')
   }
@@ -1287,7 +1445,7 @@ struct SettingsPage {
   @Builder
   private SystemSettings() {
     Column({ space: 18 }) {
-      this.SectionTitle('最近一次运行摘要', 'LAST_RUNTIME')
+      this.SectionTitle('最近一次运行摘要', '')
       this.TelemetryPanel()
     }
     .width('100%')
@@ -1296,88 +1454,112 @@ struct SettingsPage {
   @Builder
   private AdvancedSettings() {
     Column({ space: 18 }) {
-      this.SectionTitle('高级设置', 'ADVANCED_RUNTIME')
+      this.SectionTitle('高级设置', '')
       this.AdvancedControlsCard()
       this.AdvancedSettingRow(
         '虚拟手柄显示',
-        this.inputPreferences.hideVirtualController ? '当前隐藏 · 运行时不渲染屏上手柄' : '当前显示 · 运行时叠加屏上手柄',
-        this.inputPreferences.hideVirtualController ? '显示' : '隐藏',
+        this.hideVirtualControllerSummaryText,
+        this.runtimeProfilesReady ? (this.inputPreferences.hideVirtualController ? '显示' : '隐藏') : '重试',
         () => {
           void this.toggleHideVirtualController()
         }
       )
       this.AdvancedSettingRow(
-        '按 core 隐藏未声明键',
-        this.inputPreferences.hideUndeclaredKeys ? '当前开启 · 仅显示当前 core 声明使用的按键' : '当前关闭 · 显示完整虚拟手柄按键集',
-        this.inputPreferences.hideUndeclaredKeys ? '关闭' : '开启',
+        '按当前游戏隐藏未使用按键',
+        this.hideUndeclaredKeysSummaryText,
+        this.runtimeProfilesReady ? (this.inputPreferences.hideUndeclaredKeys ? '关闭' : '开启') : '重试',
         () => {
           void this.toggleHideUndeclaredKeys()
         }
       )
       this.AdvancedSettingRow(
-        'GPU Backend',
+        '渲染方式',
         this.gpuBackendText,
-        this.renderProfile.hwRenderAllowed ? '关闭' : '开启',
+        this.runtimeProfilesReady ? (this.renderProfile.hwRenderAllowed ? '关闭' : '开启') : '重试',
         () => {
           void this.toggleHwRenderAllowed()
         }
       )
       this.AdvancedSettingRow(
-        'Scaling / Render Mode',
-        `${this.renderModeText} · 当前项真实映射到 scalingMode`,
-        '切换',
+        '渲染模式',
+        `${this.renderModeText} · 会影响运行页的画面呈现方式`,
+        this.runtimeProfilesReady ? '切换' : '重试',
         () => {
+          if (!this.runtimeProfilesReady) {
+            void this.refreshSettings()
+            return
+          }
           void this.cycleRenderMode()
         }
       )
       this.AdvancedSettingRow(
-        'Software Resolution',
+        '软件渲染分辨率',
         `${this.softwareResolutionText} · 仅软件渲染路径会使用该上限`,
-        '切换',
+        this.runtimeProfilesReady ? '切换' : '重试',
         () => {
+          if (!this.runtimeProfilesReady) {
+            void this.refreshSettings()
+            return
+          }
           void this.cycleSoftwareResolutionPreset()
         }
       )
       this.AdvancedSettingRow(
-        'VSync',
+        '垂直同步',
         this.vsyncSummaryText,
-        this.renderProfile.swapInterval === 0 ? '开启' : '关闭',
+        this.runtimeProfilesReady ? (this.renderProfile.swapInterval === 0 ? '开启' : '关闭') : '重试',
         () => {
+          if (!this.runtimeProfilesReady) {
+            void this.refreshSettings()
+            return
+          }
           void this.toggleSwapInterval()
         }
       )
       this.AdvancedSettingRow(
-        'AI Upscale',
+        'AI 超分',
         this.aiUpscaleSummaryText,
-        this.renderProfile.aiUpscaleEnabled ? '关闭' : '开启',
+        this.runtimeProfilesReady ? (this.renderProfile.aiUpscaleEnabled ? '关闭' : '开启') : '重试',
         () => {
+          if (!this.runtimeProfilesReady) {
+            void this.refreshSettings()
+            return
+          }
           void this.toggleAIUpscale()
         }
       )
-      this.AdvancedSettingRow('Audio Buffer', `最近一次运行摘要 · ${this.audioBufferSummaryText}`)
+      this.AdvancedSettingRow('音频缓冲', `历史运行摘要 · ${this.audioBufferSummaryText}`)
       this.AdvancedSettingRow(
-        'Audio Latency',
-        `${describeAudioLatency(this.audioProfile.latencyMs)} · 缓冲越大越抗模拟器/低端机 underrun,代价是按键到出声延迟。注:低/标准档受平台最小缓冲地板(真机~100ms/模拟器~250ms)限制,模拟器上仅"高缓冲"档(300ms)能进一步加深缓冲`,
-        '切换',
+        '音频延迟',
+        `${this.audioLatencySummaryText} · 缓冲越大越能减少爆音和断续，代价是按键到出声延迟更高。注：低/标准档会受平台最小缓冲限制，模拟器上通常只有“高缓冲”档会更明显增加缓冲深度。`,
+        this.runtimeProfilesReady ? '切换' : '重试',
         () => {
+          if (!this.runtimeProfilesReady) {
+            void this.refreshSettings()
+            return
+          }
           void this.cycleAudioLatencyPreset()
         }
       )
       this.AdvancedSettingRow(
-        'Shader Mode',
+        '滤镜模式',
         this.shaderModeSummaryText,
-        '配置',
+        this.runtimeProfilesReady ? '配置' : '重试',
         () => {
+          if (!this.runtimeProfilesReady) {
+            void this.refreshSettings()
+            return
+          }
           this.openPage('pages/ShaderPreviewPage', '滤镜预览')
         }
       )
       this.AdvancedSettingRow('当前运行时状态', this.advancedStatusText)
       this.AdvancedSettingRow('最近一次应用', this.runtimeApplyStatusText)
-      this.NavigationRow('Input / Netplay Center', '手柄与联机', 'pages/MultiplayerInputPage')
-      this.NavigationRow('Input Layout Editor', '触控布局', 'pages/InputLayoutPage')
-      this.NavigationRow('Core / Firmware Manager', 'Core 与固件', 'pages/CoreManagerPage')
+      this.NavigationRow('输入设备', '查看本机输入源和外接设备列表', 'pages/MultiplayerInputPage')
+      this.NavigationRow('触控布局', '调整屏上按键布局', 'pages/InputLayoutPage')
+      this.NavigationRow('核心与固件', '查看当前版本提供的核心与固件文件情况', 'pages/CoreManagerPage')
       this.NavigationRow('滤镜预览', '画面滤镜预览', 'pages/ShaderPreviewPage')
-      this.NavigationRow('About / Help', '关于与帮助', 'pages/AboutHelpPage')
+      this.NavigationRow('关于与帮助', '查看导入、合规和版本说明', 'pages/AboutHelpPage')
     }
     .width('100%')
   }

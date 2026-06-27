@@ -13,6 +13,10 @@ export interface RuntimeVisualSettingsProfile {
   updatedAt: number
 }
 
+interface RuntimeVisualSettingsFileErrorWithCode {
+  code?: string | number
+}
+
 const RUNTIME_VISUAL_SETTINGS_VERSION = 1
 const RUNTIME_VISUAL_SETTINGS_DIR_NAME = 'runtime'
 const RUNTIME_VISUAL_SETTINGS_FILE_NAME = 'visual_settings.json'
@@ -39,11 +43,14 @@ export async function loadRuntimeVisualSettingsProfile(
   }
   try {
     const parsed = JSON.parse(text) as Partial<RuntimeVisualSettingsProfile> | null
+    if (!isRuntimeVisualSettingsProfileShapeValid(parsed)) {
+      throw new Error('runtime_visual_settings_invalid')
+    }
     return normalizeRuntimeVisualSettingsProfile(parsed)
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('RuntimeVisualSettingsRepository', 'Load', `视觉配置损坏，已回退默认值: ${message}`)
-    return createDefaultRuntimeVisualSettingsProfile()
+    LogHelper.warn('RuntimeVisualSettingsRepository', 'Load', `视觉配置读取失败: ${message}`)
+    throw err as Error
   }
 }
 
@@ -92,6 +99,20 @@ export function normalizeRuntimeVisualSettingsProfile(
     saturation: clampPercent(profile?.saturation, 200, DEFAULT_SATURATION),
     updatedAt: Number(profile?.updatedAt) || 0
   }
+}
+
+function isRuntimeVisualSettingsProfileShapeValid(
+  profile: Partial<RuntimeVisualSettingsProfile> | null | undefined
+): boolean {
+  if (!profile || typeof profile !== 'object') {
+    return false
+  }
+  return 'version' in profile &&
+    'updatedAt' in profile &&
+    'aspectMode' in profile &&
+    'scanlineIntensity' in profile &&
+    'curvature' in profile &&
+    'saturation' in profile
 }
 
 export function resolveRuntimeVisualAspectRatio(
@@ -163,8 +184,11 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -174,7 +198,20 @@ async function readOptionalText(path: string): Promise<string> {
   }
   try {
     return await fs.readText(path)
-  } catch (_err) {
-    return ''
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return ''
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as RuntimeVisualSettingsFileErrorWithCode).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

@@ -8,6 +8,9 @@ export struct ImportEmptyStateHero {
   @Param buttonPressed: boolean = false
   @Param scanStatusText: string = '正在扫描本地文件...'
   @Param particleBoosted: boolean = false
+  @Param titleText: string = '一键导入游戏，重温经典'
+  @Param descriptionText: string = '请选择本地 ROM 或 ISO 文件开始导入。'
+  @Param footnoteText: string = '仅支持你合法拥有的游戏'
   @Event onPrimaryAction?: () => void
   @Event onPrimaryTouch?: (pressed: boolean) => void
 
@@ -68,7 +71,7 @@ export struct ImportEmptyStateHero {
         offsetY: 0
       })
 
-      Text('一键导入游戏，重温经典')
+      Text(this.titleText)
         .fontSize(31)
         .fontWeight(FontWeight.Medium)
         .fontColor(EmuColors.onSurface)
@@ -77,7 +80,7 @@ export struct ImportEmptyStateHero {
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .margin({ bottom: 18 })
 
-      Text('系统未检测到可用镜像。请选择本地 ROM 或 ISO 文件开始模拟。')
+      Text(this.descriptionText)
         .fontSize(EmuTypography.lg)
         .lineHeight(28)
         .fontColor('#CCABABAB')
@@ -165,7 +168,7 @@ export struct ImportEmptyStateHero {
         this.onPrimaryAction?.()
       })
 
-      Text('仅支持你合法拥有的游戏')
+      Text(this.footnoteText)
         .fontSize(EmuTypography.xs)
         .fontColor('#555555')
         .letterSpacing(1.2)

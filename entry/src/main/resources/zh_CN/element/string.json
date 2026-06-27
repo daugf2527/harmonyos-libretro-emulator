@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "模块描述"
+      "value": "HarmonyOS 手机端本地模拟前端入口模块"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "启动碳影本地模拟前端"
     },
     {
       "name": "EntryAbility_label",
-      "value": "DrawingToXComponent"
+      "value": "碳影"
     }
   ]
 }

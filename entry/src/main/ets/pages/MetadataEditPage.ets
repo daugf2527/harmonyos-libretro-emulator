@@ -23,7 +23,7 @@ struct MetadataEditPage {
   @Local private releaseYearText: string = ''
   @Local private platformText: string = ''
   @Local private coverKeyText: string = ''
-  @Local private statusText: string = 'LOCAL_METADATA_EDITOR'
+  @Local private statusText: string = '资料编辑'
   private pageActive: boolean = false
   private pageTaskToken: number = 0
 
@@ -66,13 +66,13 @@ struct MetadataEditPage {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
-      this.statusText = 'CONTEXT_MISSING'
+      this.statusText = '现在还不能读取本地资料，请稍后再试'
       return
     }
     const targetRomFile = this.resolveRomFile()
     this.romFile = targetRomFile
     if (targetRomFile.length === 0) {
-      this.statusText = 'ROM_CONTEXT_MISSING'
+      this.statusText = '未找到对应游戏条目'
       return
     }
     try {
@@ -81,7 +81,7 @@ struct MetadataEditPage {
         return
       }
       this.applyInitialFields(record)
-      this.statusText = record ? 'LOCAL_METADATA_LOADED' : 'LOCAL_METADATA_EMPTY'
+      this.statusText = record ? '本地资料已读到' : '当前条目暂无本地资料'
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
         return
@@ -89,14 +89,14 @@ struct MetadataEditPage {
       const message = (err as Error).message || String(err)
       LogHelper.error('MetadataEditPage', 'Load', `读取本地 metadata 失败: ${message}`)
       this.applyInitialFields(undefined)
-      this.statusText = 'LOCAL_METADATA_LOAD_FAILED'
+      this.statusText = '本地资料没有读出来，请稍后重试'
     }
   }
 
   private applyInitialFields(record: LibraryRecord | undefined): void {
     this.titleText = record?.title ?? ''
     this.publisherText = record?.publisher ?? ''
-    this.overviewText = '' // overview 字段已废弃，不再显示
+    this.overviewText = record?.overview ?? ''
     this.releaseYearText = record?.releaseYear && record.releaseYear > 0 ? `${record.releaseYear}` : ''
     this.platformText = record?.platform ?? ''
     this.coverKeyText = record?.coverKey ?? ''
@@ -106,11 +106,11 @@ struct MetadataEditPage {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
-      this.statusText = 'CONTEXT_MISSING'
+      this.statusText = '现在还不能保存资料，请稍后再试'
       return
     }
     if (this.romFile.length === 0) {
-      this.statusText = 'ROM_CONTEXT_MISSING'
+      this.statusText = '未找到对应游戏条目'
       return
     }
     try {
@@ -119,14 +119,14 @@ struct MetadataEditPage {
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      this.statusText = 'LOCAL_METADATA_SAVED'
+      this.statusText = '资料已保存到本地'
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
         return
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('MetadataEditPage', 'Save', `保存本地 metadata 失败: ${message}`)
-      this.statusText = 'LOCAL_METADATA_SAVE_FAILED'
+      this.statusText = '资料没有保存成功，请稍后重试'
     }
   }
 
@@ -141,6 +141,7 @@ struct MetadataEditPage {
   private buildMetadataPatchInput(): LibraryMetadataPatch {
     return {
       title: this.titleText.trim(),
+      overview: this.overviewText.trim(),
       publisher: this.publisherText.trim(),
       releaseYear: this.parseReleaseYear(),
       platform: this.platformText.trim(),
@@ -156,6 +157,7 @@ struct MetadataEditPage {
       } as MetadataEditRouteParams
     }).catch((err: Error) => {
       LogHelper.error('MetadataEditPage', 'Route', `返回详情页失败: ${err.message}`)
+      this.statusText = '现在还回不到游戏详情，请稍后再试'
     })
   }
 
@@ -233,19 +235,19 @@ struct MetadataEditPage {
             .fontColor(EmuColors.onSurface)
             .width('100%')
 
-          Text(this.romFile.length > 0 ? this.romFile : 'UNKNOWN_ROM')
+          Text(this.romFile.length > 0 ? this.romFile : '未找到 ROM 路径')
             .fontSize(EmuTypography.xs)
             .fontFamily('monospace')
             .fontColor(EmuColors.primary)
             .letterSpacing(1.2)
             .width('100%')
 
-          this.Field('TITLE', this.titleText, 'Unknown', 'title')
-          this.Field('PUBLISHER', this.publisherText, 'Unknown', 'publisher')
-          this.Field('OVERVIEW', this.overviewText, 'Unknown', 'overview')
-          this.Field('RELEASE YEAR', this.releaseYearText, 'Unknown', 'releaseYear')
-          this.Field('PLATFORM', this.platformText, 'Unknown', 'platform')
-          this.Field('COVER KEY', this.coverKeyText, 'Optional local cover key', 'coverKey')
+          this.Field('标题', this.titleText, '输入游戏标题', 'title')
+          this.Field('发行方', this.publisherText, '输入发行方（可选）', 'publisher')
+          this.Field('简介', this.overviewText, '输入本地简介（可选）', 'overview')
+          this.Field('发行年份', this.releaseYearText, '例如 2004', 'releaseYear')
+          this.Field('平台', this.platformText, '例如 GBA / PS / NDS', 'platform')
+          this.Field('封面样式', this.coverKeyText, '留空使用默认封面样式', 'coverKey')
 
           Row({ space: 12 }) {
             Button('保存')

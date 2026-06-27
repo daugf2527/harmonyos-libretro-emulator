@@ -6,14 +6,32 @@ import { ScanlineBackground } from './EmuAppShell'
 @ComponentV2
 export struct LibraryLaunchOverlay {
   @Param coverKey: string = ''
-  @Param progress: number = 0
-  @Param statusText: string = 'READY_TO_HANDOFF'
-  @Param cpuText: string = 'FPS: --'
-  @Param runtimeStatusText: string = 'NO DATA'
+  @Param statusText: string = '准备启动游戏'
+  @Param cpuText: string = '帧率: --'
+  @Param runtimeStatusText: string = '暂无记录'
   @Param fileLabel: string = ''
+  @Local private spinnerAngle: number = 0
+  @Local private barOffset: number = -96
+  private animationTimer: number = -1
 
-  private get normalizedProgress(): number {
-    return Math.max(0, Math.min(100, Math.round(this.progress)))
+  aboutToAppear(): void {
+    if (this.animationTimer !== -1) {
+      return
+    }
+    this.spinnerAngle = 0
+    this.barOffset = -96
+    this.animationTimer = setInterval(() => {
+      this.spinnerAngle = (this.spinnerAngle + 18) % 360
+      const nextOffset = this.barOffset + 12
+      this.barOffset = nextOffset > 280 ? -96 : nextOffset
+    }, 60)
+  }
+
+  aboutToDisappear(): void {
+    if (this.animationTimer !== -1) {
+      clearInterval(this.animationTimer)
+      this.animationTimer = -1
+    }
   }
 
   build() {
@@ -27,7 +45,7 @@ export struct LibraryLaunchOverlay {
         this.Header()
         this.Body()
 
-        Text('Kinetic Obsidian // Virtual_Core_v0.1')
+        Text('本地游戏运行')
           .fontSize(EmuTypography.xs)
           .fontColor('#666666')
           .fontFamily('monospace')
@@ -54,7 +72,7 @@ export struct LibraryLaunchOverlay {
           opacityValue: 1
         })
 
-        Text('EMU_OS // KERNEL.LOAD')
+        Text('正在打开游戏')
           .fontSize(11)
           .fontColor(EmuColors.primary)
           .fontFamily('monospace')
@@ -102,7 +120,7 @@ export struct LibraryLaunchOverlay {
 
       Column({ space: 12 }) {
         Row({ space: 10 }) {
-          Text('System Status')
+          Text('当前状态')
             .fontSize(9)
             .fontColor('#ABABAB')
             .fontFamily('monospace')
@@ -185,7 +203,7 @@ export struct LibraryLaunchOverlay {
             color: EmuColors.primary,
             style: BorderStyle.Solid
           })
-          .rotate({ angle: this.normalizedProgress * 3.6 })
+          .rotate({ angle: this.spinnerAngle })
 
         Row()
           .width(6)
@@ -212,11 +230,12 @@ export struct LibraryLaunchOverlay {
           .backgroundColor('#222222')
 
         Row()
-          .width(`${this.normalizedProgress}%`)
+          .width(96)
           .height(2)
           .backgroundColor(EmuColors.primary)
           .shadow({ radius: 10, color: '#5500FF41', offsetX: 0, offsetY: 0 })
           .align(Alignment.Start)
+          .translate({ x: this.barOffset })
       }
       .width('100%')
 
@@ -229,7 +248,7 @@ export struct LibraryLaunchOverlay {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
           .layoutWeight(1)
 
-        Text(`${this.normalizedProgress}%`)
+        Text('正在打开')
           .fontSize(EmuTypography.xs)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)

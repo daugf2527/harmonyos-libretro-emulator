@@ -42,6 +42,9 @@ export async function listRuntimeSramBackupsForRom(
 
   const romDirPath = buildRuntimeSramRomDirPath(context.filesDir, normalizedRomFile)
   const items: RuntimeSramBackupItem[] = []
+  if (!(await pathExists(romDirPath))) {
+    return []
+  }
   try {
     const entries = await fs.listFile(romDirPath)
     for (let index = 0; index < entries.length; index += 1) {
@@ -58,8 +61,8 @@ export async function listRuntimeSramBackupsForRom(
         byteLength: Number(stat.size) || 0
       })
     }
-  } catch (_err) {
-    return []
+  } catch (err) {
+    throw err as Error
   }
 
   items.sort((left: RuntimeSramBackupItem, right: RuntimeSramBackupItem) => right.createdAt - left.createdAt)
@@ -290,5 +293,22 @@ async function ensureDirExists(path: string): Promise<void> {
     await fs.mkdir(path, true)
   } catch (_err) {
     return
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await fs.access(path)
+    return true
+  } catch (err) {
+    const errorCode = (err as RuntimeSramErrorWithCode).code
+    if (errorCode === ERR_CODE_ENOENT || errorCode === ERR_CODE_ENOENT_NUM || errorCode === 2) {
+      return false
+    }
+    const message = (err as Error).message || String(err)
+    if (message.toLowerCase().indexOf('no such file') >= 0 || message.toLowerCase().indexOf('ret: -2') >= 0) {
+      return false
+    }
+    throw err as Error
   }
 }

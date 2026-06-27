@@ -32,15 +32,7 @@ interface ControllerCardItem {
   status: string
   power: string
   metrics: InputMetricItem[]
-}
-
-interface NetplayRoomItem {
-  id: string
-  name: string
-  game: string
-  latency: string
-  players: string
-  color: string
+  active: boolean
 }
 
 @Entry
@@ -50,8 +42,8 @@ struct InputLayoutPage {
   @Local private savedToastVisible: boolean = false
   @Local private layoutButtons: InputLayoutButton[] = createDefaultInputLayoutProfile().buttons
   @Local private selectedButtonId: string = 'a'
-  @Local private layoutStatusText: string = 'LOCAL_LAYOUT_READY'
-  @Local private layoutUpdatedAtText: string = 'NOT_SAVED'
+  @Local private layoutStatusText: string = '本地触控布局已读到'
+  @Local private layoutUpdatedAtText: string = '未保存'
   @Local private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
   private savedToastTimer: number = -1
   private pageActive: boolean = false
@@ -69,33 +61,31 @@ struct InputLayoutPage {
   }
   private readonly controllerCards: ControllerCardItem[] = [
     {
-      id: 'p1',
-      label: '玩家 1',
-      name: '虚拟手柄 P1',
-      status: '就绪',
+      id: 'layout',
+      label: '触控布局',
+      name: '屏上按键与热区编辑',
+      status: '可编辑',
       power: '本地',
       metrics: [
-        { label: '轮询', value: 'FRAME_SYNC', highlight: false },
-        { label: '延迟', value: 'INPUT_QUEUE', highlight: true },
-        { label: '协议', value: 'RETRO_PAD', highlight: false }
-      ]
+        { label: '作用范围', value: '运行页触控层', highlight: true },
+        { label: '保存方式', value: '需手动保存', highlight: false },
+        { label: '对应键位', value: '虚拟手柄键位', highlight: false }
+      ],
+      active: true
     },
     {
-      id: 'p2',
+      id: 'device',
       label: '外接手柄',
-      name: '等待连接手柄',
-      status: '未绑定',
-      power: '无设备',
+      name: '实时接入状态请前往输入设备页查看',
+      status: '查看入口',
+      power: '跳转查看',
       metrics: [
-        { label: '轮询', value: '--', highlight: false },
-        { label: '延迟', value: '--', highlight: false },
-        { label: '协议', value: 'HID_WAIT', highlight: false }
-      ]
+        { label: '当前页', value: '不检测外设', highlight: false },
+        { label: '设备状态', value: '输入设备页查看', highlight: false },
+        { label: '更多设备', value: '输入设备页查看', highlight: false }
+      ],
+      active: false
     }
-  ]
-  private readonly rooms: NetplayRoomItem[] = [
-    { id: 'local', name: '本地游玩', game: '当前运行输入桥', latency: '0ms', players: '1 / 1', color: EmuColors.primary },
-    { id: 'netplay', name: 'Netplay 联机', game: '外部服务未配置', latency: '--', players: '离线', color: EmuColors.error }
   ]
 
   aboutToAppear(): void {
@@ -165,7 +155,7 @@ struct InputLayoutPage {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
-      this.layoutStatusText = 'CONTEXT_MISSING'
+      this.layoutStatusText = '现在还不能读取布局，请稍后再试'
       return
     }
     try {
@@ -173,7 +163,7 @@ struct InputLayoutPage {
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      this.applyLayoutProfile(profile, 'LOCAL_LAYOUT_READY')
+      this.applyLayoutProfile(profile, '本地触控布局已读到')
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
         return
@@ -181,8 +171,8 @@ struct InputLayoutPage {
       const message = (err as Error).message || String(err)
       LogHelper.error('InputLayoutPage', 'Layout', `读取输入布局失败: ${message}`)
       this.layoutButtons = createDefaultInputLayoutProfile().buttons
-      this.layoutStatusText = 'LOCAL_LAYOUT_LOAD_FAILED'
-      this.layoutUpdatedAtText = 'NOT_SAVED'
+      this.layoutStatusText = '本地触控布局没有读出来，请稍后重试'
+      this.layoutUpdatedAtText = '未保存'
     }
   }
 
@@ -205,14 +195,14 @@ struct InputLayoutPage {
     })
     this.layoutButtons = nextButtons
     this.layoutStatusText = statusText
-    this.layoutUpdatedAtText = profile.updatedAt > 0 ? this.formatDateTime(profile.updatedAt) : 'NOT_SAVED'
+    this.layoutUpdatedAtText = profile.updatedAt > 0 ? this.formatDateTime(profile.updatedAt) : '未保存'
   }
 
   private async saveCurrentLayout(): Promise<void> {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
-      this.layoutStatusText = 'CONTEXT_MISSING'
+      this.layoutStatusText = '现在还不能保存布局，请稍后再试'
       return
     }
     try {
@@ -226,7 +216,7 @@ struct InputLayoutPage {
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      this.applyLayoutProfile(savedProfile, 'LOCAL_LAYOUT_SAVED')
+      this.applyLayoutProfile(savedProfile, '触控布局已保存到本地')
       this.showSavedToast()
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
@@ -234,7 +224,7 @@ struct InputLayoutPage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('InputLayoutPage', 'Layout', `保存输入布局失败: ${message}`)
-      this.layoutStatusText = 'LOCAL_LAYOUT_SAVE_FAILED'
+      this.layoutStatusText = '布局没有保存成功，请稍后重试'
     }
   }
 
@@ -242,7 +232,7 @@ struct InputLayoutPage {
     const token = this.beginPageTask()
     const context = this.getContext()
     if (!context) {
-      this.layoutStatusText = 'CONTEXT_MISSING'
+      this.layoutStatusText = '现在还不能重置布局，请稍后再试'
       return
     }
     try {
@@ -250,7 +240,7 @@ struct InputLayoutPage {
       if (!this.isCurrentPageTask(token)) {
         return
       }
-      this.applyLayoutProfile(profile, '已重置本地布局')
+      this.applyLayoutProfile(profile, '已重置本地触控布局')
       this.showSavedToast()
     } catch (err) {
       if (!this.isCurrentPageTask(token)) {
@@ -258,7 +248,7 @@ struct InputLayoutPage {
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('InputLayoutPage', 'Layout', `重置输入布局失败: ${message}`)
-      this.layoutStatusText = '本地布局重置失败'
+      this.layoutStatusText = '本地触控布局没有重置成功，请稍后重试'
     }
   }
 
@@ -291,7 +281,7 @@ struct InputLayoutPage {
       retroButtonId: b.retroButtonId
     }
     this.layoutButtons = nextButtons
-    this.layoutStatusText = 'LOCAL_LAYOUT_DIRTY'
+    this.layoutStatusText = '布局有未保存更改'
   }
 
   private setSelectedButtonRetroId(retroButtonId: number): void {
@@ -315,7 +305,7 @@ struct InputLayoutPage {
       retroButtonId: retroButtonId
     }
     this.layoutButtons = nextButtons
-    this.layoutStatusText = 'LOCAL_LAYOUT_DIRTY'
+    this.layoutStatusText = '布局有未保存更改'
   }
 
   private captureDragStart(button: InputLayoutButton): void {
@@ -410,9 +400,7 @@ struct InputLayoutPage {
 
   private onBottomNavClick(key: string): void {
     if (key === 'input') {
-      this.getUIContext().getRouter().replaceUrl({ url: 'pages/MultiplayerInputPage' }).catch((err: Error) => {
-        LogHelper.error('InputLayoutPage', 'Route', `replaceUrl MultiplayerInputPage failed: ${err.message}`)
-      })
+      this.openInputDevicesPage()
       return
     }
     const route = getEmuBottomNavTargetRoute(key, 'input')
@@ -421,6 +409,14 @@ struct InputLayoutPage {
     }
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('InputLayoutPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
+      this.layoutStatusText = '这个页面现在还打不开，请稍后再试'
+    })
+  }
+
+  private openInputDevicesPage(): void {
+    this.getUIContext().getRouter().replaceUrl({ url: 'pages/MultiplayerInputPage' }).catch((err: Error) => {
+      LogHelper.error('InputLayoutPage', 'Route', `replaceUrl MultiplayerInputPage failed: ${err.message}`)
+      this.layoutStatusText = '输入设备页现在还打不开，请稍后再试'
     })
   }
 
@@ -433,7 +429,7 @@ struct InputLayoutPage {
             .width(6)
             .height(6)
             .borderRadius(3)
-            .backgroundColor(item.status === 'READY' ? EmuColors.primary : EmuColors.outline)
+            .backgroundColor(item.active ? EmuColors.primary : EmuColors.outline)
 
           Text(item.label)
             .fontSize(EmuTypography.xs)
@@ -444,9 +440,9 @@ struct InputLayoutPage {
 
         Text(item.status)
           .fontSize(EmuTypography.xs)
-                    .fontColor(item.status === 'READY' ? EmuColors.primary : EmuColors.onSurfaceVariant)
+                    .fontColor(item.active ? EmuColors.primary : EmuColors.onSurfaceVariant)
           .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-          .backgroundColor(item.status === 'READY' ? '#1800FF41' : EmuColors.surfaceContainerHigh)
+          .backgroundColor(item.active ? '#1800FF41' : EmuColors.surfaceContainerHigh)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
@@ -457,7 +453,7 @@ struct InputLayoutPage {
             .fontSize(20)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
-          Text(`ID: ${item.id.toUpperCase()}_INPUT_BUS`)
+          Text(`端口 ${item.id.toUpperCase()}`)
             .fontSize(EmuTypography.xs)
                         .fontColor('#666666')
         }
@@ -512,7 +508,7 @@ struct InputLayoutPage {
           Text('◎')
             .fontSize(EmuTypography.lg)
             .fontColor(EmuColors.onSurfaceVariant)
-          Text('Netplay 联机')
+          Text('功能说明')
             .fontSize(13)
             .fontWeight(FontWeight.Medium)
             .fontColor(EmuColors.onSurface)
@@ -520,73 +516,41 @@ struct InputLayoutPage {
         }
         .alignItems(VerticalAlign.Center)
 
-        Text('中继：未配置')
+        Text('当前页只处理本地触控布局')
           .fontSize(EmuTypography.xs)
                     .fontColor('#666666')
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
 
-      Column({ space: 1 }) {
-        ForEach(this.rooms, (room: NetplayRoomItem) => {
-          this.RoomRow(room)
-        }, (room: NetplayRoomItem) => room.id)
+      Column({ space: 12 }) {
+        Text('当前页只负责调整屏上触控按键的位置，以及每个触控按键对应的虚拟手柄键位。')
+          .fontSize(EmuTypography.sm)
+          .fontColor(EmuColors.onSurface)
+          .width('100%')
+
+        Text('如果你要查看外接手柄接入状态或输入源列表，请前往“输入设备”页面。')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
+
+        Button('打开输入设备页')
+          .height(36)
+          .fontSize(EmuTypography.xs)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#004C0C')
+          .backgroundColor(EmuColors.primary)
+          .borderRadius(0)
+          .onClick(() => {
+            this.openInputDevicesPage()
+          })
       }
       .width('100%')
+      .padding(16)
+      .backgroundColor(EmuColors.surfaceContainerLowest)
       .border({ width: 0.5, color: '#26333333', style: BorderStyle.Solid })
     }
     .width('100%')
-  }
-
-  @Builder
-  private RoomRow(room: NetplayRoomItem) {
-    Row({ space: 16 }) {
-      Row()
-        .width(48)
-        .height(48)
-        .backgroundColor(room.color)
-        .opacity(0.32)
-        .border({ width: 0.5, color: '#6600FF41', style: BorderStyle.Solid })
-
-      Column({ space: 4 }) {
-        Text(room.name)
-          .fontSize(EmuTypography.md)
-          .fontWeight(FontWeight.Medium)
-          .fontColor(EmuColors.onSurface)
-        Text(`Game: ${room.game}`)
-          .fontSize(EmuTypography.xs)
-                    .fontColor('#666666')
-      }
-      .layoutWeight(1)
-      .alignItems(HorizontalAlign.Start)
-
-      Column({ space: 4 }) {
-        Text('Latency')
-          .fontSize(9)
-          .fontColor('#666666')
-        Text(room.latency)
-          .fontSize(EmuTypography.sm)
-                    .fontColor(room.color)
-      }
-      .alignItems(HorizontalAlign.End)
-
-      Column({ space: 4 }) {
-        Text('Players')
-          .fontSize(9)
-          .fontColor('#666666')
-        Text(room.players)
-          .fontSize(EmuTypography.sm)
-                    .fontColor(EmuColors.onSurface)
-      }
-      .alignItems(HorizontalAlign.End)
-
-      Text('›')
-        .fontSize(24)
-        .fontColor(EmuColors.onSurfaceVariant)
-    }
-    .width('100%')
-    .padding(16)
-    .backgroundColor(EmuColors.surfaceContainerLowest)
   }
 
   @Builder
@@ -729,7 +693,7 @@ struct InputLayoutPage {
             this.CalibrationMarkers()
 
             if (this.savedToastVisible) {
-              Text('INPUT_LAYOUT_SAVED')
+              Text('布局已保存到本地')
                 .fontSize(EmuTypography.xs)
                 .fontWeight(FontWeight.Bold)
                 .fontColor('#004C0C')
@@ -808,7 +772,7 @@ struct InputLayoutPage {
           .width(4)
           .height(4)
           .borderRadius(2)
-          .backgroundColor(item.status === 'READY' ? EmuColors.primary : EmuColors.outline)
+          .backgroundColor(item.active ? EmuColors.primary : EmuColors.outline)
 
         Text(item.label)
           .fontSize(10)
@@ -826,7 +790,7 @@ struct InputLayoutPage {
 
       Text(item.status)
         .fontSize(10)
-        .fontColor(item.status === 'READY' ? EmuColors.primary : EmuColors.onSurfaceVariant)
+        .fontColor(item.active ? EmuColors.primary : EmuColors.onSurfaceVariant)
     }
     .width('100%')
     .padding(12)
@@ -839,20 +803,20 @@ struct InputLayoutPage {
   @Builder
   private PropertyPanel() {
     Column({ space: 12 }) {
-      this.PropertyRow('Resolution', `${this.editorLayoutWidth} X ${this.editorLayoutHeight}`)
-      this.PropertyRow('Latency', 'INPUT_QUEUE')
-      this.PropertyRow('Input Poll', this.layoutStatusText)
-      this.PropertyRow('Selected', this.selectedButtonId.toUpperCase())
+      this.PropertyRow('画布尺寸', `${this.editorLayoutWidth} X ${this.editorLayoutHeight}`)
+      this.PropertyRow('作用范围', '运行页触控层')
+      this.PropertyRow('当前状态', this.layoutStatusText)
+      this.PropertyRow('当前按键', this.getSelectedButtonDisplayLabel())
 
       Column({ space: 8 }) {
-        Text('Mapped')
+        Text('对应键位')
           .fontSize(EmuTypography.xs)
           .fontColor(EmuColors.onSurfaceVariant)
           .width('100%')
 
         Select(this.getRetroSelectOptions())
           .selected(this.getRetroOptionIndex())
-          .value(`RETRO_${this.getCurrentRetroLabel()}`)
+          .value(this.getCurrentRetroLabel())
           .font({ size: 11 })
           .selectedOptionFont({ size: 11 })
           .optionFont({ size: 11 })
@@ -885,7 +849,7 @@ struct InputLayoutPage {
         .fontColor(EmuColors.onSurfaceVariant)
       Text(value)
         .fontSize(EmuTypography.xs)
-        .fontColor(value === 'INPUT_QUEUE' || value === this.selectedButtonId.toUpperCase() ? EmuColors.primary : EmuColors.onSurface)
+        .fontColor(value === '运行页触控层' || value === this.getSelectedButtonDisplayLabel() ? EmuColors.primary : EmuColors.onSurface)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
@@ -925,20 +889,20 @@ struct InputLayoutPage {
   @Builder
   private EditorTelemetry() {
     Column({ space: 8 }) {
-      this.EditorMetric('Resolution', `${this.editorLayoutWidth} X ${this.editorLayoutHeight}`)
-      this.EditorMetric('Latency', 'INPUT_QUEUE')
-      this.EditorMetric('Input Poll', this.layoutStatusText)
-      this.EditorMetric('Selected', this.selectedButtonId.toUpperCase())
+      this.EditorMetric('画布尺寸', `${this.editorLayoutWidth} X ${this.editorLayoutHeight}`)
+      this.EditorMetric('作用范围', '运行页触控层')
+      this.EditorMetric('当前状态', this.layoutStatusText)
+      this.EditorMetric('当前按键', this.getSelectedButtonDisplayLabel())
 
       Row({ space: 6 }) {
-        Text('Mapped')
+        Text('对应键位')
           .fontSize(EmuTypography.xs)
           .fontColor(EmuColors.onSurfaceVariant)
           .layoutWeight(1)
 
         Select(this.getRetroSelectOptions())
           .selected(this.getRetroOptionIndex())
-          .value(`RETRO_${this.getCurrentRetroLabel()}`)
+          .value(this.getCurrentRetroLabel())
           .font({ size: 10 })
           .selectedOptionFont({ size: 10 })
           .optionFont({ size: 10 })
@@ -975,28 +939,36 @@ struct InputLayoutPage {
                 .fontColor(EmuColors.onSurfaceVariant)
       Text(value)
         .fontSize(EmuTypography.xs)
-                .fontColor(value === 'INPUT_QUEUE' || value === this.selectedButtonId.toUpperCase() ? EmuColors.primary : EmuColors.onSurface)
+        .fontColor(value === '运行页触控层' || value === this.getSelectedButtonDisplayLabel() ? EmuColors.primary : EmuColors.onSurface)
     }
     .width('100%')
     .constraintSize({ maxWidth: 220 })
     .justifyContent(FlexAlign.SpaceBetween)
   }
 
+  private getSelectedButtonDisplayLabel(): string {
+    const selected = this.getSelectedButton()
+    if (!selected) {
+      return '未选择'
+    }
+    return this.getEditorCaption(selected)
+  }
+
   private getEditorCaption(button: InputLayoutButton): string {
     if (button.id === 'up' || button.id === 'down' || button.id === 'left' || button.id === 'right') {
-      return 'DIRECTIONAL'
+      return '方向键'
     }
     if (button.id === 'l') {
-      return 'LEFT_SHOULDER'
+      return '左肩键'
     }
     if (button.id === 'r') {
-      return 'RIGHT_SHOULDER'
+      return '右肩键'
     }
     if (button.id === 'a') {
-      return 'PRIMARY'
+      return '主按键'
     }
     if (button.id === 'b') {
-      return 'SECONDARY'
+      return '副按键'
     }
     return button.label
   }
@@ -1083,7 +1055,7 @@ struct InputLayoutPage {
           this.applyDragUpdate(button.id, event.offsetX, event.offsetY)
         })
         .onActionEnd(() => {
-          this.layoutStatusText = 'LOCAL_LAYOUT_DIRTY'
+          this.layoutStatusText = '布局有未保存更改'
         })
     )
   }
@@ -1098,7 +1070,7 @@ struct InputLayoutPage {
             .height(8)
             .borderRadius(4)
             .backgroundColor(EmuColors.primary)
-          Text('EDITOR\nACTIVE')
+          Text('布局编辑\n进行中')
             .fontSize(EmuTypography.xs)
                         .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(1.8)
@@ -1180,7 +1152,7 @@ struct InputLayoutPage {
           .fontColor(EmuColors.onSurface)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text('CALIBRATION MODE')
+        Text('布局校准')
           .fontSize(9)
                     .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.primary)
@@ -1288,7 +1260,7 @@ struct InputLayoutPage {
       this.CalibrationMarkers()
 
       if (this.savedToastVisible) {
-        Text('INPUT_LAYOUT_SAVED')
+        Text('布局已保存到本地')
           .fontSize(EmuTypography.xs)
           .fontWeight(FontWeight.Bold)
                     .fontColor('#004C0C')
@@ -1330,7 +1302,7 @@ struct InputLayoutPage {
       } else {
         EmuHeaderBar({
           titleText: '碳影 / Carbon Shade',
-          rightLabel: '输入映射与联机中心',
+          rightLabel: '触控布局编辑',
           titleIcon: 'terminal',
           rightIcon: 'settings_input_component',
           activeTextColor: EmuColors.primary,

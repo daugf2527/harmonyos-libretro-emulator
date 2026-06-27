@@ -58,14 +58,14 @@ export class RuntimeSoakTestController {
     }
 
     if (!testNapi) {
-      this.summaryText = '运行时未就绪'
+      this.summaryText = '当前还没连上运行中的游戏'
       onChange(this.createState())
       return
     }
 
     try {
       if (!this.reader.refactoredResetStats()) {
-        this.summaryText = 'resetStats 失败'
+        this.summaryText = '这次没有重置运行统计，请稍后再试'
         onChange(this.createState())
         return
       }
@@ -75,7 +75,7 @@ export class RuntimeSoakTestController {
       LogHelper.warn('RuntimeSoakTest', 'Stats', `启动 soak test 失败: ${message}`)
       this.running = false
       this.secondsLeft = 0
-      this.summaryText = '获取初始 Stats 失败'
+      this.summaryText = '这次没有读到初始运行统计'
       onChange(this.createState())
       return
     }
@@ -149,7 +149,7 @@ export class RuntimeSoakTestController {
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.warn('RuntimeSoakTest', 'Stats', `生成 soak test 摘要失败: ${message}`)
-      this.summaryText = '统计失败'
+      this.summaryText = '这次没有汇总出运行统计'
     }
     onChange(this.createState())
   }

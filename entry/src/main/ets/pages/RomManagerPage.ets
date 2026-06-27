@@ -1,4 +1,5 @@
 import { common } from '@kit.AbilityKit'
+import { fileIo as fs } from '@kit.CoreFileKit'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { EmuColors, EmuSpacing, EmuTypography, EmuStateColors } from '../common/EmuUiTokens'
 import {
@@ -34,7 +35,7 @@ interface RomListItem {
 
 interface StorageStats {
   totalUsed: number
-  totalAvailable: number
+  totalAvailable: number | undefined
   platformBreakdown: PlatformStorageItem[]
 }
 
@@ -113,7 +114,7 @@ struct RomManagerPage {
   @Local private importStage: string = ''
   @Local private storageStats: StorageStats = {
     totalUsed: 0,
-    totalAvailable: 0,
+    totalAvailable: undefined,
     platformBreakdown: []
   }
   @Local private showDeleteConfirm: boolean = false
@@ -152,8 +153,14 @@ struct RomManagerPage {
     this.loading = true
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
+      this.allRoms = []
+      this.storageStats = {
+        totalUsed: 0,
+        totalAvailable: undefined,
+        platformBreakdown: []
+      }
       this.loading = false
-      this.showToastMessage('加载失败 CONTEXT_MISSING')
+      this.showToastMessage('现在还读不到游戏文件列表，请稍后再试')
       return
     }
 
@@ -169,20 +176,20 @@ struct RomManagerPage {
       }
 
       const items: RomListItem[] = []
-      sources.forEach((source: LibraryRomFileSource) => {
+      for (const source of sources) {
         const record = records.find((r: LibraryRecord) => r.romFile === source.romFile)
-        const fileSize = 0
+        const fileSize = await this.readFileSize(source.romFile)
         items.push({
           fileName: source.fileName,
           filePath: source.romFile,
           fileSize: fileSize,
-          platform: record?.platform ?? 'UNKNOWN',
+          platform: this.normalizePlatformLabel(record?.platform),
           sourceType: source.sourceType,
           importedAt: record?.importedAt ?? 0,
           isDeletable: source.sourceType === 'IMPORTED',
           record: record
         })
-      })
+      }
 
       items.sort((a: RomListItem, b: RomListItem) => {
         if (a.sourceType !== b.sourceType) {
@@ -197,7 +204,13 @@ struct RomManagerPage {
       const message = (err as Error).message || String(err)
       LogHelper.error('RomManagerPage', 'Load', `加载 ROM 列表失败: ${message}`)
       if (this.isCurrentPageAction(actionToken)) {
-        this.showToastMessage('加载失败 LOAD_ERROR')
+        this.allRoms = []
+        this.storageStats = {
+          totalUsed: 0,
+          totalAvailable: undefined,
+          platformBreakdown: []
+        }
+        this.showToastMessage('游戏文件列表暂时没有读出来，请稍后重试')
       }
     } finally {
       if (this.isCurrentPageAction(actionToken)) {
@@ -206,7 +219,7 @@ struct RomManagerPage {
     }
   }
 
-  private async updateStorageStats(context: common.UIAbilityContext): Promise<void> {
+  private async updateStorageStats(_context: common.UIAbilityContext): Promise<void> {
     const platformMap: Map<string, PlatformStorageItem> = new Map()
     let totalUsed = 0
 
@@ -233,9 +246,32 @@ struct RomManagerPage {
 
     this.storageStats = {
       totalUsed: totalUsed,
-      totalAvailable: 1024 * 1024 * 1024,
+      totalAvailable: undefined,
       platformBreakdown: breakdown
     }
+  }
+
+  private applyLocalDeleteResult(targetPath: string): void {
+    const nextItems = this.allRoms.filter((item: RomListItem) => item.filePath !== targetPath)
+    this.allRoms = nextItems
+    void this.updateStorageStats(this.getUIContext().getHostContext() as common.UIAbilityContext)
+  }
+
+  private async readFileSize(path: string): Promise<number> {
+    try {
+      const stat = await fs.stat(path)
+      const size = Number(stat.size)
+      return Number.isFinite(size) && size > 0 ? size : 0
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      LogHelper.warn('RomManagerPage', 'Load', `读取文件大小失败: ${path} / ${message}`)
+      return 0
+    }
+  }
+
+  private normalizePlatformLabel(platform: string | undefined): string {
+    const value = (platform ?? '').trim()
+    return value.length > 0 ? value : '未识别'
   }
 
   private get filteredRoms(): RomListItem[] {
@@ -260,7 +296,7 @@ struct RomManagerPage {
 
   private formatFileSize(bytes: number): string {
     if (bytes === 0) {
-      return '未知'
+      return '大小未知'
     }
     if (bytes < 1024) {
       return `${bytes} B`
@@ -273,7 +309,7 @@ struct RomManagerPage {
 
   private formatDate(timestamp: number): string {
     if (timestamp === 0) {
-      return '未知'
+      return '未记录'
     }
     const date = new Date(timestamp)
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
@@ -302,16 +338,20 @@ struct RomManagerPage {
     const actionToken = this.beginPageAction()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.showToastMessage('导入失败 CONTEXT_MISSING')
+      this.showToastMessage('现在还不能导入游戏文件，请稍后再试')
       return
     }
 
     try {
-      const uris = await pickRomUris(context)
+      const selection = await pickRomUris(context)
       if (!this.isCurrentPageAction(actionToken)) {
         return
       }
-      if (uris.length === 0) {
+      if (selection.failed) {
+        this.showToastMessage(selection.message.length > 0 ? selection.message : '系统文件选择器这次没有成功返回文件，请稍后再试')
+        return
+      }
+      if (selection.uris.length === 0) {
         return
       }
 
@@ -323,7 +363,7 @@ struct RomManagerPage {
 
       const result: RomImportResult = await importRomUris(
         context,
-        uris,
+        selection.uris,
         (progress: RomImportProgress) => {
           if (!this.isCurrentPageAction(actionToken)) {
             return
@@ -348,11 +388,19 @@ struct RomManagerPage {
       this.showImportProgress = false
 
       if (result.canceled) {
-        this.showToastMessage('导入已取消 IMPORT_CANCELED')
+        this.showToastMessage('导入已取消')
+      } else if (result.importedCount === 0 && result.overwrittenCount === 0 && result.failedCount === 0 && result.skippedCount > 0) {
+        this.showToastMessage('没有导入新文件，所选内容已存在或当前格式不支持')
+      } else if (result.failedCount > 0 && result.importedCount + result.overwrittenCount > 0) {
+        this.showToastMessage(`已写入 ${result.importedCount + result.overwrittenCount} 个文件，另有 ${result.failedCount} 个还没写进本地目录`)
       } else if (result.failedCount > 0) {
-        this.showToastMessage(`导入完成，${result.failedCount} 个失败 IMPORT_PARTIAL`)
+        this.showToastMessage(`还有 ${result.failedCount} 个文件没有写进本地目录`)
+      } else if (result.overwrittenCount > 0 && result.importedCount === 0) {
+        this.showToastMessage(`已替换 ${result.overwrittenCount} 个已有文件`)
+      } else if (result.overwrittenCount > 0) {
+        this.showToastMessage(`已写入 ${result.importedCount} 个文件，并替换 ${result.overwrittenCount} 个已有文件`)
       } else {
-        this.showToastMessage(`成功导入 ${result.importedCount} 个 ROM IMPORT_SUCCESS`)
+        this.showToastMessage(`已写入 ${result.importedCount} 个游戏文件`)
       }
 
       const sources = await scanLibraryRomSources(context, () => this.isCurrentPageAction(actionToken))
@@ -373,13 +421,20 @@ struct RomManagerPage {
       const message = (err as Error).message || String(err)
       LogHelper.error('RomManagerPage', 'Import', `导入 ROM 失败: ${message}`)
       this.showImportProgress = false
-      this.showToastMessage('导入失败 IMPORT_ERROR')
+      if (message.startsWith('IMPORT_MULTIFILE_ENTRY_READ_FAILED:')) {
+        const fileName = message.substring('IMPORT_MULTIFILE_ENTRY_READ_FAILED:'.length).trim()
+        this.showToastMessage(fileName.length > 0 ?
+          `${fileName} 没有读出来，请确认文件仍可访问后再试` :
+          '多文件入口没有读出来，请确认文件仍可访问后再试')
+      } else {
+        this.showToastMessage('这批文件没有导入成功，请稍后重试')
+      }
     }
   }
 
   private onDeleteClick(item: RomListItem): void {
     if (!item.isDeletable) {
-      this.showToastMessage('内置 ROM 不可删除 BUILTIN_READONLY')
+      this.showToastMessage('内置游戏文件不支持删除')
       return
     }
     this.deleteTargetItem = item
@@ -404,7 +459,7 @@ struct RomManagerPage {
     const actionToken = this.beginPageAction()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.showToastMessage('删除失败 CONTEXT_MISSING')
+      this.showToastMessage('现在还不能删除游戏文件，请稍后再试')
       return
     }
 
@@ -414,7 +469,7 @@ struct RomManagerPage {
       const message = (err as Error).message || String(err)
       LogHelper.error('RomManagerPage', 'Delete', `删除文件失败: ${message}`)
       if (this.isCurrentPageAction(actionToken)) {
-        this.showToastMessage('删除失败 DELETE_ERROR')
+        this.showToastMessage('游戏文件没有删除成功，请稍后重试')
       }
       return
     }
@@ -434,12 +489,13 @@ struct RomManagerPage {
         return
       }
 
-      this.showToastMessage('已删除 ROM DELETE_SUCCESS')
+      this.showToastMessage('游戏文件已删除')
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('RomManagerPage', 'Delete', `删除索引刷新失败: ${message}`)
       if (this.isCurrentPageAction(actionToken)) {
-        this.showToastMessage('删除失败 DELETE_ERROR')
+        this.applyLocalDeleteResult(item.filePath)
+        this.showToastMessage('游戏文件已删掉，列表已按当前结果更新')
       }
     }
   }
@@ -461,13 +517,19 @@ struct RomManagerPage {
           .fontSize(EmuTypography.sm)
           .fontColor(EmuColors.onSurfaceVariant)
 
-        Text('/')
-          .fontSize(EmuTypography.sm)
-          .fontColor(EmuColors.outlineVariant)
+        if (this.storageStats.totalAvailable !== undefined) {
+          Text('/')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.outlineVariant)
 
-        Text(`可用 ${this.formatFileSize(this.storageStats.totalAvailable)}`)
-          .fontSize(EmuTypography.sm)
-          .fontColor(EmuColors.onSurfaceVariant)
+          Text(`剩余可用 ${this.formatFileSize(this.storageStats.totalAvailable)}`)
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+        } else {
+          Text('仅统计已写入应用沙箱的文件')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+        }
       }
 
       Row()
@@ -477,7 +539,7 @@ struct RomManagerPage {
         .borderRadius(2)
         .overlay(
           Row()
-            .width(`${this.storageStats.totalAvailable > 0 ? (this.storageStats.totalUsed / this.storageStats.totalAvailable * 100) : 0}%`)
+            .width(`${this.storageStats.totalAvailable && this.storageStats.totalAvailable > 0 ? (this.storageStats.totalUsed / this.storageStats.totalAvailable * 100) : 0}%`)
             .height(4)
             .backgroundColor(EmuColors.primary)
             .borderRadius(2)
@@ -608,11 +670,11 @@ struct RomManagerPage {
   private RomList() {
     if (this.filteredRoms.length === 0) {
       Column({ space: EmuSpacing.md }) {
-        Text('暂无 ROM')
+        Text('暂无游戏文件')
           .fontSize(EmuTypography.md)
           .fontColor(EmuColors.onSurfaceVariant)
 
-        Text('点击右上角导入按钮添加 ROM')
+        Text('点击右上角导入按钮添加游戏文件')
           .fontSize(EmuTypography.sm)
           .fontColor(EmuColors.onSurfaceVariant)
           .opacity(0.6)
@@ -785,7 +847,7 @@ struct RomManagerPage {
     Stack() {
       Column() {
         EmuHeaderBar({
-          titleText: 'ROM 管理器',
+          titleText: '游戏文件',
           titleIcon: 'folder',
           rightIcon: 'add',
           activeTextColor: EmuColors.primary,

@@ -34,12 +34,15 @@ export class RuntimeSaveStateController {
       return '需在运行中存档'
     }
     if (!context) {
-      return '上下文缺失'
+      return '当前页还没准备好，暂时不能存档'
     }
     try {
       const bundle = await runtimeSessionController.saveStateBundleAsync()
       if (!bundle.stateData || bundle.stateData.byteLength <= 0) {
         return '存档数据不可用'
+      }
+      if (options?.shouldCancel?.()) {
+        return '存档操作已取消'
       }
       await saveStateData(context, bundle.stateData, romFile, {
         thumbnail: buildThumbnailPayload(bundle),
@@ -50,9 +53,12 @@ export class RuntimeSaveStateController {
         'Save',
         `运行态即时存档已写入: rom=${LogHelper.describePathForLog(romFile)} bytes=${bundle.stateData.byteLength} thumb=${bundle.thumbnailWidth}x${bundle.thumbnailHeight}`
       )
-      return '存档已写入'
+      return '存档文件已写入'
     } catch (err) {
       const message = (err as Error).message || String(err)
+      if (message === 'SAVE_STATE_CANCELED') {
+        return '存档操作已取消'
+      }
       LogHelper.error('RuntimeSaveState', 'Save', `运行态即时存档失败: ${message}`)
       return '存档失败'
     }
@@ -68,13 +74,13 @@ export class RuntimeSaveStateController {
       return '需在运行中读档'
     }
     if (!context) {
-      return '上下文缺失'
+      return '当前页还没准备好，暂时不能读档'
     }
     try {
       const entries = await listSaveStateItems(context)
       const item = findLatestSaveForRuntimeRom(entries, romFile)
       if (!item) {
-        return '当前 ROM 暂无存档'
+        return '当前游戏还没有可读取的存档'
       }
       if (options?.shouldCancel?.()) {
         return '存档操作已取消'
@@ -99,7 +105,7 @@ export class RuntimeSaveStateController {
     romFile: string
   ): Promise<RuntimeSaveStateListItem[]> {
     if (!context) {
-      return []
+      throw new Error('runtime save state context missing')
     }
     const entries = await listSaveStateItems(context)
     const filtered = filterSaveItemsForRuntimeRom(entries, romFile)
@@ -120,7 +126,7 @@ export class RuntimeSaveStateController {
       return '需在运行中读档'
     }
     if (!context) {
-      return '上下文缺失'
+      return '当前页还没准备好，暂时不能读档'
     }
     if (fileName.length === 0) {
       return '存档文件无效'
@@ -149,7 +155,7 @@ export class RuntimeSaveStateController {
     options?: RuntimeSaveStateTaskOptions
   ): Promise<string> {
     if (!context) {
-      return '上下文缺失'
+      return '当前页还没准备好，暂时不能删除存档'
     }
     if (fileName.length === 0) {
       return '存档文件无效'
@@ -160,7 +166,7 @@ export class RuntimeSaveStateController {
       }
       await deleteSaveStateItem(context, fileName)
       LogHelper.info('RuntimeSaveState', 'Save', `运行态删除存档: file=${LogHelper.describePathForLog(fileName)}`)
-      return '存档已删除'
+      return '存档文件已删除'
     } catch (err) {
       const message = (err as Error).message || String(err)
       LogHelper.error('RuntimeSaveState', 'Save', `运行态删除存档失败: ${message}`)
@@ -209,7 +215,7 @@ function buildRuntimeSaveStateListItem(
   return {
     id: item.id,
     fileName: item.fileName,
-    slotLabel: `存档位_${slotNumber}`,
+    slotLabel: `存档 ${slotNumber}`,
     detail: `${normalizeRuntimeSaveTitle(item.fileName)} | ${formatRuntimeSaveBytes(item.byteLength)}`,
     createdLabel: item.createdAt > 0 ? formatRuntimeSaveDateTime(item.createdAt) : '本地',
     isLatest: index === 0

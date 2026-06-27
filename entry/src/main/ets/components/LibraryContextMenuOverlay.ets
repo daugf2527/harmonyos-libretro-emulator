@@ -52,7 +52,7 @@ export struct LibraryContextMenuOverlay {
         .shadow({ radius: 34, color: '#AA000000', offsetX: 0, offsetY: 12 })
 
         Row() {
-          Text('取消 CANCEL')
+          Text('取消')
             .fontSize(15)
             .fontWeight(FontWeight.Bold)
             .fontColor('#CCABABAB')

@@ -1,6 +1,7 @@
 import { common } from '@kit.AbilityKit'
 import { EmuHeaderBar } from '../components/EmuAppShell'
 import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNav'
+import { EmuCoverArt } from '../components/EmuCoverArt'
 import { LibraryContextMenuOverlay } from '../components/LibraryContextMenuOverlay'
 import { LibraryGameSections } from '../components/LibraryGameSections'
 import { LibrarySearchPanel } from '../components/LibrarySearchPanel'
@@ -114,11 +115,12 @@ struct LibraryPage {
   @Local private contextMenuGame: LibraryRecord | undefined = undefined
   @Local private highlightedRecentGameId: string = ''
   @Local private showToast: boolean = false
-  @Local private toastMessage: string = '已刷新库 SYNCED'
+  @Local private toastMessage: string = '已刷新游戏库'
   @Local private pullRefreshHeight: number = 0
   @Local private pullRefreshOpacity: number = 0
   @Local private refreshing: boolean = false
   @Local private bottomLoaderActive: boolean = false
+  @Local private libraryLoadFailed: boolean = false
   private searchTimer: number = -1
   private toastTimer: number = -1
   private refreshTimer: number = -1
@@ -127,7 +129,7 @@ struct LibraryPage {
   private pageActive: boolean = false
   private libraryRefreshToken: number = 0
   private pageActionToken: number = 0
-  private readonly coverCycleKeys: string[] = ['', 'metroid_fusion', 'zelda_triforce']
+  private readonly coverCycleKeys: string[] = ['', 'moss_signal', 'aurora_grid', 'ember_glow']
   private readonly coverPalette: string[] = ['#274530', '#27405E', '#4E2A41', '#5A4331']
   private readonly navItems = createEmuBottomNavItems('library')
   private pullTracking: boolean = false
@@ -238,9 +240,10 @@ struct LibraryPage {
     this.libraryRefreshToken = refreshToken
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
+      this.libraryLoadFailed = true
       this.applyLibraryGames([])
       if (showToast) {
-        this.showToastMessage('刷新失败 CONTEXT_MISSING')
+        this.showToastMessage('现在还读不到游戏库，请稍后再试')
       }
       return
     }
@@ -267,6 +270,8 @@ struct LibraryPage {
       if (!this.isCurrentLibraryRefresh(refreshToken)) {
         return
       }
+      this.libraryLoadFailed = true
+      this.applyLibraryGames([])
       if (showToast) {
         // 使用错误码提供用户友好的错误消息
         const userMsg = ErrorCodeUtils.getUserMessage(FileErrorCodes.FILE_LIST_ERROR.numericCode)
@@ -278,9 +283,10 @@ struct LibraryPage {
     if (!this.isCurrentLibraryRefresh(refreshToken) || !readyRecords) {
       return
     }
+    this.libraryLoadFailed = false
     this.applyLibraryGames(readyRecords)
     if (showToast) {
-      this.showToastMessage('已刷新库 SYNCED')
+      this.showToastMessage('已刷新游戏库')
     }
   }
 
@@ -351,7 +357,7 @@ struct LibraryPage {
 
   private openGame(_item: LibraryRecord): void {
     if (_item.preferredCoreId.length === 0 || _item.romFile.length === 0) {
-      this.showToastMessage('当前条目暂不支持启动')
+      this.showToastMessage('当前条目缺少可启动的核心或游戏文件')
       return
     }
     this.highlightedRecentGameId = _item.id
@@ -369,6 +375,7 @@ struct LibraryPage {
       }
     }).catch((err: Error) => {
       LogHelper.error('LibraryPage', 'Route', `跳转游戏页失败: ${err.message}`)
+      this.showToastMessage('这款游戏现在还打不开，请稍后再试')
     })
   }
 
@@ -515,6 +522,8 @@ struct LibraryPage {
     this.suspendBeforeRoute()
     this.getUIContext().getRouter().replaceUrl({ url: route }).catch((err: Error) => {
       LogHelper.error('LibraryPage', 'Route', `replaceUrl ${route} failed: ${err.message}`)
+      this.pageActive = true
+      this.showToastMessage('这个页面现在还打不开，请稍后再试')
     })
   }
 
@@ -586,7 +595,7 @@ struct LibraryPage {
       return
     }
     if (item.sourceType !== 'IMPORTED') {
-      this.showToastMessage('内置资源暂不支持删除')
+      this.showToastMessage('内置游戏暂不支持删除')
       return
     }
     try {
@@ -648,11 +657,14 @@ struct LibraryPage {
   }
 
   private resolveCoverColorByKey(key: string): string {
-    if (key === 'metroid_fusion') {
+    if (key === 'moss_signal') {
       return '#274530'
     }
-    if (key === 'zelda_triforce') {
+    if (key === 'aurora_grid') {
       return '#27405E'
+    }
+    if (key === 'ember_glow') {
+      return '#5A4331'
     }
     return this.coverPalette[0]
   }
@@ -666,7 +678,7 @@ struct LibraryPage {
     const actionToken = this.beginPageAction()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.showToastMessage('封面更新失败 CONTEXT_MISSING')
+      this.showToastMessage('现在还不能切换封面样式，请稍后再试')
       return
     }
     const nextCoverKey = this.getNextCoverKey(target)
@@ -677,7 +689,7 @@ struct LibraryPage {
         return
       }
       if (!updated) {
-        this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+        this.showToastMessage('没有找到要更新的游戏条目')
         return
       }
       this.highlightedRecentGameId = updated.id
@@ -685,14 +697,14 @@ struct LibraryPage {
       if (!this.isCurrentPageAction(actionToken)) {
         return
       }
-      this.showToastMessage('已切换内置封面 COVER_UPDATED')
+      this.showToastMessage('已切换封面样式')
     } catch (err) {
       if (!this.isCurrentPageAction(actionToken)) {
         return
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryPage', 'Cover', `更新封面失败: ${message}`)
-      this.showToastMessage('封面更新失败 COVER_WRITE_FAIL')
+      this.showToastMessage('封面样式没有更新成功，请稍后重试')
     }
   }
 
@@ -713,7 +725,7 @@ struct LibraryPage {
       }
     }).catch((err: Error) => {
       LogHelper.error('LibraryPage', 'Route', `跳转详情页失败: ${err.message}`)
-      this.showToastMessage('详情页打开失败 DETAIL_ROUTE_FAIL')
+      this.showToastMessage('这条游戏详情现在还打不开，请稍后再试')
     })
   }
 
@@ -758,7 +770,7 @@ struct LibraryPage {
     const actionToken = this.beginPageAction()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
     if (!context) {
-      this.showToastMessage('存档删除失败 CONTEXT_MISSING')
+      this.showToastMessage('现在还不能管理这款游戏的存档，请稍后再试')
       return
     }
     try {
@@ -774,17 +786,17 @@ struct LibraryPage {
         return
       }
       if (result.deletedCount === 0) {
-        this.showToastMessage('未找到对应存档 SAVE_EMPTY')
+        this.showToastMessage('没有找到可删除的存档')
         return
       }
-      this.showToastMessage(`已删除 ${result.deletedCount} 个存档 SAVE_PURGED`)
+      this.showToastMessage(`已删除 ${result.deletedCount} 个存档`)
     } catch (err) {
       if (!this.isCurrentPageAction(actionToken)) {
         return
       }
       const message = (err as Error).message || String(err)
       LogHelper.error('LibraryPage', 'Save', `删除存档失败: ${message}`)
-      this.showToastMessage('存档删除失败 SAVE_PURGE_FAIL')
+      this.showToastMessage('存档没有删除成功，请稍后重试')
     }
   }
 
@@ -826,7 +838,7 @@ struct LibraryPage {
             .backgroundColor(EmuColors.primary)
             .borderRadius(2)
 
-          Text('CONTINUE')
+          Text('最近继续')
             .fontSize(9)
             .fontColor(EmuColors.primary)
             .fontFamily('monospace')
@@ -898,9 +910,10 @@ struct LibraryPage {
   private GameSections() {
     LibraryGameSections({
       recentGames: this.cachedFilteredRecentGames,
-        games: this.cachedFilteredGames,
-        highlightedRecentGameId: this.highlightedRecentGameId,
-        bottomLoaderActive: this.bottomLoaderActive,
+      games: this.cachedFilteredGames,
+      highlightedRecentGameId: this.highlightedRecentGameId,
+      bottomLoaderActive: this.bottomLoaderActive,
+      loadFailed: this.libraryLoadFailed,
       onCardTouch: (event: TouchEvent, item: LibraryRecord) => {
         this.onCardTouch(event, item)
       },
@@ -979,13 +992,14 @@ struct LibraryPage {
           .backgroundColor(game.coverColor || this.coverPalette[0])
           .borderRadius(8)
 
-        if (game.coverKey && game.coverKey.length > 0) {
-          Image($r(`app.media.${game.coverKey}`))
-            .width('100%')
-            .height(200)
-            .objectFit(ImageFit.Cover)
-            .borderRadius(8)
-        }
+        EmuCoverArt({
+          coverKey: game.coverKey,
+          coverUrl: game.coverUrl ?? '',
+          variant: 'recent'
+        })
+          .width('100%')
+          .height(200)
+          .borderRadius(8)
       }
 
       // 标题与平台
@@ -1065,15 +1079,10 @@ struct LibraryPage {
   }
 
   private getGamePlayTimeText(game: LibraryRecord): string {
-    const items: LibraryRecord[] = [game]
-    if (!hasLibraryTelemetryData(items)) {
+    if (!Number.isFinite(game.lastRuntimeUpdatedAt) || game.lastRuntimeUpdatedAt <= 0) {
       return ''
     }
-    const cells = getLibraryTelemetryCells(items)
-    if (cells.length === 0) {
-      return ''
-    }
-    return cells[0].value
+    return formatLastPlayedRelative(game.lastRuntimeUpdatedAt)
   }
 
   private getSelectedGameDetailItems(): LibraryRecord[] {
@@ -1145,11 +1154,7 @@ struct LibraryPage {
   }
 
   private getPlatformFilterItems(): string[] {
-    const items: string[] = ['ALL']
-    for (let index = 0; index < this.cachedDisplayPlatformFilters.length; index += 1) {
-      items.push(this.cachedDisplayPlatformFilters[index])
-    }
-    return items
+    return [...this.cachedDisplayPlatformFilters]
   }
 
   @Builder

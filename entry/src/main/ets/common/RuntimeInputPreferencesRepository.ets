@@ -9,6 +9,10 @@ export interface RuntimeInputPreferencesProfile {
   updatedAt: number
 }
 
+interface RuntimeInputPreferencesFileErrorWithCode {
+  code?: string | number
+}
+
 const RUNTIME_INPUT_PREFS_VERSION = 1
 const RUNTIME_INPUT_PREFS_DIR_NAME = 'runtime'
 const RUNTIME_INPUT_PREFS_FILE_NAME = 'input_preferences.json'
@@ -32,11 +36,14 @@ export async function loadRuntimeInputPreferencesProfile(
   }
   try {
     const parsed = JSON.parse(text) as Partial<RuntimeInputPreferencesProfile> | null
+    if (!isRuntimeInputPreferencesProfileShapeValid(parsed)) {
+      throw new Error('runtime_input_preferences_invalid')
+    }
     return normalizeRuntimeInputPreferencesProfile(parsed)
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('RuntimeInputPreferencesRepository', 'Load', `输入偏好配置损坏，已回退默认值: ${message}`)
-    return createDefaultRuntimeInputPreferencesProfile()
+    LogHelper.warn('RuntimeInputPreferencesRepository', 'Load', `输入偏好配置读取失败: ${message}`)
+    throw err as Error
   }
 }
 
@@ -83,6 +90,18 @@ export function normalizeRuntimeInputPreferencesProfile(
   }
 }
 
+function isRuntimeInputPreferencesProfileShapeValid(
+  profile: Partial<RuntimeInputPreferencesProfile> | null | undefined
+): boolean {
+  if (!profile || typeof profile !== 'object') {
+    return false
+  }
+  return 'version' in profile &&
+    'updatedAt' in profile &&
+    'hideVirtualController' in profile &&
+    'hideUndeclaredKeys' in profile
+}
+
 function buildRuntimeInputPreferencesDirPath(filesDir: string): string {
   return `${filesDir}/${RUNTIME_INPUT_PREFS_DIR_NAME}`
 }
@@ -103,8 +122,11 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -114,7 +136,20 @@ async function readOptionalText(path: string): Promise<string> {
   }
   try {
     return await fs.readText(path)
-  } catch (_err) {
-    return ''
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return ''
+    }
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as RuntimeInputPreferencesFileErrorWithCode).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

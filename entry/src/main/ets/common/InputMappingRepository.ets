@@ -16,6 +16,7 @@ export interface InputMappingProfile {
 const MAPPING_VERSION = 1
 const MAPPING_DIR_NAME = 'input'
 const MAPPING_FILE_NAME = 'key_mapping.json'
+const MIN_REQUIRED_INPUT_MAPPINGS = 4
 
 function isMissingFileError(message: string): boolean {
   const normalized = message.toLowerCase()
@@ -52,15 +53,22 @@ export async function loadInputMappingProfile(
   }
   try {
     const parsed = JSON.parse(text) as Partial<InputMappingProfile> | null
+    if (!parsed || !Array.isArray(parsed.mappings)) {
+      throw new Error('input_mapping_records_invalid')
+    }
+    const normalizedMappings = normalizeMappings(parsed.mappings)
+    if (normalizedMappings.length < MIN_REQUIRED_INPUT_MAPPINGS) {
+      throw new Error('input_mapping_entries_incomplete')
+    }
     return {
       version: MAPPING_VERSION,
       name: parsed?.name || 'default',
-      mappings: normalizeMappings(parsed?.mappings)
+      mappings: normalizedMappings
     }
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.warn('InputMappingRepository', 'Load', `按键映射配置损坏，已回退默认值: ${message}`)
-    return createDefaultInputMappingProfile()
+    LogHelper.warn('InputMappingRepository', 'Load', `按键映射配置读取失败: ${message}`)
+    throw err as Error
   }
 }
 
@@ -68,14 +76,20 @@ function normalizeMappings(mappings: KeyMapping[] | undefined): KeyMapping[] {
   if (!mappings) {
     return []
   }
-  return mappings
-    .filter((item: KeyMapping) => item.keyCode.length > 0)
-    .map((item: KeyMapping): KeyMapping => {
-      return {
-        keyCode: item.keyCode,
-        joypadId: Math.max(0, Math.min(15, Math.floor(Number(item.joypadId) || 0)))
-      }
+  const dedupedMappings: KeyMapping[] = []
+  const seenKeyCodes = new Set<string>()
+  mappings.forEach((item: KeyMapping) => {
+    const keyCode = typeof item.keyCode === 'string' ? item.keyCode.trim() : ''
+    if (keyCode.length === 0 || seenKeyCodes.has(keyCode)) {
+      return
+    }
+    seenKeyCodes.add(keyCode)
+    dedupedMappings.push({
+      keyCode: keyCode,
+      joypadId: Math.max(0, Math.min(15, Math.floor(Number(item.joypadId) || 0)))
     })
+  })
+  return dedupedMappings
 }
 
 export async function saveInputMappingProfile(
@@ -121,8 +135,12 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    if (isMissingFileError(message)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -137,6 +155,6 @@ async function readOptionalText(path: string): Promise<string> {
     if (isMissingFileError(message)) {
       return ''
     }
-    return ''
+    throw err as Error
   }
 }

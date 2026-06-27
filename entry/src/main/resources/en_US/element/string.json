@@ -2,15 +2,15 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "module description"
+      "value": "Libretro emulator frontend entry module for HarmonyOS phones"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "description"
+      "value": "Launches the Carbon Shade local emulator frontend"
     },
     {
       "name": "EntryAbility_label",
-      "value": "DrawingToXComponent"
+      "value": "Carbon Shade"
     }
   ]
 }

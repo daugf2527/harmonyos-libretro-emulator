@@ -11,6 +11,7 @@ export interface LibraryRecord {
   id: string
   title: string
   subtitle: string
+  overview?: string
   platform: string
   coverColor: string
   coverKey: string
@@ -54,6 +55,7 @@ export interface LibraryRuntimeSnapshot {
 
 export interface LibraryMetadataPatch {
   title?: string
+  overview?: string
   publisher?: string
   releaseYear?: number
   platform?: string
@@ -115,6 +117,14 @@ const RUNTIME_COLUMN_DEFINITIONS: RuntimeColumnDefinition[] = [
   { name: 'last_runtime_video_nulls', definition: 'INTEGER NOT NULL DEFAULT 0' }
 ]
 
+const OPTIONAL_METADATA_COLUMN_DEFINITIONS: RuntimeColumnDefinition[] = [
+  { name: 'overview', definition: "TEXT NOT NULL DEFAULT ''" },
+  { name: 'cover_url', definition: "TEXT NOT NULL DEFAULT ''" },
+  { name: 'release_year', definition: 'INTEGER NOT NULL DEFAULT 0' },
+  { name: 'publisher', definition: "TEXT NOT NULL DEFAULT ''" },
+  { name: 'genre', definition: "TEXT NOT NULL DEFAULT ''" }
+]
+
 export async function syncLibraryIndex(
   context: common.UIAbilityContext,
   discoveredRecords: LibraryRecord[]
@@ -133,9 +143,11 @@ export async function syncLibraryIndex(
       id: existing?.id ?? record.id,
       title: record.title,
       subtitle: record.subtitle,
+      overview: existing?.overview ?? record.overview,
       platform: record.platform,
       coverColor: existing?.coverColor ?? record.coverColor,
       coverKey: existing?.coverKey ?? record.coverKey,
+      coverUrl: existing?.coverUrl ?? record.coverUrl,
       romFile: record.romFile,
       preferredCoreId: record.preferredCoreId,
       fileName: record.fileName,
@@ -156,7 +168,10 @@ export async function syncLibraryIndex(
       lastRuntimeAudioOverruns: existing?.lastRuntimeAudioOverruns ?? 0,
       lastRuntimeVideoDrops: existing?.lastRuntimeVideoDrops ?? 0,
       lastRuntimeVideoDupes: existing?.lastRuntimeVideoDupes ?? 0,
-      lastRuntimeVideoNulls: existing?.lastRuntimeVideoNulls ?? 0
+      lastRuntimeVideoNulls: existing?.lastRuntimeVideoNulls ?? 0,
+      releaseYear: existing?.releaseYear ?? record.releaseYear,
+      publisher: existing?.publisher ?? record.publisher,
+      genre: existing?.genre ?? record.genre
     })
   })
 
@@ -169,9 +184,11 @@ export async function syncLibraryIndex(
       id: record.id,
       title: record.title,
       subtitle: record.subtitle,
+      overview: record.overview,
       platform: record.platform,
       coverColor: record.coverColor,
       coverKey: record.coverKey,
+      coverUrl: record.coverUrl,
       romFile: record.romFile,
       preferredCoreId: record.preferredCoreId,
       fileName: record.fileName,
@@ -192,7 +209,10 @@ export async function syncLibraryIndex(
       lastRuntimeAudioOverruns: record.lastRuntimeAudioOverruns,
       lastRuntimeVideoDrops: record.lastRuntimeVideoDrops,
       lastRuntimeVideoDupes: record.lastRuntimeVideoDupes,
-      lastRuntimeVideoNulls: record.lastRuntimeVideoNulls
+      lastRuntimeVideoNulls: record.lastRuntimeVideoNulls,
+      releaseYear: record.releaseYear,
+      publisher: record.publisher,
+      genre: record.genre
     })
   })
 
@@ -251,9 +271,11 @@ export async function markLibraryRecordPlayed(
       id: record.id,
       title: record.title,
       subtitle: record.subtitle,
+      overview: record.overview,
       platform: record.platform,
       coverColor: record.coverColor,
       coverKey: record.coverKey,
+      coverUrl: record.coverUrl,
       romFile: record.romFile,
       preferredCoreId: record.preferredCoreId,
       fileName: record.fileName,
@@ -274,7 +296,10 @@ export async function markLibraryRecordPlayed(
       lastRuntimeAudioOverruns: record.lastRuntimeAudioOverruns,
       lastRuntimeVideoDrops: record.lastRuntimeVideoDrops,
       lastRuntimeVideoDupes: record.lastRuntimeVideoDupes,
-      lastRuntimeVideoNulls: record.lastRuntimeVideoNulls
+      lastRuntimeVideoNulls: record.lastRuntimeVideoNulls,
+      releaseYear: record.releaseYear,
+      publisher: record.publisher,
+      genre: record.genre
     }
   })
   if (!changed) {
@@ -301,9 +326,11 @@ export async function updateLibraryRuntimeSnapshot(
       id: record.id,
       title: record.title,
       subtitle: record.subtitle,
+      overview: record.overview,
       platform: record.platform,
       coverColor: record.coverColor,
       coverKey: record.coverKey,
+      coverUrl: record.coverUrl,
       romFile: record.romFile,
       preferredCoreId: record.preferredCoreId,
       fileName: record.fileName,
@@ -324,7 +351,10 @@ export async function updateLibraryRuntimeSnapshot(
       lastRuntimeAudioOverruns: Math.max(0, Math.floor(Number(snapshot.audioOverruns) || 0)),
       lastRuntimeVideoDrops: Math.max(0, Math.floor(Number(snapshot.videoDrops) || 0)),
       lastRuntimeVideoDupes: Math.max(0, Math.floor(Number(snapshot.videoDupes) || 0)),
-      lastRuntimeVideoNulls: Math.max(0, Math.floor(Number(snapshot.videoNulls) || 0))
+      lastRuntimeVideoNulls: Math.max(0, Math.floor(Number(snapshot.videoNulls) || 0)),
+      releaseYear: record.releaseYear,
+      publisher: record.publisher,
+      genre: record.genre
     }
   })
   if (!changed) {
@@ -391,6 +421,7 @@ export async function updateLibraryRecordMetadata(
     }
     const nextRecord: LibraryRecord = copyLibraryRecord(record, record.createdAt, Date.now())
     nextRecord.title = metadata.title !== undefined ? metadata.title : record.title
+    nextRecord.overview = metadata.overview !== undefined ? metadata.overview : record.overview
     nextRecord.publisher = metadata.publisher !== undefined ? metadata.publisher : record.publisher
     nextRecord.releaseYear = metadata.releaseYear !== undefined ? metadata.releaseYear : record.releaseYear
     nextRecord.platform = metadata.platform !== undefined ? metadata.platform : record.platform
@@ -421,9 +452,11 @@ export async function updateLibraryRecordCover(
       id: record.id,
       title: record.title,
       subtitle: record.subtitle,
+      overview: record.overview,
       platform: record.platform,
       coverColor: coverColor,
       coverKey: coverKey,
+      coverUrl: record.coverUrl,
       romFile: record.romFile,
       preferredCoreId: record.preferredCoreId,
       fileName: record.fileName,
@@ -444,7 +477,10 @@ export async function updateLibraryRecordCover(
       lastRuntimeAudioOverruns: record.lastRuntimeAudioOverruns,
       lastRuntimeVideoDrops: record.lastRuntimeVideoDrops,
       lastRuntimeVideoDupes: record.lastRuntimeVideoDupes,
-      lastRuntimeVideoNulls: record.lastRuntimeVideoNulls
+      lastRuntimeVideoNulls: record.lastRuntimeVideoNulls,
+      releaseYear: record.releaseYear,
+      publisher: record.publisher,
+      genre: record.genre
     }
     targetRecord = nextRecord
     return nextRecord
@@ -461,6 +497,7 @@ function copyLibraryRecord(record: LibraryRecord, createdAt: number, updatedAt: 
     id: record.id,
     title: record.title,
     subtitle: record.subtitle,
+    overview: record.overview,
     platform: record.platform,
     coverColor: record.coverColor,
     coverKey: record.coverKey,
@@ -495,16 +532,33 @@ function copyLibraryRecord(record: LibraryRecord, createdAt: number, updatedAt: 
 async function loadLibraryIndex(context: common.UIAbilityContext): Promise<LibraryRecord[]> {
   const store = await getLibraryStore(context)
   if (store) {
-    return loadRecordsFromRdb(store)
+    try {
+      return await loadRecordsFromRdb(store)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      activateJsonFallback(`读取 RDB 失败，回退 JSON: ${message}`)
+      return await loadLibraryIndexFromJsonFallback(
+        context.filesDir,
+        'library_index_fallback_snapshot_missing'
+      )
+    }
   }
-  return loadLibraryIndexFromJson(context.filesDir)
+  return await loadLibraryIndexFromJsonFallback(
+    context.filesDir,
+    preferJsonFallback ? 'library_index_fallback_snapshot_missing' : ''
+  )
 }
 
 async function saveLibraryIndex(context: common.UIAbilityContext, records: LibraryRecord[]): Promise<void> {
   const store = await getLibraryStore(context)
   if (store) {
-    await replaceRecordsInRdb(store, records)
-    return
+    try {
+      await replaceRecordsInRdb(store, records)
+      return
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      activateJsonFallback(`写入 RDB 失败，回退 JSON: ${message}`)
+    }
   }
   await saveLibraryIndexToJson(context.filesDir, records)
 }
@@ -537,10 +591,16 @@ async function openLibraryStore(context: common.UIAbilityContext): Promise<RdbSt
     return store
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.error('LibraryRepository', 'Rdb', `RDB 初始化失败，回退 JSON: ${message}`)
-    preferJsonFallback = true
+    activateJsonFallback(`RDB 初始化失败，回退 JSON: ${message}`)
     return undefined
   }
+}
+
+function activateJsonFallback(message: string): void {
+  LogHelper.error('LibraryRepository', 'Rdb', message)
+  preferJsonFallback = true
+  cachedStore = undefined
+  storePromise = undefined
 }
 
 async function createLibraryStore(
@@ -581,6 +641,11 @@ async function ensureLibrarySchema(store: RdbStoreCompat): Promise<void> {
       file_name TEXT NOT NULL,
       source_type TEXT NOT NULL,
       status TEXT NOT NULL,
+      overview TEXT NOT NULL DEFAULT '',
+      cover_url TEXT NOT NULL DEFAULT '',
+      release_year INTEGER NOT NULL DEFAULT 0,
+      publisher TEXT NOT NULL DEFAULT '',
+      genre TEXT NOT NULL DEFAULT '',
       created_at INTEGER NOT NULL,
       imported_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -600,6 +665,7 @@ async function ensureLibrarySchema(store: RdbStoreCompat): Promise<void> {
     )
   `
   await store.executeSql(createSql)
+  await ensureOptionalMetadataColumns(store)
   await ensureRuntimeColumns(store)
 
   const clearVersionSql = `DELETE FROM ${LIBRARY_META_TABLE_NAME} WHERE meta_key = '${LIBRARY_SCHEMA_VERSION_KEY}'`
@@ -643,6 +709,38 @@ async function ensureRuntimeColumns(store: RdbStoreCompat): Promise<void> {
   }
 }
 
+async function ensureOptionalMetadataColumns(store: RdbStoreCompat): Promise<void> {
+  const existingColumns: Set<string> = new Set()
+  let resultSet: RdbResultSetCompat | undefined = undefined
+  try {
+    resultSet = await store.querySql(`PRAGMA table_info(${LIBRARY_TABLE_NAME})`)
+    while (resultSet.goToNextRow()) {
+      existingColumns.add(resultSet.getString(resultSet.getColumnIndex('name')))
+    }
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.error('LibraryRepository', 'Rdb', `读取 metadata 表结构失败: ${message}`)
+  } finally {
+    if (resultSet) {
+      resultSet.close()
+    }
+  }
+  for (let index = 0; index < OPTIONAL_METADATA_COLUMN_DEFINITIONS.length; index += 1) {
+    const column = OPTIONAL_METADATA_COLUMN_DEFINITIONS[index]
+    if (existingColumns.has(column.name)) {
+      continue
+    }
+    try {
+      await store.executeSql(`ALTER TABLE ${LIBRARY_TABLE_NAME} ADD COLUMN ${column.name} ${column.definition}`)
+    } catch (err) {
+      const message = (err as Error).message || String(err)
+      if (message.toLowerCase().indexOf('duplicate') < 0) {
+        throw new Error(message)
+      }
+    }
+  }
+}
+
 async function loadRecordsFromRdb(store: RdbStoreCompat): Promise<LibraryRecord[]> {
   let resultSet: RdbResultSetCompat | undefined = undefined
   try {
@@ -653,9 +751,11 @@ async function loadRecordsFromRdb(store: RdbStoreCompat): Promise<LibraryRecord[
         id: resultSet.getString(resultSet.getColumnIndex('id')),
         title: resultSet.getString(resultSet.getColumnIndex('title')),
         subtitle: resultSet.getString(resultSet.getColumnIndex('subtitle')),
+        overview: normalizeOptionalText(resultSet.getString(resultSet.getColumnIndex('overview'))),
         platform: resultSet.getString(resultSet.getColumnIndex('platform')),
         coverColor: resultSet.getString(resultSet.getColumnIndex('cover_color')),
         coverKey: resultSet.getString(resultSet.getColumnIndex('cover_key')),
+        coverUrl: normalizeOptionalText(resultSet.getString(resultSet.getColumnIndex('cover_url'))),
         romFile: resultSet.getString(resultSet.getColumnIndex('rom_file')),
         preferredCoreId: resultSet.getString(resultSet.getColumnIndex('preferred_core_id')),
         fileName: resultSet.getString(resultSet.getColumnIndex('file_name')),
@@ -678,14 +778,17 @@ async function loadRecordsFromRdb(store: RdbStoreCompat): Promise<LibraryRecord[
         lastRuntimeAudioOverruns: Number(resultSet.getLong(resultSet.getColumnIndex('last_runtime_audio_overruns'))),
         lastRuntimeVideoDrops: Number(resultSet.getLong(resultSet.getColumnIndex('last_runtime_video_drops'))),
         lastRuntimeVideoDupes: Number(resultSet.getLong(resultSet.getColumnIndex('last_runtime_video_dupes'))),
-        lastRuntimeVideoNulls: Number(resultSet.getLong(resultSet.getColumnIndex('last_runtime_video_nulls')))
+        lastRuntimeVideoNulls: Number(resultSet.getLong(resultSet.getColumnIndex('last_runtime_video_nulls'))),
+        releaseYear: normalizeOptionalPositiveNumber(resultSet.getLong(resultSet.getColumnIndex('release_year'))),
+        publisher: normalizeOptionalText(resultSet.getString(resultSet.getColumnIndex('publisher'))),
+        genre: normalizeOptionalText(resultSet.getString(resultSet.getColumnIndex('genre')))
       })
     }
     return records
   } catch (err) {
     const message = (err as Error).message || String(err)
-    LogHelper.error('LibraryRepository', 'Rdb', `读取 RDB 失败，返回空记录: ${message}`)
-    return []
+    LogHelper.error('LibraryRepository', 'Rdb', `读取 RDB 失败: ${message}`)
+    throw err as Error
   } finally {
     if (resultSet) {
       resultSet.close()
@@ -705,13 +808,14 @@ async function replaceRecordsInRdb(store: RdbStoreCompat, records: LibraryRecord
         await store.rollBack()
         const rollbackMessage = (err as Error).message || String(err)
         LogHelper.error('LibraryRepository', 'Rdb', `事务写入回滚: ${rollbackMessage}`)
-        return
+        throw err as Error
       }
     }
     await replaceRecordsInRdbInternal(store, records)
   } catch (err) {
     const message = (err as Error).message || String(err)
     LogHelper.error('LibraryRepository', 'Rdb', `写入 RDB 失败: ${message}`)
+    throw err as Error
   }
 }
 
@@ -726,9 +830,9 @@ async function replaceRecordsInRdbInternal(store: RdbStoreCompat, records: Libra
 function buildInsertSql(record: LibraryRecord): string {
   return `
     INSERT INTO ${LIBRARY_TABLE_NAME} (
-      id, title, subtitle, platform, cover_color, cover_key, rom_file,
+      id, title, subtitle, overview, platform, cover_color, cover_key, cover_url, rom_file,
       preferred_core_id, file_name, source_type, status, created_at,
-      imported_at, updated_at, last_seen_at, last_played_at, play_count,
+      imported_at, updated_at, last_seen_at, last_played_at, play_count, release_year, publisher, genre,
       total_play_time_ms, last_session_duration_ms, last_runtime_updated_at,
       last_runtime_fps, last_runtime_audio_buffer_usage,
       last_runtime_audio_underruns, last_runtime_audio_overruns,
@@ -737,9 +841,11 @@ function buildInsertSql(record: LibraryRecord): string {
       '${escapeSql(record.id)}',
       '${escapeSql(record.title)}',
       '${escapeSql(record.subtitle)}',
+      '${escapeSql(record.overview ?? '')}',
       '${escapeSql(record.platform)}',
       '${escapeSql(record.coverColor)}',
       '${escapeSql(record.coverKey)}',
+      '${escapeSql(record.coverUrl ?? '')}',
       '${escapeSql(record.romFile)}',
       '${escapeSql(record.preferredCoreId)}',
       '${escapeSql(record.fileName)}',
@@ -751,6 +857,9 @@ function buildInsertSql(record: LibraryRecord): string {
       ${record.lastSeenAt},
       ${record.lastPlayedAt},
       ${record.playCount},
+      ${record.releaseYear ?? 0},
+      '${escapeSql(record.publisher ?? '')}',
+      '${escapeSql(record.genre ?? '')}',
       ${record.totalPlayTimeMs},
       ${record.lastSessionDurationMs},
       ${record.lastRuntimeUpdatedAt},
@@ -777,13 +886,35 @@ async function loadLibraryIndexFromJson(filesDir: string): Promise<LibraryRecord
   }
   try {
     const parsed = JSON.parse(text) as Partial<LibraryIndexDocument> | null
-    if (!parsed?.records || parsed.records.length === 0) {
+    if (!parsed || !Array.isArray(parsed.records)) {
+      throw new Error('library_index_records_invalid')
+    }
+    if (parsed.records.length === 0) {
       return []
     }
     return parsed.records.map((record: LibraryRecord) => normalizeRecord(record))
-  } catch (_err) {
-    return []
+  } catch (err) {
+    const message = (err as Error).message || String(err)
+    LogHelper.error('LibraryRepository', 'Json', `读取 JSON 索引失败: ${message}`)
+    throw err as Error
   }
+}
+
+async function loadLibraryIndexFromJsonFallback(
+  filesDir: string,
+  missingSnapshotError: string
+): Promise<LibraryRecord[]> {
+  const hasSnapshot = await fileExists(buildIndexPath(filesDir))
+  const records = await loadLibraryIndexFromJson(filesDir)
+  if (!hasSnapshot && missingSnapshotError.length > 0) {
+    LogHelper.error(
+      'LibraryRepository',
+      'Json',
+      `JSON 回退索引缺失: ${buildIndexPath(filesDir)}`
+    )
+    throw new Error(missingSnapshotError)
+  }
+  return records
 }
 
 async function saveLibraryIndexToJson(filesDir: string, records: LibraryRecord[]): Promise<void> {
@@ -801,6 +932,7 @@ async function saveLibraryIndexToJson(filesDir: string, records: LibraryRecord[]
   } catch (err) {
     const message = (err as Error).message || String(err)
     LogHelper.error('LibraryRepository', 'Save', `保存 JSON 索引失败: ${message}`)
+    throw err as Error
   } finally {
     if (file) {
       try {
@@ -816,9 +948,11 @@ function normalizeRecord(record: LibraryRecord): LibraryRecord {
     id: record.id,
     title: record.title,
     subtitle: record.subtitle,
+    overview: normalizeOptionalText(record.overview),
     platform: record.platform,
     coverColor: record.coverColor,
     coverKey: record.coverKey,
+    coverUrl: normalizeOptionalText(record.coverUrl),
     romFile: record.romFile,
     preferredCoreId: record.preferredCoreId,
     fileName: record.fileName,
@@ -839,8 +973,27 @@ function normalizeRecord(record: LibraryRecord): LibraryRecord {
     lastRuntimeAudioOverruns: Number(record.lastRuntimeAudioOverruns) || 0,
     lastRuntimeVideoDrops: Number(record.lastRuntimeVideoDrops) || 0,
     lastRuntimeVideoDupes: Number(record.lastRuntimeVideoDupes) || 0,
-    lastRuntimeVideoNulls: Number(record.lastRuntimeVideoNulls) || 0
+    lastRuntimeVideoNulls: Number(record.lastRuntimeVideoNulls) || 0,
+    releaseYear: normalizeOptionalPositiveNumber(record.releaseYear),
+    publisher: normalizeOptionalText(record.publisher),
+    genre: normalizeOptionalText(record.genre)
   }
+}
+
+function normalizeOptionalText(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+  const trimmed = value.trim()
+  return trimmed.length > 0 ? trimmed : undefined
+}
+
+function normalizeOptionalPositiveNumber(value: number | undefined): number | undefined {
+  const nextValue = Number(value)
+  if (!Number.isFinite(nextValue) || nextValue <= 0) {
+    return undefined
+  }
+  return Math.floor(nextValue)
 }
 
 function buildIndexPath(filesDir: string): string {
@@ -859,8 +1012,11 @@ async function fileExists(path: string): Promise<boolean> {
   try {
     await fs.access(path)
     return true
-  } catch (_err) {
-    return false
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return false
+    }
+    throw err as Error
   }
 }
 
@@ -870,7 +1026,22 @@ async function readOptionalText(path: string): Promise<string> {
   }
   try {
     return await fs.readText(path)
-  } catch (_err) {
-    return ''
+  } catch (err) {
+    if (isMissingFileError(err)) {
+      return ''
+    }
+    const message = (err as Error).message || String(err)
+    LogHelper.error('LibraryRepository', 'Json', `读取 JSON 文件失败: ${path} / ${message}`)
+    throw err as Error
   }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  const errorCode = (err as { code?: string | number }).code
+  if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
+    return true
+  }
+  const message = (err as Error).message || String(err)
+  const normalized = message.toLowerCase()
+  return normalized.indexOf('no such file') >= 0 || normalized.indexOf('ret: -2') >= 0
 }

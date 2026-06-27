@@ -10,7 +10,6 @@ export struct LibraryDetailHeroPanel {
   @Param localizedTitle: string = ''
   @Param coreLabel: string = ''
   @Event onLaunch?: () => void
-  @Event onQuickAction?: (message: string) => void
 
   build() {
     Column({ space: 28 }) {
@@ -87,7 +86,7 @@ export struct LibraryDetailHeroPanel {
           .fontColor(EmuColors.primary)
           .letterSpacing(1.2)
 
-        Text('LAUNCH GAME')
+        Text('启动游戏')
           .fontSize(EmuTypography.xs)
           .fontWeight(FontWeight.Bold)
           .fontColor('#CC00FF41')
@@ -106,8 +105,12 @@ export struct LibraryDetailHeroPanel {
       })
 
       Row({ space: 12 }) {
-        this.QuickActionButton('按键布局', 'videogame_asset', '游戏页控制面板即将收口到这里')
-        this.QuickActionButton('画面风格', 'palette', `当前核心: ${this.coreLabel}`)
+        this.InfoCard('按键布局', 'videogame_asset', '请在运行页或设置页调整')
+        this.InfoCard(
+          '画面风格',
+          'palette',
+          this.coreLabel.length > 0 ? `当前匹配核心：${this.coreLabel}` : '当前还没匹配核心'
+        )
       }
       .width('100%')
     }
@@ -115,28 +118,37 @@ export struct LibraryDetailHeroPanel {
   }
 
   @Builder
-  private QuickActionButton(label: string, iconName: string, toastMessage: string) {
-    Row({ space: 8 }) {
-      EmuIcon({
-        name: iconName,
-        tone: 'on_surface',
-        iconSize: 18,
-        opacityValue: 0.86
-      })
+  private InfoCard(label: string, iconName: string, detail: string) {
+    Column({ space: 8 }) {
+      Row({ space: 8 }) {
+        EmuIcon({
+          name: iconName,
+          tone: 'on_surface',
+          iconSize: 18,
+          opacityValue: 0.86
+        })
 
-      Text(label)
-        .fontSize(13)
-        .fontWeight(FontWeight.Medium)
-        .fontColor(EmuColors.onSurface)
+        Text(label)
+          .fontSize(13)
+          .fontWeight(FontWeight.Medium)
+          .fontColor(EmuColors.onSurface)
+      }
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
+
+      Text(detail)
+        .fontSize(EmuTypography.xs)
+        .fontColor('#CCABABAB')
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
     .layoutWeight(1)
-    .height(48)
+    .height(72)
+    .padding({ left: 12, right: 12, top: 12, bottom: 12 })
     .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Start)
     .backgroundColor('#1F1F1F')
     .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
     .borderRadius(2)
-    .onClick(() => {
-      this.onQuickAction?.(toastMessage)
-    })
   }
 }
