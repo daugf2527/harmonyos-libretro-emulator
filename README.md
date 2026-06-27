@@ -24,6 +24,10 @@
 
 ## 2. 文档导航（先读这里）
 
+- 文档总索引：`docs/README.md`
+- 贡献说明：`CONTRIBUTING.md`
+- 安全报告：`SECURITY.md`
+- 支持说明：`SUPPORT.md`
 - 深度白皮书（主文档）：`docs/plans/2026-02-06-new-arch-technical-whitepaper.md`
 - 核心模块深链：
   - `LibretroEngine`：`docs/plans/2026-02-06-new-arch-technical-whitepaper.md#libretroengine`
@@ -173,7 +177,15 @@ bash scripts/ci/check_regression_guards.sh
 - `harmonyos-release.yml`：`v*` tag 自动构建、签名、发布 GitHub Release
 - `harmonyos-device-deploy.yml`：手动从指定 run 下载 HAP 并部署到 self-hosted 设备
 
-## 12. 上架发布边界
+## 12. GitHub 协作文件
+
+- `CONTRIBUTING.md`：贡献与本地检查流程
+- `SECURITY.md`：安全问题上报边界
+- `SUPPORT.md`：支持与 issue 使用说明
+- `.github/ISSUE_TEMPLATE/`：Bug / Feature 模板
+- `.github/PULL_REQUEST_TEMPLATE.md`：PR 提交模板
+
+## 13. 上架发布边界
 
 - 仓库已移除 `entry/src/main/resources/rawfile/roms/` bundled ROM 样例与商业风格封面资源；商店版仅应依赖用户自行导入、且具备合法使用权的 ROM。
 - `scripts/ci/check_release_readiness.sh` 已作为守卫，持续阻止 `rawfile/roms` 与 `cover_*.png` 这类高风险资源重新进入工作树。

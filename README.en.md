@@ -22,6 +22,13 @@ This project has evolved from an early Drawing + XComponent double-buffer demo i
 
 The active architecture is `new_arch (LibretroEngine + VideoPipeline)`.
 
+## Documentation Entry Points
+
+- Docs index: `docs/README.md`
+- Contributing guide: `CONTRIBUTING.md`
+- Security policy: `SECURITY.md`
+- Support guide: `SUPPORT.md`
+
 ## Architecture Overview (Threads + Call Flow)
 
 ```text
@@ -212,6 +219,14 @@ Release and deploy are split into three workflows:
 - `harmonyos-pr-ci.yml`: PR quality gates
 - `harmonyos-release.yml`: automatic build/sign/release for `v*` tags
 - `harmonyos-device-deploy.yml`: manual deploy to self-hosted devices from a selected run
+
+## GitHub Collaboration Files
+
+- `CONTRIBUTING.md`: contributor workflow and local checks
+- `SECURITY.md`: security reporting boundary
+- `SUPPORT.md`: support and issue routing guidance
+- `.github/ISSUE_TEMPLATE/`: bug and feature templates
+- `.github/PULL_REQUEST_TEMPLATE.md`: pull request checklist
 
 Legacy compatibility:
 

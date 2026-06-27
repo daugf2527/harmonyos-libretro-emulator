@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible bug in the active project path
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for reproducible defects in the current `new_arch` path.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Exact steps, content, page flow, and expected vs actual behavior
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Device/emulator, HarmonyOS version, core, render mode
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or evidence
+      description: Relevant hilog lines, screenshots, or error text
+  - type: textarea
+    id: local_checks
+    attributes:
+      label: Local checks already run
+      description: Include quick_signals or other script output if available
