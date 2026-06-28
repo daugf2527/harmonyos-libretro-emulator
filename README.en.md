@@ -1,26 +1,159 @@
-# HarmonyOS Libretro Emulator Frontend (new_arch)
+# HarmonyOS Libretro Emulator
 
-> This document reflects the current repository state (updated on 2026-02-06).
+> A Libretro frontend project for HarmonyOS phones, built on the `new_arch` runtime.
+> This README reflects the current repository state as of `2026-06-28`.
 
-## GitHub Search Keywords
+## What This Project Is
 
-- `harmonyos libretro emulator`
-- `openharmony libretro frontend`
-- `harmonyos xcomponent emulator`
-- `arkts libretro`
-- `retroarch harmonyos`
-- `harmonyos vulkan gles`
+This repository is a real HarmonyOS Libretro frontend that connects `ArkTS/ArkUI`, `XComponent`, `NativeWindow`, `NAPI`, and Libretro cores into one working product foundation.
 
-## Project Positioning
+It is not just:
 
-This project has evolved from an early Drawing + XComponent double-buffer demo into a practical **Libretro frontend on HarmonyOS**:
+- a UI shell
+- a rendering demo
+- a one-off core loading experiment
 
-- ArkTS/ArkUI handles UI and interaction
-- C++ `libentry.so` handles engine, rendering, audio, and input bridging
-- XComponent + NativeWindow is used for video output
-- NAPI exposes `refactored*` APIs to ArkTS
+The current mainline tries to achieve three things:
 
-The active architecture is `new_arch (LibretroEngine + VideoPipeline)`.
+- bring Libretro frontend capability to HarmonyOS phones
+- keep engine, rendering, audio, input, and switching flows observable and recoverable
+- evolve toward a maintainable product codebase instead of a pile of temporary test pages and scripts
+
+## What It Looks Like Today
+
+| Onboarding | Input Center | Settings |
+| --- | --- | --- |
+| ![Onboarding](docs/verification/runtime-screenshots-2026-05-04/02_boot_welcome_quick_start.png) | ![Input Center](docs/verification/runtime-screenshots-2026-05-04/08_input_netplay_center.png) | ![Settings](docs/verification/runtime-screenshots-2026-05-04/09_system_basic_settings.png) |
+
+More screenshots and UI evidence:
+
+- `docs/verification/runtime-screenshots-2026-05-04/`
+- `docs/2026-04-30-design-page-acceptance-matrix.md`
+- `docs/archive/misc/2026-05-04-artifact-to-runtime-gap-audit.md`
+
+## Current Mainline Capabilities
+
+### 1. Engine and Lifecycle
+
+- dedicated `LibretroEngine` thread
+- explicit state machine and message queue
+- `refactoredSwitchGameAsync(...)` with cancellation, single-flight protection, and recovery
+- last-error info, state waiting, and runtime stats
+
+### 2. Rendering
+
+- `VideoPipeline` with `Hardware / Software / GLES` paths
+- `XComponent + NativeWindow` video hosting
+- core video negotiation paths such as `SET_PIXEL_FORMAT`, `SET_GEOMETRY`, and dupe/null-frame handling
+- GLES and Vulkan HW-render baseline support
+
+### 3. Audio
+
+- `AudioBridge` with resampling, DRC, RingBuffer, and runtime metrics
+- OHAudio playback path
+- minimum-audio-latency control and sync mode handling
+
+### 4. Input and Runtime Control
+
+- digital buttons, analog sticks, sensors, and port binding
+- virtual controller and input-layout pages
+- Save State, SRAM, Core Options, Cheat, and DiskControl support
+
+### 5. Product Pages
+
+- onboarding
+- import entry and import task overlay
+- library, detail page, settings, save state, help page
+- input center, shader preview, runtime control overlays
+
+## Repository Layout
+
+```text
+entry/src/main/cpp/
+  app/                 NAPI exports and XComponent bridge
+  core/                LibretroEngine, VideoPipeline, core loader, env
+  platform/            audio / graphics / resource / sync / xcomponent
+
+entry/src/main/ets/
+  pages/               product pages and test pages
+  components/          runtime controls, detail widgets, nav components
+  common/              EventHub, repositories, presenters, coordinators
+
+docs/
+  architecture/        stable architecture references
+  design/              design assets and UI references
+  plans/               roadmaps and implementation plans
+  verification/        screenshots and validation material
+  archive/             archived historical material
+
+deprecated/legacy/
+  retired experiments and old one-off kits
+```
+
+## Architecture Overview
+
+```text
+[ArkTS/UI thread]
+page state / routing / interaction
+  -> refactored* NAPI
+  -> libentry.so
+
+[XComponent callback thread]
+surface and input callbacks
+  -> PluginManager
+  -> LibretroEngine::SetNativeWindow / OnNativeWindowResized
+
+[Engine thread]
+GameLoop + MessageQueue + StateMachine
+  -> retro_run
+  -> VideoPipeline::Render
+  -> AudioBridge::ProcessAudio
+
+[Audio callback thread]
+OHAudio reads from RingBuffer and plays samples
+
+[Event bridge]
+EventBridge (C++)
+  -> LibretroEventHub (ArkTS)
+```
+
+## Why This Is Not Just Another Frontend Shell
+
+Unlike a UI-only wrapper, this repository deals with the hardest HarmonyOS-specific emulator frontend problems:
+
+- `XComponent / NativeWindow` lifecycle handling
+- Libretro core loading, switching, failure recovery
+- thread boundaries across video and audio paths
+- NAPI contracts between ArkTS and C++
+- product-page state versus runtime engine state
+
+That is why the repository contains all of the following at once:
+
+- ArkTS pages and product UI
+- substantial C++ engine and platform code
+- design, audit, verification, and release documentation
+
+## Quick Start
+
+### Environment
+
+- DevEco Studio
+- HarmonyOS SDK / Command Line Tools
+- a HarmonyOS device or emulator
+
+### Run Locally
+
+1. Open the project in DevEco Studio.
+2. Build and run the `entry` module.
+3. Enter the import flow or one of the test/runtime pages.
+4. Import ROM files you have legal rights to use, then select the appropriate core.
+
+### Local Static Checks
+
+```bash
+bash scripts/ci/check_repo_hygiene.sh
+bash scripts/ci/check_regression_guards.sh
+```
 
 ## Documentation Entry Points
 
@@ -29,259 +162,48 @@ The active architecture is `new_arch (LibretroEngine + VideoPipeline)`.
 - Security policy: `SECURITY.md`
 - Support guide: `SUPPORT.md`
 
-## Architecture Overview (Threads + Call Flow)
+Recommended reading order:
 
-```text
-[ArkTS/UI thread]
-Page calls refactoredStartEngine/refactoredLoadCore/refactoredLoadRom
-  -> NAPI (entry/src/main/cpp/app/napi/libretro_engine_napi.cpp)
-  -> LibretroEngine message queue
+1. this README
+2. `docs/README.md`
+3. `docs/plans/2026-02-06-new-arch-technical-whitepaper.md`
+4. `docs/architecture/`
+5. `docs/2026-04-30-design-page-acceptance-matrix.md`
 
-[XComponent callback thread]
-Surface Created/Changed
-  -> PluginManager forwards to LibretroEngine::SetNativeWindow / OnNativeWindowResized
+## Main Repository Constraints
 
-[Engine thread]
-LibretroEngine::GameLoop
-  -> HandleMessage(Start/LoadCore/LoadRom/...)
-  -> core_loader loads the core and binds libretro callbacks
-  -> retro_run loop
-  -> OnVideoRefresh -> VideoPipeline::Render (CPU/GLES/HW)
-  -> audio_sample_batch -> AudioBridge
+- use HarmonyOS official documentation and `libretro.h` as the source of truth
+- `deprecated/legacy/` does not participate in mainline evolution
+- NativeBuffer pixel access must go through `FromNativeWindowBuffer + Map/Unmap`
+- graphics API calls should stay on the engine/render thread
+- store builds must not ship bundled ROM samples or risky cover assets
 
-[Audio callback thread]
-OHAudio callback reads from RingBuffer; fills silence on underrun
+## CI and Release
 
-[Event bridge]
-C++ EventBridge -> ArkTS LibretroEventHub
-Events include core_crash/fps_update/audio_status/geometry_update/engine_state
-```
+Current workflows include:
 
-## Implemented Capabilities
+- `ci.yml`: lightweight static guards
+- `harmonyos-pr-ci.yml`: PR build gate
+- `harmonyos-release.yml`: release flow for `v*` tags
+- `harmonyos-device-deploy.yml`: manual deploy flow
 
-### 1) Engine and Lifecycle
+## Current Status
 
-- Dedicated engine thread + message-queue state machine (INIT/LOADING/RUNNING/PAUSED/ERROR, etc.)
-- Sync/async stop (`refactoredStopEngine` / `refactoredStopEngineAsync`)
-- `refactoredSwitchGameAsync(...)` with token-based debouncing and concurrent-switch protection
-- Last-error query/clear (`refactoredGetLastErrorInfo` / `refactoredClearLastErrorInfo`)
+This project is no longer at the “only the native core path works” stage, but it is also not at the “every core, every device, every page is fully production-closed” stage.
 
-### 2) Video Rendering
+The most accurate summary today is:
 
-- `VideoPipeline` modes:
-  - `0` Hardware Scaling
-  - `1` Software Scaling
-  - `2` GLES Scaling (default)
-- Handles `SET_PIXEL_FORMAT`, `SET_GEOMETRY`, and dupe/null frames
-- HW render negotiation paths:
-  - OpenGL ES HW context
-  - Vulkan negotiation/interface (including swapchain recreate and out-of-date handling)
-- Runtime controls in ArkTS: scaling mode, software max resolution, HW render allowance
+- the native/runtime mainline is strong enough for continued iteration
+- the product-layer pages are already present and have runtime screenshot evidence
+- compatibility coverage, device validation, long-run stability, and performance are still being tightened
 
-### 3) Audio Pipeline
+If you want the clearest picture of remaining gaps, start here:
 
-- `AudioBridge` + OHAudio low-latency playback
-- Resampling, buffer-usage metrics, underrun/overrun stats
-- Minimum audio latency configuration (core-side request in `retro_run` context)
-- `audio_status` events sent back to ArkTS
+- `Roadmap.md`
+- `docs/reference/known-issues.md`
+- `docs/2026-04-30-design-page-acceptance-matrix.md`
 
-### 4) Input System
+## License
 
-- Digital input: `refactoredSendInput`
-- Analog sticks: `refactoredSendAnalog`
-- Sensors: `refactoredSendSensor`
-- Port mapping: `refactoredAssignPortSource` / `refactoredUnassignPort`
-- Device listing and input debug stats: `refactoredListInputDevices` / `refactoredGetInputDebugStats`
-
-### 5) State and Core Control
-
-- Save State: `refactoredGetSaveStateSize` / `refactoredSaveState` / `refactoredLoadState`
-- SRAM: `refactoredGetSRAM` / `refactoredSetSRAM`
-- Core Options: `refactoredGetCoreOptions` / `refactoredSetCoreOption`
-- Cheat, Disk Control, Region, AVInfo, and Runtime Stats are exposed
-
-## UI Pages and Scenarios
-
-Current pages in `entry/src/main/resources/base/profile/main_pages.json`:
-
-- `pages/Index`: main entry
-- `pages/CoreLoaderTest`: core loading test
-- `pages/TestGambatte`: Gambatte test page
-- `pages/LibretroGamePage`: general multi-core gameplay page (primary)
-- `pages/LibretroNewArchTestPage`: new-architecture debug/validation page
-
-`LibretroGamePage` already includes a built-in multi-core list, automatic ROM matching rules, soak test entry, and core symbol validation.
-
-## Core and ROM Asset Status
-
-### Core `.so`
-
-- Directory: `entry/libs/arm64-v8a/`
-- The current development repository contains multiple bundled core binaries for bring-up and compatibility work.
-- Any store-release build should review those binaries individually for redistribution rights, required notices, and product-scope fit before shipping.
-
-### ROM
-
-- Store-release builds should rely on user-imported ROM files stored in the app sandbox.
-- Bundled rawfile ROM samples and bundled cover-art placeholders have been removed from the repository's release path, and `scripts/ci/check_release_readiness.sh` blocks them from being reintroduced into the working tree.
-- Production use should rely on ROM files imported by the user, with the user responsible for having legal rights to that content.
-
-## Quick Start
-
-1. Open the project in DevEco Studio.
-2. Build/Run the `entry` module (`module.json5` currently targets `phone`).
-3. From `Index`, start with `LibretroGamePage` or `LibretroNewArchTestPage`.
-4. Select core + ROM, then observe runtime state via events/logs.
-
-## Critical Contributor Constraints
-
-- Official docs first: when in doubt, check HarmonyOS official docs and `libretro.h`
-- NativeBuffer pixel access must follow `OH_NativeBuffer_FromNativeWindowBuffer + Map/Unmap`
-- Cross-thread shared state must be guarded explicitly (`std::mutex + std::lock_guard`)
-- Legacy architecture is archived under `deprecated/legacy/` and is not the default evolution path
-
-## Directory Map
-
-```text
-entry/src/main/cpp/
-  app/                 NAPI exports, XComponent callback bridge
-  core/                LibretroEngine, VideoPipeline, env/core loader
-  platform/            audio/graphics/resource/sync/xcomponent adapters
-  interfaces/          abstract interfaces
-  tests/               C++ integration/unit helpers (not a standalone auto test framework)
-  types/libentry/      ArkTS typings (index.d.ts)
-
-entry/src/main/ets/
-  pages/               home, test pages, general game page
-  components/          virtual controller, foldable layout components
-  common/              EventHub, logging, switch coordinator
-  config/              emulator metadata config
-
-build/
-  test-roms/           optional local-only ROM fixtures for M3 manifest generation (gitignored; never shipped)
-```
-
-## Known Limitations
-
-- HW render support exists, but stability/performance still varies by core/device combination
-- Shipping multiple cores does not imply all are fully playable on every target
-- Release readiness still requires device-specific stability validation (switching, background/foreground, rotation, long-run)
-- Store release readiness also requires copyright clearance for bundled assets, hosted privacy-policy pages, end-user legal documents, final screenshots, and audited store metadata. See `docs/release/`.
-
----
-
-For implementation details, start with:
-
-- `entry/src/main/cpp/core/engine/libretro_engine.h`
-- `entry/src/main/cpp/core/engine/video_pipeline.h`
-- `entry/src/main/cpp/app/napi/libretro_engine_napi.cpp`
-- `entry/src/main/ets/pages/LibretroGamePage.ets`
-- `entry/src/main/ets/common/LibretroEventHub.ets`
-
-## CI and Automated Regression
-
-The repository now uses two CI layers:
-
-- Lightweight static guards: `.github/workflows/ci.yml` (`push`/`pull_request`)
-- PR build gate: `.github/workflows/harmonyos-pr-ci.yml` (`pull_request`)
-
-`ci.yml` runs:
-
-- `scripts/ci/check_repo_hygiene.sh`
-  - merge conflict marker scan
-  - tracked build/cache output scan
-  - shell script syntax validation
-- `scripts/ci/check_regression_guards.sh`
-  - NativeBuffer safety guards (forbid `mmap/munmap`, require `FromNativeWindowBuffer + Map/Unmap`)
-  - `LOG_DOMAIN` compliance (`#undef LOG_DOMAIN` present and value in `0xD000-0xFFFF`)
-  - forbid hard-coded `SET_TIMEOUT=5`
-  - TODO/FIXME/HACK/XXX marker scan in first-party source
-
-`harmonyos-pr-ci.yml` adds:
-
-- HarmonyOS Command Line Tools setup
-- codelinter quality gate
-- `hvigorw assembleHap` build
-- HAP smoke checks (`module.json` / `ets/modules.abc` / `libentry.so`)
-- PR artifact upload and codelinter report upload
-
-Run locally:
-
-```bash
-bash scripts/ci/check_repo_hygiene.sh
-bash scripts/ci/check_regression_guards.sh
-```
-
-## Release and Deploy Pipelines (HarmonyOS)
-
-Release and deploy are split into three workflows:
-
-- `harmonyos-pr-ci.yml`: PR quality gates
-- `harmonyos-release.yml`: automatic build/sign/release for `v*` tags
-- `harmonyos-device-deploy.yml`: manual deploy to self-hosted devices from a selected run
-
-## GitHub Collaboration Files
-
-- `CONTRIBUTING.md`: contributor workflow and local checks
-- `SECURITY.md`: security reporting boundary
-- `SUPPORT.md`: support and issue routing guidance
-- `.github/ISSUE_TEMPLATE/`: bug and feature templates
-- `.github/PULL_REQUEST_TEMPLATE.md`: pull request checklist
-
-Legacy compatibility:
-
-- `harmonyos-full-ci.yml`: manual-only legacy full pipeline
-
-### Triggers
-
-- PR gate: open/update a pull request
-- Auto release: push a `v*` tag
-- Manual device deploy: run `harmonyos-device-deploy.yml` via `workflow_dispatch`
-
-### Required variable (configure at least one)
-
-- `secrets.HARMONY_COMMANDLINE_TOOLS_URL` or `vars.HARMONY_COMMANDLINE_TOOLS_URL`
-
-Optional checksum:
-
-- `secrets.HARMONY_COMMANDLINE_TOOLS_SHA256` or `vars.HARMONY_COMMANDLINE_TOOLS_SHA256`
-
-### Private Download Authentication (Optional)
-
-If your Command Line Tools are hosted in a private location (for example, private GitHub Release assets or private object storage), configure:
-
-- `HARMONY_COMMANDLINE_TOOLS_AUTH_TOKEN` (recommended)
-- `HARMONY_COMMANDLINE_TOOLS_AUTH_SCHEME` (default: `Bearer`)
-- `HARMONY_COMMANDLINE_TOOLS_AUTH_HEADER` (use this when you already have a full header, e.g. `Authorization: token xxx`)
-- `HARMONY_COMMANDLINE_TOOLS_AUTH_ACCEPT` (optional, e.g. `application/octet-stream`)
-
-For private GitHub Release assets, prefer the API asset URL:
-
-`https://api.github.com/repos/{owner}/{repo}/releases/assets/{asset_id}`
-
-The script will automatically add `Accept: application/octet-stream` and use your configured token/header.
-If no `AUTH_*` value is configured and the URL is under `api.github.com`, the workflow falls back to `GITHUB_TOKEN` automatically (recommended for same-repo assets).
-
-### Signing secrets (required by `harmonyos-release.yml`)
-
-- `HARMONY_SIGN_KEYSTORE_B64` (base64 of `.p12`)
-- `HARMONY_SIGN_CERT_B64` (base64 of `.cer`)
-- `HARMONY_SIGN_PROFILE_B64` (base64 of `.p7b`)
-- `HARMONY_SIGN_KEY_ALIAS`
-- `HARMONY_SIGN_KEY_PWD`
-- `HARMONY_SIGN_KEYSTORE_PWD`
-
-### Production Approval and Notifications (Optional)
-
-- `harmonyos-release.yml` uses `environment: production`
-  - If `production` has required reviewers configured, release waits for manual approval
-- Optional release webhook:
-  - `secrets.RELEASE_NOTIFY_WEBHOOK_URL` or `vars.RELEASE_NOTIFY_WEBHOOK_URL`
-  - On success, the workflow sends JSON with `tag/release_url/run_url/commit`
-
-### Manual Device Deploy Inputs (`harmonyos-device-deploy.yml`)
-
-- `source_run_id` (required): run id containing HAP artifacts
-- `artifact_name` (default: `harmonyos-hap`)
-- `hap_glob` (default: `*-signed.hap`)
-- `app_bundle_name` / `app_ability_name` / `app_module_name`
+- repository license: `LICENSE`
+- ROMs, cores, artwork, and third-party assets must only be used when the user has the legal right to use them
