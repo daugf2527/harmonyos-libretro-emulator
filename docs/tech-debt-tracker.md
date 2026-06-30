@@ -259,10 +259,10 @@
 |---|---|
 | 引入 | 2026-06-08 / B档调研（`docs/audit/2026-06-07-load-switch-stability.md` R3） |
 | 位置 | DiskControl(7) + SRAM(GetSRAM/SetSRAM) + Cheat + ResetCore + GetRegion 等同步 NAPI；`core/engine/libretro_engine.cpp` `ExecuteSyncTask`(kSyncTaskTimeoutMs=5000) |
-| 影响 | P3（latent）— 同步 NAPI × 5s 阻塞 × UI 线程，恰撞 HarmonyOS `APP_INPUT_BLOCK` 阈值；但这 14 个当前 **0 个 ArkTS 调用**，active 风险≈0，不炸 |
-| 拟修 | **defer（YAGNI）**：给 0 调用接口补用不上的 Async 版 = 为假设未来设计（违反 CLAUDE.md）。接 UI 前再补 Async 或 ArkTS 侧 taskpool 包装即可 |
+| 影响 | P3（latent）— 同步 NAPI × 5s 阻塞 × UI 线程，恰撞 HarmonyOS `APP_INPUT_BLOCK` 阈值。**2026-06-30 实物复核纠正**：原记"14 个当前 0 个 ArkTS 调用"**与实物不符**——`LibretroGamePage` 经 `RuntimeDiskControlController`(setEjectState/setImageIndex/replaceImageIndex 同步调用,无 taskpool 包装) + `RuntimeCoreControlController`(getRegion) 已实际调用同步版。但这些是**瞬时操作**(读状态/设索引,非 SaveState 式大内存序列化),单次远不及 5s,撞 `APP_INPUT_BLOCK` 概率仍极低 → active 风险仍低(非 0)。实际耗时需真机量化(未真机) |
+| 拟修 | **defer**：DiskControl/GetRegion 虽已被调用但属瞬时操作(撞 5s 阈值概率极低)，未观测到真实卡顿；真正高风险的大内存操作(SaveState/SRAM)早走 Async 绕开。补 Async 版收益低于真机暴露问题后再针对性补。接 UI 见卡顿或真机量到长耗时再补 Async / ArkTS 侧 taskpool 包装。 |
 | 状态 | open（deferred） |
-| 备注 | **2026-06-08 用户决策 defer**。详见 load-switch-stability audit R1/R3（R1 是唯一 active 高风险但存档/读档已走 Async 绕开）。改 app/napi 须 dispatch napi-boundary-reviewer。 |
+| 备注 | **2026-06-08 用户决策 defer**。详见 load-switch-stability audit R1/R3（R1 是唯一 active 高风险但存档/读档已走 Async 绕开）。改 app/napi 须 dispatch napi-boundary-reviewer。**2026-06-30 实物复核（7×24 loop·B 组）**：grep 实证推翻原"0 调用"前提——同步 DiskControl/GetRegion 已被 LibretroGamePage 经 Runtime*Controller 调用。但定性核查后 defer 结论**不变**（瞬时操作、未见真实卡顿、大内存操作已 Async）。教训同 [[feedback_pre_verify_before_dispatch]]：defer 理由也会 drift，"0 调用"类可证伪断言须定期实物复核。未真机。 |
 
 ### D024 — 音频写回调内持 state_mutex_（RT 反模式，决定 defer）
 
