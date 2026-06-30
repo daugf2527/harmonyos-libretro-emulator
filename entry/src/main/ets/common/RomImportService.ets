@@ -38,6 +38,10 @@ export interface RomImportProgress {
   hasAccurateByteProgress: boolean
 }
 
+interface RomImportFileErrorWithCode {
+  code?: string | number
+}
+
 export interface RomImportOptions {
   overwriteExisting?: boolean
   shouldCancel?: () => boolean
@@ -242,7 +246,14 @@ export async function deleteImportedRomFile(context: common.UIAbilityContext, ro
   if (safePath.length === 0) {
     throw new Error('ROM_DELETE_PATH_REJECTED')
   }
-  await fs.unlink(safePath)
+  try {
+    await fs.unlink(safePath)
+  } catch (err) {
+    if (isMissingFileError(err as Error | BusinessError | RomImportFileErrorWithCode)) {
+      return
+    }
+    throw err as Error
+  }
 }
 
 export async function pickRomUris(context: common.UIAbilityContext): Promise<DocumentPickerSelectionResult> {
@@ -969,8 +980,8 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
-  const errorCode = (err as { code?: string | number }).code
+function isMissingFileError(err: Error | BusinessError | RomImportFileErrorWithCode): boolean {
+  const errorCode = (err as RomImportFileErrorWithCode).code
   if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
     return true
   }

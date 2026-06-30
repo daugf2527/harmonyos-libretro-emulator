@@ -35,6 +35,10 @@ interface RuntimeDiskPrimaryPlanResult {
   detail: string
 }
 
+interface RuntimeDiskImageFileErrorWithCode {
+  code?: string | number
+}
+
 interface PickerSelectOptionsCompat {
   maxSelectNumber: number
 }
@@ -515,8 +519,8 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
-  const errorCode = (err as { code?: string | number }).code
+function isMissingFileError(err: Error | BusinessError | RuntimeDiskImageFileErrorWithCode): boolean {
+  const errorCode = (err as RuntimeDiskImageFileErrorWithCode).code
   if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
     return true
   }

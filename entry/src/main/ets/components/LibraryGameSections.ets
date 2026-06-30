@@ -1,5 +1,6 @@
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { LibraryRecord } from '../common/LibraryRepository'
+import { EmuButton, EmuButtonKind, EmuButtonShape, EmuButtonSize } from './EmuButton'
 import { EmuIcon } from './EmuIcon'
 import { GameCard } from './GameCard'
 import { LibrarySection } from './LibrarySection'
@@ -86,6 +87,7 @@ export struct LibraryGameSections {
   @Event onListScrolled?: (yOffset: number) => void
   @Event onListReachEnd?: () => void
   @Event onListTouched?: (event: TouchEvent, yOffset: number) => void
+  @Event onImportTap?: () => void
   private allGamesDataSource: LibraryDataSource = new LibraryDataSource();
   private listScroller: ListScroller = new ListScroller();
 
@@ -238,6 +240,19 @@ export struct LibraryGameSections {
           .fontFamily('monospace')
           .fontColor(EmuColors.onSurfaceVariant)
           .letterSpacing(0.6)
+
+        if (!this.loadFailed) {
+          EmuButton({
+            label: '导入 ROM',
+            kind: EmuButtonKind.PRIMARY,
+            buttonSize: EmuButtonSize.MD,
+            shape: EmuButtonShape.PILL,
+            onTap: () => {
+              this.onImportTap?.()
+            }
+          })
+            .margin({ top: 8 })
+        }
       }
       .width('100%')
       .padding({ top: 36, bottom: 24 })

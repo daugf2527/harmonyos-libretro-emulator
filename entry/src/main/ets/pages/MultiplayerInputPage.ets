@@ -545,14 +545,6 @@ struct MultiplayerInputPage {
   @Builder
   private TelemetrySection() {
     Column({ space: 14 }) {
-      const externalDeviceCount = this.getExternalDeviceCount()
-      const touchStatus = this.deviceListState === 'ready' ? '入口已展示' :
-        (this.deviceListState === 'error' ? '待确认' : '读取中')
-      const externalStatus = this.deviceListState === 'ready' ?
-        (externalDeviceCount > 0 ? `${externalDeviceCount} 个` : '未枚举到') :
-        (this.deviceListState === 'error' ? '待确认' : '读取中')
-      const modeText = this.deviceListState === 'ready' ? this.localLatencyText :
-        (this.deviceListState === 'error' ? '待确认' : '读取中')
       Row() {
         Row({ space: 8 }) {
           EmuIcon({ name: 'equalizer', iconSize: 16 })
@@ -582,9 +574,25 @@ struct MultiplayerInputPage {
 
       Column({ space: 8 }) {
         Row({ space: 8 }) {
-          this.MetricBox('触控入口', touchStatus, this.deviceListState === 'ready')
-          this.MetricBox('外设枚举', externalStatus, this.deviceListState === 'ready' && externalDeviceCount > 0)
-          this.MetricBox('本机摘要', modeText, this.deviceListState === 'ready' && externalDeviceCount > 0)
+          this.MetricBox(
+            '触控入口',
+            this.deviceListState === 'ready' ? '入口已展示' :
+              (this.deviceListState === 'error' ? '待确认' : '读取中'),
+            this.deviceListState === 'ready'
+          )
+          this.MetricBox(
+            '外设枚举',
+            this.deviceListState === 'ready' ?
+              (this.getExternalDeviceCount() > 0 ? `${this.getExternalDeviceCount()} 个` : '未枚举到') :
+              (this.deviceListState === 'error' ? '待确认' : '读取中'),
+            this.deviceListState === 'ready' && this.getExternalDeviceCount() > 0
+          )
+          this.MetricBox(
+            '本机摘要',
+            this.deviceListState === 'ready' ? this.localLatencyText :
+              (this.deviceListState === 'error' ? '待确认' : '读取中'),
+            this.deviceListState === 'ready' && this.getExternalDeviceCount() > 0
+          )
         }
         .width('100%')
 

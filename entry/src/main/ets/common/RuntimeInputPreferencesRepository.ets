@@ -96,10 +96,10 @@ function isRuntimeInputPreferencesProfileShapeValid(
   if (!profile || typeof profile !== 'object') {
     return false
   }
-  return 'version' in profile &&
-    'updatedAt' in profile &&
-    'hideVirtualController' in profile &&
-    'hideUndeclaredKeys' in profile
+  return profile.version !== undefined &&
+    profile.updatedAt !== undefined &&
+    profile.hideVirtualController !== undefined &&
+    profile.hideUndeclaredKeys !== undefined
 }
 
 function buildRuntimeInputPreferencesDirPath(filesDir: string): string {
@@ -144,7 +144,7 @@ async function readOptionalText(path: string): Promise<string> {
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
+function isMissingFileError(err: Error | RuntimeInputPreferencesFileErrorWithCode): boolean {
   const errorCode = (err as RuntimeInputPreferencesFileErrorWithCode).code
   if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
     return true

@@ -682,7 +682,7 @@ async function readOptionalText(path: string): Promise<string> {
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
+function isMissingFileError(err: Error | ErrorWithCode): boolean {
   const errorCode = (err as ErrorWithCode).code
   if (errorCode === ERR_CODE_ENOENT || errorCode === ERR_CODE_ENOENT_NUM || errorCode === 2) {
     return true

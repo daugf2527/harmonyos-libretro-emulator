@@ -341,7 +341,7 @@ async function readOptionalText(path: string): Promise<RuntimeCheatStoreReadResu
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
+function isMissingFileError(err: Error | RuntimeCheatFileErrorWithCode): boolean {
   const errorCode = (err as RuntimeCheatFileErrorWithCode).code
   if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
     return true

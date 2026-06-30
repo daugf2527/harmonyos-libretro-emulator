@@ -202,7 +202,7 @@ struct CoreManagerPage {
     return false
   }
 
-  private isMissingFileError(err: unknown): boolean {
+  private isMissingFileError(err: Error | CoreFileErrorWithCode): boolean {
     const errorCode = (err as CoreFileErrorWithCode).code
     if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
       return true
@@ -303,11 +303,11 @@ struct CoreManagerPage {
     return item.installed ? 'memory' : 'developer_board'
   }
 
-  private getCoreIconTone(item: ManagedCoreItem): ResourceColor {
+  private getCoreIconTone(item: ManagedCoreItem): string {
     if (this.isUnavailableCoreItem(item)) {
-      return EmuColors.onSurfaceVariant
+      return 'muted'
     }
-    return item.installed ? EmuColors.primary : EmuColors.onSurfaceVariant
+    return item.installed ? 'primary' : 'muted'
   }
 
   private getCoreStatusColor(item: ManagedCoreItem): ResourceColor {

@@ -527,6 +527,16 @@ struct LibraryPage {
     })
   }
 
+  private openImportEntryPage(): void {
+    const route = 'pages/ImportEntryPage'
+    this.suspendBeforeRoute()
+    this.getUIContext().getRouter().pushUrl({ url: route }).catch((err: Error) => {
+      LogHelper.error('LibraryPage', 'Route', `pushUrl ${route} failed: ${err.message}`)
+      this.pageActive = true
+      this.showToastMessage('导入页面现在还打不开，请稍后再试')
+    })
+  }
+
   private onCardTouch(event: TouchEvent, item: LibraryRecord): void {
     const point = this.resolveTouchPoint(event)
     const eventType = Number(event.type)
@@ -929,6 +939,9 @@ struct LibraryPage {
       onListTouched: (event: TouchEvent, yOffset: number) => {
         this.scrollOffsetY = Math.max(0, yOffset)
         this.onMainContentTouch(event)
+      },
+      onImportTap: () => {
+        this.openImportEntryPage()
       }
     })
       .layoutWeight(1)

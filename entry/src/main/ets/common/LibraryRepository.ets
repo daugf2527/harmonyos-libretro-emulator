@@ -53,6 +53,10 @@ export interface LibraryRuntimeSnapshot {
   videoNulls: number
 }
 
+interface LibraryFileErrorWithCode {
+  code?: string | number
+}
+
 export interface LibraryMetadataPatch {
   title?: string
   overview?: string
@@ -1036,8 +1040,8 @@ async function readOptionalText(path: string): Promise<string> {
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
-  const errorCode = (err as { code?: string | number }).code
+function isMissingFileError(err: Error | BusinessError | LibraryFileErrorWithCode): boolean {
+  const errorCode = (err as LibraryFileErrorWithCode).code
   if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
     return true
   }

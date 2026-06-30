@@ -398,6 +398,10 @@ struct SettingsPage {
     return this.pageActive && token === this.refreshToken
   }
 
+  private async refreshSettings(): Promise<void> {
+    await this.refreshPageData()
+  }
+
   private async refreshPageData(): Promise<void> {
     const token = this.beginRefresh()
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext
@@ -492,7 +496,7 @@ struct SettingsPage {
           `外接设备：${externalNames.join(' / ')}` :
           (externalDeviceCount > 0 ?
             `已枚举 ${externalDeviceCount} 个外接设备，但当前没有可展示的设备名称` :
-            '当前没有枚举到外接设备，页面仅展示本地触控布局')))
+            '当前没有枚举到外接设备，页面仅展示本地触控布局'))
     } catch (_err) {
       if (!this.isCurrentRefresh(token)) {
         return
@@ -982,11 +986,10 @@ struct SettingsPage {
     value: number,
     onChange: (value: number) => void
   ) {
-    const displayValue = this.runtimeProfilesReady ? value : 0
     LinearSettingRow({
       label: label,
       code: code,
-      value: displayValue,
+      value: this.runtimeProfilesReady ? value : 0,
       min: 0,
       max: 100,
       onChange: onChange

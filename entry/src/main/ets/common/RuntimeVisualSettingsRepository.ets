@@ -107,12 +107,12 @@ function isRuntimeVisualSettingsProfileShapeValid(
   if (!profile || typeof profile !== 'object') {
     return false
   }
-  return 'version' in profile &&
-    'updatedAt' in profile &&
-    'aspectMode' in profile &&
-    'scanlineIntensity' in profile &&
-    'curvature' in profile &&
-    'saturation' in profile
+  return profile.version !== undefined &&
+    profile.updatedAt !== undefined &&
+    profile.aspectMode !== undefined &&
+    profile.scanlineIntensity !== undefined &&
+    profile.curvature !== undefined &&
+    profile.saturation !== undefined
 }
 
 export function resolveRuntimeVisualAspectRatio(
@@ -206,7 +206,7 @@ async function readOptionalText(path: string): Promise<string> {
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
+function isMissingFileError(err: Error | RuntimeVisualSettingsFileErrorWithCode): boolean {
   const errorCode = (err as RuntimeVisualSettingsFileErrorWithCode).code
   if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
     return true

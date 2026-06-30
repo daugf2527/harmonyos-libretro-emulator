@@ -132,7 +132,7 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
+function isMissingFileError(err: Error | CoreFirmwareFileErrorWithCode): boolean {
   const errorCode = (err as CoreFirmwareFileErrorWithCode).code
   if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
     return true

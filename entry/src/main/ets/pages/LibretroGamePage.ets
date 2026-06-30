@@ -121,7 +121,13 @@ import {
   resolveRuntimeVisualAspectRatio,
   RuntimeVisualSettingsProfile
 } from '../common/RuntimeVisualSettingsRepository'
-import { getInputMappingService } from '../common/InputMappingService'
+import { getInputMappingService, InputMappingNativeApi } from '../common/InputMappingService'
+
+class GamePageInputMappingNativeApi implements InputMappingNativeApi {
+  setInputKeyMapping(mappingMap: Record<string, number>): boolean | void {
+    return testNapi.setInputKeyMapping(mappingMap)
+  }
+}
 
 /**
  * 携带 C++ 回传 errorCode 的切换游戏异常。
@@ -286,9 +292,8 @@ struct LibretroGamePage {
   aboutToAppear() {
     this.pageActive = true;
     this.setKeepScreenOn(true);
-    void getInputMappingService().attachNativeApi({
-      setInputKeyMapping: (mappingMap: Record<string, number>) => testNapi.setInputKeyMapping(mappingMap)
-    }).catch((err: Error) => {
+    const inputMappingNativeApi: InputMappingNativeApi = new GamePageInputMappingNativeApi();
+    void getInputMappingService().attachNativeApi(inputMappingNativeApi).catch((err: Error) => {
       const message = err?.message || String(err);
       LogHelper.warn('LibretroGame', 'Input', `同步键盘映射到运行时失败: ${message}`);
       this.runtimeSaveStatusText = '键盘映射这次没有同步到运行时，请稍后重试';
@@ -3400,8 +3405,8 @@ struct LibretroGamePage {
       this.gameRunning = true;
       this.gamePaused = false;
       this.pendingStart = false;
-      const renderConfigApplied = this.applyRuntimeRenderSettingsToNative('postlaunch');
-      if (!renderConfigApplied) {
+      const postlaunchRenderConfigApplied = this.applyRuntimeRenderSettingsToNative('postlaunch');
+      if (!postlaunchRenderConfigApplied) {
         this.runtimeSaveStatusText = '画面设置没有完整写进当前运行，请稍后重试';
       }
       // D019: 游戏启动成功(引擎 RUNNING、AudioBridge 已 Reset(sample_rate))后应用

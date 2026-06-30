@@ -108,13 +108,13 @@ function isRuntimeRenderSettingsProfileShapeValid(
   if (!profile || typeof profile !== 'object') {
     return false
   }
-  return 'version' in profile &&
-    'updatedAt' in profile &&
-    'scalingMode' in profile &&
-    'swapInterval' in profile &&
-    'softwareMaxPresetIndex' in profile &&
-    'aiUpscaleEnabled' in profile &&
-    'hwRenderAllowed' in profile
+  return profile.version !== undefined &&
+    profile.updatedAt !== undefined &&
+    profile.scalingMode !== undefined &&
+    profile.swapInterval !== undefined &&
+    profile.softwareMaxPresetIndex !== undefined &&
+    profile.aiUpscaleEnabled !== undefined &&
+    profile.hwRenderAllowed !== undefined
 }
 
 export function describeRenderMode(mode: number): string {
@@ -211,7 +211,7 @@ async function readOptionalText(path: string): Promise<string> {
   }
 }
 
-function isMissingFileError(err: unknown): boolean {
+function isMissingFileError(err: Error | RuntimeRenderSettingsFileErrorWithCode): boolean {
   const errorCode = (err as RuntimeRenderSettingsFileErrorWithCode).code
   if (errorCode === '13900002' || errorCode === 13900002 || errorCode === 2) {
     return true
