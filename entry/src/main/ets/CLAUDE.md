@@ -4,6 +4,19 @@ This file documents ArkTS/ArkUI-specific patterns enforced in `entry/src/main/et
 
 For cross-layer architecture see the root `CLAUDE.md`.
 
+## Editing .ets safely — MANDATORY before every Edit
+
+Two high-frequency traps waste large amounts of debugging time when editing `.ets` files
+(see memory `feedback_arkts_edit_safety` for full detail):
+
+1. **Edit `old_string` swallowing a comment block → syntax break → compiler OOM disguise.**
+   A stray `*` left outside a `/** */` block makes the ArkTS compiler loop and crash as
+   `JS heap out of memory` — masking a syntax error as a memory problem. **After every `.ets`
+   Edit**, run `rg -n "^\s+\*\s*$" <file>` to catch orphan `*` lines, and ensure `old_string`
+   never cuts across a comment's `/**` or `*/`.
+2. **ArkTS forbids object spread** (`{...obj}`) — only array spread is allowed. Construct
+   objects with explicit fields instead.
+
 ## aboutToAppear lifecycle — DO NOT use setTimeout
 
 **Problem**: Heavy sync work in `aboutToAppear()` blocks page transition animation on the main thread.
