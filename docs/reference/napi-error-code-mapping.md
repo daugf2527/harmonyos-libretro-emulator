@@ -24,7 +24,7 @@ interface NapiErrorResult {
 | `refactoredSaveState` | `ArrayBuffer` (向后兼容) | 3031 | `EngineErrorCodes.SAVE_STATE_SAVE_FAILED` | 存档保存失败 |
 | `refactoredSwitchGameAsync` | `{ success: true }` | 3001/3010/3020/3022 | 多种错误码 | 游戏切换失败（根据失败阶段映射） |
 
-> **预留未接入**：`EngineErrorCodes.SRAM_LOAD_FAILED`(3032) 已在 C++ 定义，但 `GetSRAM`/`SetSRAM` 失败时返回 `null`/`false` 不带 errorCode，ArkTS 侧亦无 SRAM 调用——当前两侧皆为 dead constant，待未来 SRAM UI 接入时再激活（见 `docs/audit-report-2026-06-04.md` P3-1）。
+> **预留未接入**：`EngineErrorCodes.SRAM_LOAD_FAILED`(3032) 已在 C++ 定义，但 `GetSRAM`/`SetSRAM` 失败时返回 `null`/`false` 不带 errorCode，ArkTS 侧亦无 SRAM 调用——当前两侧皆为 dead constant，待未来 SRAM UI 接入时再激活（见 `docs/audit/audit-report-2026-06-04.md` P3-1）。
 
 ### refactoredSwitchGameAsync 错误码映射逻辑
 
@@ -158,7 +158,7 @@ bash scripts/check/quick_signals.sh
 
 > ⚠️ **上文「ArkTS 层迁移建议」小节描述的是设计意图，与当前实现存在 gap。**
 
-经 2026-06-04 全方位质检交叉验证（详见 `docs/audit-report-2026-06-04.md` ARCH-1）：
+经 2026-06-04 全方位质检交叉验证（详见 `docs/audit/audit-report-2026-06-04.md` ARCH-1）：
 
 - C++ `MakeErrorResult` 确实组装并回传 `{ success, errorCode, message }`。
 - **但 ArkTS 消费侧当前丢弃 `errorCode` 字段**：`LibretroGamePage.ets` 靠 `message.includes('Core'/'核心'/'ROM')` 字符串嗅探在前端二次推断错误码；`SaveStatePage.ets` 走 boolean/null 协议；NAPI 接口签名里也无结构体类型。

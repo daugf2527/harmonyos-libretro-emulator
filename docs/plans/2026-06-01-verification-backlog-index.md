@@ -32,7 +32,7 @@ M2 可观测性  账本对齐问题,非验证问题 → 先改 Roadmap
 | **P1** | **M5 Vulkan** | 进行中(兜底) | 代码落地 + plan 详尽 | `docs/plans/2026-05-31-m5-vulkan-verification-plan.md`(5 场景 transfer-only) | ⬜ 未跑 |
 | **P1** | **M4 视频一致性** | ✅ 已完成 | 代码审计为主(无真机) | `docs/audit/m4-t46-video-callback-audit.md` | ⬜ 未跑(建议随 M5 一起测) |
 | **门禁** | **M3 质量门禁** | ✅ 已完成 | ⚠️ **stub**:矩阵+脚本仅设计,`scripts/test/` 无 matrix/compat 落地 | `docs/design/m3-automated-test-design.md` / `m3-core-compatibility-matrix.md` | ⬜ 脚本未落地,无法跑 |
-| **账本** | **M2 可观测性** | 未开始 | ⚠️ working tree 已在加 error code,且文档/代码 drift | `docs/napi-error-code-mapping.md` | N/A(先对齐 Roadmap) |
+| **账本** | **M2 可观测性** | 未开始 | ⚠️ working tree 已在加 error code,且文档/代码 drift | `docs/reference/napi-error-code-mapping.md` | N/A(先对齐 Roadmap) |
 
 ---
 

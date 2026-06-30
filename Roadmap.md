@@ -23,7 +23,7 @@
 ## 缺口清单（代码层）
 
 > **注意**: 详细问题与修复建议已迁移至 `docs/reference/known-issues.md`。
-> **最近更新**: 2026-05-31 代码审计后删除已修复问题（详见 `docs/2026-05-31-code-reality-audit.md`）
+> **最近更新**: 2026-05-31 代码审计后删除已修复问题（详见 `docs/audit/2026-05-31-code-reality-audit.md`）
 
 ### 输入
 - ~~输入快照”analog”入口未打通~~（✅ 已修复：NAPI `refactoredSendAnalog` + ArkTS 链路完整）
@@ -132,7 +132,7 @@
 
 ## 代码深度评估报告 (Code Depth Evaluation Report)
 
-> **最新审计**: 2026-05-31 代码现状深度审计（详见 `docs/2026-05-31-code-reality-audit.md`）  
+> **最新审计**: 2026-05-31 代码现状深度审计（详见 `docs/audit/2026-05-31-code-reality-audit.md`）
 > **关键发现**: 原 P0/P1 标记的 5 个问题中 4 个已修复，文档与代码实现严重脱节。
 
 ### 总体评价

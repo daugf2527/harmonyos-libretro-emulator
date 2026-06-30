@@ -383,7 +383,7 @@ HarmonyOS 5.1.0(18) 及更高版本已默认禁用 JIT 编译。
 【1. 渲染核心 (Phase 1)】
 - 参考项目: `基于XComponent组件实现双缓冲功能` (Native Double Buffering)
 - 核心价值: legacy 示例链路 `Chip8App` 对应此场景：`NativeWindow` 请求 Buffer -> 写入像素 -> Flush（已归档）。
-   - 代码位置：`deprecated/legacy/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`
+   - 代码位置：`deprecated/legacy/archive/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`
    - 主链路（Libretro）的视频输出当前走 `VideoPipeline`，不应混为一谈。
 - 关键 API: `OH_NativeWindow_NativeWindowRequestBuffer`, `OH_NativeWindow_NativeWindowFlushBuffer`
 
@@ -427,7 +427,7 @@ HarmonyOS 5.1.0(18) 及更高版本已默认禁用 JIT 编译。
 - 头文件: `<native_window/external_window.h>`
 - 核心循环：
     1.  配置: `OH_NativeWindow_NativeWindowHandleOpt(window, SET_BUFFER_GEOMETRY, requestWidth, requestHeight)`。
-        - 示例（legacy，已归档）：Chip8 使用 `64x32`（`deprecated/legacy/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`）
+        - 示例（legacy，已归档）：Chip8 使用 `64x32`（`deprecated/legacy/archive/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`）
         - 主链路（Libretro）：由 `entry/src/main/cpp/core/engine/video_pipeline.cpp::VideoPipeline::Render` 根据 `ScalingMode` 与窗口大小选择 `requestWidth/requestHeight`
     2.  请求: `OH_NativeWindow_NativeWindowRequestBuffer` 获取 `OHNativeWindowBuffer`。
     3.  映射: 使用官方 `NativeBuffer` 流程获取 CPU 可写的虚拟地址：
@@ -435,7 +435,7 @@ HarmonyOS 5.1.0(18) 及更高版本已默认禁用 JIT 编译。
         2. `OH_NativeBuffer_Map` 获取 `void* virAddr`。
         3. `OH_NativeBuffer_GetConfig` 获取 `stride/width/height/format`。
     4.  写入: 将你的 framebuffer 像素数据写入 `virAddr`。
-        - 示例（legacy，已归档）：Chip8 的 `gfx[]` → ARGB 写入（`deprecated/legacy/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`）
+        - 示例（legacy，已归档）：Chip8 的 `gfx[]` → ARGB 写入（`deprecated/legacy/archive/entry/src/main/cpp/app/games/chip8/chip8_app.cpp`）
         - 主链路（Libretro）：像素转换/缩放与写入在 `entry/src/main/cpp/core/engine/video_pipeline.cpp::VideoPipeline::Render`
     5.  解绑: `OH_NativeBuffer_Unmap`。
     6.  提交: `OH_NativeWindow_NativeWindowFlushBuffer` 将画面送显。

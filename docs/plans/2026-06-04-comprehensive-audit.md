@@ -27,7 +27,7 @@
 | `CLAUDE.md` | +344/-244 | 添加 COMMON.md @import |
 | `AGENTS.md` | +13 | 添加公共行为准则 |
 | `docs/harmonyos-sdk-target.md` | +25 | API22 目标更新 |
-| `docs/napi-error-code-mapping.md` | +16 | 错误码映射表更新 |
+| `docs/reference/napi-error-code-mapping.md` | +16 | 错误码映射表更新 |
 | `docs/tech-debt-tracker.md` | +8 | 技术债跟踪更新 |
 
 ---
@@ -75,14 +75,14 @@
 - `entry/src/main/cpp/core/engine/window_state_manager.cpp`
 - `CLAUDE.md`, `AGENTS.md`
 - `docs/harmonyos-sdk-target.md`
-- `docs/napi-error-code-mapping.md`
+- `docs/reference/napi-error-code-mapping.md`
 - `docs/tech-debt-tracker.md`
 
 **检查项:**
 1. `SET_BUFFER_GEOMETRY` 和 `SET_SWAP_INTERVAL` 的 fallback define 被删除 — API22 SDK 是否真的提供这些宏？
 2. `CLAUDE.md` 新增 `@C:/Users/newwo/.cc-switch/agent-policy/COMMON.md` — 是否导致与 AGENTS.md 内容双轨重复
 3. `AGENTS.md` 新增"公共行为准则" — 与 COMMON.md 关系是否清晰
-4. docs/napi-error-code-mapping.md 里的错误码表是否与新 namespace 常量对齐
+4. docs/reference/napi-error-code-mapping.md 里的错误码表是否与新 namespace 常量对齐
 5. docs/harmonyos-sdk-target.md 的 API22 目标描述是否准确
 
 ---
@@ -98,7 +98,7 @@
 
 ### Task E: 综合报告合成
 
-将所有 findings 合并为 `docs/audit-report-2026-06-04.md`
+将所有 findings 合并为 `docs/audit/audit-report-2026-06-04.md`
 
 ---
 
@@ -106,5 +106,5 @@
 
 - [ ] Batch 1 三个 agent 返回 findings
 - [ ] Batch 2 交叉验证完成
-- [ ] 最终报告写入 `docs/audit-report-2026-06-04.md`
+- [ ] 最终报告写入 `docs/audit/audit-report-2026-06-04.md`
 - [ ] 报告包含：问题清单（P0/P1/P2）+ 各维度 PASS/FAIL + 建议动作

@@ -396,7 +396,7 @@ constexpr int SAVE_STATE_SAVE_FAILED = 3031;
 // 预留：与 ErrorCodes.ets 的 SRAM_LOAD_FAILED(3032) 对称定义。
 // 当前 GetSRAM/SetSRAM 失败返回 null/false 不走结构化错误码，故此常量暂未被
 // MakeErrorResult 引用；待未来 SRAM 失败需要回传 errorCode 时启用。详见
-// docs/audit-report-2026-06-04.md P3-1 与 docs/napi-error-code-mapping.md。
+// docs/audit/audit-report-2026-06-04.md P3-1 与 docs/reference/napi-error-code-mapping.md。
 constexpr int SRAM_LOAD_FAILED = 3032;
 } // namespace EngineErrorCodes
 

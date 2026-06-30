@@ -7,7 +7,7 @@ cd "${ROOT_DIR}"
 
 MEMORY_DIR="/c/Users/newwo/.claude/projects/D--windsulf-daugf2527-repos-harmonyos-libretro-emulator/memory"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-REPORT="docs/gc-drift-report-${TIMESTAMP}.md"
+REPORT="docs/archive/gc/gc-drift-report-${TIMESTAMP}.md"
 
 total_refs=0
 total_drifts=0

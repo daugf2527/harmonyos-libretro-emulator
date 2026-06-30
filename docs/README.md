@@ -13,6 +13,8 @@ This directory contains the project's long-lived documentation.
 
 - `architecture/`
   - Stable architecture and subsystem references
+- `reference/`
+  - Long-lived implementation references, API notes, and support material
 - `design/`
   - UI, feature, and implementation design docs
 - `plans/`
@@ -30,11 +32,14 @@ This directory contains the project's long-lived documentation.
 
 1. [../README.md](../README.md)
 2. [architecture/](architecture/)
-3. [design/](design/)
-4. [release/](release/)
+3. [reference/](reference/)
+4. [design/](design/)
+5. [release/](release/)
 
 ## Doc Hygiene Rules
 
 - Keep stable docs near the top-level section folders above.
+- Keep only a small set of high-signal entry documents at `docs/` root.
+- Put generated drift reports under `archive/gc/` instead of the root.
 - Move obsolete or one-off investigation output to `archive/`.
 - Avoid leaving important contributor guidance only inside session-specific plans or audits.

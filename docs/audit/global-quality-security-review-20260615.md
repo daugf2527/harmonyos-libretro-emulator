@@ -200,7 +200,7 @@
 | `bash scripts/ci/check_regression_guards.sh` | 通过，`Static regression guards passed` |
 | `bash scripts/ci/check_repo_hygiene.sh` | 通过，`Repository hygiene checks passed` |
 | `& .\scripts\check\check_harmony_api26_env.ps1` | 通过；API26 SDK 包存在，`sdk-pkg/native/ets/toolchains/previewer apiVersion=26 version=26.0.0.23`，HMS native sysroot 存在 |
-| `bash scripts/gc/scan_code_drift.sh` | 失败于既有 P2 inline color 债务；新报告 `docs/gc-code-drift-20260615-145945.md` 显示 `P1:0 P2:723 P3:0 P4:0 P5:0 P6:0 P7:0` |
+| `bash scripts/gc/scan_code_drift.sh` | 失败于既有 P2 inline color 债务；当次扫描摘要为 `P1:0 P2:723 P3:0 P4:0 P5:0 P6:0 P7:0` |
 | `ROMLoader::ValidateROM()` 静态复核 | 已覆盖 rawfile/VFS 两条加载链路，拦截空文件、超大文件、全零文件、明显 HTML/XML 文档 |
 | `RuntimeCheatRepository`/`RuntimeCheatController` 静态复核 | 已限制金手指条数、code/label/id/romFile 长度与控制字符，控制器失败日志不再输出用户 label 或 code |
 | 导入/存档/SRAM 文件名边界静态复核 | `RomImportService`、`RuntimeDiskImageImportService`、`SaveStateRepository`、`RuntimeSramRepository` 已限制控制字符、路径分隔符、危险符号、纯点号前缀和超长文件名 |

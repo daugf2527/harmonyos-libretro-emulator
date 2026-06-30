@@ -45,7 +45,7 @@
 | `entry/src/main/ets/common/EngineSteps.ets` | M2（地基） |
 | `entry/src/main/ets/common/PerformanceTracker.ets` | M2（工具） |
 | `entry/src/main/ets/pages/RomManagerPage.ets` | M6（ROM 管理） |
-| `docs/napi-error-code-mapping.md` | M2（文档） |
+| `docs/reference/napi-error-code-mapping.md` | M2（文档） |
 | `docs/design/m6-core-manager-ui-spec.md` | M6（文档） |
 | `docs/design/m6-core-switch-optimization.md` | M6（文档） |
 | `docs/design/m6-rom-manager-ui-spec.md` | M6（文档） |
@@ -79,7 +79,7 @@ feat(m2): add ErrorCodes, EngineSteps, PerformanceTracker ArkTS modules
 - `entry/src/main/ets/common/ErrorCodes.ets` *(新文件)*
 - `entry/src/main/ets/common/EngineSteps.ets` *(新文件)*
 - `entry/src/main/ets/common/PerformanceTracker.ets` *(新文件)*
-- `docs/napi-error-code-mapping.md` *(新文件)*
+- `docs/reference/napi-error-code-mapping.md` *(新文件)*
 
 **理由**: 这三个模块是后续所有 M2 错误码引用的地基（LibraryPage/SaveStatePage/LibretroGamePage 均 import `ErrorCodes.ets`），必须最先进仓，否则后续 commit 的 import 会悬空。
 

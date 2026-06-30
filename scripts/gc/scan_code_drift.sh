@@ -5,7 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
-REPORT="docs/gc-code-drift-${TIMESTAMP}.md"
+REPORT="docs/archive/gc/code/gc-code-drift-${TIMESTAMP}.md"
 
 ETS_DIR="entry/src/main/ets"
 CPP_DIR="entry/src/main/cpp"
