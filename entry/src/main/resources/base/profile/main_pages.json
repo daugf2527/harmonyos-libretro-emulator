@@ -1,7 +1,6 @@
 {
   "src": [
     "pages/OnboardingPage",
-    "pages/Index",
     "pages/ImportEntryPage",
     "pages/LibraryPage",
     "pages/LibraryDetailPage",

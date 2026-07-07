@@ -12,8 +12,15 @@ import {
   loadSystemFirmwareEntries
 } from '../common/CoreFirmwareRepository'
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
-import { CoreConfig, LIBRETRO_CORE_CATALOG } from '../common/LibretroCoreCatalog'
+import {
+  CoreConfig,
+  LIBRETRO_CORE_CATALOG,
+  LIBRETRO_CORE_EXTENSION_RULES,
+  NO_GAME_CORE_IDS
+} from '../common/LibretroCoreCatalog'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
+import { runtimeCoreDiagnosticController } from '../common/RuntimeCoreDiagnosticController'
+import { resolveRuntimeCorePath } from '../common/RuntimePathResolver'
 
 interface ManagedCoreItem {
   id: string
@@ -27,6 +34,10 @@ interface ManagedCoreItem {
   firmwareFoundText: string
   firmwareMissingText: string
   hasFirmwareDependencies: boolean
+  loaderTestStatus: string
+  loaderTestDetail: string
+  loaderTestRunning: boolean
+  contentTestDetail: string
 }
 
 interface CoreFileErrorWithCode {
@@ -41,10 +52,13 @@ struct CoreManagerPage {
   @Local private selectedCoreId: string = ''
   @Local private firmwareSummaryText: string = '正在检查本地固件文件情况'
   @Local private firmwareFilesText: string = '正在检查本地固件目录'
+  @Local private loaderSummaryText: string = '核心可用性检查尚未执行'
+  @Local private loaderTestRunning: boolean = false
   @Local private remoteUpdateText: string = '当前版本仅管理随应用提供的本地核心与固件'
   @Local private foldDisplayMode: display.FoldDisplayMode = display.FoldDisplayMode.FOLD_DISPLAY_MODE_UNKNOWN
   private pageActive: boolean = false
   private coreRefreshToken: number = 0
+  private loaderTestToken: number = 0
   private readonly navItems: EmuBottomNavItem[] = createEmuBottomNavItems('system')
   private foldStatusListener: (data: display.FoldStatus) => void = (data: display.FoldStatus) => {
     if (!this.pageActive) {
@@ -67,6 +81,7 @@ struct CoreManagerPage {
   aboutToDisappear(): void {
     this.pageActive = false
     this.coreRefreshToken += 1
+    this.loaderTestToken += 1
     try {
       display.off('foldStatusChange', this.foldStatusListener)
     } catch (err) {
@@ -140,7 +155,11 @@ struct CoreManagerPage {
           firmwareDetail: firmwareState.detailText,
           firmwareFoundText: firmwareState.foundFilesText,
           firmwareMissingText: firmwareState.missingFilesText,
-          hasFirmwareDependencies: firmwareState.hasDependencies
+          hasFirmwareDependencies: firmwareState.hasDependencies,
+          loaderTestStatus: '未检查',
+          loaderTestDetail: '还没有执行核心可用性检查',
+          loaderTestRunning: false,
+          contentTestDetail: this.buildContentTestDetail(item.id)
         })
       }
       this.coreItems = nextItems
@@ -261,7 +280,11 @@ struct CoreManagerPage {
         firmwareDetail: '正在读取本地固件目录',
         firmwareFoundText: '正在读取',
         firmwareMissingText: '正在读取',
-        hasFirmwareDependencies: false
+        hasFirmwareDependencies: false,
+        loaderTestStatus: '未检查',
+        loaderTestDetail: '还没有执行核心可用性检查',
+        loaderTestRunning: false,
+        contentTestDetail: this.buildContentTestDetail(config.id)
       })
     }
     return items
@@ -282,10 +305,172 @@ struct CoreManagerPage {
         firmwareDetail: '当前没有读到这项核心和固件状态',
         firmwareFoundText: '请稍后重试',
         firmwareMissingText: '请稍后重试',
-        hasFirmwareDependencies: false
+        hasFirmwareDependencies: false,
+        loaderTestStatus: '未检查',
+        loaderTestDetail: '还没有执行核心可用性检查',
+        loaderTestRunning: false,
+        contentTestDetail: this.buildContentTestDetail(config.id)
       })
     }
     return items
+  }
+
+  private buildContentTestDetail(coreId: string): string {
+    if (NO_GAME_CORE_IDS.indexOf(coreId) >= 0) {
+      return '内容要求：可用内置 no-game 样例直接启动，不需要额外 ROM'
+    }
+    const extensionRule = LIBRETRO_CORE_EXTENSION_RULES.find((item) => item.coreId === coreId)
+    if (!extensionRule) {
+      return '内容要求：当前还没有配置可识别的内容格式'
+    }
+    const extensions = extensionRule.extensions.map((item) => `.${item}`).join('、')
+    if (extensionRule.requiresExactName) {
+      return `内容要求：需要提供 ${extensionRule.requiresExactName}，支持 ${extensions}`
+    }
+    return `内容要求：需要用户提供合法 ROM/数据文件，支持 ${extensions}`
+  }
+
+  private beginLoaderTest(): number {
+    this.loaderTestToken += 1
+    return this.loaderTestToken
+  }
+
+  private isCurrentLoaderTest(token: number): boolean {
+    return this.pageActive && token === this.loaderTestToken
+  }
+
+  private async runAllCoreLoaderTests(): Promise<void> {
+    if (this.loaderTestRunning) {
+      return
+    }
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext
+    if (!context) {
+      this.loaderSummaryText = '现在还读不到应用上下文，无法执行核心可用性检查'
+      return
+    }
+    const token = this.beginLoaderTest()
+    this.loaderTestRunning = true
+    this.loaderSummaryText = `正在检查 ${this.coreItems.length} 个核心的加载与符号`
+    this.resetCoreLoaderTestState('等待检查', '已加入本轮核心可用性检查队列', false)
+
+    let passedCount = 0
+    let failedCount = 0
+    let missingCount = 0
+    for (let index = 0; index < this.coreItems.length; index += 1) {
+      const item = this.coreItems[index]
+      if (!this.isCurrentLoaderTest(token)) {
+        return
+      }
+      if (!item.installed) {
+        missingCount += 1
+        this.updateCoreLoaderTestState(
+          item.id,
+          '缺核心',
+          `包内没有检测到 ${item.soFile}，无法检查动态库入口`,
+          false
+        )
+        this.loaderSummaryText = this.buildLoaderSummaryText(index + 1, passedCount, failedCount, missingCount)
+        continue
+      }
+
+      this.updateCoreLoaderTestState(item.id, '检查中', '正在检查核心可用性', true)
+      const corePath = await resolveRuntimeCorePath(context.bundleCodeDir, item.soFile)
+      if (!this.isCurrentLoaderTest(token)) {
+        return
+      }
+      const report = await runtimeCoreDiagnosticController.testCoreLoader(corePath, {
+        shouldCancel: () => !this.isCurrentLoaderTest(token)
+      })
+      if (!this.isCurrentLoaderTest(token)) {
+        return
+      }
+      if (this.isCoreLoaderReportSuccess(report)) {
+        passedCount += 1
+        this.updateCoreLoaderTestState(item.id, '通过', this.summarizeCoreLoaderReport(report), false)
+      } else {
+        failedCount += 1
+        this.updateCoreLoaderTestState(item.id, '失败', this.summarizeCoreLoaderReport(report), false)
+      }
+      this.loaderSummaryText = this.buildLoaderSummaryText(index + 1, passedCount, failedCount, missingCount)
+    }
+    if (this.isCurrentLoaderTest(token)) {
+      this.loaderSummaryText = this.buildLoaderSummaryText(
+        this.coreItems.length,
+        passedCount,
+        failedCount,
+        missingCount
+      )
+      this.loaderTestRunning = false
+    }
+  }
+
+  private resetCoreLoaderTestState(status: string, detail: string, running: boolean): void {
+    const nextItems: ManagedCoreItem[] = []
+    for (let index = 0; index < this.coreItems.length; index += 1) {
+      const item = this.coreItems[index]
+      nextItems.push(this.buildCoreItemWithLoaderState(item, status, detail, running))
+    }
+    this.coreItems = nextItems
+  }
+
+  private updateCoreLoaderTestState(coreId: string, status: string, detail: string, running: boolean): void {
+    const nextItems: ManagedCoreItem[] = []
+    for (let index = 0; index < this.coreItems.length; index += 1) {
+      const item = this.coreItems[index]
+      nextItems.push(item.id === coreId ?
+        this.buildCoreItemWithLoaderState(item, status, detail, running) :
+        item)
+    }
+    this.coreItems = nextItems
+  }
+
+  private buildCoreItemWithLoaderState(
+    item: ManagedCoreItem,
+    status: string,
+    detail: string,
+    running: boolean
+  ): ManagedCoreItem {
+    return {
+      id: item.id,
+      name: item.name,
+      platform: item.platform,
+      soFile: item.soFile,
+      status: item.status,
+      installed: item.installed,
+      firmwareStatus: item.firmwareStatus,
+      firmwareDetail: item.firmwareDetail,
+      firmwareFoundText: item.firmwareFoundText,
+      firmwareMissingText: item.firmwareMissingText,
+      hasFirmwareDependencies: item.hasFirmwareDependencies,
+      loaderTestStatus: status,
+      loaderTestDetail: detail,
+      loaderTestRunning: running,
+      contentTestDetail: item.contentTestDetail
+    }
+  }
+
+  private isCoreLoaderReportSuccess(report: string): boolean {
+    return report.startsWith('Success')
+  }
+
+  private summarizeCoreLoaderReport(report: string): string {
+    const lines = report.split('\n')
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index].trim()
+      if (line.length > 0) {
+        return line
+      }
+    }
+    return '核心可用性检查未返回报告'
+  }
+
+  private buildLoaderSummaryText(
+    doneCount: number,
+    passedCount: number,
+    failedCount: number,
+    missingCount: number
+  ): string {
+    return `核心可用性检查 ${doneCount}/${this.coreItems.length}：通过 ${passedCount}，失败 ${failedCount}，缺核心 ${missingCount}`
   }
 
   private isUnavailableCoreItem(item: ManagedCoreItem): boolean {
@@ -315,6 +500,16 @@ struct CoreManagerPage {
       return EmuColors.onSurfaceVariant
     }
     return item.installed ? EmuColors.primary : EmuColors.error
+  }
+
+  private getCoreLoaderStatusColor(item: ManagedCoreItem): ResourceColor {
+    if (item.loaderTestStatus === '通过') {
+      return EmuColors.primary
+    }
+    if (item.loaderTestStatus === '失败' || item.loaderTestStatus === '缺核心') {
+      return EmuColors.error
+    }
+    return EmuColors.onSurfaceVariant
   }
 
   private onBottomNavClick(key: string): void {
@@ -403,6 +598,11 @@ struct CoreManagerPage {
           .fontColor(EmuColors.onSurfaceVariant)
           .maxLines(2)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
+        Text(`可用性检查：${item.loaderTestStatus}`)
+          .fontSize(9)
+          .fontColor(this.getCoreLoaderStatusColor(item))
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
       .layoutWeight(1)
       .alignItems(HorizontalAlign.Start)
@@ -451,6 +651,9 @@ struct CoreManagerPage {
         .fontSize(EmuTypography.xs)
                 .fontColor(EmuColors.onSurfaceVariant)
       Text('需要额外固件的核心，会在列表和详情里显示本地文件情况。')
+        .fontSize(EmuTypography.xs)
+        .fontColor(EmuColors.onSurfaceVariant)
+      Text('全核心可用性检查只验证核心 .so 加载与 libretro 符号，不代表每个核心已经有可运行 ROM。')
         .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
       Text(this.remoteUpdateText)
@@ -517,7 +720,51 @@ struct CoreManagerPage {
     if (!currentItem.hasFirmwareDependencies) {
       return `${currentItem.name} 当前不需要额外固件`
     }
-    return `${currentItem.name}：${currentItem.firmwareDetail}。已找到：${currentItem.firmwareFoundText}；仍缺少：${currentItem.firmwareMissingText}`
+    return `${currentItem.name}：${currentItem.firmwareDetail}。` +
+      `已找到：${currentItem.firmwareFoundText}；仍缺少：${currentItem.firmwareMissingText}`
+  }
+
+  @Builder
+  private CoreLoaderTestPanel() {
+    Column({ space: 12 }) {
+      Row() {
+        Text('全核心可用性检查')
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .letterSpacing(2)
+          .layoutWeight(1)
+        Text(this.loaderSummaryText)
+          .fontSize(EmuTypography.xs)
+          .fontColor(this.loaderTestRunning ? EmuColors.primary : EmuColors.onSurfaceVariant)
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .textAlign(TextAlign.End)
+          .layoutWeight(2)
+      }
+      .width('100%')
+      .justifyContent(FlexAlign.SpaceBetween)
+
+      Text('逐个验证包内核心 .so 能否加载，并检查 libretro 入口符号。缺 ROM 或缺 BIOS 不会在这里判为失败。')
+        .fontSize(EmuTypography.xs)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .width('100%')
+
+      Button(this.loaderTestRunning ? '检查中...' : '检查全部核心')
+        .height(42)
+        .width('100%')
+        .type(ButtonType.Normal)
+        .fontSize(EmuTypography.sm)
+        .fontColor(Color.White)
+        .backgroundColor(this.loaderTestRunning ? EmuColors.outlineVariant : EmuColors.primary)
+        .enabled(!this.loaderTestRunning && this.coreItems.length > 0)
+        .onClick(() => {
+          void this.runAllCoreLoaderTests()
+        })
+    }
+    .width('100%')
+    .padding(14)
+    .backgroundColor(EmuColors.surfaceContainerLowest)
+    .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
   }
 
   @Builder
@@ -537,6 +784,8 @@ struct CoreManagerPage {
         .justifyContent(FlexAlign.SpaceBetween)
 
         this.MemoryFootprint()
+
+        this.CoreLoaderTestPanel()
 
         Text('核心目录')
           .fontSize(EmuTypography.xs)
@@ -616,6 +865,8 @@ struct CoreManagerPage {
 
           this.MemoryFootprint()
 
+          this.CoreLoaderTestPanel()
+
           if (this.selectedCoreId.length > 0) {
             this.CoreDetailPanel()
           } else {
@@ -682,6 +933,8 @@ struct CoreManagerPage {
           .justifyContent(FlexAlign.SpaceBetween)
 
           this.MemoryFootprint()
+
+          this.CoreLoaderTestPanel()
 
           if (this.selectedCoreId.length > 0) {
             this.CoreDetailPanel()
@@ -763,6 +1016,13 @@ struct CoreManagerPage {
       Text(item.platform)
         .fontSize(9)
         .fontColor(EmuColors.onSurfaceVariant)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .width('100%')
+
+      Text(`可用性检查：${item.loaderTestStatus}`)
+        .fontSize(9)
+        .fontColor(this.getCoreLoaderStatusColor(item))
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
         .width('100%')
@@ -848,6 +1108,27 @@ struct CoreManagerPage {
               EmuColors.primary)
         }
         .width('100%')
+
+        Row({ space: 8 }) {
+          Text('可用性检查：')
+            .fontSize(EmuTypography.sm)
+            .fontColor(EmuColors.onSurfaceVariant)
+          Text(currentItem.loaderTestStatus)
+            .fontSize(EmuTypography.sm)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(this.getCoreLoaderStatusColor(currentItem))
+        }
+        .width('100%')
+
+        Text(currentItem.loaderTestDetail)
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
+
+        Text(currentItem.contentTestDetail)
+          .fontSize(EmuTypography.xs)
+          .fontColor(EmuColors.onSurfaceVariant)
+          .width('100%')
 
         if (currentItem.hasFirmwareDependencies) {
           Column({ space: 8 }) {

@@ -12,94 +12,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import { EmuTypography } from '../common/EmuUiTokens'
 import LogHelper from '../common/LogHelper'
 
 @Entry
 @ComponentV2
 struct Index {
+  aboutToAppear(): void {
+    this.getUIContext().getRouter().replaceUrl({
+      url: 'pages/LibraryPage'
+    }).catch((err: Error) => {
+      LogHelper.error('Index', 'Route', `Router error: ${err.message}`)
+    })
+  }
+
   build() {
     Column() {
-        Row() {
-          Button('产品入口：导入主页')
-            .fontSize(EmuTypography.xl)
-            .width('80%')
-            .height(60)
-            .backgroundColor('#00FF41')
-            .fontColor('#000000')
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({
-                url: 'pages/ImportEntryPage'
-              }).catch((err: Error) => {
-                LogHelper.error('Index', 'Route', `Router error: ${err.message}`);
-              });
-            })
-        }
-        .margin({ top: 10 })
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-
-        // Onboarding 引导页按钮
-        Row() {
-          Button('Onboarding 引导页')
-            .fontSize(EmuTypography.xl)
-            .width('80%')
-            .height(60)
-            .backgroundColor('#00A651')
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({
-                url: 'pages/OnboardingPage'
-              }).catch((err: Error) => {
-                LogHelper.error('Index', 'Route', `Router error: ${err.message}`);
-              });
-            })
-        }
-        .margin({ top: 10 })
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-
-        // 导入任务反馈页（1:1 还原）
-        Row() {
-          Button('导入任务反馈页（1:1）')
-            .fontSize(EmuTypography.xl)
-            .width('80%')
-            .height(60)
-            .backgroundColor('#111111')
-            .fontColor('#00FF41')
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({
-                url: 'pages/ImportTaskOverlayPage'
-              }).catch((err: Error) => {
-                LogHelper.error('Index', 'Route', `Router error: ${err.message}`);
-              });
-            })
-        }
-        .margin({ top: 10 })
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
-
-        Row() {
-          Button('产品入口：游戏库')
-            .fontSize(EmuTypography.xl)
-            .width('80%')
-            .height(60)
-            .backgroundColor('#0A0A0A')
-            .fontColor('#00FF41')
-            .onClick(() => {
-              this.getUIContext().getRouter().pushUrl({
-                url: 'pages/LibraryPage'
-              }).catch((err: Error) => {
-                LogHelper.error('Index', 'Route', `Router error: ${err.message}`);
-              });
-            })
-        }
-        .margin({ top: 10 })
-        .width('100%')
-        .justifyContent(FlexAlign.Center)
+      Text('碳影')
+        .fontSize(28)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#00FF41')
+      Text('正在打开游戏库')
+        .fontSize(14)
+        .fontColor('#FF9EA7AD')
+        .margin({ top: 12 })
     }
     .width('100%')
     .height('100%')
     .justifyContent(FlexAlign.Center)
     .alignItems(HorizontalAlign.Center)
+    .backgroundColor('#FF000000')
   }
 }
