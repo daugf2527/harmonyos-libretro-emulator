@@ -69,6 +69,7 @@ struct LinearSettingRow {
   @Param value: number = 0
   @Param min: number = 0
   @Param max: number = 100
+  @Param disabled: boolean = false
   @Event onChange?: (value: number) => void
 
   build() {
@@ -91,7 +92,7 @@ struct LinearSettingRow {
         Text(`${this.value}%`)
           .fontSize(EmuTypography.sm)
           .fontWeight(FontWeight.Bold)
-          .fontColor(EmuColors.primary)
+          .fontColor(this.disabled ? EmuColors.onSurfaceVariant : EmuColors.primary)
       }
       .width('100%')
       .justifyContent(FlexAlign.SpaceBetween)
@@ -106,10 +107,14 @@ struct LinearSettingRow {
           .width('100%')
           .blockColor(EmuColors.onSurface)
           .trackColor('#66757575')
-          .selectedColor(EmuColors.primary)
+          .selectedColor(this.disabled ? '#66757575' : EmuColors.primary)
           .showSteps(false)
           .showTips(false)
+          .enabled(!this.disabled)
           .onChange((next: number) => {
+            if (this.disabled) {
+              return
+            }
             const clamped = Math.max(this.min, Math.min(this.max, Math.round(next)))
             this.onChange?.(clamped)
           })
@@ -122,6 +127,7 @@ struct LinearSettingRow {
       .width('100%')
     }
     .width('100%')
+    .opacity(this.disabled ? 0.55 : 1)
   }
 }
 
@@ -327,6 +333,33 @@ struct SettingsPage {
 
   private get runtimeProfilesUnavailableHintText(): string {
     return '当前运行配置还没有完整读到，请先重试后再修改'
+  }
+
+  @Builder
+  private RuntimeProfileRetryPanel(message: string) {
+    Row({ space: 12 }) {
+      Text(message)
+        .fontSize(EmuTypography.xs)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .layoutWeight(1)
+        .maxLines(2)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+
+      EmuButton({
+        label: '重试',
+        kind: EmuButtonKind.SECONDARY,
+        buttonSize: EmuButtonSize.SM,
+        shape: EmuButtonShape.PILL,
+        accent: 'primary',
+        onTap: () => {
+          void this.refreshSettings()
+        }
+      })
+    }
+    .width('100%')
+    .padding(12)
+    .backgroundColor(EmuColors.surfaceContainerHigh)
+    .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
   }
 
   private cloneRenderProfile(): RuntimeRenderSettingsProfile {
@@ -950,33 +983,31 @@ struct SettingsPage {
 
   @Builder
   private SegmentedAspectControl() {
-    Row({ space: 0 }) {
-      ForEach(this.aspectOptions, (item: SettingOptionItem) => {
-        Row() {
-          Text(item.label)
-            .fontSize(13)
-            .fontWeight(FontWeight.Bold)
-            .fontColor(this.isAspectActive(item.key) ? EmuColors.onSurface :
-              (this.runtimeProfilesReady ? '#B3ABABAB' : '#66757575'))
-        }
-        .layoutWeight(1)
-        .height(40)
-        .justifyContent(FlexAlign.Center)
-        .backgroundColor(this.isAspectActive(item.key) ? EmuColors.surfaceContainerHighest :
-          (this.runtimeProfilesReady ? EmuColors.surfaceContainerHigh : '#14141414'))
-        .onClick(() => {
-          if (!this.runtimeProfilesReady) {
-            this.runtimeApplyStatusText = '当前视觉配置没有读到，请先重试'
-            return
+    if (!this.runtimeProfilesReady) {
+      this.RuntimeProfileRetryPanel('比例配置没有读到，当前不展示可选比例，避免误判为真实设置。')
+    } else {
+      Row({ space: 0 }) {
+        ForEach(this.aspectOptions, (item: SettingOptionItem) => {
+          Row() {
+            Text(item.label)
+              .fontSize(13)
+              .fontWeight(FontWeight.Bold)
+              .fontColor(this.isAspectActive(item.key) ? EmuColors.onSurface : '#B3ABABAB')
           }
-          const nextProfile = this.cloneVisualProfile()
-          nextProfile.aspectMode = item.key === '4:3' || item.key === '16:9' ? item.key : 'native'
-          this.scheduleVisualProfilePersist(nextProfile, '画面比例')
-        })
-      }, (item: SettingOptionItem) => item.key)
+          .layoutWeight(1)
+          .height(40)
+          .justifyContent(FlexAlign.Center)
+          .backgroundColor(this.isAspectActive(item.key) ? EmuColors.surfaceContainerHighest : EmuColors.surfaceContainerHigh)
+          .onClick(() => {
+            const nextProfile = this.cloneVisualProfile()
+            nextProfile.aspectMode = item.key === '4:3' || item.key === '16:9' ? item.key : 'native'
+            this.scheduleVisualProfilePersist(nextProfile, '画面比例')
+          })
+        }, (item: SettingOptionItem) => item.key)
+      }
+      .width('100%')
+      .clip(true)
     }
-    .width('100%')
-    .clip(true)
   }
 
   @Builder
@@ -986,14 +1017,19 @@ struct SettingsPage {
     value: number,
     onChange: (value: number) => void
   ) {
-    LinearSettingRow({
-      label: label,
-      code: code,
-      value: this.runtimeProfilesReady ? value : 0,
-      min: 0,
-      max: 100,
-      onChange: onChange
-    })
+    if (!this.runtimeProfilesReady) {
+      this.RuntimeProfileRetryPanel(`${label} 没有读到，当前不展示滑块控件。`)
+    } else {
+      LinearSettingRow({
+        label: label,
+        code: code,
+        value: value,
+        min: 0,
+        max: 100,
+        disabled: false,
+        onChange: onChange
+      })
+    }
   }
 
   @Builder
@@ -1388,16 +1424,6 @@ struct SettingsPage {
           .fontWeight(FontWeight.Bold)
           .fontColor('#9AABABAB')
         this.SegmentedAspectControl()
-        if (!this.runtimeProfilesReady) {
-          Text('当前比例配置待确认，按钮样式暂不代表真实设置。')
-            .fontSize(EmuTypography.xs)
-            .fontColor(EmuColors.onSurfaceVariant)
-            .width('100%')
-          Text(this.runtimeProfilesUnavailableHintText)
-            .fontSize(EmuTypography.xs)
-            .fontColor(EmuColors.error)
-            .width('100%')
-        }
       }
       .width('100%')
 
@@ -1407,12 +1433,6 @@ struct SettingsPage {
         this.visualProfile.scanlineIntensity,
         this.onScanlineIntensityChange
       )
-      if (!this.runtimeProfilesReady) {
-        Text('扫描线强度这次没有读出来，当前滑块只是占位显示。')
-          .fontSize(EmuTypography.xs)
-          .fontColor(EmuColors.onSurfaceVariant)
-          .width('100%')
-      }
     }
     .width('100%')
   }
@@ -1431,16 +1451,6 @@ struct SettingsPage {
     Column({ space: 18 }) {
       this.SectionTitle('音频音量', '')
       this.LinearSettingBlock('主音量', '', this.audioProfile.volumePercent, this.onMasterVolumeChange)
-      if (!this.runtimeProfilesReady) {
-        Text('主音量这次没有读出来，当前滑块只是占位显示。')
-          .fontSize(EmuTypography.xs)
-          .fontColor(EmuColors.onSurfaceVariant)
-          .width('100%')
-        Text(this.runtimeProfilesUnavailableHintText)
-          .fontSize(EmuTypography.xs)
-          .fontColor(EmuColors.error)
-          .width('100%')
-      }
     }
     .width('100%')
   }

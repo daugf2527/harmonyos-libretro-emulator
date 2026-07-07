@@ -8,6 +8,8 @@ This directory contains the project's long-lived documentation.
 - Contributor workflow: [../CONTRIBUTING.md](../CONTRIBUTING.md)
 - Repository constraints: [../AGENTS.md](../AGENTS.md)
 - Release boundary: [release/appgallery-readiness-checklist.md](release/appgallery-readiness-checklist.md)
+- Release candidate runbook: [release/release-candidate-runbook.md](release/release-candidate-runbook.md)
+- AppGallery submission matrix: [release/appgallery-submission-matrix.md](release/appgallery-submission-matrix.md)
 
 ## Main Sections
 

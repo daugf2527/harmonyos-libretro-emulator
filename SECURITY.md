@@ -24,7 +24,9 @@ Report with:
 
 Current private contact path:
 
-- See [SUPPORT.md](SUPPORT.md) and replace the placeholder release contact with the project owner contact before public release.
+- Use the AppGallery Connect developer contact entry for the published app.
+- For repository triage, follow [SUPPORT.md](SUPPORT.md). Do not post exploit
+  details, signing material, secrets, or user data in public issues.
 
 ## What Counts as High Risk Here
 

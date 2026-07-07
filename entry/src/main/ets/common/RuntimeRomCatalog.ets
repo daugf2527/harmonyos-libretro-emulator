@@ -66,8 +66,8 @@ export function buildRuntimeRomConfigs(sources: RuntimeRomSourceItem[]): Runtime
   NO_GAME_CORE_IDS.forEach((coreId: string) => {
     roms.push({
       id: `nogame:${coreId}`,
-      name: '无需 ROM',
-      file: '',
+      name: getNoGameRuntimeName(coreId),
+      file: buildNoGameRuntimeRomFile(coreId),
       coreId: coreId
     })
   })
@@ -75,7 +75,28 @@ export function buildRuntimeRomConfigs(sources: RuntimeRomSourceItem[]): Runtime
   return roms
 }
 
+export function buildNoGameRuntimeRomFile(coreId: string): string {
+  return `nogame:${coreId}`
+}
+
+export function isNoGameRuntimeRomFile(romFile: string): boolean {
+  return romFile.startsWith('nogame:')
+}
+
+function getNoGameRuntimeName(coreId: string): string {
+  if (coreId === '2048') {
+    return '2048 内置测试'
+  }
+  if (coreId === 'mrboom') {
+    return 'Mr.Boom 内置测试'
+  }
+  return '无需 ROM'
+}
+
 export function getFileNameFromPath(path: string): string {
+  if (isNoGameRuntimeRomFile(path)) {
+    return getNoGameRuntimeName(path.substring('nogame:'.length))
+  }
   const normalizedPath = path.split('?')[0]
   const slashIndex = normalizedPath.lastIndexOf('/')
   if (slashIndex >= 0 && slashIndex < normalizedPath.length - 1) {

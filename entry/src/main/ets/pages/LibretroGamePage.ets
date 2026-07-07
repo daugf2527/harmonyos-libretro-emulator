@@ -523,7 +523,7 @@ struct LibretroGamePage {
       if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
         return;
       }
-      this.hideVirtualController = profile.hideVirtualController;
+      this.hideVirtualController = false;
       this.hideUndeclaredKeys = profile.hideUndeclaredKeys;
     } catch (_err) {
       if (!this.isCurrentRuntimeLaunchSettingsTask(token)) {
@@ -2803,17 +2803,15 @@ struct LibretroGamePage {
       return;
     }
     const aspectRatio = width / height;
-    // 折叠态判断阈值（基于华为折叠屏设备实测数据）
-    // 单折态（竖屏）：宽高比 < 1.2
-    // 双折态（半展开）：1.2 <= 宽高比 < 2.0
-    // 三折态（全展开）：宽高比 >= 2.0
+    // 普通手机/模拟器窄屏必须走 single，single 才挂载 RuntimeVirtualControllerLayer。
+    // 仅在足够宽的画布上进入折叠屏专用 dual/triple 布局。
     let newMode: 'single' | 'dual' | 'triple' = 'single';
-    if (aspectRatio >= 2.0) {
-      newMode = 'triple';
-    } else if (aspectRatio >= 1.2) {
-      newMode = 'dual';
-    } else {
+    if (width < 720 || aspectRatio < 1.15) {
       newMode = 'single';
+    } else if (width >= 1100 && aspectRatio >= 1.85) {
+      newMode = 'triple';
+    } else if (width >= 720 && aspectRatio >= 1.15) {
+      newMode = 'dual';
     }
     if (newMode !== this.currentFoldMode) {
       LogHelper.info('LibretroGame', 'Foldable', `折叠态切换: ${this.currentFoldMode} -> ${newMode} (${width}x${height}, AR=${aspectRatio.toFixed(2)})`);
@@ -2867,15 +2865,40 @@ struct LibretroGamePage {
         })
       }
 
-      // 左上角系统菜单按钮：运行中显示暂停图标，点击触发 PauseOverlay；未运行时按 MENU 返回上一页。
-      Button(this.gameRunning ? '⏸' : 'MENU')
-        .width(46)
-        .height(40)
-        .fontSize(this.gameRunning ? 20 : EmuTypography.xl)
-        .fontColor(EmuColors.primary)
-        .backgroundColor('#CC000000')
-        .border({ width: 0.5, color: '#33484848', style: BorderStyle.Solid })
-        .borderRadius(4)
+      // 左上角运行控制：用自绘暂停标识，避免系统字体把暂停符号渲染成异常色块。
+      Button({ type: ButtonType.Normal }) {
+        if (this.gameRunning) {
+          Row({ space: 5 }) {
+            Column()
+              .width(4)
+              .height(16)
+              .borderRadius(2)
+              .backgroundColor(EmuColors.primary)
+
+            Column()
+              .width(4)
+              .height(16)
+              .borderRadius(2)
+              .backgroundColor(EmuColors.primary)
+          }
+          .justifyContent(FlexAlign.Center)
+          .alignItems(VerticalAlign.Center)
+        } else {
+          Text('MENU')
+            .fontSize(10)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(EmuColors.primary)
+            .fontFamily('monospace')
+            .letterSpacing(1)
+        }
+      }
+        .width(this.gameRunning ? 42 : 56)
+        .height(42)
+        .padding(0)
+        .backgroundColor('#D9000000')
+        .border({ width: 1, color: '#7700FF41', style: BorderStyle.Solid })
+        .borderRadius(this.gameRunning ? 21 : 8)
+        .shadow({ radius: 12, color: '#AA000000', offsetX: 0, offsetY: 4 })
         .margin({ left: 18, top: 48 })
         .enabled(!this.switching && (!this.gameRunning || !this.gamePaused))
         .onClick(() => {
@@ -3246,6 +3269,7 @@ struct LibretroGamePage {
         }
         .width('100%')
         .layoutWeight(35)
+        .constraintSize({ minHeight: 220 })
       }
     }
     .width('100%')

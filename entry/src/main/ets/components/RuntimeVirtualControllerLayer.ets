@@ -13,6 +13,8 @@ struct RuntimeKeyButton {
   @Param isPrimary: boolean = false
   @Param buttonWidth: number = 48
   @Param buttonHeight: number = 48
+  @Param layoutWidth: number = 440
+  @Param layoutHeight: number = 340
   @Param cornerRadius: number = 3
   @Param labelFontSize: number = 16
   @Param disabled: boolean = false
@@ -65,8 +67,8 @@ struct RuntimeKeyButton {
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
     }
-    .width(this.buttonWidth)
-    .height(this.buttonHeight)
+    .width(this.getPercentWidth(this.buttonWidth))
+    .height(this.getPercentHeight(this.buttonHeight))
     .padding({ left: 6, right: 6, top: 2, bottom: 2 })
     .backgroundColor(this.resolveBackground())
     .border({
@@ -89,7 +91,7 @@ struct RuntimeKeyButton {
       duration: EmuMotion.instantMs,
       curve: Curve.EaseOut
     })
-    .position({ x: this.button.x, y: this.button.y })
+    .position({ x: this.getPercentX(this.button.x), y: this.getPercentY(this.button.y) })
     .enabled(!this.disabled)
     .onTouch((event: TouchEvent) => {
       if (this.disabled) {
@@ -104,49 +106,31 @@ struct RuntimeKeyButton {
       }
     })
   }
-}
 
-@ComponentV2
-struct RuntimeFloatingFunctionButton {
-  @Require @Param button: InputLayoutButton
-  @Local private pressed: boolean = false
-  @Event onPressChange?: (pressed: boolean) => void
+  private getPercentX(value: number): string {
+    return `${this.clampPercent((value / this.layoutWidth) * 100)}%`
+  }
 
-  build() {
-    Button({ type: ButtonType.Normal }) {
-      Text(this.button.label)
-        .fontSize(11)
-        .fontWeight(FontWeight.Bold)
-        .fontFamily('monospace')
-        .fontColor(this.pressed ? EmuStateColors.onPrimary : EmuColors.primary)
-        .letterSpacing(0.4)
+  private getPercentY(value: number): string {
+    return `${this.clampPercent((value / this.layoutHeight) * 100)}%`
+  }
+
+  private getPercentWidth(value: number): string {
+    return `${this.clampPercent((value / this.layoutWidth) * 100)}%`
+  }
+
+  private getPercentHeight(value: number): string {
+    return `${this.clampPercent((value / this.layoutHeight) * 100)}%`
+  }
+
+  private clampPercent(value: number): number {
+    if (value < 0) {
+      return 0
     }
-    .height(26)
-    .padding({ left: 14, right: 14, top: 2, bottom: 2 })
-    .backgroundColor(this.pressed ? EmuColors.primary : '#1F00FF41')
-    .border({
-      width: this.pressed ? 1.8 : 1.2,
-      color: EmuColors.primary,
-      style: BorderStyle.Solid
-    })
-    .borderRadius(13)
-    .shadow({
-      radius: this.pressed ? 14 : 8,
-      color: this.pressed ? '#AA00FF41' : '#4400FF41',
-      offsetX: 0,
-      offsetY: this.pressed ? 1 : 2
-    })
-    .scale(this.pressed ? { x: 0.95, y: 0.95 } : { x: 1, y: 1 })
-    .animation({ duration: EmuMotion.instantMs, curve: Curve.EaseOut })
-    .onTouch((event: TouchEvent) => {
-      if (event.type === TouchType.Down) {
-        this.pressed = true
-        this.onPressChange?.(true)
-      } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-        this.pressed = false
-        this.onPressChange?.(false)
-      }
-    })
+    if (value > 100) {
+      return 100
+    }
+    return value
   }
 }
 
@@ -187,9 +171,6 @@ export struct RuntimeVirtualControllerLayer {
         .hitTestBehavior(HitTestMode.None)
 
       this.buildLayoutCanvas()
-
-      // 浮层:select/start 贴 controller 顶部居中,不挤压主按键 layout 空间
-      this.buildFloatingFunctionButtons()
     }
     .width('100%')
     .height('100%')
@@ -199,12 +180,14 @@ export struct RuntimeVirtualControllerLayer {
   private buildLayoutCanvas() {
     Stack({ alignContent: Alignment.TopStart }) {
       ForEach(this.buttons, (button: InputLayoutButton) => {
-        if (!this.isFloatingFunctionButton(button.id) && this.isButtonDeclaredByCore(button)) {
+        if (this.isButtonDeclaredByCore(button)) {
           RuntimeKeyButton({
             button: button,
             isPrimary: this.isPrimaryRuntimeButton(button.id),
             buttonWidth: this.getButtonWidth(button),
             buttonHeight: this.getButtonHeight(button),
+            layoutWidth: this.layoutWidth,
+            layoutHeight: this.layoutHeight,
             cornerRadius: this.getBorderRadius(button),
             labelFontSize: this.getLabelFontSize(button),
             forcedPressed: this.getDpadForcedPressed(button.id),
@@ -224,8 +207,8 @@ export struct RuntimeVirtualControllerLayer {
       // disabled=true 让 4 个原 dir button 不再响应 touch,避免双触发。
       this.buildDpadOverlay()
     }
-    .width(this.layoutWidth)
-    .height(this.layoutHeight)
+    .width('100%')
+    .height('100%')
     .margin({ bottom: 16, left: 16, right: 16, top: 8 })
     .hitTestBehavior(HitTestMode.Transparent)
   }
@@ -234,9 +217,12 @@ export struct RuntimeVirtualControllerLayer {
   private buildDpadOverlay() {
     if (this.hasDpadButtons()) {
       Stack()
-        .width(this.getDpadBboxWidth())
-        .height(this.getDpadBboxHeight())
-        .position({ x: this.getDpadBboxX(), y: this.getDpadBboxY() })
+        .width(this.getRuntimePercentWidth(this.getDpadBboxWidth()))
+        .height(this.getRuntimePercentHeight(this.getDpadBboxHeight()))
+        .position({
+          x: this.getRuntimePercentX(this.getDpadBboxX()),
+          y: this.getRuntimePercentY(this.getDpadBboxY())
+        })
         .backgroundColor(this.dpadActive ? '#1A00FF41' : Color.Transparent)
         .borderRadius(this.getDpadBboxWidth() / 2)
         .animation({ duration: EmuMotion.instantMs, curve: Curve.EaseOut })
@@ -246,39 +232,12 @@ export struct RuntimeVirtualControllerLayer {
     }
   }
 
-  @Builder
-  private buildFloatingFunctionButtons() {
-    Stack({ alignContent: Alignment.Top }) {
-      Row({ space: 14 }) {
-        ForEach(this.buttons, (button: InputLayoutButton) => {
-          if (this.isFloatingFunctionButton(button.id) && this.isButtonDeclaredByCore(button)) {
-            RuntimeFloatingFunctionButton({
-              button: button,
-              onPressChange: (pressed: boolean) => {
-                const keyId = this.getRetroButtonId(button)
-                if (keyId < 0 || !this.onButtonChange) {
-                  return
-                }
-                this.onButtonChange(keyId, pressed)
-              }
-            })
-          }
-        }, (button: InputLayoutButton) => button.id)
-      }
-      .padding({ top: 6 })
-    }
-    .width('100%')
-    .height('100%')
-    .hitTestBehavior(HitTestMode.Transparent)
-  }
-
-  private isFloatingFunctionButton(id: string): boolean {
-    return id === 'select' || id === 'start'
-  }
-
   // mask=0 表示 core 未声明,默认显示;mask>0 时只显示 bit 命中的键。
   // retroButtonId<0 (无映射) 在 mask 模式下也隐藏。
   private isButtonDeclaredByCore(button: InputLayoutButton): boolean {
+    if (!this.hasDeclaredButtonMatch()) {
+      return true
+    }
     if (this.inputDescriptorMask === 0) {
       return true
     }
@@ -287,6 +246,20 @@ export struct RuntimeVirtualControllerLayer {
       return false
     }
     return (this.inputDescriptorMask & (1 << keyId)) !== 0
+  }
+
+  private hasDeclaredButtonMatch(): boolean {
+    if (this.inputDescriptorMask === 0) {
+      return true
+    }
+    let matched = false
+    this.buttons.forEach((button: InputLayoutButton) => {
+      const keyId = this.getRetroButtonId(button)
+      if (keyId >= 0 && keyId <= 15 && (this.inputDescriptorMask & (1 << keyId)) !== 0) {
+        matched = true
+      }
+    })
+    return matched
   }
 
   private isDpadDirection(id: string): boolean {
@@ -518,5 +491,31 @@ export struct RuntimeVirtualControllerLayer {
       return 11
     }
     return -1
+  }
+
+  private getRuntimePercentX(value: number): string {
+    return `${this.clampRuntimePercent((value / this.layoutWidth) * 100)}%`
+  }
+
+  private getRuntimePercentY(value: number): string {
+    return `${this.clampRuntimePercent((value / this.layoutHeight) * 100)}%`
+  }
+
+  private getRuntimePercentWidth(value: number): string {
+    return `${this.clampRuntimePercent((value / this.layoutWidth) * 100)}%`
+  }
+
+  private getRuntimePercentHeight(value: number): string {
+    return `${this.clampRuntimePercent((value / this.layoutHeight) * 100)}%`
+  }
+
+  private clampRuntimePercent(value: number): number {
+    if (value < 0) {
+      return 0
+    }
+    if (value > 100) {
+      return 100
+    }
+    return value
   }
 }

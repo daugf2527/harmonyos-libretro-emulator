@@ -4,7 +4,6 @@ import { createEmuBottomNavItems, EmuBottomNav } from '../components/EmuBottomNa
 import { EmuCoverArt } from '../components/EmuCoverArt'
 import { LibraryContextMenuOverlay } from '../components/LibraryContextMenuOverlay'
 import { LibraryGameSections } from '../components/LibraryGameSections'
-import { LibrarySearchPanel } from '../components/LibrarySearchPanel'
 import { EmuColors } from '../common/EmuUiTokens'
 import { setPendingLibraryLaunchRequest } from '../common/LibraryLaunchBridge'
 import { getEmuBottomNavTargetRoute } from '../common/RouteHelper'
@@ -885,38 +884,6 @@ struct LibraryPage {
   }
 
   @Builder
-  private SearchAndTelemetry() {
-    LibrarySearchPanel({
-      keyword: this.searchKeyword,
-      searchBusy: this.searchBusy,
-      showSearchResults: this.showSearchResults,
-      searchResults: this.cachedSearchResults,
-      telemetryCells: getLibraryTelemetryCells(this.allGames),
-      showTelemetry: hasLibraryTelemetryData(this.allGames),
-      platforms: this.cachedDisplayPlatformFilters,
-      selectedPlatform: this.selectedPlatform,
-      onKeywordChange: (value: string) => {
-        this.onSearchKeywordChange(value)
-      },
-      onSearchResultLaunch: (item: LibraryRecord) => {
-        this.searchKeyword = item.title
-        this.recomputeFilteredCaches()
-        this.hideSearchResults()
-        // 双折态/三折态：显示详情
-        if (this.currentFoldMode === 'dual' || this.currentFoldMode === 'triple') {
-          this.selectedGameForDetail = item
-        } else {
-          this.openGame(item)
-        }
-      },
-      onPlatformChange: (value: string) => {
-        this.selectedPlatform = value
-        this.recomputeFilteredCaches()
-      }
-    })
-  }
-
-  @Builder
   private GameSections() {
     LibraryGameSections({
       recentGames: this.cachedFilteredRecentGames,
@@ -924,6 +891,14 @@ struct LibraryPage {
       highlightedRecentGameId: this.highlightedRecentGameId,
       bottomLoaderActive: this.bottomLoaderActive,
       loadFailed: this.libraryLoadFailed,
+      searchKeyword: this.searchKeyword,
+      searchBusy: this.searchBusy,
+      showSearchResults: this.showSearchResults,
+      searchResults: this.cachedSearchResults,
+      telemetryCells: getLibraryTelemetryCells(this.allGames),
+      showTelemetry: hasLibraryTelemetryData(this.allGames),
+      platforms: this.cachedDisplayPlatformFilters,
+      selectedPlatform: this.selectedPlatform,
       onCardTouch: (event: TouchEvent, item: LibraryRecord) => {
         this.onCardTouch(event, item)
       },
@@ -942,6 +917,24 @@ struct LibraryPage {
       },
       onImportTap: () => {
         this.openImportEntryPage()
+      },
+      onSearchKeywordChange: (value: string) => {
+        this.onSearchKeywordChange(value)
+      },
+      onSearchResultLaunch: (item: LibraryRecord) => {
+        this.searchKeyword = item.title
+        this.recomputeFilteredCaches()
+        this.hideSearchResults()
+        // 双折态/三折态：显示详情
+        if (this.currentFoldMode === 'dual' || this.currentFoldMode === 'triple') {
+          this.selectedGameForDetail = item
+        } else {
+          this.openGame(item)
+        }
+      },
+      onPlatformChange: (value: string) => {
+        this.selectedPlatform = value
+        this.recomputeFilteredCaches()
       }
     })
       .layoutWeight(1)
@@ -956,8 +949,6 @@ struct LibraryPage {
       if (this.hasLastPlayed) {
         this.LastPlayedChip()
       }
-
-      this.SearchAndTelemetry()
 
       this.GameSections()
     }

@@ -23,7 +23,10 @@ struct AboutHelpPage {
   private readonly helpItems: HelpItem[] = [
     { id: 'import', title: '怎么导入游戏？', detail: '本地文件选择 / 导入目录 / 库页刷新', value: '从导入入口选择你有合法使用权的本地 ROM 或镜像文件。文件写入完成后，回到库页会在刷新扫描后出现。' },
     { id: 'input', title: '按键没反应怎么办？', detail: '输入设备检查 / 端口分配 / 布局调整', value: '先到输入设备页查看当前能否列出本机输入设备，再检查端口分配和触控布局。当前页展示的是本机枚举结果与触控入口，不代表联网或实时输入诊断。' },
-    { id: 'legal', title: '合规声明', detail: '内容来源 / 使用责任 / 本地导入', value: '应用不提供 ROM 下载，也不提供在线内容。请自行确认 ROM、BIOS 和核心文件的来源、授权与使用权。' },
+    { id: 'legal', title: '合规声明', detail: '内容来源 / 使用责任 / 本地导入', value: '应用不提供 ROM、BIOS 或商业内容下载。请自行确认 ROM、BIOS、核心文件、封面和元数据的来源、授权与使用权。' },
+    { id: 'privacy', title: '隐私政策', detail: '本地处理 / 不上传 / 震动权限', value: '当前版本默认不要求账号，不提供广告、云同步或遥测。导入内容、存档、配置、输入布局与日志保存在本机，仅用于本地运行体验。' },
+    { id: 'eula', title: '用户协议', detail: '许可范围 / 用户责任 / 第三方组件', value: '你只能使用自己拥有合法使用权的内容；不得通过本应用分发未授权内容。第三方核心和组件受各自许可证约束。' },
+    { id: 'support', title: '反馈与支持', detail: 'Carbon Shade Project / GitHub Issues', value: '公开问题可通过 GitHub Issues 反馈：github.com/daugf2527/harmonyos-libretro-emulator/issues。安全问题不要公开贴漏洞细节。' },
     { id: 'version', title: '当前提供什么？', detail: '本地模拟体验 / 当前功能范围', value: '当前版本提供本地导入、游戏库、输入、存档和画面设置等能力，不包含在线服务。' }
   ]
 
@@ -150,7 +153,7 @@ struct AboutHelpPage {
             .fontSize(EmuTypography.sm)
             .lineHeight(18)
             .fontColor(EmuColors.onSurfaceVariant)
-            .maxLines(3)
+            .maxLines(4)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .margin({ top: 6 })
         }

@@ -1,9 +1,11 @@
 import { EmuColors, EmuTypography } from '../common/EmuUiTokens'
 import { LibraryRecord } from '../common/LibraryRepository'
+import { EmuTelemetryCellItem } from './EmuTelemetryPanel'
 import { EmuButton, EmuButtonKind, EmuButtonShape, EmuButtonSize } from './EmuButton'
 import { EmuIcon } from './EmuIcon'
 import { GameCard } from './GameCard'
 import { LibrarySection } from './LibrarySection'
+import { LibrarySearchPanel } from './LibrarySearchPanel'
 
 class LibraryDataSource implements IDataSource {
   private games: LibraryRecord[] = [];
@@ -82,12 +84,23 @@ export struct LibraryGameSections {
   @Param bottomLoaderActive: boolean = false
   @Param spinnerAngle: number = 0
   @Param loadFailed: boolean = false
+  @Param searchKeyword: string = ''
+  @Param searchBusy: boolean = false
+  @Param showSearchResults: boolean = false
+  @Param selectedPlatform: string = 'ALL'
+  @Param searchResults: LibraryRecord[] = []
+  @Param telemetryCells: EmuTelemetryCellItem[] = []
+  @Param showTelemetry: boolean = true
+  @Param platforms: string[] = ['ALL']
   @Event onCardTouch?: (event: TouchEvent, item: LibraryRecord) => void
   @Event onHideSearchResults?: () => void
   @Event onListScrolled?: (yOffset: number) => void
   @Event onListReachEnd?: () => void
   @Event onListTouched?: (event: TouchEvent, yOffset: number) => void
   @Event onImportTap?: () => void
+  @Event onSearchKeywordChange?: (value: string) => void
+  @Event onSearchResultLaunch?: (item: LibraryRecord) => void
+  @Event onPlatformChange?: (value: string) => void
   private allGamesDataSource: LibraryDataSource = new LibraryDataSource();
   private listScroller: ListScroller = new ListScroller();
 
@@ -97,6 +110,28 @@ export struct LibraryGameSections {
 
   build() {
     List({ space: 18, scroller: this.listScroller }) {
+      ListItem() {
+        LibrarySearchPanel({
+          keyword: this.searchKeyword,
+          searchBusy: this.searchBusy,
+          showSearchResults: this.showSearchResults,
+          searchResults: this.searchResults,
+          telemetryCells: this.telemetryCells,
+          showTelemetry: this.showTelemetry,
+          platforms: this.platforms,
+          selectedPlatform: this.selectedPlatform,
+          onKeywordChange: (value: string) => {
+            this.onSearchKeywordChange?.(value)
+          },
+          onSearchResultLaunch: (item: LibraryRecord) => {
+            this.onSearchResultLaunch?.(item)
+          },
+          onPlatformChange: (value: string) => {
+            this.onPlatformChange?.(value)
+          }
+        })
+      }
+
       ListItem() {
         Column({ space: 18 }) {
           LibrarySection({
@@ -167,6 +202,7 @@ export struct LibraryGameSections {
             platform: item.platform,
             coverColor: item.coverColor,
             coverKey: item.coverKey,
+            coverUrl: item.coverUrl ?? '',
             variant: 'recent',
             isHighlighted: item.id === this.getHighlightedRecentGameId()
           })

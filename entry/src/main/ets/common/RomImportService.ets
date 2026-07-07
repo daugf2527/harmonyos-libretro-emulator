@@ -155,6 +155,9 @@ export function getPreferredCoreIdForFile(fileName: string): string {
   if (isLikelyDocumentationFile(fileName)) {
     return ''
   }
+  if (fileName.toLowerCase() === 'data.zip') {
+    return 'xrick'
+  }
   const ext = getRomFileExtension(fileName)
   if (GAMBATTE_EXTENSIONS.includes(ext)) {
     return 'gambatte'

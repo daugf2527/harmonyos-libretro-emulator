@@ -2,13 +2,24 @@ import { deviceInfo } from '@kit.BasicServicesKit'
 import { resourceManager } from '@kit.LocalizationKit'
 import { fileIo as fs } from '@kit.CoreFileKit'
 import LogHelper from './LogHelper'
+import { isNoGameRuntimeRomFile } from './RuntimeRomCatalog'
 
 export interface RuntimeRomPathResolution {
   romPath: string
   useResMgr: boolean
 }
 
-export async function resolveRuntimeCorePath(bundleCodeDir: string, soFile: string): Promise<string> {
+export interface RuntimeCorePathResolution {
+  corePath: string
+  found: boolean
+  abi: string
+  expectedAbis: string[]
+}
+
+export async function resolveRuntimeCorePathInfo(
+  bundleCodeDir: string,
+  soFile: string
+): Promise<RuntimeCorePathResolution> {
   const abiCandidates = buildCoreAbiCandidates()
   for (let index = 0; index < abiCandidates.length; index += 1) {
     const abi = abiCandidates[index]
@@ -18,17 +29,33 @@ export async function resolveRuntimeCorePath(bundleCodeDir: string, soFile: stri
         'LibretroGame',
         'Engine',
         `Core path resolved: abi=${abi}, path=${LogHelper.describePathForLog(path)}`
-      )
-      return path
+          )
+      return {
+        corePath: path,
+        found: true,
+        abi,
+        expectedAbis: abiCandidates
+      }
     }
   }
-  const fallback = `${bundleCodeDir}/libs/${abiCandidates[0]}/${soFile}`
+  const fallbackAbi = abiCandidates.length > 0 ? abiCandidates[0] : 'arm64'
+  const fallback = `${bundleCodeDir}/libs/${fallbackAbi}/${soFile}`
   LogHelper.warn(
     'LibretroGame',
     'Engine',
-    `Core path fallback (not found): ${LogHelper.describePathForLog(fallback)}, abiList=${String(deviceInfo.abiList ?? '')}`
+    `Core path missing for current ABI: ${LogHelper.describePathForLog(fallback)}, abiList=${String(deviceInfo.abiList ?? '')}`
   )
-  return fallback
+  return {
+    corePath: fallback,
+    found: false,
+    abi: fallbackAbi,
+    expectedAbis: abiCandidates
+  }
+}
+
+export async function resolveRuntimeCorePath(bundleCodeDir: string, soFile: string): Promise<string> {
+  const resolved = await resolveRuntimeCorePathInfo(bundleCodeDir, soFile)
+  return resolved.corePath
 }
 
 export function resolveRuntimeRomPathForSwitch(
@@ -37,6 +64,9 @@ export function resolveRuntimeRomPathForSwitch(
   filesDir: string
 ): RuntimeRomPathResolution {
   if (!romPath) {
+    return { romPath: '', useResMgr: false }
+  }
+  if (isNoGameRuntimeRomFile(romPath)) {
     return { romPath: '', useResMgr: false }
   }
   if (!isRawfilePath(romPath)) {
@@ -59,15 +89,18 @@ function buildCoreAbiCandidates(): string[] {
     candidates.push(abi)
   }
 
-  if (rawAbiList.indexOf('x86_64') >= 0) {
+  const hasX64 = rawAbiList.indexOf('x86_64') >= 0
+  const hasArm64 = rawAbiList.indexOf('arm64') >= 0 || rawAbiList.indexOf('aarch64') >= 0
+  if (hasX64 && !hasArm64) {
     addCandidate('x86_64')
+  } else if (hasArm64) {
+    addCandidate('arm64')
+    addCandidate('arm64-v8a')
   } else {
     addCandidate('arm64')
     addCandidate('arm64-v8a')
+    addCandidate('x86_64')
   }
-  addCandidate('arm64')
-  addCandidate('arm64-v8a')
-  addCandidate('x86_64')
   return candidates
 }
 

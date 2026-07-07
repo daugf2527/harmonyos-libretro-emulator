@@ -8,6 +8,9 @@ export interface LibraryRomFileSource {
   fileName: string
   romFile: string
   sourceType: LibrarySourceType
+  preferredCoreId?: string
+  title?: string
+  platform?: string
 }
 
 export function buildLibraryRecordsFromSources(sources: LibraryRomFileSource[]): LibraryRecord[] {
@@ -21,15 +24,17 @@ export function buildLibraryRecordsFromSources(sources: LibraryRomFileSource[]):
   const now = Date.now()
   const games: LibraryRecord[] = []
   uniqueSources.forEach((source: LibraryRomFileSource, index: number) => {
-    const preferredCoreId = getPreferredCoreIdForFile(source.fileName.toLowerCase())
+    const preferredCoreId = source.preferredCoreId && source.preferredCoreId.length > 0 ?
+      source.preferredCoreId :
+      getPreferredCoreIdForFile(source.fileName.toLowerCase())
     if (preferredCoreId.length === 0) {
       return
     }
     games.push({
       id: source.romFile,
-      title: buildGameTitle(source.fileName),
+      title: source.title && source.title.length > 0 ? source.title : buildGameTitle(source.fileName),
       subtitle: source.fileName,
-      platform: resolvePlatform(source.fileName),
+      platform: source.platform && source.platform.length > 0 ? source.platform : resolvePlatform(source.fileName),
       coverColor: buildCoverColor(index),
       coverKey: resolveCoverKey(source.fileName),
       romFile: source.romFile,
@@ -146,6 +151,16 @@ function buildCoverColor(index: number): string {
 }
 
 function resolveCoverKey(fileName: string): string {
+  const normalizedName = fileName.toLowerCase()
+  if (normalizedName.indexOf('zelda') >= 0 || normalizedName.indexOf('link') >= 0) {
+    return 'zelda_triforce'
+  }
+  if (normalizedName.indexOf('chrono') >= 0) {
+    return 'chrono_trigger'
+  }
+  if (normalizedName.indexOf('metroid') >= 0) {
+    return 'metroid_fusion'
+  }
   const platform = resolvePlatform(fileName)
   if (platform === 'GB' || platform === 'GBA') {
     return 'moss_signal'

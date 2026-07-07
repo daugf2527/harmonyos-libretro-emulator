@@ -45,6 +45,8 @@ struct InputLayoutPage {
   @Local private layoutStatusText: string = '本地触控布局已读到'
   @Local private layoutUpdatedAtText: string = '未保存'
   @Local private currentFoldMode: 'single' | 'dual' | 'triple' = 'single'
+  @Local private viewportWidth: number = 0
+  @Local private viewportHeight: number = 0
   private savedToastTimer: number = -1
   private pageActive: boolean = false
   private pageTaskToken: number = 0
@@ -131,6 +133,17 @@ struct InputLayoutPage {
   }
 
   private detectFoldMode(): void {
+    if (this.viewportWidth > 0 && this.viewportHeight > 0) {
+      const aspectRatio = this.viewportWidth / this.viewportHeight
+      if (this.viewportWidth < 720 || aspectRatio < 1.15) {
+        this.currentFoldMode = 'single'
+        return
+      }
+      if (this.viewportWidth < 1100 || aspectRatio < 1.85) {
+        this.currentFoldMode = 'dual'
+        return
+      }
+    }
     try {
       const foldStatus = display.getFoldStatus()
       const displayClass = display.getFoldDisplayMode()
@@ -143,7 +156,7 @@ struct InputLayoutPage {
       } else if (displayClass === display.FoldDisplayMode.FOLD_DISPLAY_MODE_FULL) {
         this.currentFoldMode = 'triple'
       } else {
-        this.currentFoldMode = 'dual'
+        this.currentFoldMode = 'single'
       }
     } catch (err) {
       // 非折叠屏设备，默认单折态
@@ -585,89 +598,33 @@ struct InputLayoutPage {
     }
   }
 
-  // 双折态布局 (M态) - 左侧按钮列表 30%，右侧预览+编辑 70%
+  // 双折态布局 (M态) - 只保留触控布局编辑区，避免输入设备栏挤占画布
   @Builder
   private DualFoldLayout() {
-    Row() {
-      // 左侧：按钮列表 (30%)
-      Column({ space: 14 }) {
-        Text('输入设备')
-          .fontSize(EmuTypography.lg)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(EmuColors.onSurface)
-          .padding({ left: 16, top: 16 })
-
-        Scroll() {
-          Column({ space: 14 }) {
-            ForEach(this.controllerCards, (item: ControllerCardItem) => {
-              this.ControllerCard(item)
-            }, (item: ControllerCardItem) => item.id)
-
-            this.NetplaySection()
-          }
-          .padding({ left: 16, right: 16, bottom: 16 })
+    Column() {
+      if (this.isEditorMode()) {
+        this.EditorContent()
+      } else {
+        Column({ space: 16 }) {
+          EmuIcon({ name: 'settings_input_component', iconSize: 64, tone: 'muted' })
+          Text('点击右上角图标进入编辑模式')
+            .fontSize(EmuTypography.lg)
+            .fontColor(EmuColors.onSurfaceVariant)
         }
+        .width('100%')
         .layoutWeight(1)
-        .scrollBar(BarState.Auto)
+        .justifyContent(FlexAlign.Center)
       }
-      .width('30%')
-      .height('100%')
-      .backgroundColor(EmuColors.surfaceContainerLowest)
-      .border({ width: { right: 1 }, color: EmuMetrics.panelBorderColor, style: BorderStyle.Solid })
-
-      // 右侧：预览区 + 编辑面板 (70%)
-      Column() {
-        if (this.isEditorMode()) {
-          this.EditorContent()
-        } else {
-          // 非编辑模式显示提示
-          Column({ space: 16 }) {
-            EmuIcon({ name: 'settings_input_component', iconSize: 64, tone: 'muted' })
-            Text('点击右上角图标进入编辑模式')
-              .fontSize(EmuTypography.lg)
-              .fontColor(EmuColors.onSurfaceVariant)
-          }
-          .width('100%')
-          .layoutWeight(1)
-          .justifyContent(FlexAlign.Center)
-        }
-      }
-      .width('70%')
-      .height('100%')
     }
     .width('100%')
     .layoutWeight(1)
   }
 
-  // 三折态布局 (G态) - 左侧按钮列表 20%，中间预览区 50%，右侧属性编辑 30%
+  // 三折态布局 (G态) - 编辑画布 70%，右侧属性编辑 30%
   @Builder
   private TripleFoldLayout() {
     Row() {
-      // 左侧：按钮列表 (20%)
-      Column({ space: 14 }) {
-        Text('输入设备')
-          .fontSize(EmuTypography.md)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(EmuColors.onSurface)
-          .padding({ left: 12, top: 12 })
-
-        Scroll() {
-          Column({ space: 12 }) {
-            ForEach(this.controllerCards, (item: ControllerCardItem) => {
-              this.CompactControllerCard(item)
-            }, (item: ControllerCardItem) => item.id)
-          }
-          .padding({ left: 12, right: 12, bottom: 12 })
-        }
-        .layoutWeight(1)
-        .scrollBar(BarState.Auto)
-      }
-      .width('20%')
-      .height('100%')
-      .backgroundColor(EmuColors.surfaceContainerLowest)
-      .border({ width: { right: 1 }, color: EmuMetrics.panelBorderColor, style: BorderStyle.Solid })
-
-      // 中间：预览区 (50%)
+      // 左侧：预览区 (70%)
       Column() {
         if (this.isEditorMode()) {
           Stack() {
@@ -720,7 +677,7 @@ struct InputLayoutPage {
           .justifyContent(FlexAlign.Center)
         }
       }
-      .width('50%')
+      .width('70%')
       .height('100%')
       .border({ width: { right: 1 }, color: EmuMetrics.panelBorderColor, style: BorderStyle.Solid })
 
@@ -843,18 +800,21 @@ struct InputLayoutPage {
 
   @Builder
   private PropertyRow(label: string, value: string) {
-    Row() {
+    Row({ space: 10 }) {
       Text(label)
         .fontSize(EmuTypography.xs)
         .fontColor(EmuColors.onSurfaceVariant)
+        .width(58)
       Text(value)
         .fontSize(EmuTypography.xs)
         .fontColor(value === '运行页触控层' || value === this.getSelectedButtonDisplayLabel() ? EmuColors.primary : EmuColors.onSurface)
         .maxLines(1)
         .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
+        .textAlign(TextAlign.End)
     }
     .width('100%')
-    .justifyContent(FlexAlign.SpaceBetween)
+    .alignItems(VerticalAlign.Center)
   }
 
   // 编辑操作按钮 (用于三折态右侧栏)
@@ -933,17 +893,22 @@ struct InputLayoutPage {
 
   @Builder
   private EditorMetric(label: string, value: string) {
-    Row() {
+    Row({ space: 10 }) {
       Text(label)
         .fontSize(EmuTypography.xs)
-                .fontColor(EmuColors.onSurfaceVariant)
+        .fontColor(EmuColors.onSurfaceVariant)
+        .width(58)
       Text(value)
         .fontSize(EmuTypography.xs)
         .fontColor(value === '运行页触控层' || value === this.getSelectedButtonDisplayLabel() ? EmuColors.primary : EmuColors.onSurface)
+        .maxLines(1)
+        .textOverflow({ overflow: TextOverflow.Ellipsis })
+        .layoutWeight(1)
+        .textAlign(TextAlign.End)
     }
     .width('100%')
     .constraintSize({ maxWidth: 220 })
-    .justifyContent(FlexAlign.SpaceBetween)
+    .alignItems(VerticalAlign.Center)
   }
 
   private getSelectedButtonDisplayLabel(): string {
@@ -982,7 +947,7 @@ struct InputLayoutPage {
         .backgroundColor(EmuColors.primary)
       Text(label)
         .fontSize(EmuTypography.xs)
-                .fontColor(EmuColors.primary)
+        .fontColor(EmuColors.primary)
         .backgroundColor(EmuColors.background)
         .padding({ left: 4, right: 4 })
         .maxLines(1)
@@ -1013,15 +978,15 @@ struct InputLayoutPage {
     Stack() {
       Row() {
         Text(button.label)
-          .fontSize(button.shape === 'shoulder' ? 12 : 16)
+          .fontSize(button.shape === 'shoulder' ? 10 : 13)
           .fontWeight(FontWeight.Bold)
           .fontColor(EmuColors.onSurface)
           .maxLines(1)
           .textOverflow({ overflow: TextOverflow.Ellipsis })
       }
-      .width(button.shape === 'shoulder' ? 86 : button.size)
-      .height(button.shape === 'shoulder' ? 34 : button.size)
-      .borderRadius(button.shape === 'circle' ? button.size / 2 : 3)
+      .width(this.getEditorPercentWidth(button.shape === 'shoulder' ? 86 : button.size))
+      .height(this.getEditorPercentHeight(button.shape === 'shoulder' ? 34 : button.size))
+      .borderRadius(button.shape === 'circle' ? 999 : 3)
       .backgroundColor(isSelected ? '#6600FF41' : '#33FFFFFF')
       .border({
         width: 1,
@@ -1037,9 +1002,9 @@ struct InputLayoutPage {
       .align(Alignment.TopStart)
       .margin({ top: -24 })
     }
-    .width(this.getButtonVisualWidth(button))
-    .height(this.getButtonVisualHeight(button))
-    .padding(10)
+    .width(this.getEditorPercentWidth(this.getButtonVisualWidth(button)))
+    .height(this.getEditorPercentHeight(this.getButtonVisualHeight(button)))
+    .padding(6)
     .align(Alignment.TopStart)
     .position({ x: this.getEditorPercentX(button.x), y: this.getEditorPercentY(button.y) })
     .onClick(() => {
@@ -1063,65 +1028,66 @@ struct InputLayoutPage {
   @Builder
   private EditorBottomBar() {
     Column() {
-      Row({ space: 14 }) {
+      Column({ space: 12 }) {
         Row({ space: 8 }) {
           Row()
             .width(8)
             .height(8)
             .borderRadius(4)
             .backgroundColor(EmuColors.primary)
-          Text('布局编辑\n进行中')
+          Text('布局编辑进行中')
             .fontSize(EmuTypography.xs)
-                        .fontColor(EmuColors.onSurfaceVariant)
+            .fontColor(EmuColors.onSurfaceVariant)
             .letterSpacing(1.8)
-            .lineHeight(18)
         }
-        .layoutWeight(1)
-        .padding({ right: 12 })
-        .border({ width: { right: 0.5 }, color: '#55484848', style: BorderStyle.Solid })
+        .width('100%')
         .alignItems(VerticalAlign.Center)
 
-        Button('重置')
-          .height(48)
-          .padding({ left: 14, right: 14 })
-          .fontSize(15)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(EmuColors.onSurfaceVariant)
-          .backgroundColor(Color.Transparent)
-          .border({ width: 0.5, color: Color.Transparent, style: BorderStyle.Solid })
-          .onClick(() => {
-            void this.resetCurrentLayout()
-          })
+        Row({ space: 12 }) {
+          Button('重置')
+            .height(42)
+            .layoutWeight(1)
+            .fontSize(EmuTypography.sm)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(EmuColors.onSurfaceVariant)
+            .backgroundColor(Color.Transparent)
+            .border({ width: 0.5, color: '#55484848', style: BorderStyle.Solid })
+            .onClick(() => {
+              void this.resetCurrentLayout()
+            })
 
-        Button('保存')
-          .height(48)
-          .padding({ left: 22, right: 22 })
-          .fontSize(EmuTypography.xl)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#004C0C')
-          .backgroundColor(EmuColors.primary)
-          .borderRadius(0)
-          .onClick(() => {
-            void this.saveCurrentLayout()
-          })
+          Button('保存')
+            .height(42)
+            .layoutWeight(1)
+            .fontSize(EmuTypography.md)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#004C0C')
+            .backgroundColor(EmuColors.primary)
+            .borderRadius(0)
+            .onClick(() => {
+              void this.saveCurrentLayout()
+            })
 
-        Row({ space: 14 }) {
-          EmuIcon({ name: 'grid_view', tone: 'muted', iconSize: 22 })
-          EmuIcon({ name: 'tune', tone: 'muted', iconSize: 22 })
+          Row({ space: 12 }) {
+            EmuIcon({ name: 'grid_view', tone: 'muted', iconSize: 20 })
+            EmuIcon({ name: 'tune', tone: 'muted', iconSize: 20 })
+          }
+          .height(42)
+          .padding({ left: 10, right: 10 })
+          .border({ width: 0.5, color: '#55484848', style: BorderStyle.Solid })
+          .justifyContent(FlexAlign.Center)
+          .alignItems(VerticalAlign.Center)
         }
-        .padding({ left: 12 })
-        .border({ width: { left: 0.5 }, color: '#55484848', style: BorderStyle.Solid })
-        .justifyContent(FlexAlign.Center)
-        .alignItems(VerticalAlign.Center)
+        .width('100%')
       }
       .width('100%')
       .constraintSize({ maxWidth: 520 })
-      .padding({ left: 18, right: 18, top: 16, bottom: 16 })
+      .padding({ left: 16, right: 16, top: 14, bottom: 14 })
       .backgroundColor('#F0191919')
       .backdropBlur(24)
       .borderRadius(6)
       .border({ width: 0.5, color: '#55484848', style: BorderStyle.Solid })
-      .alignItems(VerticalAlign.Center)
+      .alignItems(HorizontalAlign.Center)
     }
     .width('100%')
     .padding({ left: 0, right: 0, bottom: 24 })
@@ -1132,50 +1098,50 @@ struct InputLayoutPage {
   @Builder
   private EditorHeaderBar() {
     Row() {
-      Row({ space: 12 }) {
+      Row({ space: 10 }) {
         EmuIcon({
           name: 'memory',
-          iconSize: 28
+          iconSize: 24
         })
 
-        Text('碳影 / Carbon Shade')
-                    .fontSize(EmuTypography.xl)
-          .fontColor(EmuColors.primary)
-          .letterSpacing(4)
+        Column({ space: 3 }) {
+          Text('触控布局编辑')
+            .fontSize(EmuTypography.md)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(EmuColors.onSurface)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+          Text('Carbon Shade / 布局校准')
+            .fontSize(9)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(EmuColors.primary)
+            .letterSpacing(1.2)
+            .maxLines(1)
+            .textOverflow({ overflow: TextOverflow.Ellipsis })
+        }
+        .alignItems(HorizontalAlign.Start)
       }
+      .layoutWeight(1)
       .alignItems(VerticalAlign.Center)
-
-      Column({ space: 3 }) {
-        Text('正在编辑布局...')
-          .fontSize(EmuTypography.md)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(EmuColors.onSurface)
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-        Text('布局校准')
-          .fontSize(9)
-                    .fontWeight(FontWeight.Bold)
-          .fontColor(EmuColors.primary)
-          .letterSpacing(2.4)
-      }
-      .alignItems(HorizontalAlign.Center)
 
       Row({ space: 4 }) {
         EmuIcon({
           name: 'settings_input_component',
           tone: 'muted',
-          iconSize: 30
+          iconSize: 28
         })
       }
-      .width(56)
+      .width(44)
+      .height(44)
       .justifyContent(FlexAlign.End)
+      .alignItems(VerticalAlign.Center)
       .onClick(() => {
         this.toggleEditorMode()
       })
     }
     .width('100%')
-    .height(72)
-    .padding({ left: 24, right: 24 })
+    .height(64)
+    .padding({ left: 16, right: 16 })
     .justifyContent(FlexAlign.SpaceBetween)
     .alignItems(VerticalAlign.Center)
     .backdropBlur(24)
@@ -1285,6 +1251,14 @@ struct InputLayoutPage {
     return `${this.clampPercent((value / this.editorLayoutHeight) * 100)}%`
   }
 
+  private getEditorPercentWidth(value: number): string {
+    return `${this.clampPercent((value / this.editorLayoutWidth) * 100)}%`
+  }
+
+  private getEditorPercentHeight(value: number): string {
+    return `${this.clampPercent((value / this.editorLayoutHeight) * 100)}%`
+  }
+
   private clampPercent(value: number): number {
     if (value < 0) {
       return 0
@@ -1340,5 +1314,18 @@ struct InputLayoutPage {
     .height('100%')
     .backgroundColor(EmuColors.background)
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    .onAreaChange((oldValue: Area, newValue: Area) => {
+      const width = Number(newValue.width)
+      const height = Number(newValue.height)
+      if (width <= 0 || height <= 0) {
+        return
+      }
+      if (width === this.viewportWidth && height === this.viewportHeight) {
+        return
+      }
+      this.viewportWidth = width
+      this.viewportHeight = height
+      this.detectFoldMode()
+    })
   }
 }

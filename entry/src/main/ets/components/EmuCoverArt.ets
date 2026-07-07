@@ -66,6 +66,21 @@ export struct EmuCoverArt {
           .width('100%')
           .height('100%')
           .objectFit(ImageFit.Cover)
+      } else if (this.coverKey === 'metroid_fusion' || this.coverKey === 'aria_of_sorrow') {
+        Image($r('app.media.cover_metroid_fusion'))
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+      } else if (this.coverKey === 'zelda_triforce') {
+        Image($r('app.media.cover_zelda_triforce'))
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
+      } else if (this.coverKey === 'chrono_trigger') {
+        Image($r('app.media.cover_chrono_trigger'))
+          .width('100%')
+          .height('100%')
+          .objectFit(ImageFit.Cover)
       } else {
         Column() {
           Row()

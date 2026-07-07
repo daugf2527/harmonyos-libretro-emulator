@@ -23,13 +23,14 @@ Use these paths:
 - Device compatibility depends on core, content, render mode, and system behavior.
 - Store-release readiness is still gated by release documents and asset policy.
 
-## Release Contact Placeholder
+## Release Contact
 
-Public release contact is not finalized in-repo yet.
+Public release support uses the repository issue tracker until a dedicated
+AppGallery Connect support contact is configured by the account owner.
 
-Before public distribution, fill in:
-
-- project/team name
-- support email
-- privacy contact
-- security contact
+- Project/team name: Carbon Shade Project
+- Support: https://github.com/daugf2527/harmonyos-libretro-emulator/issues
+- Privacy: use the AppGallery Connect developer contact entry, or open a
+  GitHub Issue without sensitive personal data.
+- Security: follow [SECURITY.md](SECURITY.md), do not post vulnerability
+  details publicly.
